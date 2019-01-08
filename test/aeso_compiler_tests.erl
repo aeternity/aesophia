@@ -21,8 +21,8 @@ simple_compile_test_() ->
      fun (_) -> ok end,                         %Cleanup
      [ {"Testing the " ++ ContractName ++ " contract",
         fun() ->
-            #{byte_code := ByteCode, 
-              contract_source := _, 
+            #{byte_code := ByteCode,
+              contract_source := _,
               type_info := _} = compile(ContractName),
             ?assertMatch(Code when is_binary(Code), ByteCode)
         end} || ContractName <- compilable_contracts() ] ++
@@ -133,4 +133,12 @@ failing_contracts() ->
          "Repeated name x in pattern\n"
          "  x :: x (at line 26, column 7)\n",
          "No record type with fields y, z (at line 14, column 22)\n"]}
+    , {"init_type_error",
+        ["Cannot unify string\n"
+         "         and map(int, int)\n"
+         "when checking that 'init' returns a value of type 'state' at line 7, column 3\n"]}
+    , {"missing_state_type",
+        ["Cannot unify string\n"
+         "         and ()\n"
+         "when checking that 'init' returns a value of type 'state' at line 5, column 3\n"]}
     ].

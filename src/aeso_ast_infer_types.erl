@@ -352,11 +352,24 @@ check_fundecl(_, {fun_decl, _Attrib, {id, _, Name}, Type}) ->
 infer_nonrec(Env, LetFun) ->
     create_constraints(),
     NewLetFun = infer_letfun(Env, LetFun),
+    check_special_funs(Env, NewLetFun),
     solve_constraints(),
     destroy_and_report_unsolved_constraints(),
     Result = {TypeSig, _} = instantiate(NewLetFun),
     print_typesig(TypeSig),
     Result.
+
+%% Currenty only the init function.
+check_special_funs(_Env, {{"init", Type}, _}) ->
+    {type_sig, Ann, _Named, _Args, Res} = Type,
+    State =
+        %% We might have implicit (no) state.
+        case lookup_type({id, [], "state"}) of
+            false -> {tuple_t, [{origin, system}], []};
+            _     -> {id, [{origin, system}], "state"}
+        end,
+    unify(Res, State, {checking_init_type, Ann});
+check_special_funs(_, _) -> ok.
 
 typesig_to_fun_t({type_sig, Ann, Named, Args, Res}) -> {fun_t, Ann, Named, Args, Res}.
 
@@ -1502,6 +1515,9 @@ pp_when({check_expr, Expr, Inferred0, Expected0}) ->
                   "against the expected type\n~s\n",
                   [pp_loc(Expr), pp_typed("  ", Expr, Inferred),
                    pp_type("  ", Expected)]);
+pp_when({checking_init_type, Ann}) ->
+    io_lib:format("when checking that 'init' returns a value of type 'state' at ~s\n",
+                  [pp_loc(Ann)]);
 pp_when(unknown) -> "".
 
 -spec pp_why_record(why_record()) -> iolist().
