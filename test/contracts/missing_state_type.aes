@@ -1,0 +1,6 @@
+
+contract MissingStateType =
+
+  // Check that we get a type error also for implicit state
+  function init() = "should be ()"
+
