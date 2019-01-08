@@ -94,8 +94,8 @@ contract_to_icode([{letrec,_,Defs}|Rest], Icode) ->
     %% just to parse a list of (mutually recursive) definitions.
     contract_to_icode(Defs++Rest, Icode);
 contract_to_icode([], Icode) -> Icode;
-contract_to_icode(Code, Icode) ->
-    lager:debug("Unhandled code ~p~n",[Code]),
+contract_to_icode(_Code, Icode) ->
+    %% TODO debug output for debug("Unhandled code ~p~n",[Code]),
     Icode.
 
 ast_id({id, _, Id}) -> Id.
@@ -444,9 +444,8 @@ ast_body({typed,_,{record,Attrs,Fields},{record_t,DefFields}}, Icode) ->
     NamedField = fun({field, _, [{proj, _, {id, _, Name}}], E}) -> {Name, E} end,
     NamedFields = lists:map(NamedField, Fields),
     #tuple{cpts =
-               [case proplists:get_value(Name,NamedFields) of
+               [case proplists:get_value(Name, NamedFields) of
                     undefined ->
-                        lager:debug("~p not in ~p\n", [Name, NamedFields]),
                         Line = aeso_syntax:get_ann(line, Attrs),
                         #missing_field{format = "Missing field in record: ~s (on line ~p)\n",
                         args = [Name,Line]};
