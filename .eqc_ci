@@ -1,0 +1,3 @@
+{build, "rebar3 as eqc compile"}.
+{test_root, "."}.
+{test_path, "_build/eqc/lib/aesophia/quickcheck"}.   %% here are the properties

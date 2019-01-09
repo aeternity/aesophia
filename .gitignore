@@ -16,3 +16,5 @@ _build
 .idea
 *.iml
 rebar3.crashdump
+current_counterexample.eqc
+.qcci
