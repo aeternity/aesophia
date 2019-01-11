@@ -34,7 +34,7 @@
         , builtin_str_equal/0
         , builtin_int_to_str/0
         , builtin_int_to_str_/0
-        , builtin_int_digits/1
+        , builtin_baseX_digits/1
         , builtin_baseX_tab/1
         , builtin_baseX_int/1
         , builtin_string_reverse/0
@@ -71,11 +71,11 @@ builtin_deps1({map_upd_default, Type})    -> [{map_lookup_default, Type}, map_pu
 builtin_deps1(map_from_list)              -> [map_put];
 builtin_deps1(str_equal)                  -> [str_equal_p];
 builtin_deps1(string_concat)              -> [string_concat_inner1, string_concat_inner2];
-builtin_deps1(int_to_str)                 -> [int_to_str_, {int_digits, 10}];
+builtin_deps1(int_to_str)                 -> [int_to_str_, {baseX_digits, 10}];
 builtin_deps1(addr_to_str)                -> [{baseX_int, 58}];
 builtin_deps1({baseX_int, X})             -> [{baseX_int_pad, X}];
 builtin_deps1({baseX_int_pad, X})         -> [{baseX_int_encode, X}];
-builtin_deps1({baseX_int_encode, X})      -> [{baseX_int_encode_, X}, {baseX_tab, X}, {int_digits, X}];
+builtin_deps1({baseX_int_encode, X})      -> [{baseX_int_encode_, X}, {baseX_tab, X}, {baseX_digits, X}];
 builtin_deps1(string_reverse)             -> [string_reverse_];
 builtin_deps1(_)                          -> [].
 
@@ -180,16 +180,16 @@ builtin_function(BF) ->
         str_equal_p                -> bfun(BF, builtin_str_equal_p, []);
         str_equal                  -> bfun(BF, builtin_str_equal, []);
         int_to_str                 -> bfun(BF, builtin_int_to_str, []);
+        addr_to_str                -> bfun(BF, builtin_addr_to_str, []);
         int_to_str_                -> bfun(BF, builtin_int_to_str_, []);
-        {int_digits, X}            -> bfun(BF, builtin_int_digits, [X]);
-        {baseX_tab, X}             -> bfun(BF, builtin_baseX_tab, [X]);
         {baseX_int, X}             -> bfun(BF, builtin_baseX_int, [X]);
-        string_reverse             -> bfun(BF, builtin_string_reverse, []);
-        string_reverse_            -> bfun(BF, builtin_string_reverse_, []);
+        {baseX_digits, X}          -> bfun(BF, builtin_baseX_digits, [X]);
+        {baseX_tab, X}             -> bfun(BF, builtin_baseX_tab, [X]);
         {baseX_int_pad, X}         -> bfun(BF, builtin_baseX_int_pad, [X]);
         {baseX_int_encode, X}      -> bfun(BF, builtin_baseX_int_encode, [X]);
         {baseX_int_encode_, X}     -> bfun(BF, builtin_baseX_int_encode_, [X]);
-        addr_to_str                -> bfun(BF, builtin_addr_to_str, [])
+        string_reverse             -> bfun(BF, builtin_string_reverse, []);
+        string_reverse_            -> bfun(BF, builtin_string_reverse_, [])
     end.
 
 %% Event primitive (dependent on Event type)
@@ -434,7 +434,7 @@ builtin_int_to_str() ->
                  {tuple, [?I(1), ?V(i0), ?I(0)]}},
      [{{tuple, [v(off), v(i), v(x)]},
      ?LET(ret, {inline_asm, [?A(?MSIZE)]},
-     ?LET(n,   ?call({int_digits, 10}, [?V(i), ?I(0)]),
+     ?LET(n,   ?call({baseX_digits, 10}, [?V(i), ?I(0)]),
      ?LET(fac, ?EXP(10, n),
          {seq, [?ADD(n, off), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]}, %% Store str len
                 ?call(int_to_str_,
@@ -484,7 +484,7 @@ builtin_baseX_int_pad(X = 58) ->
 
 builtin_baseX_int_encode(X) ->
     {[{"src", word}, {"ix", word}, {"dst", word}],
-     ?LET(n, ?call({int_digits, X}, [?V(src), ?I(0)]),
+     ?LET(n, ?call({baseX_digits, X}, [?V(src), ?I(0)]),
         {seq, [?ADD(n, ?ADD(ix, 1)), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
                ?call({baseX_int_encode_, X}, [?V(src), ?V(dst), ?EXP(X, n), ?V(ix)])]}),
      word}.
@@ -503,10 +503,10 @@ builtin_baseX_int_encode_(X) ->
      },
      word}.
 
-builtin_int_digits(X) ->
+builtin_baseX_digits(X) ->
     {[{"x0", word}, {"dgts", word}],
      ?LET(x1, ?DIV(x0, X),
-        {ifte, ?EQ(x1, 0), ?V(dgts), ?call({int_digits, X}, [?V(x1), ?ADD(dgts, 1)])}),
+        {ifte, ?EQ(x1, 0), ?V(dgts), ?call({baseX_digits, X}, [?V(x1), ?ADD(dgts, 1)])}),
      word}.
 
 builtin_string_reverse() ->
