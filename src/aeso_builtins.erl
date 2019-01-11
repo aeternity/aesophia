@@ -13,37 +13,6 @@
         , check_event_type/1
         , used_builtins/1 ]).
 
--export([ builtin_event/1
-        , builtin_abort/0
-        , builtin_map_lookup/1
-        , builtin_map_put/0
-        , builtin_map_delete/0
-        , builtin_map_size/0
-        , builtin_map_get/1
-        , builtin_map_lookup_default/1
-        , builtin_map_member/0
-        , builtin_map_upd/1
-        , builtin_map_upd_default/1
-        , builtin_map_from_list/0
-        , builtin_list_concat/0
-        , builtin_string_length/0
-        , builtin_string_concat/0
-        , builtin_string_concat_inner1/0
-        , builtin_string_concat_inner2/0
-        , builtin_str_equal_p/0
-        , builtin_str_equal/0
-        , builtin_int_to_str/0
-        , builtin_baseX_digits/1
-        , builtin_baseX_tab/1
-        , builtin_baseX_int/1
-        , builtin_string_reverse/0
-        , builtin_string_reverse_/0
-        , builtin_baseX_int_pad/1
-        , builtin_baseX_int_encode/1
-        , builtin_baseX_int_encode_/1
-        , builtin_addr_to_str/0]).
-
-
 -import(aeso_ast_to_icode, [prim_call/5]).
 
 -include_lib("aebytecode/include/aeb_opcodes.hrl").
@@ -153,41 +122,40 @@ check_event_type(EvtName, Type, Icode) ->
         false -> error({EvtName, payload_should_be_string, is, VMType})
     end.
 
-bfun(B, F, Args) ->
-    {IArgs, IExpr, IRet} = erlang:apply(?MODULE, F, Args),
+bfun(B, {IArgs, IExpr, IRet}) ->
     {{builtin, B}, [private], IArgs, IExpr, IRet}.
 
 builtin_function(BF) ->
     case BF of
-        {event, EventT}            -> bfun(BF, builtin_event, [EventT]);
-        abort                      -> bfun(BF, builtin_abort, []);
-        {map_lookup, Type}         -> bfun(BF, builtin_map_lookup, [Type]);
-        map_put                    -> bfun(BF, builtin_map_put, []);
-        map_delete                 -> bfun(BF, builtin_map_delete, []);
-        map_size                   -> bfun(BF, builtin_map_size, []);
-        {map_get, Type}            -> bfun(BF, builtin_map_get, [Type]);
-        {map_lookup_default, Type} -> bfun(BF, builtin_map_lookup_default, [Type]);
-        map_member                 -> bfun(BF, builtin_map_member, []);
-        {map_upd, Type}            -> bfun(BF, builtin_map_upd, [Type]);
-        {map_upd_default, Type}    -> bfun(BF, builtin_map_upd_default, [Type]);
-        map_from_list              -> bfun(BF, builtin_map_from_list, []);
-        list_concat                -> bfun(BF, builtin_list_concat, []);
-        string_length              -> bfun(BF, builtin_string_length, []);
-        string_concat              -> bfun(BF, builtin_string_concat, []);
-        string_concat_inner1       -> bfun(BF, builtin_string_concat_inner1, []);
-        string_concat_inner2       -> bfun(BF, builtin_string_concat_inner2, []);
-        str_equal_p                -> bfun(BF, builtin_str_equal_p, []);
-        str_equal                  -> bfun(BF, builtin_str_equal, []);
-        int_to_str                 -> bfun(BF, builtin_int_to_str, []);
-        addr_to_str                -> bfun(BF, builtin_addr_to_str, []);
-        {baseX_int, X}             -> bfun(BF, builtin_baseX_int, [X]);
-        {baseX_digits, X}          -> bfun(BF, builtin_baseX_digits, [X]);
-        {baseX_tab, X}             -> bfun(BF, builtin_baseX_tab, [X]);
-        {baseX_int_pad, X}         -> bfun(BF, builtin_baseX_int_pad, [X]);
-        {baseX_int_encode, X}      -> bfun(BF, builtin_baseX_int_encode, [X]);
-        {baseX_int_encode_, X}     -> bfun(BF, builtin_baseX_int_encode_, [X]);
-        string_reverse             -> bfun(BF, builtin_string_reverse, []);
-        string_reverse_            -> bfun(BF, builtin_string_reverse_, [])
+        {event, EventT}            -> bfun(BF, builtin_event(EventT));
+        abort                      -> bfun(BF, builtin_abort());
+        {map_lookup, Type}         -> bfun(BF, builtin_map_lookup(Type));
+        map_put                    -> bfun(BF, builtin_map_put());
+        map_delete                 -> bfun(BF, builtin_map_delete());
+        map_size                   -> bfun(BF, builtin_map_size());
+        {map_get, Type}            -> bfun(BF, builtin_map_get(Type));
+        {map_lookup_default, Type} -> bfun(BF, builtin_map_lookup_default(Type));
+        map_member                 -> bfun(BF, builtin_map_member());
+        {map_upd, Type}            -> bfun(BF, builtin_map_upd(Type));
+        {map_upd_default, Type}    -> bfun(BF, builtin_map_upd_default(Type));
+        map_from_list              -> bfun(BF, builtin_map_from_list());
+        list_concat                -> bfun(BF, builtin_list_concat());
+        string_length              -> bfun(BF, builtin_string_length());
+        string_concat              -> bfun(BF, builtin_string_concat());
+        string_concat_inner1       -> bfun(BF, builtin_string_concat_inner1());
+        string_concat_inner2       -> bfun(BF, builtin_string_concat_inner2());
+        str_equal_p                -> bfun(BF, builtin_str_equal_p());
+        str_equal                  -> bfun(BF, builtin_str_equal());
+        int_to_str                 -> bfun(BF, builtin_int_to_str());
+        addr_to_str                -> bfun(BF, builtin_addr_to_str());
+        {baseX_int, X}             -> bfun(BF, builtin_baseX_int(X));
+        {baseX_digits, X}          -> bfun(BF, builtin_baseX_digits(X));
+        {baseX_tab, X}             -> bfun(BF, builtin_baseX_tab(X));
+        {baseX_int_pad, X}         -> bfun(BF, builtin_baseX_int_pad(X));
+        {baseX_int_encode, X}      -> bfun(BF, builtin_baseX_int_encode(X));
+        {baseX_int_encode_, X}     -> bfun(BF, builtin_baseX_int_encode_(X));
+        string_reverse             -> bfun(BF, builtin_string_reverse());
+        string_reverse_            -> bfun(BF, builtin_string_reverse_())
     end.
 
 %% Event primitive (dependent on Event type)
