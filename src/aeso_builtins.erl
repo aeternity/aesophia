@@ -35,13 +35,13 @@
         , builtin_int_to_str/0
         , builtin_int_to_str_/0
         , builtin_int_digits/1
-        , builtin_base58_tab/0
-        , builtin_base58_int/0
+        , builtin_baseX_tab/1
+        , builtin_baseX_int/1
         , builtin_string_reverse/0
         , builtin_string_reverse_/0
-        , builtin_base58_int_pad/0
-        , builtin_base58_int_encode/0
-        , builtin_base58_int_encode_/0
+        , builtin_baseX_int_pad/1
+        , builtin_baseX_int_encode/1
+        , builtin_baseX_int_encode_/1
         , builtin_addr_to_str/0]).
 
 
@@ -72,9 +72,10 @@ builtin_deps1(map_from_list)              -> [map_put];
 builtin_deps1(str_equal)                  -> [str_equal_p];
 builtin_deps1(string_concat)              -> [string_concat_inner1, string_concat_inner2];
 builtin_deps1(int_to_str)                 -> [int_to_str_, {int_digits, 10}];
-builtin_deps1(addr_to_str)                -> [base58_int, string_concat];
-builtin_deps1(base58_int)                 -> [base58_int_encode, base58_int_pad, string_reverse, string_concat];
-builtin_deps1(base58_int_encode)          -> [base58_int_encode_, base58_tab, {int_digits, 58}];
+builtin_deps1(addr_to_str)                -> [{baseX_int, 58}];
+builtin_deps1({baseX_int, X})             -> [{baseX_int_pad, X}];
+builtin_deps1({baseX_int_pad, X})         -> [{baseX_int_encode, X}];
+builtin_deps1({baseX_int_encode, X})      -> [{baseX_int_encode_, X}, {baseX_tab, X}, {int_digits, X}];
 builtin_deps1(string_reverse)             -> [string_reverse_];
 builtin_deps1(_)                          -> [].
 
@@ -181,13 +182,13 @@ builtin_function(BF) ->
         int_to_str                 -> bfun(BF, builtin_int_to_str, []);
         int_to_str_                -> bfun(BF, builtin_int_to_str_, []);
         {int_digits, X}            -> bfun(BF, builtin_int_digits, [X]);
-        base58_tab                 -> bfun(BF, builtin_base58_tab, []);
-        base58_int                 -> bfun(BF, builtin_base58_int, []);
+        {baseX_tab, X}             -> bfun(BF, builtin_baseX_tab, [X]);
+        {baseX_int, X}             -> bfun(BF, builtin_baseX_int, [X]);
         string_reverse             -> bfun(BF, builtin_string_reverse, []);
         string_reverse_            -> bfun(BF, builtin_string_reverse_, []);
-        base58_int_pad             -> bfun(BF, builtin_base58_int_pad, []);
-        base58_int_encode          -> bfun(BF, builtin_base58_int_encode, []);
-        base58_int_encode_         -> bfun(BF, builtin_base58_int_encode_, []);
+        {baseX_int_pad, X}         -> bfun(BF, builtin_baseX_int_pad, [X]);
+        {baseX_int_encode, X}      -> bfun(BF, builtin_baseX_int_encode, [X]);
+        {baseX_int_encode_, X}     -> bfun(BF, builtin_baseX_int_encode_, [X]);
         addr_to_str                -> bfun(BF, builtin_addr_to_str, [])
     end.
 
@@ -458,7 +459,7 @@ builtin_int_to_str_() ->
      },
      word}.
 
-builtin_base58_tab() ->
+builtin_baseX_tab(58) ->
     <<Fst32:256>> = <<"123456789ABCDEFGHJKLMNPQRSTUVWXY">>,
     <<Lst26:256>> = <<"Zabcdefghijkmnopqrstuvwxyz", 0:48>>,
     {[{"ix", word}],
@@ -468,37 +469,37 @@ builtin_base58_tab() ->
      },
      word}.
 
-builtin_base58_int() ->
+builtin_baseX_int(X) ->
     {[{"w", word}],
      ?LET(ret, {inline_asm, [?A(?MSIZE)]},
-        {seq, [?call(base58_int_pad, [?V(w), ?I(0), ?I(0)]), {inline_asm, [?A(?POP)]}, ?V(ret)]}),
+        {seq, [?call({baseX_int_pad, X}, [?V(w), ?I(0), ?I(0)]), {inline_asm, [?A(?POP)]}, ?V(ret)]}),
      word}.
 
-builtin_base58_int_pad() ->
+builtin_baseX_int_pad(X = 58) ->
     {[{"src", word}, {"ix", word}, {"dst", word}],
      {ifte, ?GT(?ADD(?DIV(ix, 31), ?BYTE(ix, src)), 0),
-         ?call(base58_int_encode, [?V(src), ?V(ix), ?V(dst)]),
-         ?call(base58_int_pad, [?V(src), ?ADD(ix, 1), ?ADD(dst, ?BSL($1, ?SUB(31, ix)))])},
+         ?call({baseX_int_encode, X}, [?V(src), ?V(ix), ?V(dst)]),
+         ?call({baseX_int_pad, X}, [?V(src), ?ADD(ix, 1), ?ADD(dst, ?BSL($1, ?SUB(31, ix)))])},
      word}.
 
-builtin_base58_int_encode() ->
+builtin_baseX_int_encode(X) ->
     {[{"src", word}, {"ix", word}, {"dst", word}],
-     ?LET(n, ?call({int_digits, 58}, [?V(src), ?I(0)]),
+     ?LET(n, ?call({int_digits, X}, [?V(src), ?I(0)]),
         {seq, [?ADD(n, ?ADD(ix, 1)), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
-               ?call(base58_int_encode_, [?V(src), ?V(dst), ?EXP(58, n), ?V(ix)])]}),
+               ?call({baseX_int_encode_, X}, [?V(src), ?V(dst), ?EXP(X, n), ?V(ix)])]}),
      word}.
 
-builtin_base58_int_encode_() ->
+builtin_baseX_int_encode_(X) ->
     {[{"src", word}, {"dst", word}, {"fac", word}, {"ix", word}],
      {ifte, ?EQ(fac, 0),
          {seq, [?V(dst), {inline_asm, [?A(?MSIZE), ?A(?MSTORE), ?A(?MSIZE)]}]},
          {ifte, ?EQ(ix, 32),
               %% We've filled a word, write it and start on new word
               {seq, [?V(dst), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
-                     ?call(base58_int_encode_, [?V(src), ?I(0), ?V(fac), ?I(0)])]},
-              ?call(base58_int_encode_,
-                    [?MOD(src, fac), ?ADD(dst, ?BSL(?call(base58_tab, [?DIV(src, fac)]), ?SUB(31, ix))),
-                     ?DIV(fac, 58), ?ADD(ix, 1)])}
+                     ?call({baseX_int_encode_, X}, [?V(src), ?I(0), ?V(fac), ?I(0)])]},
+              ?call({baseX_int_encode_, X},
+                    [?MOD(src, fac), ?ADD(dst, ?BSL(?call({baseX_tab, X}, [?DIV(src, fac)]), ?SUB(31, ix))),
+                     ?DIV(fac, X), ?ADD(ix, 1)])}
      },
      word}.
 
@@ -533,5 +534,5 @@ builtin_string_reverse_() ->
      word}.
 
 builtin_addr_to_str() ->
-    {[{"a", word}], ?call(base58_int, [?V(a)]), word}.
+    {[{"a", word}], ?call({baseX_int, 58}, [?V(a)]), word}.
 
