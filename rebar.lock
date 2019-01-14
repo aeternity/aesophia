@@ -1,8 +1,4 @@
 [{<<"aebytecode">>,
   {git,"https://github.com/aeternity/aebytecode.git",
        {ref,"99bf097759dedbe7553f87a796bc7e1c7322e64b"}},
-  0},
- {<<"enacl">>,
-  {git,"https://github.com/aeternity/enacl.git",
-       {ref,"26180f42c0b3a450905d2efd8bc7fd5fd9cece75"}},
   0}].
