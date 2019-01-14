@@ -50,7 +50,13 @@
     , kind     :: project | create | update %% Projection constraints can match contract
     , context  :: why_record() }).          %% types, but field constraints only record types.
 
--type field_constraint() :: #field_constraint{}.
+%% Constraint checking that 'record_t' has precisely 'fields'.
+-record(record_create_constraint,
+    { record_t :: utype()
+    , fields   :: [aeso_syntax:id()]
+    , context  :: why_record() }).
+
+-type field_constraint() :: #field_constraint{} | #record_create_constraint{}.
 
 -record(field_info,
     { field_t  :: utype()
@@ -514,10 +520,15 @@ infer_expr(Env, {record, Attrs, Fields}) ->
     RecordType = fresh_uvar(Attrs),
     NewFields = [{field, A, FieldName, infer_expr(Env, Expr)}
                  || {field, A, FieldName, Expr} <- Fields],
-    constrain([begin
+    RecordType1 = unfold_types_in_type(RecordType),
+    constrain([ #record_create_constraint{
+                    record_t = RecordType1,
+                    fields   = [ FieldName || {field, _, [{proj, _, FieldName}], _} <- Fields ],
+                    context  = Attrs } ] ++
+              [begin
                 [{proj, _, FieldName}] = LV,
                 #field_constraint{
-                    record_t = unfold_types_in_type(RecordType),
+                    record_t = RecordType1,
                     field    = FieldName,
                     field_t  = T,
                     kind     = create,
@@ -971,7 +982,32 @@ get_field_constraints() ->
     ets_tab2list(field_constraints).
 
 solve_field_constraints() ->
-    solve_field_constraints(get_field_constraints()).
+    FieldCs =
+        lists:filter(fun(#field_constraint{}) -> true; (_) -> false end,
+                        get_field_constraints()),
+    solve_field_constraints(FieldCs).
+
+check_record_create_constraints([]) -> ok;
+check_record_create_constraints([C | Cs]) ->
+    #record_create_constraint{
+        record_t = Type,
+        fields   = Fields,
+        context  = When } = C,
+    Type1 = unfold_types_in_type(instantiate(Type)),
+    try lookup_type(record_type_name(Type1)) of
+        {_, {record_t, RecFields}} ->
+            ActualNames = [ Fld || {field_t, _, {id, _, Fld}, _} <- RecFields ],
+            GivenNames  = [ Fld || {id, _, Fld} <- Fields ],
+            case ActualNames -- GivenNames of   %% We know already that we don't have too many fields
+                []      -> ok;
+                Missing -> type_error({missing_fields, When, Type1, Missing})
+            end;
+        _ -> %% We can get here if there are other type errors.
+            ok
+    catch _:_ ->    %% Might be unsolved, we get a different error in that case
+        ok
+    end,
+    check_record_create_constraints(Cs).
 
 -spec solve_field_constraints([field_constraint()]) -> ok.
 solve_field_constraints(Constraints) ->
@@ -1071,8 +1107,10 @@ solve_known_record_types(Constraints) ->
     DerefConstraints--SolvedConstraints.
 
 destroy_and_report_unsolved_field_constraints() ->
-    Unsolved = get_field_constraints(),
-    Unknown  = solve_known_record_types(Unsolved),
+    {FieldCs, CreateCs} =
+        lists:partition(fun(#field_constraint{}) -> true; (_) -> false end,
+                        get_field_constraints()),
+    Unknown  = solve_known_record_types(FieldCs),
     if Unknown == [] -> ok;
        true ->
             case solve_unknown_record_types(Unknown) of
@@ -1080,6 +1118,7 @@ destroy_and_report_unsolved_field_constraints() ->
                 Errors -> [ type_error(Err) || Err <- Errors ]
             end
     end,
+    check_record_create_constraints(CreateCs),
     destroy_field_constraints(),
     ok.
 
@@ -1400,6 +1439,12 @@ pp_error({ambiguous_record, Fields = [{_, First} | _], Candidates}) ->
                    [ ["  - ", pp(C), " (at ", pp_loc(C), ")\n"] || C <- Candidates ]]);
 pp_error({missing_field, Field, Rec}) ->
     io_lib:format("Record type ~s does not have field ~s (at ~s)\n", [pp(Rec), pp(Field), pp_loc(Field)]);
+pp_error({missing_fields, Ann, RecType, Fields}) ->
+    Many = length(Fields) > 1,
+    S    = [ "s" || Many ],
+    Are  = if Many -> "are"; true -> "is" end,
+    io_lib:format("The field~s ~s ~s missing when constructing an element of type ~s (at ~s)\n",
+                  [S, string:join(Fields, ", "), Are, pp(RecType), pp_loc(Ann)]);
 pp_error({no_records_with_all_fields, Fields = [{_, First} | _]}) ->
     S = [ "s" || length(Fields) > 1 ],
     io_lib:format("No record type with field~s ~s (at ~s)\n",

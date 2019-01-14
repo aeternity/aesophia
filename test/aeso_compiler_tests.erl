@@ -29,10 +29,17 @@ simple_compile_test_() ->
      [ {"Testing error messages of " ++ ContractName,
         fun() ->
             {type_errors, Errors} = compile(ContractName),
-            ?assertEqual(lists:sort(ExpectedErrors), lists:sort(Errors))
+            check_errors(lists:sort(ExpectedErrors), lists:sort(Errors))
         end} ||
             {ContractName, ExpectedErrors} <- failing_contracts() ]
     }.
+
+check_errors(Expect, Actual) ->
+    case {Expect -- Actual, Actual -- Expect} of
+        {[], Extra}   -> ?assertMatch({unexpected, []}, {unexpected, Extra});
+        {Missing, []} -> ?assertMatch({missing, []}, {missing, Missing});
+        {Missing, Extra} -> ?assertEqual(Missing, Extra)
+    end.
 
 compile(Name) ->
     try
@@ -130,6 +137,7 @@ failing_contracts() ->
          "  - r (at line 4, column 10)\n"
          "  - r' (at line 5, column 10)\n",
          "Record type r2 does not have field y (at line 15, column 22)\n",
+         "The field z is missing when constructing an element of type r2 (at line 15, column 24)\n",
          "Repeated name x in pattern\n"
          "  x :: x (at line 26, column 7)\n",
          "No record type with fields y, z (at line 14, column 22)\n"]}
@@ -141,4 +149,8 @@ failing_contracts() ->
         ["Cannot unify string\n"
          "         and ()\n"
          "when checking that 'init' returns a value of type 'state' at line 5, column 3\n"]}
+    , {"missing_fields_in_record_expression",
+        ["The field x is missing when constructing an element of type r('a) (at line 7, column 40)\n",
+         "The field y is missing when constructing an element of type r(int) (at line 8, column 40)\n",
+         "The fields y, z are missing when constructing an element of type r('1) (at line 6, column 40)\n"]}
     ].
