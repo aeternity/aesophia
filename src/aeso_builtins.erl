@@ -39,10 +39,11 @@ builtin_deps1({map_upd_default, Type})    -> [{map_lookup_default, Type}, map_pu
 builtin_deps1(map_from_list)              -> [map_put];
 builtin_deps1(str_equal)                  -> [str_equal_p];
 builtin_deps1(string_concat)              -> [string_concat_inner1, string_concat_inner2];
-builtin_deps1(int_to_str)                 -> [int_to_str_, int_digits];
-builtin_deps1(addr_to_str)                -> [base58_int, string_concat];
-builtin_deps1(base58_int)                 -> [base58_int_encode, base58_int_pad, string_reverse, string_concat];
-builtin_deps1(base58_int_encode)          -> [base58_int_encode_, base58_tab];
+builtin_deps1(int_to_str)                 -> [{baseX_int, 10}];
+builtin_deps1(addr_to_str)                -> [{baseX_int, 58}];
+builtin_deps1({baseX_int, X})             -> [{baseX_int_pad, X}];
+builtin_deps1({baseX_int_pad, X})         -> [{baseX_int_encode, X}];
+builtin_deps1({baseX_int_encode, X})      -> [{baseX_int_encode_, X}, {baseX_tab, X}, {baseX_digits, X}];
 builtin_deps1(string_reverse)             -> [string_reverse_];
 builtin_deps1(_)                          -> [].
 
@@ -108,8 +109,6 @@ check_event_type(Evts, Icode) ->
       || {constr_t, _, {con, _, Name}, Types} <- Evts, T <- Types ].
 
 check_event_type(EvtName, Type, Icode) ->
-    io:format("~p: ~p??\n", [EvtName, Type]),
-    io:format("=> ~p\n", [aeso_ast_to_icode:ast_typerep(Type, Icode)]),
     VMType =
         try
            aeso_ast_to_icode:ast_typerep(Type, Icode)
@@ -123,11 +122,47 @@ check_event_type(EvtName, Type, Icode) ->
         false -> error({EvtName, payload_should_be_string, is, VMType})
     end.
 
+bfun(B, {IArgs, IExpr, IRet}) ->
+    {{builtin, B}, [private], IArgs, IExpr, IRet}.
+
+builtin_function(BF) ->
+    case BF of
+        {event, EventT}            -> bfun(BF, builtin_event(EventT));
+        abort                      -> bfun(BF, builtin_abort());
+        {map_lookup, Type}         -> bfun(BF, builtin_map_lookup(Type));
+        map_put                    -> bfun(BF, builtin_map_put());
+        map_delete                 -> bfun(BF, builtin_map_delete());
+        map_size                   -> bfun(BF, builtin_map_size());
+        {map_get, Type}            -> bfun(BF, builtin_map_get(Type));
+        {map_lookup_default, Type} -> bfun(BF, builtin_map_lookup_default(Type));
+        map_member                 -> bfun(BF, builtin_map_member());
+        {map_upd, Type}            -> bfun(BF, builtin_map_upd(Type));
+        {map_upd_default, Type}    -> bfun(BF, builtin_map_upd_default(Type));
+        map_from_list              -> bfun(BF, builtin_map_from_list());
+        list_concat                -> bfun(BF, builtin_list_concat());
+        string_length              -> bfun(BF, builtin_string_length());
+        string_concat              -> bfun(BF, builtin_string_concat());
+        string_concat_inner1       -> bfun(BF, builtin_string_concat_inner1());
+        string_concat_inner2       -> bfun(BF, builtin_string_concat_inner2());
+        str_equal_p                -> bfun(BF, builtin_str_equal_p());
+        str_equal                  -> bfun(BF, builtin_str_equal());
+        int_to_str                 -> bfun(BF, builtin_int_to_str());
+        addr_to_str                -> bfun(BF, builtin_addr_to_str());
+        {baseX_int, X}             -> bfun(BF, builtin_baseX_int(X));
+        {baseX_digits, X}          -> bfun(BF, builtin_baseX_digits(X));
+        {baseX_tab, X}             -> bfun(BF, builtin_baseX_tab(X));
+        {baseX_int_pad, X}         -> bfun(BF, builtin_baseX_int_pad(X));
+        {baseX_int_encode, X}      -> bfun(BF, builtin_baseX_int_encode(X));
+        {baseX_int_encode_, X}     -> bfun(BF, builtin_baseX_int_encode_(X));
+        string_reverse             -> bfun(BF, builtin_string_reverse());
+        string_reverse_            -> bfun(BF, builtin_string_reverse_())
+    end.
+
 %% Event primitive (dependent on Event type)
 %%
 %% We need to switch on the event and prepare the correct #event for icode_to_asm
 %% NOTE: we assume all errors are already checked!
-builtin_function(Builtin = {event, EventT}) ->
+builtin_event(EventT) ->
     A         = fun(X) -> aeb_opcodes:mnemonic(X) end,
     VIx       = fun(Ix) -> v(lists:concat(["v", Ix])) end,
     ArgPats   = fun(Ts) -> [ VIx(Ix) || Ix <- lists:seq(0, length(Ts) - 1) ] end,
@@ -149,149 +184,132 @@ builtin_function(Builtin = {event, EventT}) ->
     {variant_t, Cons} = EventT,
     Tags              = lists:seq(0, length(Cons) - 1),
 
-    {{builtin, Builtin}, [private],
-        [{"e", event}],
-        {switch, v(e),
-            [{Pat(Tag, Types), Clause(Tag, Con, Types)}
-             || {Tag, {constr_t, _, Con, Types}} <- lists:zip(Tags, Cons) ]},
-        {tuple, []}};
+    {[{"e", event}],
+     {switch, v(e),
+         [{Pat(Tag, Types), Clause(Tag, Con, Types)}
+          || {Tag, {constr_t, _, Con, Types}} <- lists:zip(Tags, Cons) ]},
+     {tuple, []}}.
 
 %% Abort primitive.
-builtin_function(abort) ->
+builtin_abort() ->
     A = fun(X) -> aeb_opcodes:mnemonic(X) end,
-    {{builtin, abort}, [private],
-     [{"s", string}],
+    {[{"s", string}],
      {inline_asm, [A(?PUSH1),0,  %% Push a dummy 0 for the first arg
                    A(?REVERT)]}, %% Stack: 0,Ptr
-     {tuple,[]}};
+     {tuple,[]}}.
 
 %% Map primitives
-builtin_function(Builtin = {map_lookup, Type}) ->
+builtin_map_lookup(Type) ->
     Ret = aeso_icode:option_typerep(Type),
-    {{builtin, Builtin}, [private],
-        [{"m", word}, {"k", word}],
-            prim_call(?PRIM_CALL_MAP_GET, #integer{value = 0},
-                      [#var_ref{name = "m"}, #var_ref{name = "k"}],
-                      [word, word], Ret),
-     Ret};
+    {[{"m", word}, {"k", word}],
+     prim_call(?PRIM_CALL_MAP_GET, #integer{value = 0},
+               [#var_ref{name = "m"}, #var_ref{name = "k"}],
+               [word, word], Ret),
+     Ret}.
 
-builtin_function(Builtin = map_put) ->
+builtin_map_put() ->
     %% We don't need the types for put.
-    {{builtin, Builtin}, [private],
-        [{"m", word}, {"k", word}, {"v", word}],
-        prim_call(?PRIM_CALL_MAP_PUT, #integer{value = 0},
-                  [v(m), v(k), v(v)],
-                  [word, word, word], word),
-     word};
+    {[{"m", word}, {"k", word}, {"v", word}],
+     prim_call(?PRIM_CALL_MAP_PUT, #integer{value = 0},
+               [v(m), v(k), v(v)], [word, word, word], word),
+     word}.
 
-builtin_function(Builtin = map_delete) ->
-    {{builtin, Builtin}, [private],
-        [{"m", word}, {"k", word}],
-        prim_call(?PRIM_CALL_MAP_DELETE, #integer{value = 0},
-                  [v(m), v(k)],
-                  [word, word], word),
-     word};
+builtin_map_delete() ->
+    {[{"m", word}, {"k", word}],
+     prim_call(?PRIM_CALL_MAP_DELETE, #integer{value = 0},
+               [v(m), v(k)], [word, word], word),
+     word}.
 
-builtin_function(Builtin = map_size) ->
-    Name = {builtin, Builtin},
-    {Name, [private], [{"m", word}],
-        prim_call(?PRIM_CALL_MAP_SIZE, #integer{value = 0},
-                  [v(m)], [word], word),
-        word};
+builtin_map_size() ->
+    {[{"m", word}],
+     prim_call(?PRIM_CALL_MAP_SIZE, #integer{value = 0},
+               [v(m)], [word], word),
+     word}.
 
 %% Map builtins
-builtin_function(Builtin = {map_get, Type}) ->
+builtin_map_get(Type) ->
     %% function map_get(m, k) =
     %%   switch(map_lookup(m, k))
     %%     Some(v) => v
-    {{builtin, Builtin}, [private],
-        [{"m", word}, {"k", word}],
-            {switch, ?call({map_lookup, Type}, [v(m), v(k)]),
-                [{option_some(v(v)), v(v)}]},
-     Type};
+    {[{"m", word}, {"k", word}],
+     {switch, ?call({map_lookup, Type}, [v(m), v(k)]), [{option_some(v(v)), v(v)}]},
+     Type}.
 
-builtin_function(Builtin = {map_lookup_default, Type}) ->
+builtin_map_lookup_default(Type) ->
     %% function map_lookup_default(m, k, default) =
     %%   switch(map_lookup(m, k))
     %%     None    => default
     %%     Some(v) => v
-    {{builtin, Builtin}, [private],
-        [{"m", word}, {"k", word}, {"default", Type}],
-            {switch, ?call({map_lookup, Type}, [v(m), v(k)]),
-                [{option_none(),     v(default)},
-                 {option_some(v(v)), v(v)}]},
-     Type};
+    {[{"m", word}, {"k", word}, {"default", Type}],
+     {switch, ?call({map_lookup, Type}, [v(m), v(k)]),
+         [{option_none(),     v(default)},
+          {option_some(v(v)), v(v)}]},
+     Type}.
 
-builtin_function(Builtin = map_member) ->
+builtin_map_member() ->
     %% function map_member(m, k) : bool =
     %%   switch(Map.lookup(m, k))
     %%     None => false
     %%     _    => true
-    {{builtin, Builtin}, [private],
-        [{"m", word}, {"k", word}],
-            {switch, ?call({map_lookup, word}, [v(m), v(k)]),
-                [{option_none(), {integer, 0}},
-                 {{var_ref, "_"}, {integer, 1}}]},
-     word};
+    {[{"m", word}, {"k", word}],
+     {switch, ?call({map_lookup, word}, [v(m), v(k)]),
+         [{option_none(), {integer, 0}},
+          {{var_ref, "_"}, {integer, 1}}]},
+     word}.
 
-builtin_function(Builtin = {map_upd, Type}) ->
+builtin_map_upd(Type) ->
     %% function map_upd(map, key, fun) =
     %%   map_put(map, key, fun(map_get(map, key)))
-    {{builtin, Builtin}, [private],
-     [{"map", word}, {"key", word}, {"valfun", word}],
+    {[{"map", word}, {"key", word}, {"valfun", word}],
      ?call(map_put,
         [v(map), v(key),
          #funcall{ function = v(valfun),
                    args     = [?call({map_get, Type}, [v(map), v(key)])] }]),
-     word};
+     word}.
 
-builtin_function(Builtin = {map_upd_default, Type}) ->
+builtin_map_upd_default(Type) ->
     %% function map_upd(map, key, val, fun) =
     %%   map_put(map, key, fun(map_lookup_default(map, key, val)))
-    {{builtin, Builtin}, [private],
-     [{"map", word}, {"key", word}, {"val", word}, {"valfun", word}],
+    {[{"map", word}, {"key", word}, {"val", word}, {"valfun", word}],
      ?call(map_put,
         [v(map), v(key),
          #funcall{ function = v(valfun),
                    args     = [?call({map_lookup_default, Type}, [v(map), v(key), v(val)])] }]),
-     word};
+     word}.
 
-builtin_function(Builtin = map_from_list) ->
+builtin_map_from_list() ->
     %% function map_from_list(xs, acc) =
     %%   switch(xs)
     %%     [] => acc
     %%     (k, v) :: xs => map_from_list(xs, acc { [k] = v })
-    {{builtin, Builtin}, [private],
-     [{"xs", {list, {tuple, [word, word]}}}, {"acc", word}],
+    {[{"xs", {list, {tuple, [word, word]}}}, {"acc", word}],
      {switch, v(xs),
         [{{list, []}, v(acc)},
          {{binop, '::', {tuple, [v(k), v(v)]}, v(ys)},
           ?call(map_from_list,
             [v(ys), ?call(map_put, [v(acc), v(k), v(v)])])}]},
-     word};
+     word}.
 
 %% list_concat
 %%
 %% Concatenates two lists.
-builtin_function(list_concat) ->
-    {{builtin, list_concat}, [private],
-     [{"l1", {list, word}}, {"l2", {list, word}}],
+builtin_list_concat() ->
+    {[{"l1", {list, word}}, {"l2", {list, word}}],
      {switch, v(l1),
         [{{list, []}, v(l2)},
          {{binop, '::', v(hd), v(tl)},
           {binop, '::', v(hd), ?call(list_concat, [v(tl), v(l2)])}}
         ]
      },
-     word};
+     word}.
 
-builtin_function(string_length) ->
+builtin_string_length() ->
     %% function length(str) =
     %%   switch(str)
     %%      {n} -> n  // (ab)use the representation
-    {{builtin, string_length}, [private],
-        [{"s", string}],
-        ?DEREF(n, s, ?V(n)),
-     word};
+    {[{"s", string}],
+     ?DEREF(n, s, ?V(n)),
+     word}.
 
 %% str_concat - concatenate two strings
 %%
@@ -299,9 +317,8 @@ builtin_function(string_length) ->
 %% top of the Heap and the address to it is returned. The tricky bit is when
 %% the words from the second string has to be shifted to fit next to the first
 %% string.
-builtin_function(string_concat) ->
-    {{builtin, string_concat}, [private],
-     [{"s1", string}, {"s2", string}],
+builtin_string_concat() ->
+    {[{"s1", string}, {"s2", string}],
      ?DEREF(n1, s1,
      ?DEREF(n2, s2,
         {ifte, ?EQ(n2, 0),
@@ -313,13 +330,12 @@ builtin_function(string_concat) ->
                        ?V(ret)                   %% Put the actual return value
                       ]})}
      )),
-     word};
+     word}.
 
-builtin_function(string_concat_inner1) ->
+builtin_string_concat_inner1() ->
     %% Copy all whole words from the first string, and set up for word fusion
     %% Special case when the length of the first string is divisible by 32.
-    {{builtin, string_concat_inner1}, [private],
-     [{"n1", word}, {"p1", pointer}, {"n2", word}, {"p2", pointer}],
+    {[{"n1", word}, {"p1", pointer}, {"n2", word}, {"p2", pointer}],
      ?DEREF(w1, p1,
         {ifte, ?GT(n1, 32),
             {seq, [?V(w1), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
@@ -328,13 +344,12 @@ builtin_function(string_concat_inner1) ->
                 ?call(string_concat_inner2, [?I(32), ?I(0), ?V(n2), ?V(p2)]),
                 ?call(string_concat_inner2, [?SUB(32, n1), ?V(w1), ?V(n2), ?V(p2)])}
         }),
-     word};
+     word}.
 
-builtin_function(string_concat_inner2) ->
+builtin_string_concat_inner2() ->
     %% Current "work in progess" word 'x', has 'o' bytes that are "free" - fill them from
     %% words of the second string.
-    {{builtin, string_concat_inner2}, [private],
-     [{"o", word}, {"x", word}, {"n2", word}, {"p2", pointer}],
+    {[{"o", word}, {"x", word}, {"n2", word}, {"p2", pointer}],
      {ifte, ?LT(n2, 1),
         {seq, [?V(x), {inline_asm, [?A(?MSIZE), ?A(?MSTORE), ?A(?MSIZE)]}]}, %% Use MSIZE as dummy return value
         ?DEREF(w2, p2,
@@ -348,163 +363,121 @@ builtin_function(string_concat_inner2) ->
                        {inline_asm, [?A(?MSIZE), ?A(?MSTORE), ?A(?MSIZE)]}]} %% Use MSIZE as dummy return value
             })
      },
-     word};
+     word}.
 
-builtin_function(str_equal_p) ->
+builtin_str_equal_p() ->
     %% function str_equal_p(n, p1, p2) =
     %%   if(n =< 0) true
     %%   else
     %%      let w1 = *p1
     %%      let w2 = *p2
     %%      w1 == w2 && str_equal_p(n - 32, p1 + 32, p2 + 32)
-    {{builtin, str_equal_p}, [private],
-        [{"n", word}, {"p1", pointer}, {"p2", pointer}],
-        {ifte, ?LT(n, 1),
-            ?I(1),
-            ?DEREF(w1, p1,
-            ?DEREF(w2, p2,
-                ?AND(?EQ(w1, w2),
-                     ?call(str_equal_p, [?SUB(n, 32), ?NXT(p1), ?NXT(p2)]))))},
-     word};
+    {[{"n", word}, {"p1", pointer}, {"p2", pointer}],
+     {ifte, ?LT(n, 1),
+         ?I(1),
+         ?DEREF(w1, p1,
+         ?DEREF(w2, p2,
+             ?AND(?EQ(w1, w2),
+                  ?call(str_equal_p, [?SUB(n, 32), ?NXT(p1), ?NXT(p2)]))))},
+     word}.
 
-builtin_function(str_equal) ->
+builtin_str_equal() ->
     %% function str_equal(s1, s2) =
     %%   let n1 = length(s1)
     %%   let n2 = length(s2)
     %%   n1 == n2 && str_equal_p(n1, s1 + 32, s2 + 32)
-    {{builtin, str_equal}, [private],
-        [{"s1", string}, {"s2", string}],
-        ?DEREF(n1, s1,
-        ?DEREF(n2, s2,
-            ?AND(?EQ(n1, n2), ?call(str_equal_p, [?V(n1), ?NXT(s1), ?NXT(s2)]))
-        )),
-        word};
+    {[{"s1", string}, {"s2", string}],
+     ?DEREF(n1, s1,
+     ?DEREF(n2, s2,
+         ?AND(?EQ(n1, n2), ?call(str_equal_p, [?V(n1), ?NXT(s1), ?NXT(s2)]))
+     )),
+     word}.
 
-builtin_function(int_to_str) ->
-    {{builtin, int_to_str}, [private],
-        [{"i0", word}],
-        {switch, {ifte, ?LT(i0, 0),
-                    {tuple, [?I(2), ?NEG(i0), ?BSL(45, 31)]},
-                    {tuple, [?I(1), ?V(i0), ?I(0)]}},
-        [{{tuple, [v(off), v(i), v(x)]},
-        ?LET(ret, {inline_asm, [?A(?MSIZE)]},
-        ?LET(n,   ?call(int_digits, [?DIV(i, 10), ?I(0)]),
-        ?LET(fac, ?EXP(10, n),
-            {seq, [?ADD(n, off), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]}, %% Store str len
-                   ?call(int_to_str_,
-                        [?MOD(i, fac), ?ADD(x, ?BSL(?ADD(48, ?DIV(i, fac)), ?SUB(32, off))), ?DIV(fac, 10), ?V(off)]),
-                   {inline_asm, [?A(?POP)]}, ?V(ret)]}
-        )))}]},
-        word};
+builtin_int_to_str() ->
+    {[{"i", word}], ?call({baseX_int, 10}, [?V(i)]), word}.
 
-builtin_function(int_to_str_) ->
-    {{builtin, int_to_str_}, [private],
-        [{"x", word}, {"y", word}, {"fac", word}, {"n", word}],
-        {ifte, ?EQ(fac, 0),
-            {seq, [?V(y), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]}, ?V(n)]},
-            {ifte, ?EQ(?MOD(n, 32), 0),
-                 %% We've filled a word, write it and start on new word
-                 {seq, [?V(y), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
-                        ?call(int_to_str_,
-                              [?MOD(x, fac), ?BSL(?ADD(48, ?DIV(x, fac)), 31),
-                               ?DIV(fac, 10), ?I(1)])]},
-                 ?call(int_to_str_,
-                       [?MOD(x, fac), ?ADD(y, ?BSL(?ADD(48, ?DIV(x, fac)), ?SUB(31, n))),
-                        ?DIV(fac, 10), ?ADD(n, 1)])}
-        },
-        word};
+builtin_baseX_tab(_X = 10) ->
+    {[{"ix", word}], ?ADD($0, ix), word};
+builtin_baseX_tab(_X = 58) ->
+    <<Fst32:256>> = <<"123456789ABCDEFGHJKLMNPQRSTUVWXY">>,
+    <<Lst26:256>> = <<"Zabcdefghijkmnopqrstuvwxyz", 0:48>>,
+    {[{"ix", word}],
+     {ifte, ?LT(ix, 32),
+         ?BYTE(ix, Fst32),
+         ?BYTE(?SUB(ix, 32), Lst26)
+     },
+     word}.
 
-builtin_function(int_digits) ->
-    {{builtin, int_digits}, [private],
-        [{"x", word}, {"n", word}],
-        {ifte, ?EQ(x, 0), ?V(n), ?call(int_digits, [?DIV(x, 10), ?ADD(n, 1)])},
-        word};
+builtin_baseX_int(X) ->
+    {[{"w", word}],
+     ?LET(ret, {inline_asm, [?A(?MSIZE)]},
+        {seq, [?call({baseX_int_pad, X}, [?V(w), ?I(0), ?I(0)]), {inline_asm, [?A(?POP)]}, ?V(ret)]}),
+     word}.
 
-builtin_function(base58_tab) ->
-    Fst32 = 22252025330403739761829862310514590177935513752035045390683118730099851483225,
-    Lst26 = 40880219588527126470443504235291962205031881694701834176631306799289575931904,
-    {{builtin, base58_tab}, [private],
-        [{"ix", word}],
-        {ifte, ?LT(ix, 32),
-            ?BYTE(ix, Fst32),
-            ?BYTE(?SUB(ix, 32), Lst26)
-        }, word};
+builtin_baseX_int_pad(X = 10) ->
+    {[{"src", word}, {"ix", word}, {"dst", word}],
+     {ifte, ?LT(src, 0),
+        ?call({baseX_int_encode, X}, [?NEG(src), ?I(1), ?BSL($-, 31)]),
+        ?call({baseX_int_encode, X}, [?V(src), ?V(ix), ?V(dst)])},
+     word};
+builtin_baseX_int_pad(X = 58) ->
+    {[{"src", word}, {"ix", word}, {"dst", word}],
+     {ifte, ?GT(?ADD(?DIV(ix, 31), ?BYTE(ix, src)), 0),
+         ?call({baseX_int_encode, X}, [?V(src), ?V(ix), ?V(dst)]),
+         ?call({baseX_int_pad, X}, [?V(src), ?ADD(ix, 1), ?ADD(dst, ?BSL($1, ?SUB(31, ix)))])},
+     word}.
 
-builtin_function(base58_int) ->
-    {{builtin, base58_int}, [private],
-        [{"w", word}],
-        ?LET(str0, ?call(base58_int_encode, [?V(w)]),
-        ?LET(str1, ?call(base58_int_pad, [?V(w), ?I(0), ?I(0)]),
-        ?LET(str2, ?call(string_concat, [?V(str0), ?V(str1)]),
-            ?call(string_reverse, [?V(str2)])
-        ))),
-        word};
+builtin_baseX_int_encode(X) ->
+    {[{"src", word}, {"ix", word}, {"dst", word}],
+     ?LET(n, ?call({baseX_digits, X}, [?V(src), ?I(0)]),
+        {seq, [?ADD(n, ?ADD(ix, 1)), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
+               ?call({baseX_int_encode_, X}, [?V(src), ?V(dst), ?EXP(X, n), ?V(ix)])]}),
+     word}.
 
-builtin_function(string_reverse) ->
-    {{builtin, string_reverse}, [private],
-        [{"s", string}],
-        ?DEREF(n, s,
-        ?LET(ret, {inline_asm, [?A(?MSIZE)]},
-            {seq, [?V(n), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
-                   ?call(string_reverse_, [?NXT(s), ?I(0), ?I(31), ?SUB(?V(n), 1)]),
-                   {inline_asm, [?A(?POP)]}, ?V(ret)]})),
-        word};
+builtin_baseX_int_encode_(X) ->
+    {[{"src", word}, {"dst", word}, {"fac", word}, {"ix", word}],
+     {ifte, ?EQ(fac, 0),
+         {seq, [?V(dst), {inline_asm, [?A(?MSIZE), ?A(?MSTORE), ?A(?MSIZE)]}]},
+         {ifte, ?EQ(ix, 32),
+              %% We've filled a word, write it and start on new word
+              {seq, [?V(dst), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
+                     ?call({baseX_int_encode_, X}, [?V(src), ?I(0), ?V(fac), ?I(0)])]},
+              ?call({baseX_int_encode_, X},
+                    [?MOD(src, fac), ?ADD(dst, ?BSL(?call({baseX_tab, X}, [?DIV(src, fac)]), ?SUB(31, ix))),
+                     ?DIV(fac, X), ?ADD(ix, 1)])}
+     },
+     word}.
 
-builtin_function(string_reverse_) ->
-    {{builtin, string_reverse_}, [private],
-        [{"p", pointer}, {"x", word}, {"i1", word}, {"i2", word}],
-        {ifte, ?LT(i2, 0),
-            {seq, [?V(x), {inline_asm, [?A(?MSIZE), ?A(?MSTORE), ?A(?MSIZE)]}]},
-            ?LET(p1, ?ADD(p, ?MUL(?DIV(i2, 32), 32)),
-            ?DEREF(w, p1,
-            ?LET(b, ?BYTE(?MOD(i2, 32), w),
-            {ifte, ?LT(i1, 0),
-                {seq, [?V(x), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
-                       ?call(string_reverse_,
-                             [?V(p), ?BSL(b, 31), ?I(30), ?SUB(i2, 1)])]},
-                ?call(string_reverse_,
-                      [?V(p), ?ADD(x, ?BSL(b, i1)), ?SUB(i1, 1), ?SUB(i2, 1)])})))},
-        word};
+builtin_baseX_digits(X) ->
+    {[{"x0", word}, {"dgts", word}],
+     ?LET(x1, ?DIV(x0, X),
+        {ifte, ?EQ(x1, 0), ?V(dgts), ?call({baseX_digits, X}, [?V(x1), ?ADD(dgts, 1)])}),
+     word}.
 
-builtin_function(base58_int_pad) ->
-    {{builtin, base58_int_pad}, [private],
-        [{"w", word}, {"i", word}, {"x", word}],
-        {ifte, ?GT(?BYTE(i, w), 0),
-            {seq, [?V(i), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
-                   ?V(x), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
-                   {inline_asm, [?A(?PUSH1), 64, ?A(?MSIZE), ?A(?SUB)]}]},
-            ?call(base58_int_pad, [?V(w), ?ADD(i, 1),
-                                   ?ADD(x, ?BSL(49, ?SUB(31, i)))])},
-        word};
+builtin_string_reverse() ->
+    {[{"s", string}],
+     ?DEREF(n, s,
+     ?LET(ret, {inline_asm, [?A(?MSIZE)]},
+         {seq, [?V(n), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
+                ?call(string_reverse_, [?NXT(s), ?I(0), ?I(31), ?SUB(?V(n), 1)]),
+                {inline_asm, [?A(?POP)]}, ?V(ret)]})),
+     word}.
 
-builtin_function(base58_int_encode) ->
-    {{builtin, base58_int_encode}, [private],
-        [{"w", word}],
-        ?LET(ret, {inline_asm, [?A(?MSIZE), ?A(?PUSH1), 0, ?A(?MSIZE), ?A(?MSTORE)]}, %% write placeholder
-        ?LET(n, ?call(base58_int_encode_, [?V(w), ?I(0), ?I(0), ?I(31)]),
-            {seq, [?V(ret), {inline_asm, [?A(?DUP2), ?A(?SWAP1), ?A(?MSTORE)]},
-                   ?V(ret)]})),
-        word};
+builtin_string_reverse_() ->
+    {[{"p", pointer}, {"x", word}, {"i1", word}, {"i2", word}],
+     {ifte, ?LT(i2, 0),
+         {seq, [?V(x), {inline_asm, [?A(?MSIZE), ?A(?MSTORE), ?A(?MSIZE)]}]},
+         ?LET(p1, ?ADD(p, ?MUL(?DIV(i2, 32), 32)),
+         ?DEREF(w, p1,
+         ?LET(b, ?BYTE(?MOD(i2, 32), w),
+         {ifte, ?LT(i1, 0),
+             {seq, [?V(x), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
+                    ?call(string_reverse_,
+                          [?V(p), ?BSL(b, 31), ?I(30), ?SUB(i2, 1)])]},
+             ?call(string_reverse_,
+                   [?V(p), ?ADD(x, ?BSL(b, i1)), ?SUB(i1, 1), ?SUB(i2, 1)])})))},
+     word}.
 
-builtin_function(base58_int_encode_) ->
-    {{builtin, base58_int_encode_}, [private],
-        [{"w", word}, {"x", word}, {"n", word}, {"i", word}],
-        {ifte, ?EQ(w, 0),
-            {seq, [?V(x), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]}, ?V(n)]},
-            {ifte, ?LT(i, 0),
-                {seq, [?V(x), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
-                       ?call(base58_int_encode_,
-                             [?DIV(w, 58), ?BSL(?call(base58_tab, [?MOD(w, 58)]), 31),
-                              ?ADD(n, 1), ?I(30)])]},
-                ?call(base58_int_encode_,
-                    [?DIV(w, 58), ?ADD(x, ?BSL(?call(base58_tab, [?MOD(w, 58)]), i)),
-                     ?ADD(n, 1), ?SUB(i, 1)])}},
-        word};
-
-
-builtin_function(addr_to_str) ->
-    {{builtin, addr_to_str}, [private],
-        [{"a", word}],
-        ?call(base58_int, [?V(a)]),
-        word}.
+builtin_addr_to_str() ->
+    {[{"a", word}], ?call({baseX_int, 58}, [?V(a)]), word}.
 
