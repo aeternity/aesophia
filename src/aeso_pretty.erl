@@ -147,6 +147,8 @@ decl(D, Options) ->
 -spec decl(aeso_syntax:decl()) -> doc().
 decl({contract, _, C, Ds}) ->
     block(follow(text("contract"), hsep(name(C), text("="))), decls(Ds));
+decl({namespace, _, C, Ds}) ->
+    block(follow(text("namespace"), hsep(name(C), text("="))), decls(Ds));
 decl({type_decl, _, T, Vars}) -> typedecl(alias_t, T, Vars);
 decl({type_def, _, T, Vars, Def}) ->
     Kind = element(1, Def),

@@ -150,11 +150,10 @@ failing_contracts() ->
         <<"Ambiguous record type with field y (at line 13, column 25) could be one of\n"
           "  - r (at line 4, column 10)\n"
           "  - r' (at line 5, column 10)">>,
-        <<"Record type r2 does not have field y (at line 15, column 22)">>,
-        <<"The field z is missing when constructing an element of type r2 (at line 15, column 24)">>,
         <<"Repeated name x in pattern\n"
           "  x :: x (at line 26, column 7)">>,
-        <<"No record type with fields y, z (at line 14, column 22)">>]}
+        <<"No record type with fields y, z (at line 14, column 22)">>,
+        <<"No record type with fields y, w (at line 15, column 22)">>]}
     , {"init_type_error",
        [<<"Cannot unify string\n"
           "         and map(int, int)\n"
@@ -166,5 +165,7 @@ failing_contracts() ->
     , {"missing_fields_in_record_expression",
        [<<"The field x is missing when constructing an element of type r('a) (at line 7, column 40)">>,
         <<"The field y is missing when constructing an element of type r(int) (at line 8, column 40)">>,
-        <<"The fields y, z are missing when constructing an element of type r('1) (at line 6, column 40)">>]}
+        <<"The fields y, z are missing when constructing an element of type r('a) (at line 6, column 40)">>]}
+    , {"namespace_clash",
+       [<<"The contract Call (at line 4, column 10) has the same name as a namespace at (builtin location)">>]}
     ].

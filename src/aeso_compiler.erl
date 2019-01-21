@@ -152,7 +152,7 @@ create_calldata(Contract, Function, Argument) when is_map(Contract) ->
         [FunName | _] ->
             Args    = lists:map(fun($\n) -> 32; (X) -> X end, Argument),    %% newline to space
             CallContract = lists:flatten(
-                [ "contract Call =\n"
+                [ "contract MakeCall =\n"
                 , "  function ", Function, "\n"
                 , "  function __call() = ", FunName, "(", Args, ")"
                 ]),
@@ -161,15 +161,15 @@ create_calldata(Contract, Function, Argument) when is_map(Contract) ->
 
 
 get_arg_icode(Funs) ->
-    [Args] = [ Args || {?CALL_NAME, _, _, {funcall, _, Args}, _} <- Funs ],
+    [Args] = [ Args || {[_, ?CALL_NAME], _, _, {funcall, _, Args}, _} <- Funs ],
     Args.
 
 get_call_type([{contract, _, _, Defs}]) ->
-    case [ {FunName, FunType}
+    case [ {lists:last(QFunName), FunType}
           || {letfun, _, {id, _, ?CALL_NAME}, [], _Ret,
                 {typed, _,
                     {app, _,
-                        {typed, _, {id, _, FunName}, FunType}, _}, _}} <- Defs ] of
+                        {typed, _, {qid, _, QFunName}, FunType}, _}, _}} <- Defs ] of
         [Call] -> {ok, Call};
         []     -> {error, missing_call_function}
     end;
@@ -228,7 +228,7 @@ to_bytecode([Op|Rest], Options) ->
 to_bytecode([], _) -> [].
 
 extract_type_info(#{functions := Functions} =_Icode) ->
-    TypeInfo = [aeso_abi:function_type_info(list_to_binary(Name), Args, TypeRep)
+    TypeInfo = [aeso_abi:function_type_info(list_to_binary(lists:last(Name)), Args, TypeRep)
                 || {Name, Attrs, Args,_Body, TypeRep} <- Functions,
                    not is_tuple(Name),
                    not lists:member(private, Attrs)

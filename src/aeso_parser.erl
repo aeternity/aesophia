@@ -36,7 +36,8 @@ decl() ->
     ?LAZY_P(
     choice(
       %% Contract declaration
-    [ ?RULE(keyword(contract), con(), tok('='), maybe_block(decl()), {contract, _1, _2, _4})
+    [ ?RULE(keyword(contract),  con(), tok('='), maybe_block(decl()), {contract, _1, _2, _4})
+    , ?RULE(keyword(namespace), con(), tok('='), maybe_block(decl()), {namespace, _1, _2, _4})
 
       %% Type declarations  TODO: format annotation for "type bla" vs "type bla()"
     , ?RULE(keyword(type),     id(),                                          {type_decl, _1, _2, []})

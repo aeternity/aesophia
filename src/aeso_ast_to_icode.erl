@@ -19,9 +19,13 @@
 convert_typed(TypedTree, Options) ->
     code(TypedTree, aeso_icode:new(Options)).
 
-code([{contract, _Attribs, {con, _, Name}, Code}|Rest], Icode) ->
+code([{contract, _Attribs, Con = {con, _, Name}, Code}|Rest], Icode) ->
     NewIcode = contract_to_icode(Code,
-                                 aeso_icode:set_name(Name, Icode)),
+                                 aeso_icode:set_namespace(Con,
+                                 aeso_icode:set_name(Name, Icode))),
+    code(Rest, NewIcode);
+code([{namespace, _Ann, Name, Code}|Rest], Icode) ->
+    NewIcode = contract_to_icode(Code, aeso_icode:enter_namespace(Name, Icode)),
     code(Rest, NewIcode);
 code([], Icode) ->
     add_default_init_function(add_builtins(Icode)).
@@ -33,18 +37,24 @@ gen_error(Error) ->
 
 %% Create default init function (only if state is unit).
 add_default_init_function(Icode = #{functions := Funs, state_type := State}) ->
-    case lists:keymember("init", 1, Funs) of
+    {_, _, QInit} = aeso_icode:qualify({id, [], "init"}, Icode),
+    case lists:keymember(QInit, 1, Funs) of
         true -> Icode;
-        false when State /= {tuple, []} -> gen_error(missing_init_function);
+        false when State /= {tuple, []} ->
+            gen_error(missing_init_function);
         false ->
             Type  = {tuple, [typerep, {tuple, []}]},
             Value = #tuple{ cpts = [type_value({tuple, []}), {tuple, []}] },
-            DefaultInit = {"init", [], [], Value, Type},
+            DefaultInit = {QInit, [], [], Value, Type},
             Icode#{ functions => [DefaultInit | Funs] }
     end.
 
 -spec contract_to_icode(aeso_syntax:ast(), aeso_icode:icode()) ->
                                aeso_icode:icode().
+contract_to_icode([{namespace, _, Name, Defs} | Rest], Icode) ->
+    NS = aeso_icode:get_namespace(Icode),
+    Icode1 = contract_to_icode(Defs, aeso_icode:enter_namespace(Name, Icode)),
+    contract_to_icode(Rest, aeso_icode:set_namespace(NS, Icode1));
 contract_to_icode([{type_def, _Attrib, {id, _, Name}, Args, Def} | Rest],
                   Icode = #{ types := Types, constructors := Constructors }) ->
     TypeDef = make_type_def(Args, Def, Icode),
@@ -52,8 +62,9 @@ contract_to_icode([{type_def, _Attrib, {id, _, Name}, Args, Def} | Rest],
         case Def of
             {variant_t, Cons} ->
                 Tags = lists:seq(0, length(Cons) - 1),
-                GetName = fun({constr_t, _, {con, _, C}, _}) -> C end,
-                maps:from_list([ {GetName(Con), Tag} || {Tag, Con} <- lists:zip(Tags, Cons) ]);
+                GetName = fun({constr_t, _, C, _}) -> C end,
+                QName = fun(Con) -> {_, _, Xs} = aeso_icode:qualify(GetName(Con), Icode), Xs end,
+                maps:from_list([ {QName(Con), Tag} || {Tag, Con} <- lists:zip(Tags, Cons) ]);
             _ -> #{}
         end,
     Icode1 = Icode#{ types := Types#{ Name => TypeDef },
@@ -84,7 +95,8 @@ contract_to_icode([{letfun, Attrib, Name, Args, _What, Body={typed,_,_,T}}|Rest]
                  {tuple, [typerep, ast_typerep(T, Icode)]}};
             _ -> {ast_body(Body, Icode), ast_typerep(T, Icode)}
         end,
-    NewIcode = ast_fun_to_icode(FunName, FunAttrs, FunArgs, FunBody, TypeRep, Icode),
+    QName    = aeso_icode:qualify(Name, Icode),
+    NewIcode = ast_fun_to_icode(ast_id(QName), FunAttrs, FunArgs, FunBody, TypeRep, Icode),
     contract_to_icode(Rest, NewIcode);
 contract_to_icode([{letrec,_,Defs}|Rest], Icode) ->
     %% OBS! This code ignores the letrec structure of the source,
@@ -98,7 +110,8 @@ contract_to_icode(_Code, Icode) ->
     %% TODO debug output for debug("Unhandled code ~p~n",[Code]),
     Icode.
 
-ast_id({id, _, Id}) -> Id.
+ast_id({id, _, Id}) -> Id;
+ast_id({qid, _, Id}) -> Id.
 
 ast_args([{arg, _, Name, Type}|Rest], Acc, Icode) ->
     ast_args(Rest, [{ast_id(Name), ast_type(Type, Icode)}| Acc], Icode);
@@ -384,7 +397,8 @@ ast_body(?qid_app(["Address", "to_str"], [Addr], _, _), Icode) ->
 
 %% Other terms
 ast_body({id, _, Name}, _Icode) ->
-    %% TODO Look up id in env
+    #var_ref{name = Name};
+ast_body({qid, _, Name}, _Icode) ->
     #var_ref{name = Name};
 ast_body({bool, _, Bool}, _Icode) ->        %BOOL as ints
     Value = if Bool -> 1 ; true -> 0 end,
@@ -441,9 +455,15 @@ ast_body({proj, _, {typed, _, _, {con, _, Contract}}, {id, _, FunName}}, _Icode)
                string:join([Contract, FunName], ".")});
 
 ast_body({con, _, Name}, Icode) ->
+    Tag = aeso_icode:get_constructor_tag([Name], Icode),
+    #tuple{cpts = [#integer{value = Tag}]};
+ast_body({qcon, _, Name}, Icode) ->
     Tag = aeso_icode:get_constructor_tag(Name, Icode),
     #tuple{cpts = [#integer{value = Tag}]};
 ast_body({app, _, {typed, _, {con, _, Name}, _}, Args}, Icode) ->
+    Tag = aeso_icode:get_constructor_tag([Name], Icode),
+    #tuple{cpts = [#integer{value = Tag} | [ ast_body(Arg, Icode) || Arg <- Args ]]};
+ast_body({app, _, {typed, _, {qcon, _, Name}, _}, Args}, Icode) ->
     Tag = aeso_icode:get_constructor_tag(Name, Icode),
     #tuple{cpts = [#integer{value = Tag} | [ ast_body(Arg, Icode) || Arg <- Args ]]};
 ast_body({app,As,Fun,Args}, Icode) ->
