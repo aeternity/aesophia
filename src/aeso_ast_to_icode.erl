@@ -316,6 +316,12 @@ ast_body({map, _, Map, [Upd]}, Icode) ->
 ast_body({map, Ann, Map, [Upd | Upds]}, Icode) ->
     ast_body({map, Ann, {map, Ann, Map, [Upd]}, Upds}, Icode);
 
+%% Crypto
+ast_body(?qid_app(["Crypto", "ecverify"], [Msg, PK, Sig], _, _), Icode) ->
+    prim_call(?PRIM_CALL_CRYPTO_ECVERIFY, #integer{value = 0},
+              [ast_body(Msg, Icode), ast_body(PK, Icode), ast_body(Sig, Icode)],
+              [word, word, sign_t()], word);
+
 %% Strings
 %% -- String length
 ast_body(?qid_app(["String", "length"], [String], _, _), Icode) ->
