@@ -149,11 +149,16 @@ global_env() ->
      {["Map", "member"],         Fun([K, Map(K, V)], Bool)},
      {["Map", "size"],           Fun1(Map(K, V), Int)},
      %% Crypto/Curve operations
-     {["Crypto", "ecverify"],    Fun([Hash, Address, SignId], Bool)},
+     {["Crypto", "ecverify"], Fun([Hash, Address, SignId], Bool)},
+     {["Crypto", "sha3"],     Fun1(A, Hash)},
+     {["Crypto", "sha256"],   Fun1(A, Hash)},
+     {["Crypto", "blake2b"],  Fun1(A, Hash)},
      %% Strings
-     {["String", "length"], Fun1(String, Int)},
-     {["String", "concat"], Fun([String, String], String)},
-     {["String", "sha3"],   Fun1(String, Hash)},
+     {["String", "length"],  Fun1(String, Int)},
+     {["String", "concat"],  Fun([String, String], String)},
+     {["String", "sha3"],    Fun1(String, Hash)},
+     {["String", "sha256"],  Fun1(String, Hash)},
+     {["String", "blake2b"], Fun1(String, Hash)},
      %% Conversion
      {["Int", "to_str"],     Fun1(Int, String)},
      {["Address", "to_str"], Fun1(Address, String)}

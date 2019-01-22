@@ -322,6 +322,17 @@ ast_body(?qid_app(["Crypto", "ecverify"], [Msg, PK, Sig], _, _), Icode) ->
               [ast_body(Msg, Icode), ast_body(PK, Icode), ast_body(Sig, Icode)],
               [word, word, sign_t()], word);
 
+ast_body(?qid_app(["Crypto", "sha3"], [Term], [Type], _), Icode) ->
+    generic_hash_primop(?PRIM_CALL_CRYPTO_SHA3, Term, Type, Icode);
+ast_body(?qid_app(["Crypto", "sha256"], [Term], [Type], _), Icode) ->
+    generic_hash_primop(?PRIM_CALL_CRYPTO_SHA256, Term, Type, Icode);
+ast_body(?qid_app(["Crypto", "blake2b"], [Term], [Type], _), Icode) ->
+    generic_hash_primop(?PRIM_CALL_CRYPTO_BLAKE2B, Term, Type, Icode);
+ast_body(?qid_app(["String", "sha256"], [String], _, _), Icode) ->
+    string_hash_primop(?PRIM_CALL_CRYPTO_SHA256_STRING, String, Icode);
+ast_body(?qid_app(["String", "blake2b"], [String], _, _), Icode) ->
+    string_hash_primop(?PRIM_CALL_CRYPTO_BLAKE2B_STRING, String, Icode);
+
 %% Strings
 %% -- String length
 ast_body(?qid_app(["String", "length"], [String], _, _), Icode) ->
@@ -598,6 +609,16 @@ prim_call(Prim, Amount, Args, ArgTypes, OutType) ->
                          arg      = #tuple{cpts = [#integer{ value = Prim }| Args]},
                          type_hash= #integer{value = TypeHash}
                        }.
+
+generic_hash_primop(PrimOp, Term, Type, Icode) ->
+    ArgType   = ast_type(Type, Icode),
+    TypeValue = type_value(ArgType),
+    prim_call(PrimOp, #integer{value = 0},
+        [TypeValue, ast_body(Term, Icode)],
+        [typerep, ArgType], word).
+
+string_hash_primop(PrimOp, String, Icode) ->
+    prim_call(PrimOp, #integer{value = 0}, [ast_body(String, Icode)], [string], word).
 
 make_type_def(Args, Def, Icode = #{ type_vars := TypeEnv }) ->
     TVars = [ X || {tvar, _, X} <- Args ],
