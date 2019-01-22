@@ -81,8 +81,9 @@ option_some(X) -> {tuple, [{integer, 1}, X]}.
 -define(EXP(A, B), op('^', A, B)).
 -define(AND(A, B), op('&&', A, B)).
 
--define(BSL(X, B), ?MUL(X, ?EXP(2, ?MUL(B, 8)))).
--define(BSR(X, B), ?DIV(X, ?EXP(2, ?MUL(B, 8)))).
+%% Bit shift operations takes their arguments backwards!?
+-define(BSL(X, B), op('bsl', ?MUL(B, 8), X)).
+-define(BSR(X, B), op('bsr', ?MUL(B, 8), X)).
 
 op(Op, A, B) -> {binop, Op, operand(A), operand(B)}.
 

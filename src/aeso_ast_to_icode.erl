@@ -526,12 +526,9 @@ ast_binop(Op, Ann, {typed, _, A, Type}, B, Icode)
 ast_binop('++', _, A, B, Icode) ->
     #funcall{ function = #var_ref{ name = {builtin, list_concat} },
               args     = [ast_body(A, Icode), ast_body(B, Icode)] };
-ast_binop('bsl', _, A, B, Icode) ->
-    #binop{op = '*', left = ast_body(A, Icode),
-                     right = #binop{op = '^', left = {integer, 2}, right = ast_body(B, Icode)}};
-ast_binop('bsr', _, A, B, Icode) ->
-    #binop{op = 'div', left = ast_body(A, Icode),
-                       right = #binop{op = '^', left = {integer, 2}, right = ast_body(B, Icode)}};
+%% Bit shift operations takes their arguments backwards!?
+ast_binop(Op, _, A, B, Icode) when Op =:= 'bsl'; Op =:= 'bsr' ->
+    #binop{op = Op, right = ast_body(A, Icode), left = ast_body(B, Icode)};
 ast_binop(Op, _, A, B, Icode) ->
     #binop{op = Op, left = ast_body(A, Icode), right = ast_body(B, Icode)}.
 
