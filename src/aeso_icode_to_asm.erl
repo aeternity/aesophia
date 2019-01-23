@@ -562,6 +562,8 @@ assemble_infix('^')    -> i(?EXP);
 assemble_infix('bor')  -> i(?OR);
 assemble_infix('band') -> i(?AND);
 assemble_infix('bxor') -> i(?XOR);
+assemble_infix('bsl')  -> i(?SHL);
+assemble_infix('bsr')  -> i(?SHR);
 assemble_infix('<')    -> i(?SLT);    %% comparisons are SIGNED
 assemble_infix('>')    -> i(?SGT);
 assemble_infix('==')   -> i(?EQ);
