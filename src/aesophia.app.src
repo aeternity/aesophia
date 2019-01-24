@@ -5,6 +5,7 @@
   {applications,
    [kernel,
     stdlib,
+    jsx,
     syntax_tools,
     getopt,
     aebytecode
