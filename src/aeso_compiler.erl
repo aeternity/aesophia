@@ -252,7 +252,7 @@ parse_error({Line,Pos}, ErrorString) ->
     error({parse_errors,[Error]}).
 
 read_contract(Name) ->
-    {ok, Bin} = file:read_file(filename:join(contract_path(), lists:concat([Name, ".aes"]))),
+    {ok, Bin} = file:read_file(Name),
     binary_to_list(Bin).
 
 contract_path() ->
