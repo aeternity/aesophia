@@ -21,8 +21,8 @@
 -include("aeso_icode.hrl").
 
 
--type option() :: pp_sophia_code | pp_ast | pp_icode | pp_assembler |
-                  pp_bytecode.
+-type option() :: pp_sophia_code | pp_ast | pp_types | pp_typed_ast |
+		  pp_icode| pp_assembler | pp_bytecode.
 -type options() :: [option()].
 
 -export_type([ option/0
@@ -43,29 +43,51 @@ file(Filename) ->
     file(Filename, []).
 
 -spec file(string(), options()) -> map().
-file(Filename, Options) ->
-    C = read_contract(Filename),
-    from_string(C, Options).
+file(File, Options) ->
+    case read_contract(File, Options) of
+	{ok,Bin} -> from_string(Bin, Options);
+	{error,Error} -> {error,{File,Error}}
+    end.
 
--spec from_string(string(), options()) -> map().
+-spec from_string(binary() | string(), options()) -> map().
+from_string(ContractBin, Options) when is_binary(ContractBin) ->
+    from_string(binary_to_list(ContractBin), Options);
 from_string(ContractString, Options) ->
-    Ast = parse(ContractString, Options),
-    ok = pp_sophia_code(Ast, Options),
-    ok = pp_ast(Ast, Options),
-    TypedAst = aeso_ast_infer_types:infer(Ast, Options),
-    %% pp_types is handled inside aeso_ast_infer_types.
-    ok = pp_typed_ast(TypedAst, Options),
-    ICode = to_icode(TypedAst, Options),
-    TypeInfo = extract_type_info(ICode),
-    ok = pp_icode(ICode, Options),
-    Assembler =  assemble(ICode, Options),
-    ok = pp_assembler(Assembler, Options),
-    ByteCodeList = to_bytecode(Assembler, Options),
-    ByteCode = << << B:8 >> || B <- ByteCodeList >>,
-    ok = pp_bytecode(ByteCode, Options),
-    #{byte_code => ByteCode, type_info => TypeInfo,
-      contract_source => ContractString,
-      compiler_version => version()}.
+    try
+	Ast = parse(ContractString, Options),
+	ok = pp_sophia_code(Ast, Options),
+	ok = pp_ast(Ast, Options),
+	TypedAst = aeso_ast_infer_types:infer(Ast, Options),
+	%% pp_types is handled inside aeso_ast_infer_types.
+	ok = pp_typed_ast(TypedAst, Options),
+	ICode = to_icode(TypedAst, Options),
+	TypeInfo = extract_type_info(ICode),
+	ok = pp_icode(ICode, Options),
+	Assembler =  assemble(ICode, Options),
+	ok = pp_assembler(Assembler, Options),
+	ByteCodeList = to_bytecode(Assembler, Options),
+	ByteCode = << << B:8 >> || B <- ByteCodeList >>,
+	ok = pp_bytecode(ByteCode, Options),
+	{ok,#{byte_code => ByteCode,
+	      compiler_version => version(),
+	      contract_source => ContractString,
+	      type_info => TypeInfo
+	     }}
+    catch
+        %% The compiler errors.
+        error:{parse_errors,Errors} ->
+	    {error,join_errors("Parse errors", Errors, fun(E) -> E end)};
+        error:{type_errors,Errors} ->
+	    {error,join_errors("Type errors", Errors, fun(E) -> E end)};
+        error:{code_errors,Errors} ->
+            {error,join_errors("Code errors", Errors,
+			       fun (E) -> io_lib:format("~p", [E]) end)}
+        %% General programming errors in the compiler just signal error.
+    end.
+
+join_errors(Prefix, Errors, Pfun) ->
+    Ess = [ Pfun(E) || E <- Errors ],
+    list_to_binary(string:join([Prefix|Ess], "\n")).
 
 -define(CALL_NAME, "__call").
 
@@ -76,26 +98,36 @@ from_string(ContractString, Options) ->
 -spec check_call(string(), options()) -> {ok, string(), {[Type], Type | any}, [term()]} | {error, term()}
     when Type :: term().
 check_call(ContractString, Options) ->
-    Ast = parse(ContractString, Options),
-    ok = pp_sophia_code(Ast, Options),
-    ok = pp_ast(Ast, Options),
-    TypedAst = aeso_ast_infer_types:infer(Ast, [permissive_address_literals]),
-    {ok, {FunName, {fun_t, _, _, ArgTypes, RetType}}} = get_call_type(TypedAst),
-    ok = pp_typed_ast(TypedAst, Options),
-    Icode = to_icode(TypedAst, Options),
-    ArgVMTypes = [ aeso_ast_to_icode:ast_typerep(T, Icode) || T <- ArgTypes ],
-    RetVMType  = case RetType of
-                    {id, _, "_"} -> any;
-                    _            -> aeso_ast_to_icode:ast_typerep(RetType, Icode)
-                end,
-    ok = pp_icode(Icode, Options),
-    #{ functions := Funs } = Icode,
-    ArgIcode = get_arg_icode(Funs),
-    try [ icode_to_term(T, Arg) || {T, Arg} <- lists:zip(ArgVMTypes, ArgIcode) ] of
-        ArgTerms ->
-            {ok, FunName, {ArgVMTypes, RetVMType}, ArgTerms}
-    catch throw:Err ->
-        {error, Err}
+    try
+	Ast = parse(ContractString, Options),
+	ok = pp_sophia_code(Ast, Options),
+	ok = pp_ast(Ast, Options),
+	TypedAst = aeso_ast_infer_types:infer(Ast, [permissive_address_literals]),
+	{ok, {FunName, {fun_t, _, _, ArgTypes, RetType}}} = get_call_type(TypedAst),
+	ok = pp_typed_ast(TypedAst, Options),
+	Icode = to_icode(TypedAst, Options),
+	ArgVMTypes = [ aeso_ast_to_icode:ast_typerep(T, Icode) || T <- ArgTypes ],
+	RetVMType  = case RetType of
+			 {id, _, "_"} -> any;
+			 _            -> aeso_ast_to_icode:ast_typerep(RetType, Icode)
+		     end,
+	ok = pp_icode(Icode, Options),
+	#{ functions := Funs } = Icode,
+	ArgIcode = get_arg_icode(Funs),
+	ArgTerms = [ icode_to_term(T, Arg) ||
+		       {T, Arg} <- lists:zip(ArgVMTypes, ArgIcode) ],
+	{ok, FunName, {ArgVMTypes, RetVMType}, ArgTerms}
+    catch
+	error:{parse_errors, Errors} ->
+	    {error,join_errors("Parse errors", Errors, fun (E) -> E end)};
+	error:{type_errors, Errors} ->
+	    {error,join_errors("Type errors", Errors, fun (E) -> E end)};
+	error:{badmatch,{error,missing_call_function}} ->
+	    {error,join_errors("Type errors", ["missing __call function"],
+			       fun (E) -> E end)};
+	throw:Error ->				%Don't ask
+            {error,join_errors("Code errors", [Error],
+			       fun (E) -> io_lib:format("~p", [E]) end)}
     end.
 
 -spec create_calldata(map(), string(), string()) ->
@@ -113,7 +145,7 @@ create_calldata(Contract, Function, Argument) when is_map(Contract) ->
     %% Function should be "foo : type", and
     %% Argument should be "Arg1, Arg2, .., ArgN" (no parens)
     case string:lexemes(Function, ": ") of
-                     %% If function is a single word fallback to old calldata generation
+        %% If function is a single word fallback to old calldata generation
         [FunName] -> aeso_abi:old_create_calldata(Contract, FunName, Argument);
         [FunName | _] ->
             Args    = lists:map(fun($\n) -> 32; (X) -> X end, Argument),    %% newline to space
@@ -251,9 +283,13 @@ parse_error({Line,Pos}, ErrorString) ->
     Error = io_lib:format("line ~p, column ~p: ~s", [Line,Pos,ErrorString]),
     error({parse_errors,[Error]}).
 
-read_contract(Name) ->
-    {ok, Bin} = file:read_file(filename:join(contract_path(), lists:concat([Name, ".aes"]))),
-    binary_to_list(Bin).
+read_contract(Name, Opts) ->
+    FileName = filename(Name, ".aes", Opts),
+    file:read_file(FileName).
 
-contract_path() ->
-    "apps/aesophia/test/contracts".
+filename(File, Suffix, _Opts) ->
+    Base = filename:basename(File, Suffix),
+    Sdir = filename:dirname(File),
+    if Sdir == "." -> Base ++ Suffix;
+       true -> filename:join(Sdir, Base ++ Suffix)
+    end.

@@ -17,11 +17,12 @@ line({symbol, Line, _}) -> Line.
 symbol_name({symbol, _, Name}) -> Name.
 
 pp(Ast) ->
-    %% TODO: Actually do *Pretty* printing.
-    io:format("~p~n", [Ast]).
+    %% io:format("Tree:\n~p\n",[Ast]),
+    String = prettypr:format(aeso_pretty:decls(Ast, [])),
+    io:format("Ast:\n~s\n", [String]).
 
 pp_typed(TypedAst) ->
+    %% io:format("Typed tree:\n~p\n",[TypedAst]),
     String = prettypr:format(aeso_pretty:decls(TypedAst, [show_generated])),
-    %%io:format("Typed tree:\n~p\n",[TypedAst]),
-    io:format("Type info:\n~s\n",[String]).
+    io:format("Type ast:\n~s\n",[String]).
 
