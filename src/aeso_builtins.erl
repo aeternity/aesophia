@@ -155,6 +155,7 @@ builtin_function(BF) ->
         {baseX_tab, X}             -> bfun(BF, builtin_baseX_tab(X));
         {baseX_int_pad, X}         -> bfun(BF, builtin_baseX_int_pad(X));
         {baseX_int_encode, X}      -> bfun(BF, builtin_baseX_int_encode(X));
+        {baseX_int_encode_, X}     -> bfun(BF, builtin_baseX_int_encode_(X));
         string_reverse             -> bfun(BF, builtin_string_reverse());
         string_reverse_            -> bfun(BF, builtin_string_reverse_())
     end.
