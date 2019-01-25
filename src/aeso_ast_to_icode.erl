@@ -349,24 +349,25 @@ ast_body(?qid_app(["String", "sha3"], [String], _, _), Icode) ->
     #unop{ op = 'sha3', rand = ast_body(String, Icode) };
 
 %% -- Bits
-ast_body(?qid_app(["Bits", "test"], [Bits, Ix], _, _), Icode) ->
-    %% (Bits bsr Ix) band 1
-    #binop{ op    = 'band'
-          , left  = #binop{ op = 'bsr', left = ast_body(Ix, Icode), right = ast_body(Bits, Icode) }
-          , right = #integer{ value = 1 } };
-ast_body(?qid_app(["Bits", "set"], [Bits, Ix], _, _), Icode) ->
-    %% Bits bor (1 bsl Ix)
-    #binop{ op    = 'bor'
-          , left  = ast_body(Bits, Icode)
-          , right = #binop{ op = 'bsl', left = ast_body(Ix, Icode), right = #integer{ value = 1 } } };
-ast_body(?qid_app(["Bits", "clear"], [Bits, Ix], _, _), Icode) ->
-    %% Bits band (bnot (1 bsl Ix))
-    #binop{ op    = 'band'
-          , left  = ast_body(Bits, Icode)
-          , right = #unop{ op   = 'bnot'
-                         , rand = #binop{ op = 'bsl'
-                                        , left = ast_body(Ix, Icode)
-                                        , right = #integer{ value = 1 } } } };
+ast_body(?qid_app(["Bits", Fun], Args, _, _), Icode)
+        when Fun == "test"; Fun == "set"; Fun == "clear";
+             Fun == "union"; Fun == "intersection"; Fun == "difference" ->
+    C  = fun(N) when is_integer(N) -> #integer{ value = N };
+            (AST) -> ast_body(AST, Icode) end,
+    Bin = fun(O) -> fun(A, B) -> #binop{ op = O, left = C(A), right = C(B) } end end,
+    And = Bin('band'),
+    Or  = Bin('bor'),
+    Bsl = fun(A, B) -> (Bin('bsl'))(B, A) end, %% flipped arguments
+    Bsr = fun(A, B) -> (Bin('bsr'))(B, A) end,
+    Neg = fun(A) -> #unop{ op = 'bnot', rand = C(A) } end,
+    case [Fun | Args] of
+        ["test", Bits, Ix]     -> And(Bsr(Bits, Ix), 1);
+        ["set", Bits, Ix]      -> Or(Bits, Bsl(1, Ix));
+        ["clear", Bits, Ix]    -> And(Bits, Neg(Bsl(1, Ix)));
+        ["union", A, B]        -> Or(A, B);
+        ["intersection", A, B] -> And(A, B);
+        ["difference", A, B]   -> And(A, Neg(And(A, B)))
+    end;
 ast_body({qid, _, ["Bits", "zero"]}, _Icode) ->
     #integer{ value = 0 };
 ast_body(?qid_app(["Bits", "sum"], [Bits], _, _), Icode) ->

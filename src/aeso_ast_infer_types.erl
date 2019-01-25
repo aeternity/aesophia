@@ -165,6 +165,9 @@ global_env() ->
      {["Bits", "clear"], Fun([Bits, Int], Bits)},
      {["Bits", "test"],  Fun([Bits, Int], Bool)},
      {["Bits", "sum"],   Fun1(Bits, Int)},
+     {["Bits", "intersection"], Fun([Bits, Bits], Bits)},
+     {["Bits", "union"],        Fun([Bits, Bits], Bits)},
+     {["Bits", "difference"],   Fun([Bits, Bits], Bits)},
      {["Bits", "zero"],  Bits},
      %% Conversion
      {["Int", "to_str"],     Fun1(Int, String)},
