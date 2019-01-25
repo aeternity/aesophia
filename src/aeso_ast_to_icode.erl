@@ -353,14 +353,14 @@ ast_body(?qid_app(["Bits", Fun], Args, _, _), Icode)
         when Fun == "test"; Fun == "set"; Fun == "clear";
              Fun == "union"; Fun == "intersection"; Fun == "difference" ->
     C  = fun(N) when is_integer(N) -> #integer{ value = N };
-            (AST) -> ast_body(AST, Icode) end,
+            (X) -> X end,
     Bin = fun(O) -> fun(A, B) -> #binop{ op = O, left = C(A), right = C(B) } end end,
     And = Bin('band'),
     Or  = Bin('bor'),
     Bsl = fun(A, B) -> (Bin('bsl'))(B, A) end, %% flipped arguments
     Bsr = fun(A, B) -> (Bin('bsr'))(B, A) end,
     Neg = fun(A) -> #unop{ op = 'bnot', rand = C(A) } end,
-    case [Fun | Args] of
+    case [Fun | [ ast_body(Arg, Icode) || Arg <- Args ]] of
         ["test", Bits, Ix]     -> And(Bsr(Bits, Ix), 1);
         ["set", Bits, Ix]      -> Or(Bits, Bsl(1, Ix));
         ["clear", Bits, Ix]    -> And(Bits, Neg(Bsl(1, Ix)));
@@ -371,7 +371,7 @@ ast_body(?qid_app(["Bits", Fun], Args, _, _), Icode)
 ast_body({qid, _, ["Bits", "none"]}, _Icode) ->
     #integer{ value = 0 };
 ast_body({qid, _, ["Bits", "all"]}, _Icode) ->
-    #integer{ value = -1 };
+    #integer{ value = 1 bsl 256 - 1 };
 ast_body(?qid_app(["Bits", "sum"], [Bits], _, _), Icode) ->
     builtin_call(popcount, [ast_body(Bits, Icode), #integer{ value = 0 }]);
 
