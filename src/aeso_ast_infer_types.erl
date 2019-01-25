@@ -79,6 +79,7 @@ global_env() ->
     Event   = {id, Ann, "event"},
     State   = {id, Ann, "state"},
     Hash    = {id, Ann, "hash"},
+    Bits    = {id, Ann, "bits"},
     Oracle  = fun(Q, R) -> {app_t, Ann, {id, Ann, "oracle"}, [Q, R]} end,
     Query   = fun(Q, R) -> {app_t, Ann, {id, Ann, "oracle_query"}, [Q, R]} end,
     Unit    = {tuple_t, Ann, []},
@@ -159,6 +160,12 @@ global_env() ->
      {["String", "sha3"],    Fun1(String, Hash)},
      {["String", "sha256"],  Fun1(String, Hash)},
      {["String", "blake2b"], Fun1(String, Hash)},
+     %% Bits
+     {["Bits", "set"],   Fun([Bits, Int], Bits)},
+     {["Bits", "clear"], Fun([Bits, Int], Bits)},
+     {["Bits", "test"],  Fun([Bits, Int], Bool)},
+     {["Bits", "sum"],   Fun1(Bits, Int)},
+     {["Bits", "zero"],  Bits},
      %% Conversion
      {["Int", "to_str"],     Fun1(Int, String)},
      {["Address", "to_str"], Fun1(Address, String)}

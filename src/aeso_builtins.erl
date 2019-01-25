@@ -148,6 +148,7 @@ builtin_function(BF) ->
         string_shift_copy          -> bfun(BF, builtin_string_shift_copy());
         str_equal_p                -> bfun(BF, builtin_str_equal_p());
         str_equal                  -> bfun(BF, builtin_str_equal());
+        popcount                   -> bfun(BF, builtin_popcount());
         int_to_str                 -> bfun(BF, builtin_int_to_str());
         addr_to_str                -> bfun(BF, builtin_addr_to_str());
         {baseX_int, X}             -> bfun(BF, builtin_baseX_int(X));
@@ -397,6 +398,17 @@ builtin_str_equal() ->
          ?AND(?EQ(n1, n2), ?call(str_equal_p, [?V(n1), ?NXT(s1), ?NXT(s2)]))
      )),
      word}.
+
+%% Count the number of 1s in a bit field.
+builtin_popcount() ->
+    %% function popcount(bits, acc) =
+    %%   if (bits == 0) acc
+    %%   else popcount(bits bsr 1, acc + bits band 1)
+    {[{"bits", word}, {"acc", word}],
+     {ifte, ?EQ(bits, 0),
+        ?V(acc),
+        ?call(popcount, [op('bsr', 1, bits), ?ADD(acc, op('band', bits, 1))])
+     }, word}.
 
 builtin_int_to_str() ->
     {[{"i", word}], ?call({baseX_int, 10}, [?V(i)]), word}.

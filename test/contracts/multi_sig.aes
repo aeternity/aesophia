@@ -5,7 +5,7 @@
 
 contract MultiSig =
 
-    record pending_state = { yetNeeded : uint, ownersDone : uint, index : uint }
+    record pending_state = { yetNeeded : int, ownersDone : bits, index : int }
 
     datatype event =
         Confirmation (address, hash)    // of { .owner : Address, .operation : Hash }
@@ -13,18 +13,18 @@ contract MultiSig =
       | OwnerChanged (address, address) // of { .oldOwner : Address, .newOwner : Address }
       | OwnerAdded   (address)          // of { .newOwner : Address }
       | OwnerRemoved (address)          // of { .removedOwner : Address }
-      | ReqChanged   (uint)             // of { .newReq : uint }
+      | ReqChanged   (int)             // of { .newReq : int }
 
-    let maxOwners : uint = 250
+    let maxOwners : int = 250
 
-    record state = { nRequired    : uint
-                 , nOwners      : uint
-                 , owners       : map(uint, address)
-                 , ownerIndex   : map(address, uint)
+    record state = { nRequired    : int
+                 , nOwners      : int
+                 , owners       : map(int, address)
+                 , ownerIndex   : map(address, int)
                  , pending      : map(hash, pending_state)
                  , pendingIndex : list(address) }
 
-    function init (owners : list(address), nRequired : uint) : state =
+    function init (owners : list(address), nRequired : int) : state =
       let n = length(owners) + 1
       { nRequired  = nRequired,
         nOwners    = n,
@@ -39,10 +39,9 @@ contract MultiSig =
     function revoke(operation : hash) =
       let ownerIx = lookup(state.ownerIndex, caller())
       let pending = lookup(state.pendingIndex, operation)
-      let ownerIxBit = 1 bsl (ownerIx - 1)
-      let _ = require(pending.ownersDone band ownerIxBit > 0)
+      let _ = require(Bits.test(pending.ownersDone, ownerIx))
       let pending' = pending { yetNeeded  = pending.yetNeeded + 1
-                             , ownersDone = pending.ownersDone - ownerIxBit }
+                             , ownersDone = Bits.clear(pending.ownersDone, ownerIx - 1) }
       put(state{ pendingIndex.operator = pending' })
       event(Revoke(caller, operation))
 
@@ -91,7 +90,7 @@ contract MultiSig =
                              , pendingIx = [] },
               event = [OwnerRemoved(oldOwner)] }
 
-    function changeRequirement(newReq : uint) =
+    function changeRequirement(newReq : int) =
       let _ = require(newReq =< state.nOwners)
       switch(check_pending(callhash()))
         CheckFail(state') => { state = state' }
@@ -102,7 +101,7 @@ contract MultiSig =
             event = [ReqChanged(newReq)] }
 
 
-    function getOwner(ownerIx0 : uint) =
+    function getOwner(ownerIx0 : int) =
       lookup(state.owners, ownerIx0 + 1)
 
     function isOwner(owner : address) =
@@ -116,8 +115,7 @@ contract MultiSig =
         Some(pending) =>
           let _ = require(isOwner(owner))
           let ownerIx = lookup(state.ownerIndex, owner)
-          let ownerIxBit = 1 bsl (ownerIx - 1)
-          (pending.ownersDone band ownerIxBit) != 0
+          Bits.test(pending.ownersDone, ownerIx - 1)
 
     /* Leave the rest for now... */
 
