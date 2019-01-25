@@ -368,8 +368,10 @@ ast_body(?qid_app(["Bits", Fun], Args, _, _), Icode)
         ["intersection", A, B] -> And(A, B);
         ["difference", A, B]   -> And(A, Neg(And(A, B)))
     end;
-ast_body({qid, _, ["Bits", "zero"]}, _Icode) ->
+ast_body({qid, _, ["Bits", "none"]}, _Icode) ->
     #integer{ value = 0 };
+ast_body({qid, _, ["Bits", "all"]}, _Icode) ->
+    #integer{ value = -1 };
 ast_body(?qid_app(["Bits", "sum"], [Bits], _, _), Icode) ->
     builtin_call(popcount, [ast_body(Bits, Icode), #integer{ value = 0 }]);
 

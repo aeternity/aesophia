@@ -168,7 +168,8 @@ global_env() ->
      {["Bits", "intersection"], Fun([Bits, Bits], Bits)},
      {["Bits", "union"],        Fun([Bits, Bits], Bits)},
      {["Bits", "difference"],   Fun([Bits, Bits], Bits)},
-     {["Bits", "zero"],  Bits},
+     {["Bits", "none"],  Bits},
+     {["Bits", "all"],   Bits},
      %% Conversion
      {["Int", "to_str"],     Fun1(Int, String)},
      {["Address", "to_str"], Fun1(Address, String)}
