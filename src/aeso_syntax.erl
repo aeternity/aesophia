@@ -75,10 +75,10 @@
 
 -type op() :: bin_op() | un_op().
 
--type bin_op() :: '+' | '-' | '*' | '/' | mod | '^' | 'band' | 'bor' | 'bsl' | 'bsr' | 'bxor'
+-type bin_op() :: '+' | '-' | '*' | '/' | mod | '^'
                 | '++' | '::' | '<' | '>' | '=<' | '>=' | '==' | '!='
                 | '||' | '&&' | '..'.
--type un_op() :: '-' | '!' | 'bnot'.
+-type un_op() :: '-' | '!'.
 
 -type expr()
     :: {lam, ann(), [arg()], expr()}

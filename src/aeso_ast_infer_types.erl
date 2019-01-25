@@ -691,8 +691,7 @@ infer_infix({BoolOp, As})
     {fun_t, As, [], [Bool,Bool], Bool};
 infer_infix({IntOp, As})
   when IntOp == '+';    IntOp == '-';   IntOp == '*';   IntOp == '/';
-       IntOp == '^';    IntOp == 'mod'; IntOp == 'bsl'; IntOp == 'bsr';
-       IntOp == 'band'; IntOp == 'bor'; IntOp == 'bxor' ->
+       IntOp == '^';    IntOp == 'mod' ->
     Int = {id, As, "int"},
     {fun_t, As, [], [Int, Int], Int};
 infer_infix({RelOp, As})
@@ -714,8 +713,7 @@ infer_infix({'++', As}) ->
 infer_prefix({'!',As}) ->
     Bool = {id, As, "bool"},
     {fun_t, As, [], [Bool], Bool};
-infer_prefix({IntOp,As})
-  when IntOp =:= '-'; IntOp =:= 'bnot' ->
+infer_prefix({IntOp,As}) when IntOp =:= '-' ->
     Int = {id, As, "int"},
     {fun_t, As, [], [Int], Int}.
 
