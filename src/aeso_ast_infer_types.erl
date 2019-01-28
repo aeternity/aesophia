@@ -79,6 +79,7 @@ global_env() ->
     Event   = {id, Ann, "event"},
     State   = {id, Ann, "state"},
     Hash    = {id, Ann, "hash"},
+    Bits    = {id, Ann, "bits"},
     Oracle  = fun(Q, R) -> {app_t, Ann, {id, Ann, "oracle"}, [Q, R]} end,
     Query   = fun(Q, R) -> {app_t, Ann, {id, Ann, "oracle_query"}, [Q, R]} end,
     Unit    = {tuple_t, Ann, []},
@@ -159,6 +160,16 @@ global_env() ->
      {["String", "sha3"],    Fun1(String, Hash)},
      {["String", "sha256"],  Fun1(String, Hash)},
      {["String", "blake2b"], Fun1(String, Hash)},
+     %% Bits
+     {["Bits", "set"],   Fun([Bits, Int], Bits)},
+     {["Bits", "clear"], Fun([Bits, Int], Bits)},
+     {["Bits", "test"],  Fun([Bits, Int], Bool)},
+     {["Bits", "sum"],   Fun1(Bits, Int)},
+     {["Bits", "intersection"], Fun([Bits, Bits], Bits)},
+     {["Bits", "union"],        Fun([Bits, Bits], Bits)},
+     {["Bits", "difference"],   Fun([Bits, Bits], Bits)},
+     {["Bits", "none"],  Bits},
+     {["Bits", "all"],   Bits},
      %% Conversion
      {["Int", "to_str"],     Fun1(Int, String)},
      {["Address", "to_str"], Fun1(Address, String)}
@@ -691,8 +702,7 @@ infer_infix({BoolOp, As})
     {fun_t, As, [], [Bool,Bool], Bool};
 infer_infix({IntOp, As})
   when IntOp == '+';    IntOp == '-';   IntOp == '*';   IntOp == '/';
-       IntOp == '^';    IntOp == 'mod'; IntOp == 'bsl'; IntOp == 'bsr';
-       IntOp == 'band'; IntOp == 'bor'; IntOp == 'bxor' ->
+       IntOp == '^';    IntOp == 'mod' ->
     Int = {id, As, "int"},
     {fun_t, As, [], [Int, Int], Int};
 infer_infix({RelOp, As})
@@ -714,8 +724,7 @@ infer_infix({'++', As}) ->
 infer_prefix({'!',As}) ->
     Bool = {id, As, "bool"},
     {fun_t, As, [], [Bool], Bool};
-infer_prefix({IntOp,As})
-  when IntOp =:= '-'; IntOp =:= 'bnot' ->
+infer_prefix({IntOp,As}) when IntOp =:= '-' ->
     Int = {id, As, "int"},
     {fun_t, As, [], [Int], Int}.
 

@@ -176,11 +176,11 @@ expr200() -> infixr(expr300(), binop('||')).
 expr300() -> infixr(expr400(), binop('&&')).
 expr400() -> infix(expr500(),  binop(['<', '>', '=<', '>=', '==', '!='])).
 expr500() -> infixr(expr600(), binop(['::', '++'])).
-expr600() -> infixl(expr650(), binop(['+', '-', 'bor', 'bxor', 'bsr', 'bsl'])).
+expr600() -> infixl(expr650(), binop(['+', '-'])).
 expr650() -> ?RULE(many(token('-')), expr700(), prefixes(_1, _2)).
-expr700() -> infixl(expr750(), binop(['*', '/', mod, 'band'])).
+expr700() -> infixl(expr750(), binop(['*', '/', mod])).
 expr750() -> infixl(expr800(), binop(['^'])).
-expr800() -> ?RULE(many(choice(token('!'), token('bnot'))), expr900(), prefixes(_1, _2)).
+expr800() -> ?RULE(many(token('!')), expr900(), prefixes(_1, _2)).
 expr900() -> ?RULE(exprAtom(), many(elim()), elim(_1, _2)).
 
 exprAtom() ->

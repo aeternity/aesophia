@@ -348,6 +348,33 @@ ast_body(?qid_app(["String", "concat"], [String1, String2], _, _), Icode) ->
 ast_body(?qid_app(["String", "sha3"], [String], _, _), Icode) ->
     #unop{ op = 'sha3', rand = ast_body(String, Icode) };
 
+%% -- Bits
+ast_body(?qid_app(["Bits", Fun], Args, _, _), Icode)
+        when Fun == "test"; Fun == "set"; Fun == "clear";
+             Fun == "union"; Fun == "intersection"; Fun == "difference" ->
+    C  = fun(N) when is_integer(N) -> #integer{ value = N };
+            (X) -> X end,
+    Bin = fun(O) -> fun(A, B) -> #binop{ op = O, left = C(A), right = C(B) } end end,
+    And = Bin('band'),
+    Or  = Bin('bor'),
+    Bsl = fun(A, B) -> (Bin('bsl'))(B, A) end, %% flipped arguments
+    Bsr = fun(A, B) -> (Bin('bsr'))(B, A) end,
+    Neg = fun(A) -> #unop{ op = 'bnot', rand = C(A) } end,
+    case [Fun | [ ast_body(Arg, Icode) || Arg <- Args ]] of
+        ["test", Bits, Ix]     -> And(Bsr(Bits, Ix), 1);
+        ["set", Bits, Ix]      -> Or(Bits, Bsl(1, Ix));
+        ["clear", Bits, Ix]    -> And(Bits, Neg(Bsl(1, Ix)));
+        ["union", A, B]        -> Or(A, B);
+        ["intersection", A, B] -> And(A, B);
+        ["difference", A, B]   -> And(A, Neg(And(A, B)))
+    end;
+ast_body({qid, _, ["Bits", "none"]}, _Icode) ->
+    #integer{ value = 0 };
+ast_body({qid, _, ["Bits", "all"]}, _Icode) ->
+    #integer{ value = 1 bsl 256 - 1 };
+ast_body(?qid_app(["Bits", "sum"], [Bits], _, _), Icode) ->
+    builtin_call(popcount, [ast_body(Bits, Icode), #integer{ value = 0 }]);
+
 %% -- Conversion
 ast_body(?qid_app(["Int", "to_str"], [Int], _, _), Icode) ->
     builtin_call(int_to_str, [ast_body(Int, Icode)]);
@@ -526,9 +553,6 @@ ast_binop(Op, Ann, {typed, _, A, Type}, B, Icode)
 ast_binop('++', _, A, B, Icode) ->
     #funcall{ function = #var_ref{ name = {builtin, list_concat} },
               args     = [ast_body(A, Icode), ast_body(B, Icode)] };
-%% Bit shift operations takes their arguments backwards!?
-ast_binop(Op, _, A, B, Icode) when Op =:= 'bsl'; Op =:= 'bsr' ->
-    #binop{op = Op, right = ast_body(A, Icode), left = ast_body(B, Icode)};
 ast_binop(Op, _, A, B, Icode) ->
     #binop{op = Op, left = ast_body(A, Icode), right = ast_body(B, Icode)}.
 
