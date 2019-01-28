@@ -5,7 +5,6 @@
   {applications,
    [kernel,
     stdlib,
-    enacl,
     syntax_tools,
     aebytecode
    ]},
