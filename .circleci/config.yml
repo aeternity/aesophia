@@ -14,9 +14,9 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - dialyzer-cache-v1-{{ .Branch }}-{{ .Revision }}
-            - dialyzer-cache-v1-{{ .Branch }}-
-            - dialyzer-cache-v1-
+            - dialyzer-cache-v2-{{ .Branch }}-{{ .Revision }}
+            - dialyzer-cache-v2-{{ .Branch }}-
+            - dialyzer-cache-v2-
       - run:
           name: Build
           command: rebar3 compile
@@ -30,7 +30,7 @@ jobs:
           name: Common Tests
           command: rebar3 ct
       - save_cache:
-          key: dialyzer-cache-v1-{{ .Branch }}-{{ .Revision }}
+          key: dialyzer-cache-v2-{{ .Branch }}-{{ .Revision }}
           paths:
             - _build/default/rebar3_20.3.8_plt
       - store_artifacts:
