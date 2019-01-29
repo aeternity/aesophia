@@ -1,9 +1,9 @@
 version: 2.1
 
-executors: # a reusable executor
+executors:
   aebuilder:
     docker:
-      - image: aeternity/builder
+      - image: aeternity/builder:ci-build-add_rebar3
         user: builder
     working_directory: ~/aesophia
 
