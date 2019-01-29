@@ -170,7 +170,7 @@ expr(E) -> expr_p(0, E).
 
 %% -- Not exported -----------------------------------------------------------
 
--spec name(aeso_syntax:id() | aeso_syntax:con() | aeso_syntax:tvar()) -> doc().
+-spec name(aeso_syntax:id() | aeso_syntax:qid() | aeso_syntax:con() | aeso_syntax:qcon() | aeso_syntax:tvar()) -> doc().
 name({id, _,   Name})  -> text(Name);
 name({con, _,  Name})  -> text(Name);
 name({qid, _,  Names}) -> text(string:join(Names, "."));
