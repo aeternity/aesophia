@@ -32,6 +32,6 @@ jobs:
       - save_cache:
           key: dialyzer-cache-v1-{{ .Branch }}-{{ .Revision }}
           paths:
-            - _build/default/rebar3_20.1.7_plt
+            - _build/default/rebar3_20.3.8_plt
       - store_artifacts:
           path: _build/test/logs
