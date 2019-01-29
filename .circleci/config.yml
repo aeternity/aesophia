@@ -3,7 +3,7 @@ version: 2.1
 executors:
   aebuilder:
     docker:
-      - image: aeternity/builder:ci-build-add_rebar3
+      - image: aeternity/builder
         user: builder
     working_directory: ~/aesophia
 
