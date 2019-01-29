@@ -1,0 +1,37 @@
+version: 2.1
+
+executors: # a reusable executor
+  aebuilder:
+    docker:
+      - image: aeternity/builder
+        user: builder
+    working_directory: ~/aesophia
+
+jobs:
+  build:
+    executor: aebuilder
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - dialyzer-cache-v1-{{ .Branch }}-{{ .Revision }}
+            - dialyzer-cache-v1-{{ .Branch }}-
+            - dialyzer-cache-v1-
+      - run:
+          name: Build
+          command: rebar3 compile
+      - run:
+          name: Static Analysis
+          command: rebar3 dialyzer
+      - run:
+          name: Eunit
+          command: rebar3 eunit
+      - run:
+          name: Common Tests
+          command: rebar3 ct
+      - save_cache:
+          key: dialyzer-cache-v1-{{ .Branch }}-{{ .Revision }}
+          paths:
+            - _build/default/rebar3_20.1.7_plt
+      - store_artifacts:
+          path: _build/test/logs
