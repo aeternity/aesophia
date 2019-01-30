@@ -255,5 +255,3 @@ read_contract(Name) ->
     {ok, Bin} = file:read_file(Name),
     binary_to_list(Bin).
 
-contract_path() ->
-    "apps/aesophia/test/contracts".
