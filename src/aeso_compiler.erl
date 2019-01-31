@@ -99,7 +99,7 @@ check_call(ContractString, Options) ->
     end.
 
 -spec create_calldata(map(), string(), string()) ->
-                             {ok, aeso_sophia:heap(), aeso_sophia:type(), aeso_sophia:type()}
+                             {ok, binary(), aeso_sophia:type(), aeso_sophia:type()}
                                  | {error, argument_syntax_error}.
 create_calldata(Contract, "", CallCode) when is_map(Contract) ->
     case check_call(CallCode, []) of
@@ -252,8 +252,6 @@ parse_error({Line,Pos}, ErrorString) ->
     error({parse_errors,[Error]}).
 
 read_contract(Name) ->
-    {ok, Bin} = file:read_file(filename:join(contract_path(), lists:concat([Name, ".aes"]))),
+    {ok, Bin} = file:read_file(Name),
     binary_to_list(Bin).
 
-contract_path() ->
-    "apps/aesophia/test/contracts".

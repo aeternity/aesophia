@@ -1,8 +1,10 @@
+{"1.1.0",
 [{<<"aebytecode">>,
   {git,"https://github.com/aeternity/aebytecode.git",
        {ref,"99bf097759dedbe7553f87a796bc7e1c7322e64b"}},
   0},
- {<<"enacl">>,
-  {git,"https://github.com/aeternity/enacl.git",
-       {ref,"26180f42c0b3a450905d2efd8bc7fd5fd9cece75"}},
-  0}].
+ {<<"getopt">>,{pkg,<<"getopt">>,<<"1.0.1">>},0}]}.
+[
+{pkg_hash,[
+ {<<"getopt">>, <<"C73A9FA687B217F2FF79F68A3B637711BB1936E712B521D8CE466B29CBF7808A">>}]}
+].

@@ -27,8 +27,8 @@
 -type typerep() :: aeso_sophia:type().
 -type function_type_info() :: { FunctionHash :: hash()
                               , FunctionName :: function_name()
-                              , ArgType      :: aeso_sophia:heap() %% binary typerep
-                              , OutType      :: aeso_sophia:heap() %% binary typerep
+                              , ArgType      :: binary() %% binary typerep
+                              , OutType      :: binary() %% binary typerep
                               }.
 -type type_info() :: [function_type_info()].
 
@@ -84,8 +84,8 @@ check_given_type(FunName, GivenArgs, GivenRet, CalldataType, ExpectRet) ->
                         {expected, ExpectArgs, '=>', ExpectRet}}}
     end.
 
--spec check_calldata(aeso_sophia:heap(), type_info()) ->
-                        {'ok', typerep()} | {'error', atom()}.
+-spec check_calldata(binary(), type_info()) ->
+                        {'ok', typerep(), typerep()} | {'error', atom()}.
 check_calldata(CallData, TypeInfo) ->
     %% The first element of the CallData should be the function name
     case get_function_hash_from_calldata(CallData) of
@@ -136,7 +136,7 @@ function_type_hash(Name, ArgType, OutType) when is_binary(Name) ->
                             , aeso_heap:to_binary(OutType)
                             ]),
     %% Calculate a 256 bit digest BLAKE2b hash value of a binary
-    {ok, Hash} = enacl:generichash(?HASH_SIZE, Bin),
+    {ok, Hash} = aeso_blake2:blake2b(?HASH_SIZE, Bin),
     Hash.
 
 -spec arg_typerep_from_function(function_name(), type_info()) ->
@@ -153,7 +153,7 @@ arg_typerep_from_function(Function, TypeInfo) ->
     end.
 
 -spec typereps_from_type_hash(hash(), type_info()) ->
-           {'ok', typerep()} | {'error', 'bad_type_data' | 'unknown_function'}.
+           {'ok', typerep(), typerep()} | {'error', 'bad_type_data' | 'unknown_function'}.
 typereps_from_type_hash(TypeHash, TypeInfo) ->
     case lists:keyfind(TypeHash, 1, TypeInfo) of
         {TypeHash,_Function, ArgTypeBin, OutTypeBin} ->
