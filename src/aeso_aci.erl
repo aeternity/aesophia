@@ -45,9 +45,12 @@ encode(ContractString) ->
     %% io:format("~p\n", [TypedAst]),
     %% aeso_ast:pp(Ast),
     %% aeso_ast:pp_typed(TypedAst),
-    Cname = contract_name(hd(TypedAst)),
-    Tdefs = [ encode_typedef(T) || T <- sort_decls(contract_types(hd(TypedAst))) ],
-    Fdefs = [ encode_func(F) || F <- sort_decls(contract_funcs(hd(TypedAst))) ],
+    %% We look at the first contract.
+    Contract = hd(TypedAst),
+    Cname = contract_name(Contract),
+    Tdefs = [ encode_typedef(T) || T <- sort_decls(contract_types(Contract)) ],
+    Fdefs = [ encode_func(F) || F <- sort_decls(contract_funcs(Contract)),
+				not is_private_func(F) ],
     Jmap = [{<<"contract">>, [{<<"name">>, list_to_binary(Cname)},
 			      {<<"type_defs">>, Tdefs},
 			      {<<"functions">>, Fdefs}]}],
@@ -60,7 +63,8 @@ encode_func(Fdef) ->
     Type = function_type(Fdef),
     [{<<"name">>, list_to_binary(Name)},
      {<<"arguments">>, encode_args(Args)},
-     {<<"type">>, list_to_binary(encode_type(Type))}].
+     {<<"type">>, list_to_binary(encode_type(Type))},
+     {<<"stateful">>, is_stateful_func(Fdef)}].
 
 encode_args(Args) ->
     [ encode_arg(A) || A <- Args ].
@@ -146,18 +150,19 @@ decode_args(As) ->
 
 decode_arg(#{<<"type">> := T}) -> decode_type(T).
 
-decode_tdefs(Ts) -> [ decode_tdef(T) || T <- Ts ].
+%% To keep dialyzer happy and quiet.
+%% decode_tdefs(Ts) -> [ decode_tdef(T) || T <- Ts ].
 
-decode_tdef(#{<<"name">> := Name,<<"vars">> := Vs,<<"typedef">> := T}) ->
-    ["  type"," ",io_lib:format("~s", [Name]),decode_tvars(Vs),
-     " = ",decode_type(T),$\n].
+%% decode_tdef(#{<<"name">> := Name,<<"vars">> := Vs,<<"typedef">> := T}) ->
+%%     ["  type"," ",io_lib:format("~s", [Name]),decode_tvars(Vs),
+%%      " = ",decode_type(T),$\n].
 
-decode_tvars([]) -> [];				%No tvars, no parentheses
-decode_tvars(Vs) ->
-    Dvs = [ decode_tvar(V) || V <- Vs ],
-    [$(,lists:join(", ", Dvs),$)].
+%% decode_tvars([]) -> [];				%No tvars, no parentheses
+%% decode_tvars(Vs) ->
+%%     Dvs = [ decode_tvar(V) || V <- Vs ],
+%%     [$(,lists:join(", ", Dvs),$)].
 
-decode_tvar(#{<<"name">> := N}) -> io_lib:format("~s", [N]).
+%% decode_tvar(#{<<"name">> := N}) -> io_lib:format("~s", [N]).
 
 %% #contract{Ann, Con, [Declarations]}.
 
@@ -170,10 +175,9 @@ contract_types(#contract{decls=Decls}) ->
     [ D || D <- Decls, is_record(D, type_def) ].
 
 sort_decls(Ds) ->
-    %% We can easily sort them in annotation, they all should have the
-    %% same column.
     Sort = fun (D1, D2) ->
-		   aeso_syntax:get_ann(D1) =< aeso_syntax:get_ann(D2)
+		   aeso_syntax:get_ann(line, D1, 0) =<
+		       aeso_syntax:get_ann(line, D2, 0)
 	   end,
     lists:sort(Sort, Ds).
 
@@ -184,6 +188,10 @@ function_name(#letfun{id=#id{name=N}}) -> N.
 function_args(#letfun{args=Args}) -> Args.
 
 function_type(#letfun{type=Type}) -> Type.
+
+is_private_func(#letfun{ann=A}) -> aeso_syntax:get_ann(private, A, false).
+
+is_stateful_func(#letfun{ann=A}) -> aeso_syntax:get_ann(stateful, A, false).
 
 %% #type_def{Ann, Id, [Var], Typedef}.
 
