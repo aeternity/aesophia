@@ -106,21 +106,22 @@ check_event_type(Icode) ->
     end.
 
 check_event_type(Evts, Icode) ->
-    [ check_event_type(Name, T, Icode)
-      || {constr_t, _, {con, _, Name}, Types} <- Evts, T <- Types ].
+    [ check_event_type(Name, Ix, T, Icode)
+      || {constr_t, Ann, {con, _, Name}, Types} <- Evts,
+         {Ix, T} <- lists:zip(aeso_syntax:get_ann(indices, Ann), Types) ].
 
-check_event_type(EvtName, Type, Icode) ->
+check_event_type(EvtName, Ix, Type, Icode) ->
     VMType =
         try
            aeso_ast_to_icode:ast_typerep(Type, Icode)
         catch _:_ ->
             error({EvtName, could_not_resolve_type, Type})
         end,
-    case aeso_syntax:get_ann(indexed, Type, false) of
-        true when VMType == word    -> ok;
-        false when VMType == string -> ok;
-        true  -> error({EvtName, indexed_field_should_be_word, is, VMType});
-        false -> error({EvtName, payload_should_be_string, is, VMType})
+    case {Ix, VMType} of
+        {indexed, word}      -> ok;
+        {notindexed, string} -> ok;
+        {indexed, _}         -> error({EvtName, indexed_field_should_be_word, is, VMType});
+        {notindexed, _}      -> error({EvtName, payload_should_be_string, is, VMType})
     end.
 
 bfun(B, {IArgs, IExpr, IRet}) ->
@@ -169,16 +170,15 @@ builtin_event(EventT) ->
     A         = fun(X) -> aeb_opcodes:mnemonic(X) end,
     VIx       = fun(Ix) -> v(lists:concat(["v", Ix])) end,
     ArgPats   = fun(Ts) -> [ VIx(Ix) || Ix <- lists:seq(0, length(Ts) - 1) ] end,
-    IsIndexed = fun(T) -> aeso_syntax:get_ann(indexed, T, false) end,
     Payload = %% Should put data ptr, length on stack.
         fun([]) ->  {inline_asm, [A(?PUSH1), 0, A(?PUSH1), 0]};
            ([V]) -> {seq, [V, {inline_asm, [A(?DUP1), A(?MLOAD),                  %% length, ptr
                                             A(?SWAP1), A(?PUSH1), 32, A(?ADD)]}]} %% ptr+32, length
         end,
     Clause =
-        fun(_Tag, {con, _, Con}, Types) ->
-            Indexed   = [ Var || {Var, Type} <- lists:zip(ArgPats(Types), Types),
-                                 IsIndexed(Type) ],
+        fun(_Tag, {con, _, Con}, IxTypes) ->
+            Types     = [ T || {_Ix, T} <- IxTypes ],
+            Indexed   = [ Var || {Var, {indexed, _Type}} <- lists:zip(ArgPats(Types), IxTypes) ],
             EvtIndex  = {unop, 'sha3', str_to_icode(Con)},
             {event, lists:reverse(Indexed) ++ [EvtIndex], Payload(ArgPats(Types) -- Indexed)}
         end,
@@ -189,8 +189,8 @@ builtin_event(EventT) ->
 
     {[{"e", event}],
      {switch, v(e),
-         [{Pat(Tag, Types), Clause(Tag, Con, Types)}
-          || {Tag, {constr_t, _, Con, Types}} <- lists:zip(Tags, Cons) ]},
+         [{Pat(Tag, Types), Clause(Tag, Con, lists:zip(aeso_syntax:get_ann(indices, Ann), Types))}
+          || {Tag, {constr_t, Ann, Con, Types}} <- lists:zip(Tags, Cons) ]},
      {tuple, []}}.
 
 %% Abort primitive.

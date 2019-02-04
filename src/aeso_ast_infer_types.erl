@@ -207,10 +207,7 @@ lookup_name(Env, Name) ->
 
 -spec lookup_type(env(), type_id()) -> false | {qname(), type_info()}.
 lookup_type(Env, Id) ->
-    case lookup_env(Env, type, qname(Id)) of
-        false       -> false;
-        {QId, Type} -> {QId, unfold_types_in_type(Env, push_anns(Id, Type))}
-    end.
+    lookup_env(Env, type, qname(Id)).
 
 -spec lookup_env(env(), term, qname()) -> false | {qname(), fun_info()};
                 (env(), type, qname()) -> false | {qname(), type_info()}.
@@ -562,27 +559,27 @@ check_typedefs(Env, Defs) ->
     TypeMap  = maps:from_list([ {GetName(Def), Def} || Def <- Defs ]),
     DepGraph = maps:map(fun(_, Def) -> aeso_syntax_utils:used_types(Def) end, TypeMap),
     SCCs     = aeso_utils:scc(DepGraph),
-    %% io:format("Dependency sorted types:\n  ~p\n", [SCCs]),
-    Env1     = check_typedef_sccs(Env, TypeMap, SCCs),
+    {Env1, Defs1} = check_typedef_sccs(Env, TypeMap, SCCs, []),
     destroy_and_report_type_errors(),
-    SCCNames = fun({cyclic, Xs}) -> Xs; ({acyclic, X}) -> [X] end,
-    {Env1, [ Def || SCC <- SCCs, Name <- SCCNames(SCC),
-                    Def <- [maps:get(Name, TypeMap, undefined)], Def /= undefined ]}.
+    {Env1, Defs1}.
 
--spec check_typedef_sccs(env(), #{ name() => aeso_syntax:decl() }, [{acyclic, name()} | {cyclic, [name()]}]) ->
-        env().
-check_typedef_sccs(Env, _TypeMap, []) -> Env;
-check_typedef_sccs(Env, TypeMap, [{acyclic, Name} | SCCs]) ->
+-spec check_typedef_sccs(env(), #{ name() => aeso_syntax:decl() },
+                         [{acyclic, name()} | {cyclic, [name()]}], [aeso_syntax:decl()]) ->
+        {env(), [aeso_syntax:decl()]}.
+check_typedef_sccs(Env, _TypeMap, [], Acc) -> {Env, lists:reverse(Acc)};
+check_typedef_sccs(Env, TypeMap, [{acyclic, Name} | SCCs], Acc) ->
     case maps:get(Name, TypeMap, undefined) of
-        undefined -> check_typedef_sccs(Env, TypeMap, SCCs);    %% Builtin type
-        {type_def, Ann, D, Xs, Def} ->
+        undefined -> check_typedef_sccs(Env, TypeMap, SCCs, Acc);    %% Builtin type
+        {type_def, Ann, D, Xs, Def0} ->
+            Def  = check_event(Env, Name, Ann, Def0),
+            Acc1 = [{type_def, Ann, D, Xs, Def} | Acc],
             Env1 = bind_type(Name, Ann, {Xs, Def}, Env),
             case Def of
-                {alias_t, _}  -> check_typedef_sccs(Env1, TypeMap, SCCs); %% TODO: check these
+                {alias_t, _}  -> check_typedef_sccs(Env1, TypeMap, SCCs, Acc1); %% TODO: check these
                 {record_t, Fields} ->
                     RecTy = app_t(Ann, D, Xs),
                     Env2 = check_fields(Env1, TypeMap, RecTy, Fields),
-                    check_typedef_sccs(Env2, TypeMap, SCCs);
+                    check_typedef_sccs(Env2, TypeMap, SCCs, Acc1);
                 {variant_t, Cons} ->
                     Target   = app_t(Ann, D, Xs),
                     ConType  = fun([]) -> Target; (Args) -> {type_sig, Ann, [], Args, Target} end,
@@ -592,14 +589,13 @@ check_typedef_sccs(Env, TypeMap, [{acyclic, Name} | SCCs]) ->
                                  end || ConDef <- Cons ],
                     check_repeated_constructors([ {Con, ConType(Args)} || {constr_t, _, Con, Args} <- Cons ]),
                     [ check_constructor_overlap(Env1, Con, Target) || {constr_t, _, Con, _} <- Cons ],
-                    [ check_event(Cons) || Name == "event" ],
-                    check_typedef_sccs(bind_funs(ConTypes, Env1), TypeMap, SCCs)
+                    check_typedef_sccs(bind_funs(ConTypes, Env1), TypeMap, SCCs, Acc1)
             end
     end;
-check_typedef_sccs(Env, TypeMap, [{cyclic, Names} | SCCs]) ->
+check_typedef_sccs(Env, TypeMap, [{cyclic, Names} | SCCs], Acc) ->
     Id = fun(X) -> {type_def, _, D, _, _} = maps:get(X, TypeMap), D end,
     type_error({recursive_types_not_implemented, lists:map(Id, Names)}),
-    check_typedef_sccs(Env, TypeMap, SCCs).
+    check_typedef_sccs(Env, TypeMap, SCCs, Acc).
 
 -spec check_fields(env(), #{ name() => aeso_syntax:decl() }, type(), [aeso_syntax:field_t()]) -> env().
 check_fields(Env, _TypeMap, _, []) -> Env;
@@ -607,18 +603,26 @@ check_fields(Env, TypeMap, RecTy, [{field_t, Ann, Id, Type} | Fields]) ->
     Env1 = bind_field(name(Id), #field_info{ ann = Ann, kind = record, field_t = Type, record_t = RecTy }, Env),
     check_fields(Env1, TypeMap, RecTy, Fields).
 
-check_event(Cons) ->
-    [ check_event(Name, Types) || {constr_t, _, {con, _, Name}, Types} <- Cons ].
+check_event(Env, "event", Ann, Def) ->
+    case Def of
+        {variant_t, Cons} ->
+            {variant_t, [ check_event_con(Env, Con) || Con <- Cons ]};
+        _ -> type_error({event_must_be_variant_type, Ann})
+    end;
+check_event(_Env, _Name, _Ann, Def) -> Def.
 
-%% Initially we limit the type of an event, it can have 0-3 topics/indexed "words"
-%% and 0-1 strings as payload.
-check_event(Name, Types) ->
-    IsIndexed  = fun(T) -> aeso_syntax:get_ann(indexed, T, false) end,
-    Indexed    = [ T || T <- Types, IsIndexed(T) ],
-    NonIndexed = Types -- Indexed,
+check_event_con(_Env, {constr_t, Ann, Con, Args}) ->
+    IsIndexed  = fun(T) -> case aeso_syntax:get_ann(indexed, T, false) of
+                               true  -> indexed;
+                               false -> notindexed
+                           end end,
+    Indices    = lists:map(IsIndexed, Args),
+    Indexed    = [ T || T <- Args, IsIndexed(T) == indexed ],
+    NonIndexed = Args -- Indexed,
     %% TODO: Is is possible to check also the types of arguments in a sensible way?
-    [ type_error({event_0_to_3_indexed_values, Name}) || length(Indexed) > 3 ],
-    [ type_error({event_0_to_1_string_values, Name}) || length(NonIndexed) > 1 ].
+    [ type_error({event_0_to_3_indexed_values, Con}) || length(Indexed) > 3 ],
+    [ type_error({event_0_to_1_string_values, Con}) || length(NonIndexed) > 1 ],
+    {constr_t, [{indices, Indices} | Ann], Con, Args}.
 
 -spec check_constructor_overlap(env(), aeso_syntax:con(), type()) -> ok | no_return().
 check_constructor_overlap(Env, Con = {con, _, Name}, NewType) ->
@@ -1112,101 +1116,6 @@ get_option(Key, Default) ->
 
 when_option(Opt, Do) ->
     get_option(Opt, false) andalso Do().
-
-%% Record types
-
-%% create_type_defs(Defs) ->
-%%     %% A map from type names to definitions
-%%     ets_new(type_defs, [set]),
-%%     %% A relation from field names to types
-%%     ets_new(record_fields, [bag]),
-%%     [ case Def of
-%%         {type_def, _Attrs, Id, Args, Typedef} ->
-%%             insert_typedef(Id, Args, Typedef);
-%%         {contract, _Attrs, Id, Contents} ->
-%%             insert_contract(Id, Contents);
-%%         _ -> ok
-%%       end || Def <- Defs],
-%%     ok.
-
-%% destroy_type_defs() ->
-%%     ets_delete(type_defs),
-%%     ets_delete(record_fields).
-
-%% Key used in type_defs ets table.
-%% -spec type_key(type_id()) -> [string()].
-%% type_key({Tag, _, Name})  when Tag =:= id;  Tag =:= con  -> [Name];
-%% type_key({Tag, _, QName}) when Tag =:= qid; Tag =:= qcon -> QName.
-
-%% Contract entrypoints take two named arguments (gas : int = Call.gas_left(), value : int = 0).
-%% contract_call_type({fun_t, Ann, [], Args, Ret}) ->
-%%     Id    = fun(X) -> {id, Ann, X} end,
-%%     Int   = Id("int"),
-%%     Typed = fun(E, T) -> {typed, Ann, E, T} end,
-%%     Named = fun(Name, Default) -> {named_arg_t, Ann, Id(Name), Int, Default} end,
-%%     {fun_t, Ann, [Named("gas",   Typed({app, Ann, Typed({qid, Ann, ["Call", "gas_left"]},
-%%                                                         {fun_t, Ann, [], [], Int}),
-%%                                         []}, Int)),
-%%                   Named("value", Typed({int, Ann, 0}, Int))], Args, Ret}.
-
-%% insert_contract(Id, Contents) ->
-%%     Key = type_key(Id),
-%%     Sys    = [{origin, system}],
-%%     Fields = [ {field_t, Ann, Entrypoint, contract_call_type(Type)}
-%%                 || {fun_decl, Ann, Entrypoint, Type} <- Contents ] ++
-%%               %% Predefined fields
-%%              [ {field_t, Sys, {id, Sys, "address"}, {id, Sys, "address"}} ],
-%%     ets_insert(type_defs, {Key, [], {contract_t, Fields}}),
-%%     %% TODO: types defined in other contracts
-%%     [insert_record_field(Entrypoint, #field_info{ kind     = contract,
-%%                                                   field_t  = Type,
-%%                                                   record_t = Id })
-%%      || {field_t, _, {id, _, Entrypoint}, Type} <- Fields ].
-
-%% -spec insert_typedef(type_id(), [aeso_syntax:tvar()], aeso_syntax:typedef()) -> ok.
-%% insert_typedef(Id, Args, Typedef) ->
-%%     Attrs = aeso_syntax:get_ann(Id),
-%%     Key   = type_key(Id),
-%%     ets_insert(type_defs, {Key, Args, Typedef}),
-%%     case Typedef of
-%%         {record_t, Fields} ->
-%%             [insert_record_field(FieldName, #field_info{ kind     = record,
-%%                                                          field_t  = FieldType,
-%%                                                          record_t = {app_t, Attrs, Id, Args} })
-%%              || {field_t, _, {id, _, FieldName}, FieldType} <- Fields],
-%%             ok;
-%%         {variant_t, _} -> ok;
-%%         {alias_t, _} -> ok
-%%     end.
-
-%% -spec lookup_type(type_id()) -> false | {[aeso_syntax:tvar()], aeso_syntax:typedef()}.
-%% lookup_type(Id) ->
-%%     case ets_lookup(type_defs, type_key(Id)) of
-%%         []                        -> false;
-%%         [{_Key, Params, Typedef}] ->
-%%             {Params, unfold_types_in_type(push_anns(Id, Typedef))}
-%%     end.
-
-push_anns(T1, {Ann, {Args, {alias_t, Id}}}) ->
-    As1 = aeso_syntax:get_ann(T1),
-    As2 = aeso_syntax:get_ann(Id),
-    As = umerge(lists:sort(As2), lists:sort(As1)),
-    {Ann, {Args, {alias_t, aeso_syntax:set_ann(As, Id)}}};
-push_anns(_, T) -> T.
-
-umerge([], Ls2) -> Ls2;
-umerge(Ls1, []) -> Ls1;
-umerge([E = {K, _V1} | Ls1], [{K, _V2} | Ls2]) ->
-    [E | umerge(Ls1, Ls2)];
-umerge([E = {K1, _V1} | Ls1], Ls2 = [{K2, _V2} | _]) when K1 < K2 ->
-    [E | umerge(Ls1, Ls2)];
-umerge(Ls1 = [{K1, _V1} | _], [E = {K2, _V2} | Ls2]) when K2 < K1 ->
-    [E | umerge(Ls1, Ls2)].
-
-
-%% -spec insert_record_field(string(), field_info()) -> true.
-%% insert_record_field(FieldName, FieldInfo) ->
-%%     ets_insert(record_fields, {FieldName, FieldInfo}).
 
 %% -- Constraints --
 
