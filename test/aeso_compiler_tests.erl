@@ -10,15 +10,10 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
-%% simple_compile_test_() -> ok.
 %%  Very simply test compile the given contracts. Only basic checks
 %%  are made on the output, just that it is a binary which indicates
 %%  that the compilation worked.
-
 simple_compile_test_() ->
-    {setup,
-     fun () -> ok end,                          %Setup
-     fun (_) -> ok end,                         %Cleanup
      [ {"Testing the " ++ ContractName ++ " contract",
         fun() ->
             #{byte_code := ByteCode,
@@ -31,8 +26,7 @@ simple_compile_test_() ->
             <<"Type errors\n",ErrorString/binary>> = compile(ContractName),
             check_errors(lists:sort(ExpectedErrors), ErrorString)
         end} ||
-            {ContractName, ExpectedErrors} <- failing_contracts() ]
-    }.
+            {ContractName, ExpectedErrors} <- failing_contracts() ].
 
 check_errors(Expect, ErrorString) ->
     %% This removes the final single \n as well.
@@ -168,4 +162,12 @@ failing_contracts() ->
         <<"The fields y, z are missing when constructing an element of type r('a) (at line 6, column 40)">>]}
     , {"namespace_clash",
        [<<"The contract Call (at line 4, column 10) has the same name as a namespace at (builtin location)">>]}
+    , {"bad_events",
+        [<<"The payload type int (at line 10, column 30) should be string">>,
+         <<"The payload type alias_address (at line 12, column 30) equals address but it should be string">>,
+         <<"The indexed type string (at line 9, column 25) is not a word type">>,
+         <<"The indexed type alias_string (at line 11, column 25) equals string which is not a word type">>]}
+    , {"bad_events2",
+        [<<"The event constructor BadEvent1 (at line 9, column 7) has too many string values (max 1)">>,
+         <<"The event constructor BadEvent2 (at line 10, column 7) has too many indexed values (max 3)">>]}
     ].

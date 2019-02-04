@@ -607,11 +607,13 @@ check_event(Env, "event", Ann, Def) ->
     case Def of
         {variant_t, Cons} ->
             {variant_t, [ check_event_con(Env, Con) || Con <- Cons ]};
-        _ -> type_error({event_must_be_variant_type, Ann})
+        _ ->
+            type_error({event_must_be_variant_type, Ann}),
+            Def
     end;
 check_event(_Env, _Name, _Ann, Def) -> Def.
 
-check_event_con(_Env, {constr_t, Ann, Con, Args}) ->
+check_event_con(Env, {constr_t, Ann, Con, Args}) ->
     IsIndexed  = fun(T) -> case aeso_syntax:get_ann(indexed, T, false) of
                                true  -> indexed;
                                false -> notindexed
@@ -619,10 +621,30 @@ check_event_con(_Env, {constr_t, Ann, Con, Args}) ->
     Indices    = lists:map(IsIndexed, Args),
     Indexed    = [ T || T <- Args, IsIndexed(T) == indexed ],
     NonIndexed = Args -- Indexed,
+    [ check_event_arg_type(Env, Ix, Type) || {Ix, Type} <- lists:zip(Indices, Args) ],
     %% TODO: Is is possible to check also the types of arguments in a sensible way?
     [ type_error({event_0_to_3_indexed_values, Con}) || length(Indexed) > 3 ],
     [ type_error({event_0_to_1_string_values, Con}) || length(NonIndexed) > 1 ],
     {constr_t, [{indices, Indices} | Ann], Con, Args}.
+
+check_event_arg_type(Env, Ix, Type0) ->
+    Type = unfold_types_in_type(Env, Type0),
+    case Ix of
+        indexed    -> [ type_error({indexed_type_must_be_word, Type0, Type})   || not is_word_type(Type) ];
+        notindexed -> [ type_error({payload_type_must_be_string, Type0, Type}) || not is_string_type(Type) ]
+    end.
+
+%% Not so nice.
+is_word_type({id, _, Name}) ->
+    lists:member(Name, ["int", "address", "hash", "bits", "bool"]);
+is_word_type({app_t, _, {id, _, Name}, [_, _]}) ->
+    lists:member(Name, ["oracle", "oracle_query"]);
+is_word_type({con, _, _}) -> true;
+is_word_type({qcon, _, _}) -> true;
+is_word_type(_) -> false.
+
+is_string_type({id, _, "string"}) -> true;
+is_string_type(_) -> false.
 
 -spec check_constructor_overlap(env(), aeso_syntax:con(), type()) -> ok | no_return().
 check_constructor_overlap(Env, Con = {con, _, Name}, NewType) ->
@@ -1686,10 +1708,26 @@ pp_error({recursive_types_not_implemented, Types}) ->
            true              -> " is" end,
     io_lib:format("The following type~s recursive, which is not yet supported:\n~s",
                     [S, [io_lib:format("  - ~s (at ~s)\n", [pp(T), pp_loc(T)]) || T <- Types]]);
+pp_error({event_must_be_variant_type, Where}) ->
+    io_lib:format("The event type must be a variant type (at ~s)\n", [pp_loc(Where)]);
+pp_error({indexed_type_must_be_word, Type, Type}) ->
+    io_lib:format("The indexed type ~s (at ~s) is not a word type\n",
+                    [pp_type("", Type), pp_loc(Type)]);
+pp_error({indexed_type_must_be_word, Type, Type1}) ->
+    io_lib:format("The indexed type ~s (at ~s) equals ~s which is not a word type\n",
+                    [pp_type("", Type), pp_loc(Type), pp_type("", Type1)]);
+pp_error({payload_type_must_be_string, Type, Type}) ->
+    io_lib:format("The payload type ~s (at ~s) should be string\n",
+                    [pp_type("", Type), pp_loc(Type)]);
+pp_error({payload_type_must_be_string, Type, Type1}) ->
+    io_lib:format("The payload type ~s (at ~s) equals ~s but it should be string\n",
+                    [pp_type("", Type), pp_loc(Type), pp_type("", Type1)]);
 pp_error({event_0_to_3_indexed_values, Constr}) ->
-    io_lib:format("The event constructor ~s has too many indexed values (max 3)\n", [Constr]);
+    io_lib:format("The event constructor ~s (at ~s) has too many indexed values (max 3)\n",
+        [name(Constr), pp_loc(Constr)]);
 pp_error({event_0_to_1_string_values, Constr}) ->
-    io_lib:format("The event constructor ~s has too many string values (max 1)\n", [Constr]);
+    io_lib:format("The event constructor ~s (at ~s) has too many string values (max 1)\n",
+        [name(Constr), pp_loc(Constr)]);
 pp_error({repeated_constructor, Cs}) ->
     io_lib:format("Variant types must have distinct constructor names\n~s",
                   [[ io_lib:format("~s  (at ~s)\n", [pp_typed("  - ", C, T), pp_loc(C)]) || {C, T} <- Cs ]]);
