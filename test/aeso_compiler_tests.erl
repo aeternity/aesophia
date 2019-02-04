@@ -26,7 +26,16 @@ simple_compile_test_() ->
             <<"Type errors\n",ErrorString/binary>> = compile(ContractName),
             check_errors(lists:sort(ExpectedErrors), ErrorString)
         end} ||
-            {ContractName, ExpectedErrors} <- failing_contracts() ].
+            {ContractName, ExpectedErrors} <- failing_contracts() ] ++
+     [ {"Testing deadcode elimination",
+        fun() ->
+            #{ byte_code := NoDeadCode } = compile("nodeadcode"),
+            #{ byte_code := DeadCode   } = compile("deadcode"),
+            SizeNoDeadCode = byte_size(NoDeadCode),
+            SizeDeadCode   = byte_size(DeadCode),
+            ?assertMatch({_, _, true}, {SizeDeadCode, SizeNoDeadCode, SizeDeadCode + 40 < SizeNoDeadCode}),
+            ok
+        end} ].
 
 check_errors(Expect, ErrorString) ->
     %% This removes the final single \n as well.
@@ -64,7 +73,9 @@ compilable_contracts() ->
      "stack",
      "test",
      "builtin_bug",
-     "builtin_map_get_bug"
+     "builtin_map_get_bug",
+     "nodeadcode",
+     "deadcode"
     ].
 
 %% Contracts that should produce type errors

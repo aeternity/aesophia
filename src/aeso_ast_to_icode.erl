@@ -21,7 +21,8 @@ convert_typed(TypedTree, Options) ->
                {contract, _, {con, _, Con}, _} -> Con;
                _ -> gen_error(last_declaration_must_be_contract)
            end,
-    code(TypedTree, aeso_icode:set_name(Name, aeso_icode:new(Options))).
+    Icode = code(TypedTree, aeso_icode:set_name(Name, aeso_icode:new(Options))),
+    deadcode_elimination(Icode).
 
 code([{contract, _Attribs, Con, Code}|Rest], Icode) ->
     NewIcode = contract_to_icode(Code, aeso_icode:set_namespace(Con, Icode)),
@@ -786,3 +787,39 @@ builtin_call(Builtin, Args) ->
 add_builtins(Icode = #{functions := Funs}) ->
     Builtins = aeso_builtins:used_builtins(Funs),
     Icode#{functions := [ aeso_builtins:builtin_function(B) || B <- Builtins ] ++ Funs}.
+
+
+%% -------------------------------------------------------------------
+%% Deadcode elimination
+%% -------------------------------------------------------------------
+
+deadcode_elimination(Icode = #{ functions := Funs }) ->
+    PublicNames = [ Name || {Name, Ann, _, _, _} <- Funs, not lists:member(private, Ann) ],
+    ArgsToPat   = fun(Args) -> [ #var_ref{ name = X } || {X, _} <- Args ] end,
+    Defs        = maps:from_list([ {Name, {binder, ArgsToPat(Args), Body}} || {Name, _, Args, Body, _} <- Funs ]),
+    UsedNames   = chase_names(Defs, PublicNames, #{}),
+    UsedFuns    = [ Def || Def = {Name, _, _, _, _} <- Funs, maps:is_key(Name, UsedNames) ],
+    Icode#{ functions := UsedFuns }.
+
+chase_names(_Defs, [], Used) -> Used;
+chase_names(Defs, [X | Xs], Used) ->
+                              %% can happen when compiling __call contracts
+    case maps:is_key(X, Used) orelse not maps:is_key(X, Defs) of
+        true  -> chase_names(Defs, Xs, Used); %% already chased
+        false ->
+            Def  = maps:get(X, Defs),
+            Vars = maps:keys(free_vars(Def)),
+            chase_names(Defs, Vars ++ Xs, Used#{ X => true })
+    end.
+
+free_vars(#var_ref{ name = X }) -> #{ X => true };
+free_vars(#arg{ name = X }) -> #{ X => true };
+free_vars({binder, Pat, Body}) ->
+    maps:without(maps:keys(free_vars(Pat)), free_vars(Body));
+free_vars(#switch{ expr = E, cases = Cases }) ->
+    free_vars([E | [{binder, P, B} || {P, B} <- Cases]]);
+free_vars(#lambda{ args = Xs, body = E }) ->
+    free_vars({binder, Xs, E});
+free_vars(T) when is_tuple(T) -> free_vars(tuple_to_list(T));
+free_vars([H | T]) -> maps:merge(free_vars(H), free_vars(T));
+free_vars(_) -> #{}.

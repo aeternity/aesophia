@@ -20,7 +20,7 @@
                  , args :: arg_list()
                  , body :: expr()}).
 
--record(var_ref, { name :: string() | {builtin, atom() | tuple()}}).
+-record(var_ref, { name :: string() | list(string()) | {builtin, atom() | tuple()}}).
 
 -record(prim_call_contract,
     { gas      :: expr()
