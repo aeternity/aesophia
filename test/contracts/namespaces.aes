@@ -22,10 +22,6 @@ namespace Lib =
 
 contract TestNamespaces =
 
-  record state = { x : int }
-
-  function init() = { x = 0 }
-
   function palindrome(xs : list(int)) : bool =
     Lib.eqlist(xs, Lib.reverse(xs))
 

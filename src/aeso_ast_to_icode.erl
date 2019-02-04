@@ -17,12 +17,14 @@
 
 -spec convert_typed(aeso_syntax:ast(), list()) -> aeso_icode:icode().
 convert_typed(TypedTree, Options) ->
-    code(TypedTree, aeso_icode:new(Options)).
+    Name = case lists:last(TypedTree) of
+               {contract, _, {con, _, Con}, _} -> Con;
+               _ -> gen_error(last_declaration_must_be_contract)
+           end,
+    code(TypedTree, aeso_icode:set_name(Name, aeso_icode:new(Options))).
 
-code([{contract, _Attribs, Con = {con, _, Name}, Code}|Rest], Icode) ->
-    NewIcode = contract_to_icode(Code,
-                                 aeso_icode:set_namespace(Con,
-                                 aeso_icode:set_name(Name, Icode))),
+code([{contract, _Attribs, Con, Code}|Rest], Icode) ->
+    NewIcode = contract_to_icode(Code, aeso_icode:set_namespace(Con, Icode)),
     code(Rest, NewIcode);
 code([{namespace, _Ann, Name, Code}|Rest], Icode) ->
     NewIcode = contract_to_icode(Code, aeso_icode:enter_namespace(Name, Icode)),
@@ -79,8 +81,7 @@ contract_to_icode([{type_def, _Attrib, {id, _, Name}, Args, Def} | Rest],
     contract_to_icode(Rest, Icode2);
 contract_to_icode([{letfun, Attrib, Name, Args, _What, Body={typed,_,_,T}}|Rest], Icode) ->
     FunAttrs = [ stateful || proplists:get_value(stateful, Attrib, false) ] ++
-               [ private  || proplists:get_value(private, Attrib, false) orelse
-                             proplists:get_value(internal, Attrib, false) ],
+               [ private  || is_private(Attrib, Icode) ],
     %% TODO: Handle types
     FunName = ast_id(Name),
     %% TODO: push funname to env
@@ -764,6 +765,15 @@ has_maps(typerep)       -> false;
 has_maps({list, T})     -> has_maps(T);
 has_maps({tuple, Ts})   -> lists:any(fun has_maps/1, Ts);
 has_maps({variant, Cs}) -> lists:any(fun has_maps/1, lists:append(Cs)).
+
+%% A function is private if marked 'private' or 'internal', or if it's not
+%% defined in the main contract name space. (NOTE: changes when we introduce
+%% inheritance).
+is_private(Ann, #{ contract_name := MainContract } = Icode) ->
+    {_, _, CurrentNamespace} = aeso_icode:get_namespace(Icode),
+    proplists:get_value(private,  Ann, false) orelse
+    proplists:get_value(internal, Ann, false) orelse
+    MainContract /= CurrentNamespace.
 
 %% -------------------------------------------------------------------
 %% Builtins
