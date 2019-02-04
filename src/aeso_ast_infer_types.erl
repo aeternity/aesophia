@@ -150,16 +150,19 @@ check_tvar(#env{ typevars = TVars}, T = {tvar, _, X}) ->
 
 -spec bind_fun(name(), type() | typesig(), env()) -> env().
 bind_fun(X, Type, Env) ->
-    Ann = aeso_syntax:get_ann(Type),
     case lookup_name(Env, [X]) of
-        false ->
-            on_current_scope(Env, fun(Scope = #scope{ funs = Funs }) ->
-                                    Scope#scope{ funs = [{X, {Ann, Type}} | Funs] }
-                                  end);
+        false -> force_bind_fun(X, Type, Env);
         {_QId, {Ann1, _}} ->
-            type_error({duplicate_definition, X, [Ann1, Ann]}),
+            type_error({duplicate_definition, X, [Ann1, aeso_syntax:get_ann(Type)]}),
             Env
     end.
+
+-spec force_bind_fun(name(), type() | typesig(), env()) -> env().
+force_bind_fun(X, Type, Env) ->
+    Ann = aeso_syntax:get_ann(Type),
+    on_current_scope(Env, fun(Scope = #scope{ funs = Funs }) ->
+                            Scope#scope{ funs = [{X, {Ann, Type}} | Funs] }
+                          end).
 
 -spec bind_funs([{name(), type() | typesig()}], env()) -> env().
 bind_funs([], Env) -> Env;
@@ -182,8 +185,18 @@ bind_state(Env) ->
             {S, _} -> {qid, Ann, S};
             false  -> Unit
         end,
-    bind_funs([{"state", State},
-               {"put", {fun_t, Ann, [], [State], Unit}}], Env).
+    Event =
+        case lookup_type(Env, {id, Ann, "event"}) of
+            {E, _} -> {qid, Ann, E};
+            false  -> {id, Ann, "event"}    %% will cause type error if used(?)
+        end,
+    Env1 = bind_funs([{"state", State},
+                      {"put", {fun_t, Ann, [], [State], Unit}}], Env),
+
+    %% A bit of a hack: we bind Chain.event with the local event type.
+    Env2 = force_bind_fun("event", {fun_t, Ann, [], [Event], Unit},
+                    Env1#env{ namespace = ["Chain"] }),
+    Env2#env{ namespace = Env1#env.namespace }.
 
 -spec bind_field(name(), field_info(), env()) -> env().
 bind_field(X, Info, Env = #env{ fields = Fields }) ->
@@ -325,7 +338,6 @@ global_env() ->
     Bool    = {id, Ann, "bool"},
     String  = {id, Ann, "string"},
     Address = {id, Ann, "address"},
-    Event   = {id, Ann, "event"},
     Hash    = {id, Ann, "hash"},
     Bits    = {id, Ann, "bits"},
     Oracle  = fun(Q, R) -> {app_t, Ann, {id, Ann, "oracle"}, [Q, R]} end,
@@ -376,8 +388,7 @@ global_env() ->
                      {"timestamp",    Int},
                      {"block_height", Int},
                      {"difficulty",   Int},
-                     {"gas_limit",    Int},
-                     {"event",        Fun1(Event, Unit)}])
+                     {"gas_limit",    Int}])
         , types = MkDefs([{"ttl", 0}]) },
 
     ContractScope = #scope
@@ -558,13 +569,13 @@ infer_contract(Env, What, Defs) ->
            end,
     Get = fun(K) -> [ Def || Def <- Defs, Kind(Def) == K ] end,
     {Env1, TypeDefs} = check_typedefs(Env, Get(type)),
+    create_type_errors(),
     Env2 =
         case What of
             namespace -> Env1;
             contract  -> bind_state(Env1)   %% bind state and put
         end,
     {ProtoSigs, Decls} = lists:unzip([ check_fundecl(Env1, Decl) || Decl <- Get(prototype) ]),
-    create_type_errors(),
     Env3      = bind_funs(ProtoSigs, Env2),
     Functions = Get(function),
     %% Check for duplicates in Functions (we turn it into a map below)
@@ -780,8 +791,9 @@ check_reserved_entrypoints(Funs) ->
 check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type = {fun_t, _, _, _, _}}) ->
     Type1 = {fun_t, _, Named, Args, Ret} = check_type(Env, Type),
     {{Name, {type_sig, Ann, Named, Args, Ret}}, {fun_decl, Ann, Id, Type1}};
-check_fundecl(_, {fun_decl, _Attrib, {id, _, Name}, Type}) ->
-    error({fundecl_must_have_funtype, Name, Type}).
+check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type}) ->
+    type_error({fundecl_must_have_funtype, Ann, Id, Type}),
+    {{Name, {type_sig, Ann, [], [], Type}}, check_type(Env, Type)}.
 
 infer_nonrec(Env, LetFun) ->
     create_constraints(),

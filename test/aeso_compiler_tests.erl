@@ -76,7 +76,9 @@ compilable_contracts() ->
      "builtin_map_get_bug",
      "nodeadcode",
      "deadcode",
-     "variant_types"
+     "variant_types",
+     "state_handling",
+     "events"
     ].
 
 %% Contracts that should produce type errors
