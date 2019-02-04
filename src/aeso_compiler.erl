@@ -161,8 +161,10 @@ create_calldata(Contract, Function, Argument) when is_map(Contract) ->
 
 
 get_arg_icode(Funs) ->
-    [Args] = [ Args || {[_, ?CALL_NAME], _, _, {funcall, _, Args}, _} <- Funs ],
-    Args.
+    case [ Args || {[_, ?CALL_NAME], _, _, {funcall, _, Args}, _} <- Funs ] of
+        [Args] -> Args;
+        []     -> error({missing_call_function, Funs})
+    end.
 
 get_call_type([{contract, _, _, Defs}]) ->
     case [ {lists:last(QFunName), FunType}

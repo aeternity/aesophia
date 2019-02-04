@@ -58,7 +58,7 @@ contract_to_icode([{namespace, _, Name, Defs} | Rest], Icode) ->
     NS = aeso_icode:get_namespace(Icode),
     Icode1 = contract_to_icode(Defs, aeso_icode:enter_namespace(Name, Icode)),
     contract_to_icode(Rest, aeso_icode:set_namespace(NS, Icode1));
-contract_to_icode([{type_def, _Attrib, {id, _, Name}, Args, Def} | Rest],
+contract_to_icode([{type_def, _Attrib, Id = {id, _, Name}, Args, Def} | Rest],
                   Icode = #{ types := Types, constructors := Constructors }) ->
     TypeDef = make_type_def(Args, Def, Icode),
     NewConstructors =
@@ -70,7 +70,8 @@ contract_to_icode([{type_def, _Attrib, {id, _, Name}, Args, Def} | Rest],
                 maps:from_list([ {QName(Con), Tag} || {Tag, Con} <- lists:zip(Tags, Cons) ]);
             _ -> #{}
         end,
-    Icode1 = Icode#{ types := Types#{ Name => TypeDef },
+    {_, _, TName} = aeso_icode:qualify(Id, Icode),
+    Icode1 = Icode#{ types := Types#{ TName => TypeDef },
                      constructors := maps:merge(Constructors, NewConstructors) },
     Icode2 = case Name of
                 "state" when Args == [] -> Icode1#{ state_type => ast_typerep(Def, Icode) };
@@ -108,9 +109,11 @@ contract_to_icode([{letrec,_,Defs}|Rest], Icode) ->
     %% just to parse a list of (mutually recursive) definitions.
     contract_to_icode(Defs++Rest, Icode);
 contract_to_icode([], Icode) -> Icode;
-contract_to_icode(_Code, Icode) ->
-    %% TODO debug output for debug("Unhandled code ~p~n",[Code]),
-    Icode.
+contract_to_icode([{fun_decl, _, _, _} | Code], Icode) ->
+    contract_to_icode(Code, Icode);
+contract_to_icode([Decl | Code], Icode) ->
+    io:format("Unhandled declaration: ~p\n", [Decl]),
+    contract_to_icode(Code, Icode).
 
 ast_id({id, _, Id}) -> Id;
 ast_id({qid, _, Id}) -> Id.
@@ -167,10 +170,10 @@ ast_body({qid, _, ["Chain", "spend"]}, _Icode) ->
     gen_error({underapplied_primitive, 'Chain.spend'});
 
 %% State
-ast_body({id, _, "state"}, _Icode) -> prim_state;
-ast_body(?id_app("put", [NewState], _, _), Icode) ->
+ast_body({qid, _, [Con, "state"]}, #{ contract_name := Con }) -> prim_state;
+ast_body(?qid_app([Con, "put"], [NewState], _, _), Icode = #{ contract_name := Con }) ->
     #prim_put{ state = ast_body(NewState, Icode) };
-ast_body({id, _, "put"}, _Icode) ->
+ast_body({qid, _, [Con, "put"]}, #{ contract_name := Con }) ->
     gen_error({underapplied_primitive, put});   %% TODO: eta
 
 %% Abort
