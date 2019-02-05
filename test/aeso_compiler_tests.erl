@@ -23,8 +23,12 @@ simple_compile_test_() ->
         end} || ContractName <- compilable_contracts() ] ++
      [ {"Testing error messages of " ++ ContractName,
         fun() ->
-            <<"Type errors\n",ErrorString/binary>> = compile(ContractName),
-            check_errors(lists:sort(ExpectedErrors), ErrorString)
+            case compile(ContractName, false) of
+                <<"Type errors\n", ErrorString/binary>> ->
+                    check_errors(lists:sort(ExpectedErrors), ErrorString);
+                <<"Parse errors\n", ErrorString/binary>> ->
+                    check_errors(lists:sort(ExpectedErrors), ErrorString)
+            end
         end} ||
             {ContractName, ExpectedErrors} <- failing_contracts() ] ++
      [ {"Testing deadcode elimination",
@@ -46,9 +50,13 @@ check_errors(Expect, ErrorString) ->
         {Missing, Extra} -> ?assertEqual(Missing, Extra)
     end.
 
-compile(Name) ->
+compile(Name) -> compile(Name, true).
+
+compile(Name, AllowInc) ->
     String = aeso_test_utils:read_contract(Name),
-    case aeso_compiler:from_string(String, []) of
+    case aeso_compiler:from_string(String, [{include_path, [aeso_test_utils:contract_path()]},
+                                            {allow_include, AllowInc},
+                                            {src_file, Name}]) of
         {ok,Map} -> Map;
         {error,ErrorString} -> ErrorString
     end.
@@ -78,7 +86,8 @@ compilable_contracts() ->
      "deadcode",
      "variant_types",
      "state_handling",
-     "events"
+     "events",
+     "include"
     ].
 
 %% Contracts that should produce type errors
@@ -192,4 +201,6 @@ failing_contracts() ->
            "  r.foo : (gas : int, value : int) => Remote.themap\n"
            "against the expected type\n"
            "  (gas : int, value : int) => map(string, int)">>]}
+    , {"include",
+        [<<"file include, line 1, column 9: includes not allowed in this context\n">>]}
     ].

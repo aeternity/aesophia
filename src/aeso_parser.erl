@@ -5,28 +5,37 @@
 -module(aeso_parser).
 
 -export([string/1,
+         string/2,
          type/1]).
 
 -include("aeso_parse_lib.hrl").
 
--spec string(string()) ->
-                    {ok, aeso_syntax:ast()}
-                        | {error, {aeso_parse_lib:pos(),
-                                   atom(),
-                                   term()}}
-                        | {error, {aeso_parse_lib:pos(),
-                                   atom()}}.
+-type parse_result() :: {ok, aeso_syntax:ast()}
+                      | {error, {aeso_parse_lib:pos(), atom(), term()}}
+                      | {error, {aeso_parse_lib:pos(), atom()}}.
+
+-spec string(string()) -> parse_result().
 string(String) ->
-  parse_and_scan(file(), String).
+    string(String, []).
+
+-spec string(string(), aeso_compiler:options()) -> parse_result().
+string(String, Opts) ->
+    case parse_and_scan(file(), String, Opts) of
+        {ok, AST} ->
+            expand_includes(AST, Opts);
+        Err = {error, _} ->
+            Err
+    end.
 
 type(String) ->
-  parse_and_scan(type(), String).
+    parse_and_scan(type(), String, []).
 
-parse_and_scan(P, S) ->
-  case aeso_scan:scan(S) of
-    {ok, Tokens} -> aeso_parse_lib:parse(P, Tokens);
-    Error        -> Error
-  end.
+parse_and_scan(P, S, Opts) ->
+    set_current_file(proplists:get_value(src_file, Opts, no_file)),
+    case aeso_scan:scan(S) of
+        {ok, Tokens} -> aeso_parse_lib:parse(P, Tokens);
+        Error        -> Error
+    end.
 
 %% -- Parsing rules ----------------------------------------------------------
 
@@ -38,6 +47,7 @@ decl() ->
       %% Contract declaration
     [ ?RULE(keyword(contract),  con(), tok('='), maybe_block(decl()), {contract, _1, _2, _4})
     , ?RULE(keyword(namespace), con(), tok('='), maybe_block(decl()), {namespace, _1, _2, _4})
+    , ?RULE(keyword(include),   str(), {include, _2})
 
       %% Type declarations  TODO: format annotation for "type bla" vs "type bla()"
     , ?RULE(keyword(type),     id(),                                          {type_decl, _1, _2, []})
@@ -302,6 +312,7 @@ binop(Ops) ->
 con()      -> token(con).
 id()       -> token(id).
 tvar()     -> token(tvar).
+str()      -> token(string).
 
 token(Tag) ->
     ?RULE(tok(Tag),
@@ -337,10 +348,17 @@ bracket_list(P) -> brackets(comma_sep(P)).
 -type ann_col()  :: aeso_syntax:ann_col().
 
 -spec pos_ann(ann_line(), ann_col()) -> ann().
-pos_ann(Line, Col) -> [{line, Line}, {col, Col}].
+pos_ann(Line, Col) -> [{file, current_file()}, {line, Line}, {col, Col}].
+
+current_file() ->
+    get('$current_file').
+
+set_current_file(File) ->
+    put('$current_file', File).
 
 ann_pos(Ann) ->
-    {proplists:get_value(line, Ann),
+    {proplists:get_value(file, Ann),
+     proplists:get_value(line, Ann),
      proplists:get_value(col, Ann)}.
 
 get_ann(Ann) when is_list(Ann) -> Ann;
@@ -358,10 +376,10 @@ set_ann(Key, Val, Node) ->
     setelement(2, Node, lists:keystore(Key, 1, Ann, {Key, Val})).
 
 get_pos(Node) ->
-    {get_ann(line, Node), get_ann(col, Node)}.
+    {current_file(), get_ann(line, Node), get_ann(col, Node)}.
 
-set_pos({L, C}, Node) ->
-    set_ann(line, L, set_ann(col, C, Node)).
+set_pos({F, L, C}, Node) ->
+    set_ann(file, F, set_ann(line, L, set_ann(col, C, Node))).
 
 infix(L, Op, R) -> set_ann(format, infix,  {app, get_ann(L), Op, [L, R]}).
 
@@ -443,8 +461,10 @@ parse_pattern(E) -> bad_expr_err("Not a valid pattern", E).
 parse_field_pattern({field, Ann, F, E}) ->
     {field, Ann, F, parse_pattern(E)}.
 
-return_error({L, C}, Err) ->
-    fail(io_lib:format("~p:~p:\n~s", [L, C, Err])).
+return_error({no_file, L, C}, Err) ->
+    fail(io_lib:format("~p:~p:\n~s", [L, C, Err]));
+return_error({F, L, C}, Err) ->
+    fail(io_lib:format("In ~s at ~p:~p:\n~s", [F, L, C, Err])).
 
 -spec ret_doc_err(ann(), prettypr:document()) -> no_return().
 ret_doc_err(Ann, Doc) ->
@@ -455,4 +475,35 @@ bad_expr_err(Reason, E) ->
   ret_doc_err(get_ann(E),
               prettypr:sep([prettypr:text(Reason ++ ":"),
                             prettypr:nest(2, aeso_pretty:expr(E))])).
+
+%% -- Helper functions -------------------------------------------------------
+expand_includes(AST, Opts) ->
+    expand_includes(AST, [], Opts).
+
+expand_includes([], Acc, _Opts) ->
+    {ok, lists:reverse(Acc)};
+expand_includes([{include, S = {string, _, File}} | AST], Acc, Opts) ->
+    AllowInc = proplists:get_value(allow_include, Opts, false),
+    case read_file(File, Opts) of
+        {ok, Bin} when AllowInc ->
+            Opts1 = lists:keystore(src_file, 1, Opts, {src_file, File}),
+            case string(binary_to_list(Bin), Opts1) of
+                {ok, AST1} ->
+                    expand_includes(AST1 ++ AST, Acc, Opts);
+                Err = {error, _} ->
+                    Err
+            end;
+        {ok, _} ->
+            {error, {get_pos(S), include_not_allowed}};
+        {error, _} ->
+            {error, {get_pos(S), include_error}}
+    end;
+expand_includes([E | AST], Acc, Opts) ->
+    expand_includes(AST, [E | Acc], Opts).
+
+read_file(File, Opts) ->
+    CandidateNames = [File] ++ [ filename:join(Dir, File)
+                                 || Dir <- proplists:get_value(include_path, Opts, []) ],
+    lists:foldr(fun(F, {error, _}) -> file:read_file(F);
+                   (_F, OK) -> OK end, {error, not_found}, CandidateNames).
 
