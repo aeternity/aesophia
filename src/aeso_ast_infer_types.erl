@@ -68,7 +68,7 @@
 
 -type access() :: public | private | internal.
 
--type typedef() :: {[aeso_syntax:tvar()], aeso_syntax:type_def() | {contract_t, [aeso_syntax:field_t()]}}
+-type typedef() :: {[aeso_syntax:tvar()], aeso_syntax:typedef() | {contract_t, [aeso_syntax:field_t()]}}
                  | {builtin, non_neg_integer()}.
 
 -type type() :: aeso_syntax:type().
@@ -227,10 +227,11 @@ bind_contract({contract, Ann, Id, Contents}, Env) ->
                 || {fun_decl, AnnF, Entrypoint, Type} <- Contents ] ++
               %% Predefined fields
              [ {field_t, Sys, {id, Sys, "address"}, {id, Sys, "address"}} ],
-    FieldInfo = [ {Entrypoint, #field_info{ kind     = contract,
+    FieldInfo = [ {Entrypoint, #field_info{ ann      = FieldAnn,
+                                            kind     = contract,
                                             field_t  = Type,
                                             record_t = Id }}
-                || {field_t, _, {id, _, Entrypoint}, Type} <- Fields ],
+                || {field_t, _, {id, FieldAnn, Entrypoint}, Type} <- Fields ],
     bind_type(Key, Ann, {[], {contract_t, Fields}},
         bind_fields(FieldInfo, Env)).
 
@@ -296,7 +297,7 @@ lookup_record_field(Env, FieldName) ->
     maps:get(FieldName, Env#env.fields, []).
 
 %% For 'create' or 'update' constraints we don't consider contract types.
--spec lookup_record_field(env(), name(), contract | record) -> [field_info()].
+-spec lookup_record_field(env(), name(), create | project | update) -> [field_info()].
 lookup_record_field(Env, FieldName, Kind) ->
     [ Fld || Fld = #field_info{ kind = K } <- lookup_record_field(Env, FieldName),
              Kind == project orelse K /= contract ].
@@ -1357,7 +1358,7 @@ solve_field_constraints(Env, Constraints) ->
             [] ->
                 type_error({undefined_field, Field}),
                 false;
-            [{FieldName, #field_info{field_t = FldType, record_t = RecType}}] ->
+            [#field_info{field_t = FldType, record_t = RecType}] ->
                 create_freshen_tvars(),
                 FreshFldType = freshen(FldType),
                 FreshRecType = freshen(RecType),
