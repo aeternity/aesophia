@@ -136,8 +136,9 @@ decode_contract(#{<<"name">> := Name,
      %% decode_tdefs(Ts),
      decode_funcs(Fs)].
 
-decode_funcs(Fs) -> [ decode_func(F) || F <- Fs].
+decode_funcs(Fs) -> [ decode_func(F) || F <- Fs ].
 
+decode_func(#{<<"name">> := <<"init">>}) -> [];
 decode_func(#{<<"name">> := Name,<<"arguments">> := As,<<"type">> := T}) ->
     ["  function"," ",io_lib:format("~s", [Name])," : ",
      decode_args(As)," => ",decode_type(T),$\n].
