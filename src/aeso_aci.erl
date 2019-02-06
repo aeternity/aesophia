@@ -11,8 +11,8 @@
 
 -export([encode/1,decode/1]).
 
-%% Define records for the various typed syntactic forms. These don't
-%% seem to exist elsewhere.
+%% Define records for the various typed syntactic forms. These make
+%% the code easier but don't seem to exist elsewhere.
 
 -record(contract, {ann,con,decls}).
 -record(letfun, {ann,id,args,type,body}).
@@ -38,7 +38,7 @@
 encode(ContractString) when is_binary(ContractString) ->
     encode(binary_to_list(ContractString));
 encode(ContractString) ->
-    Options = [],				%No options yet
+    Options = [],                               %No options yet
     Ast = parse_string(ContractString),
     TypedAst = aeso_ast_infer_types:infer(Ast, Options),
     %% io:format("~p\n", [Ast]),
@@ -50,10 +50,10 @@ encode(ContractString) ->
     Cname = contract_name(Contract),
     Tdefs = [ encode_typedef(T) || T <- sort_decls(contract_types(Contract)) ],
     Fdefs = [ encode_func(F) || F <- sort_decls(contract_funcs(Contract)),
-				not is_private_func(F) ],
+                                not is_private_func(F) ],
     Jmap = [{<<"contract">>, [{<<"name">>, list_to_binary(Cname)},
-			      {<<"type_defs">>, Tdefs},
-			      {<<"functions">>, Fdefs}]}],
+                              {<<"type_defs">>, Tdefs},
+                              {<<"functions">>, Fdefs}]}],
     %% io:format("~p\n", [Jmap]),
     jsx:encode(Jmap).
 
@@ -126,13 +126,13 @@ decode(Json) ->
     Map = jsx:decode(Json, [return_maps]),
     %% io:format("~p\n", [Map]),
     #{<<"contract">> := C} = Map,
-    lists:flatten(decode_contract(C)).
+    list_to_binary(decode_contract(C)).
 
 decode_contract(#{<<"name">> := Name,
-		  <<"type_defs">> := _Ts,
-		  <<"functions">> := Fs}) ->
+                  <<"type_defs">> := _Ts,
+                  <<"functions">> := Fs}) ->
     ["contract"," ",io_lib:format("~s", [Name])," =\n",
-     [],					%Don't include types yet.
+     [],                                        %Don't include types yet.
      %% decode_tdefs(Ts),
      decode_funcs(Fs)].
 
@@ -153,18 +153,18 @@ decode_arg(#{<<"type">> := T}) -> decode_type(T).
 
 %% To keep dialyzer happy and quiet.
 %% decode_tdefs(Ts) -> [ decode_tdef(T) || T <- Ts ].
-
+%%
 %% decode_tdef(#{<<"name">> := Name,<<"vars">> := Vs,<<"typedef">> := T}) ->
 %%     ["  type"," ",io_lib:format("~s", [Name]),decode_tvars(Vs),
 %%      " = ",decode_type(T),$\n].
-
-%% decode_tvars([]) -> [];				%No tvars, no parentheses
+%%
+%% decode_tvars([]) -> [];                         %No tvars, no parentheses
 %% decode_tvars(Vs) ->
 %%     Dvs = [ decode_tvar(V) || V <- Vs ],
 %%     [$(,lists:join(", ", Dvs),$)].
-
+%%
 %% decode_tvar(#{<<"name">> := N}) -> io_lib:format("~s", [N]).
-
+%%
 %% #contract{Ann, Con, [Declarations]}.
 
 contract_name(#contract{con=#con{name=N}}) -> N.
@@ -177,9 +177,9 @@ contract_types(#contract{decls=Decls}) ->
 
 sort_decls(Ds) ->
     Sort = fun (D1, D2) ->
-		   aeso_syntax:get_ann(line, D1, 0) =<
-		       aeso_syntax:get_ann(line, D2, 0)
-	   end,
+                   aeso_syntax:get_ann(line, D1, 0) =<
+                       aeso_syntax:get_ann(line, D2, 0)
+           end,
     lists:sort(Sort, Ds).
 
 %% #letfun{Ann, Id, [Arg], Type, Typedef}.
