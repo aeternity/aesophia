@@ -44,9 +44,11 @@ file(Filename) ->
 
 -spec file(string(), options()) -> {ok, map()} | {error, binary()}.
 file(File, Options) ->
-    case read_contract(File, Options) of
+    case read_contract(File) of
         {ok, Bin} -> from_string(Bin, Options);
-        {error, Error} -> {error, {File, Error}}
+        {error, Error} ->
+	    ErrorString = [File,": ",file:format_error(Error)],
+	    {error, join_errors("File errors", [ErrorString], fun(E) -> E end)}
     end.
 
 -spec from_string(binary() | string(), options()) -> {ok, map()} | {error, binary()}.
@@ -283,13 +285,5 @@ parse_error({Line, Pos}, ErrorString) ->
     Error = io_lib:format("line ~p, column ~p: ~s", [Line, Pos, ErrorString]),
     error({parse_errors, [Error]}).
 
-read_contract(Name, Opts) ->
-    FileName = filename(Name, ".aes", Opts),
-    file:read_file(FileName).
-
-filename(File, Suffix, _Opts) ->
-    Base = filename:basename(File, Suffix),
-    Sdir = filename:dirname(File),
-    if Sdir == "." -> Base ++ Suffix;
-       true -> filename:join(Sdir, Base ++ Suffix)
-    end.
+read_contract(Name) ->
+    file:read_file(Name).
