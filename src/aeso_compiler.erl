@@ -28,8 +28,8 @@
                 | pp_icode
                 | pp_assembler
                 | pp_bytecode
-                | {include_path, [string()]}
-                | {allow_include, boolean()}
+                | {include, {file_system, [string()]} |
+                            {explicit_files, #{string() => binary()}}}
                 | {src_file, string()}.
 -type options() :: [option()].
 
@@ -49,12 +49,13 @@ version() ->
 -spec file(string()) -> {ok, map()} | {error, binary()}.
 file(Filename) ->
     Dir = filename:dirname(Filename),
-    file(Filename, [{include_path, [Dir]}]).
+    {ok, Cwd} = file:get_cwd(),
+    file(Filename, [{include, {file_system, [Cwd, Dir]}}]).
 
 -spec file(string(), options()) -> {ok, map()} | {error, binary()}.
 file(File, Options) ->
     case read_contract(File) of
-        {ok, Bin} -> from_string(Bin, [{src_file, File}, {allow_include, true} | Options]);
+        {ok, Bin} -> from_string(Bin, [{src_file, File} | Options]);
         {error, Error} ->
 	    ErrorString = [File,": ",file:format_error(Error)],
 	    {error, join_errors("File errors", [ErrorString], fun(E) -> E end)}
@@ -288,10 +289,8 @@ parse(Text, Options) ->
             ErrorString = io_lib:format("Ambiguous ~p", [As]),
             parse_error(Pos, ErrorString);
         %% Include error
-        {error, {Pos, include_not_allowed}} ->
-            parse_error(Pos, "includes not allowed in this context");
-        {error, {Pos, include_error}} ->
-            parse_error(Pos, "could not find include file")
+        {error, {Pos, {include_error, File}}} ->
+            parse_error(Pos, io_lib:format("could not find include file '~s'", [File]))
     end.
 
 parse_error(Pos, ErrorString) ->

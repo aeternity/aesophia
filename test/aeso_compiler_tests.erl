@@ -23,7 +23,7 @@ simple_compile_test_() ->
         end} || ContractName <- compilable_contracts() ] ++
      [ {"Testing error messages of " ++ ContractName,
         fun() ->
-            case compile(ContractName, false) of
+            case compile(ContractName) of
                 <<"Type errors\n", ErrorString/binary>> ->
                     check_errors(lists:sort(ExpectedErrors), ErrorString);
                 <<"Parse errors\n", ErrorString/binary>> ->
@@ -31,6 +31,17 @@ simple_compile_test_() ->
             end
         end} ||
             {ContractName, ExpectedErrors} <- failing_contracts() ] ++
+     [ {"Testing include with explicit files",
+        fun() ->
+            FileSystem = maps:from_list(
+                [ begin
+                    {ok, Bin} = file:read_file(filename:join([aeso_test_utils:contract_path(), File])),
+                    {File, Bin}
+                  end || File <- ["included.aes", "../contracts/included2.aes"] ]),
+            #{byte_code := Code1} = compile("include", [{include, {explicit_files, FileSystem}}]),
+            #{byte_code := Code2} = compile("include"),
+            ?assertMatch(true, Code1 == Code2)
+        end} ] ++
      [ {"Testing deadcode elimination",
         fun() ->
             #{ byte_code := NoDeadCode } = compile("nodeadcode"),
@@ -50,15 +61,14 @@ check_errors(Expect, ErrorString) ->
         {Missing, Extra} -> ?assertEqual(Missing, Extra)
     end.
 
-compile(Name) -> compile(Name, true).
+compile(Name) ->
+    compile(Name, [{include, {file_system, [aeso_test_utils:contract_path()]}}]).
 
-compile(Name, AllowInc) ->
+compile(Name, Options) ->
     String = aeso_test_utils:read_contract(Name),
-    case aeso_compiler:from_string(String, [{include_path, [aeso_test_utils:contract_path()]},
-                                            {allow_include, AllowInc},
-                                            {src_file, Name}]) of
-        {ok,Map} -> Map;
-        {error,ErrorString} -> ErrorString
+    case aeso_compiler:from_string(String, [{src_file, Name} | Options]) of
+        {ok, Map}            -> Map;
+        {error, ErrorString} -> ErrorString
     end.
 
 %% compilable_contracts() -> [ContractName].
@@ -201,8 +211,6 @@ failing_contracts() ->
            "  r.foo : (gas : int, value : int) => Remote.themap\n"
            "against the expected type\n"
            "  (gas : int, value : int) => map(string, int)">>]}
-    , {"include",
-        [<<"file include, line 1, column 9: includes not allowed in this context\n">>]}
     , {"bad_include_and_ns",
         [<<"Include of 'included.aes' at line 2, column 11\nnot allowed, include only allowed at top level.">>,
          <<"Nested namespace not allowed\nNamespace 'Foo' at line 3, column 13 not defined at top level.">>]}

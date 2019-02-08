@@ -483,9 +483,8 @@ expand_includes(AST, Opts) ->
 expand_includes([], Acc, _Opts) ->
     {ok, lists:reverse(Acc)};
 expand_includes([{include, S = {string, _, File}} | AST], Acc, Opts) ->
-    AllowInc = proplists:get_value(allow_include, Opts, false),
     case read_file(File, Opts) of
-        {ok, Bin} when AllowInc ->
+        {ok, Bin} ->
             Opts1 = lists:keystore(src_file, 1, Opts, {src_file, File}),
             case string(binary_to_list(Bin), Opts1) of
                 {ok, AST1} ->
@@ -493,17 +492,22 @@ expand_includes([{include, S = {string, _, File}} | AST], Acc, Opts) ->
                 Err = {error, _} ->
                     Err
             end;
-        {ok, _} ->
-            {error, {get_pos(S), include_not_allowed}};
         {error, _} ->
-            {error, {get_pos(S), include_error}}
+            {error, {get_pos(S), {include_error, File}}}
     end;
 expand_includes([E | AST], Acc, Opts) ->
     expand_includes(AST, [E | Acc], Opts).
 
 read_file(File, Opts) ->
-    CandidateNames = [File] ++ [ filename:join(Dir, File)
-                                 || Dir <- proplists:get_value(include_path, Opts, []) ],
-    lists:foldr(fun(F, {error, _}) -> file:read_file(F);
-                   (_F, OK) -> OK end, {error, not_found}, CandidateNames).
+    case proplists:get_value(include, Opts, {explicit_files, #{}}) of
+        {file_system, Paths} ->
+            CandidateNames = [ filename:join(Dir, File) || Dir <- Paths ],
+            lists:foldr(fun(F, {error, _}) -> file:read_file(F);
+                           (_F, OK) -> OK end, {error, not_found}, CandidateNames);
+        {explicit_files, Files} ->
+            case maps:get(binary_to_list(File), Files, not_found) of
+                not_found -> {error, not_found};
+                Src       -> {ok, Src}
+            end
+    end.
 
