@@ -28,7 +28,8 @@ code([{contract, _Attribs, Con, Code}|Rest], Icode) ->
     NewIcode = contract_to_icode(Code, aeso_icode:set_namespace(Con, Icode)),
     code(Rest, NewIcode);
 code([{namespace, _Ann, Name, Code}|Rest], Icode) ->
-    NewIcode = contract_to_icode(Code, aeso_icode:enter_namespace(Name, Icode)),
+                                            %% TODO: nested namespaces
+    NewIcode = contract_to_icode(Code, aeso_icode:set_namespace(Name, Icode)),
     code(Rest, NewIcode);
 code([], Icode) ->
     add_default_init_function(add_builtins(Icode)).
