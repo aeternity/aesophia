@@ -15,7 +15,7 @@
 -export_type([bin_op/0, un_op/0]).
 -export_type([decl/0, letbind/0, typedef/0]).
 -export_type([arg/0, field_t/0, constructor_t/0, named_arg_t/0]).
--export_type([type/0, constant/0, expr/0, arg_expr/0, field/1, stmt/0, alt/0, lvalue/0, pat/0]).
+-export_type([type/0, constant/0, expr/0, arg_expr/0, field/1, stmt/0, alt/0, lvalue/0, elim/0, pat/0]).
 -export_type([ast/0]).
 
 -type ast() :: [decl()].

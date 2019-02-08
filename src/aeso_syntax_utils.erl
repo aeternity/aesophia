@@ -6,89 +6,114 @@
 %%%-------------------------------------------------------------------
 -module(aeso_syntax_utils).
 
--export([used_ids/1, used_types/1]).
+-export([used_ids/1, used_types/1, fold/4]).
+
+-record(alg, {zero, plus, minus}). %% minus for variable binding
+
+-type alg(A) :: #alg{ zero  :: A
+                    , plus  :: fun((A, A) -> A)
+                    , minus :: fun((A, A) -> A) }.
+
+-type kind() :: decl | type | expr | pat.
+
+-spec fold(alg(A), fun((kind(), _) -> A), kind(), E | [E]) -> A
+    when E :: aeso_syntax:decl()
+            | aeso_syntax:typedef()
+            | aeso_syntax:field_t()
+            | aeso_syntax:constructor_t()
+            | aeso_syntax:type()
+            | aeso_syntax:expr()
+            | aeso_syntax:pat()
+            | aeso_syntax:arg()
+            | aeso_syntax:alt()
+            | aeso_syntax:elim()
+            | aeso_syntax:arg_expr()
+            | aeso_syntax:field(aeso_syntax:expr())
+            | aeso_syntax:stmt().
+fold(Alg, Fun, K, Xs) when is_list(Xs) ->
+    lists:foldl(fun(X, A) -> (Alg#alg.plus)(A, fold(Alg, Fun, K, X)) end,
+                Alg#alg.zero, Xs);
+fold(Alg = #alg{zero = Zero, plus = Plus, minus = Minus}, Fun, K, X) ->
+    Sum  = fun(Xs) -> lists:foldl(Plus, Zero, Xs) end,
+    Decl = fun(D) -> fold(Alg, Fun, decl, D) end,
+    Type = fun(T) -> fold(Alg, Fun, type, T) end,
+    Expr = fun(E) -> fold(Alg, Fun, expr, E) end,
+    Pat  = fun(P) -> fold(Alg, Fun, pat,  P) end,
+    Top = Fun(K, X),
+    LetBound = fun LB ({letval, _, Y, _, _})    -> Expr(Y);
+                   LB ({letfun, _, F, _, _, _}) -> Expr(F);
+                   LB ({letrec, _, Ds})         -> Sum(lists:map(LB, Ds));
+                   LB (_)                       -> Zero
+                end,
+    Rec = case X of
+            %% decl()
+            {contract, _, _, Ds}     -> Decl(Ds);
+            {namespace, _, _, Ds}    -> Decl(Ds);
+            {type_decl, _, _, _}     -> Zero;
+            {type_def, _, _, _, D}   -> Decl(D);
+            {fun_decl, _, _, T}      -> Type(T);
+            {letval, _, _, T, E}     -> Plus(Type(T), Expr(E));
+            {letfun, _, _, Xs, T, E} -> Plus(Type(T), Minus(Expr(E), Expr(Xs)));
+            {letrec, _, Ds}          -> Decl(Ds);
+            %% typedef()
+            {alias_t, T}    -> Type(T);
+            {record_t, Fs}  -> Type(Fs);
+            {variant_t, Cs} -> Type(Cs);
+            %% field_t() and constructor_t()
+            {field_t, _, _, T}   -> Type(T);
+            {constr_t, _, _, Ts} -> Type(Ts);
+            %% type()
+            {fun_t, _, Named, Args, Ret} -> Type([Named, Args, Ret]);
+            {app_t, _, T, Ts} -> Type([T | Ts]);
+            {tuple_t, _, Ts} -> Type(Ts);
+            %% named_arg_t()
+            {named_arg_t, _, _, T, E} -> Plus(Type(T), Expr(E));
+            %% expr()
+            {lam, _, Args, E}      -> Minus(Expr(E), Expr(Args));
+            {'if', _, A, B, C}     -> Expr([A, B, C]);
+            {switch, _, E, Alts}   -> Expr([E, Alts]);
+            {app, _, A, As}        -> Expr([A | As]);
+            {proj, _, E, _}        -> Expr(E);
+            {tuple, _, As}         -> Expr(As);
+            {list, _, As}          -> Expr(As);
+            {typed, _, E, T}       -> Plus(Expr(E), Type(T));
+            {record, _, Fs}        -> Expr(Fs);
+            {record, _, E, Fs}     -> Expr([E | Fs]);
+            {map, _, E, Fs}        -> Expr([E | Fs]);
+            {map, _, KVs}          -> Sum([Expr([Key, Val]) || {Key, Val} <- KVs]);
+            {map_get, _, A, B}     -> Expr([A, B]);
+            {map_get, _, A, B, C}  -> Expr([A, B, C]);
+            {block, Ann, [S | Ss]} -> Plus(Expr(S), Minus(Expr({block, Ann, Ss}), LetBound(S)));
+            {block, _, []}         -> Zero;
+            %% field()
+            {field, _, LV, E}    -> Expr([LV, E]);
+            {field, _, LV, _, E} -> Expr([LV, E]);
+            %% arg()
+            {arg, _, X, T} -> Plus(Expr(X), Type(T));
+            %% alt()
+            {'case', _, P, E} -> Minus(Expr(E), Pat(P));
+            %% elim()
+            {proj, _, _}    -> Zero;
+            {map_get, _, E} -> Expr(E);
+            %% arg_expr()
+            {named_arg, _, _, E} -> Expr(E);
+            _ -> Alg#alg.zero
+          end,
+    (Alg#alg.plus)(Top, Rec).
 
 %% Var set combinators
-none()           -> [].
-one(X)           -> [X].
-union_map(F, Xs) -> lists:umerge(lists:map(F, Xs)).
-minus(Xs, Ys)    -> Xs -- Ys.
 
-%% Compute names used by a definition or expression.
-used_ids(Es) when is_list(Es) ->
-    union_map(fun used_ids/1, Es);
-used_ids({bind, A, B}) ->
-    minus(used_ids(B), used_ids(A));
-%% Declarations
-used_ids({contract, _, _, Decls})    -> used_ids(Decls);
-used_ids({type_decl, _, _, _})       -> none();
-used_ids({type_def, _, _, _, _})     -> none();
-used_ids({fun_decl, _, _, _})        -> none();
-used_ids({letval, _, _, _, E})       -> used_ids(E);
-used_ids({letfun, _, _, Args, _, E}) -> used_ids({bind, Args, E});
-used_ids({letrec, _, Decls})         -> used_ids(Decls);
-%% Args
-used_ids({arg, _, X, _}) -> used_ids(X);
-used_ids({named_arg, _, _, E}) -> used_ids(E);
-%% Constants
-used_ids({int, _, _})    -> none();
-used_ids({bool, _, _})   -> none();
-used_ids({hash, _, _})   -> none();
-used_ids({unit, _})      -> none();
-used_ids({string, _, _}) -> none();
-used_ids({char, _, _})   -> none();
-%% Expressions
-used_ids({lam, _, Args, E})  -> used_ids({bind, Args, E});
-used_ids({'if', _, A, B, C}) -> used_ids([A, B, C]);
-used_ids({switch, _, E, Bs}) -> used_ids([E, Bs]);
-used_ids({app, _, E, Es})    -> used_ids([E | Es]);
-used_ids({proj, _, E, _})    -> used_ids(E);
-used_ids({tuple, _, Es})     -> used_ids(Es);
-used_ids({list, _, Es})      -> used_ids(Es);
-used_ids({typed, _, E, _})   -> used_ids(E);
-used_ids({record, _, Fs})    -> used_ids(Fs);
-used_ids({record, _, E, Fs}) -> used_ids([E, Fs]);
-used_ids({map, _, E, Fs})    -> used_ids([E, Fs]);
-used_ids({map, _, KVs})      -> used_ids([ [K, V] || {K, V} <- KVs ]);
-used_ids({map_get, _, M, K}) -> used_ids([M, K]);
-used_ids({map_get, _, M, K, V}) -> used_ids([M, K, V]);
-used_ids({block, _, Ss})     -> used_ids_s(Ss);
-used_ids({Op, _}) when is_atom(Op) -> none();
-used_ids({id, _, X})   -> [X];
-used_ids({qid, _, _})  -> none();
-used_ids({con, _, _})  -> none();
-used_ids({qcon, _, _}) -> none();
-%% Switch branches
-used_ids({'case', _, P, E}) -> used_ids({bind, P, E});
-%% Fields
-used_ids({field, _, LV, E})    -> used_ids([LV, E]);
-used_ids({field, _, LV, X, E}) -> used_ids([LV, {bind, X, E}]);
-used_ids({proj, _, _})         -> none();
-used_ids({map_get, _, E})      -> used_ids(E).
+-spec ulist_alg() -> alg([any()]).
+ulist_alg() -> #alg{ zero = [], plus = fun lists:umerge/2, minus = fun erlang:'--'/2 }.
 
-%% Statements
-used_ids_s([])       -> none();
-used_ids_s([S | Ss]) ->
-    used_ids([S, {bind, bound_ids(S), {block, [], Ss}}]).
+used_ids(E) ->
+    fold(ulist_alg(),
+         fun(expr, {id, _, X}) -> [X];
+            (pat,  {id, _, X}) -> [X];
+            (_, _) -> [] end, decl, E).
 
-bound_ids({letval, _, X, _, _})    -> one(X);
-bound_ids({letfun, _, X, _, _, _}) -> one(X);
-bound_ids({letrec, _, Decls})      -> union_map(fun bound_ids/1, Decls);
-bound_ids(_)                       -> none().
+used_types(T) ->
+    fold(ulist_alg(),
+         fun(type, {id, _, X}) -> [X];
+            (_, _) -> [] end, decl, T).
 
-used_types(Ts) when is_list(Ts)    -> union_map(fun used_types/1, Ts);
-used_types({type_def, _, _, _, T}) -> used_types(T);
-used_types({alias_t, T})           -> used_types(T);
-used_types({record_t, Fs})         -> used_types(Fs);
-used_types({variant_t, Cs})        -> used_types(Cs);
-used_types({field_t, _, _, T})     -> used_types(T);
-used_types({constr_t, _, _, Ts})   -> used_types(Ts);
-used_types({fun_t, _, Named, Args, T}) -> used_types([T | Named ++ Args]);
-used_types({named_arg_t, _, _, T, _}) -> used_types(T);
-used_types({app_t, _, T, Ts})      -> used_types([T | Ts]);
-used_types({tuple_t, _, Ts})       -> used_types(Ts);
-used_types({id, _, X})             -> one(X);
-used_types({qid, _, _})            -> none();
-used_types({con, _, _})            -> none();
-used_types({qcon, _, _})           -> none();
-used_types({tvar, _, _})           -> none().
