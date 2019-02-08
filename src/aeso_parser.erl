@@ -493,7 +493,7 @@ expand_includes([{include, S = {string, _, File}} | AST], Acc, Opts) ->
                     Err
             end;
         {error, _} ->
-            {error, {get_pos(S), {include_error, File}}}
+            {error, {get_pos(S), include_error, File}}
     end;
 expand_includes([E | AST], Acc, Opts) ->
     expand_includes(AST, [E | Acc], Opts).

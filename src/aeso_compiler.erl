@@ -289,7 +289,7 @@ parse(Text, Options) ->
             ErrorString = io_lib:format("Ambiguous ~p", [As]),
             parse_error(Pos, ErrorString);
         %% Include error
-        {error, {Pos, {include_error, File}}} ->
+        {error, {Pos, include_error, File}} ->
             parse_error(Pos, io_lib:format("could not find include file '~s'", [File]))
     end.
 
