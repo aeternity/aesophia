@@ -203,4 +203,7 @@ failing_contracts() ->
            "  (gas : int, value : int) => map(string, int)">>]}
     , {"include",
         [<<"file include, line 1, column 9: includes not allowed in this context\n">>]}
+    , {"bad_include_and_ns",
+        [<<"Include of 'included.aes' at line 2, column 11\nnot allowed, include only allowed at top level.">>,
+         <<"Nested namespace not allowed\nNamespace 'Foo' at line 3, column 13 not defined at top level.">>]}
     ].

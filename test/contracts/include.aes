@@ -2,7 +2,6 @@ include "included.aes"
 include "../contracts/included2.aes"
 
 contract Include =
-  // include "maps.aes"
   function foo() =
     Included.foo() < Included2a.bar()
 

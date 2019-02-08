@@ -566,11 +566,13 @@ infer_constant({letval, Attrs,_Pattern, Type, E}) ->
 infer_contract(Env, What, Defs) ->
     Kind = fun({type_def, _, _, _, _})  -> type;
               ({letfun, _, _, _, _, _}) -> function;
-              ({fun_decl, _, _, _})     -> prototype
+              ({fun_decl, _, _, _})     -> prototype;
+              (_)                       -> unexpected
            end,
     Get = fun(K) -> [ Def || Def <- Defs, Kind(Def) == K ] end,
     {Env1, TypeDefs} = check_typedefs(Env, Get(type)),
     create_type_errors(),
+    check_unexpected(Get(unexpected)),
     Env2 =
         case What of
             namespace -> Env1;
@@ -645,6 +647,9 @@ check_typedef(Env, {record_t, Fields}) ->
 check_typedef(Env, {variant_t, Cons}) ->
     {variant_t, [ {constr_t, Ann, Con, [ check_type(Env, Arg) || Arg <- Args ]}
                 || {constr_t, Ann, Con, Args} <- Cons ]}.
+
+check_unexpected(Xs) ->
+    [ type_error(X) || X <- Xs ].
 
 -spec check_type(env(), aeso_syntax:type()) -> aeso_syntax:type().
 check_type(Env, T) ->
@@ -1869,6 +1874,12 @@ pp_error({duplicate_definition, Name, Locs}) ->
 pp_error({duplicate_scope, Kind, Name, OtherKind, L}) ->
     io_lib:format("The ~p ~s (at ~s) has the same name as a ~p at ~s\n",
                   [Kind, pp(Name), pp_loc(Name), OtherKind, pp_loc(L)]);
+pp_error({include, {string, Pos, Name}}) ->
+    io_lib:format("Include of '~s' at ~s\nnot allowed, include only allowed at top level.\n",
+                  [binary_to_list(Name), pp_loc(Pos)]);
+pp_error({namespace, _Pos, {con, Pos, Name}, _Def}) ->
+    io_lib:format("Nested namespace not allowed\nNamespace '~s' at ~s not defined at top level.\n",
+                  [Name, pp_loc(Pos)]);
 pp_error(Err) ->
     io_lib:format("Unknown error: ~p\n", [Err]).
 
