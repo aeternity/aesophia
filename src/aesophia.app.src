@@ -6,6 +6,7 @@
    [kernel,
     stdlib,
     syntax_tools,
+    getopt,
     aebytecode
    ]},
   {env,[]},
