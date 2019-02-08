@@ -193,10 +193,10 @@ bind_state(Env) ->
     Env1 = bind_funs([{"state", State},
                       {"put", {fun_t, Ann, [], [State], Unit}}], Env),
 
-    %% A bit of a hack: we bind Chain.event with the local event type.
-    Env2 = force_bind_fun("event", {fun_t, Ann, [], [Event], Unit},
-                    Env1#env{ namespace = ["Chain"] }),
-    Env2#env{ namespace = Env1#env.namespace }.
+    %% We bind Chain.event in a local 'Chain' namespace.
+    pop_scope(
+      bind_fun("event", {fun_t, Ann, [], [Event], Unit},
+      push_scope(namespace, {con, Ann, "Chain"}, Env1))).
 
 -spec bind_field(name(), field_info(), env()) -> env().
 bind_field(X, Info, Env = #env{ fields = Fields }) ->
