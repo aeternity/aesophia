@@ -5,8 +5,8 @@
   {applications,
    [kernel,
     stdlib,
-    enacl,
     syntax_tools,
+    getopt,
     aebytecode
    ]},
   {env,[]},

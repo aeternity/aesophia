@@ -36,8 +36,6 @@ contract AllSyntax =
       (x, [y, z]) => bar({x = z, y = -y + - -z * (-1)})
       (x, y :: _) => ()
 
-  function bitOperations(x, y) = bnot (0xff00 band x bsl 4 bxor 0xa5a5a5 bsr 4 bor y)
-
   function mutual() =
     let rec recFun(x : int) = mutFun(x)
         and mutFun(x) = if(x =< 0) 1 else x * recFun(x - 1)

@@ -38,7 +38,7 @@ builtin_deps1({map_upd, Type})            -> [{map_get, Type}, map_put];
 builtin_deps1({map_upd_default, Type})    -> [{map_lookup_default, Type}, map_put];
 builtin_deps1(map_from_list)              -> [map_put];
 builtin_deps1(str_equal)                  -> [str_equal_p];
-builtin_deps1(string_concat)              -> [string_concat_inner1, string_concat_inner2];
+builtin_deps1(string_concat)              -> [string_concat_inner1, string_copy, string_shift_copy];
 builtin_deps1(int_to_str)                 -> [{baseX_int, 10}];
 builtin_deps1(addr_to_str)                -> [{baseX_int, 58}];
 builtin_deps1({baseX_int, X})             -> [{baseX_int_pad, X}];
@@ -144,9 +144,11 @@ builtin_function(BF) ->
         string_length              -> bfun(BF, builtin_string_length());
         string_concat              -> bfun(BF, builtin_string_concat());
         string_concat_inner1       -> bfun(BF, builtin_string_concat_inner1());
-        string_concat_inner2       -> bfun(BF, builtin_string_concat_inner2());
+        string_copy                -> bfun(BF, builtin_string_copy());
+        string_shift_copy          -> bfun(BF, builtin_string_shift_copy());
         str_equal_p                -> bfun(BF, builtin_str_equal_p());
         str_equal                  -> bfun(BF, builtin_str_equal());
+        popcount                   -> bfun(BF, builtin_popcount());
         int_to_str                 -> bfun(BF, builtin_int_to_str());
         addr_to_str                -> bfun(BF, builtin_addr_to_str());
         {baseX_int, X}             -> bfun(BF, builtin_baseX_int(X));
@@ -322,14 +324,17 @@ builtin_string_concat() ->
     {[{"s1", string}, {"s2", string}],
      ?DEREF(n1, s1,
      ?DEREF(n2, s2,
-        {ifte, ?EQ(n2, 0),
-            ?V(s1), %% Second string is empty return first string
-            ?LET(ret, {inline_asm, [?A(?MSIZE)]},
-                {seq, [?ADD(n1, n2), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]}, %% Store total len
-                       ?call(string_concat_inner1, [?V(n1), ?NXT(s1), ?V(n2), ?NXT(s2)]),
-                       {inline_asm, [?A(?POP)]}, %% Discard fun ret val
-                       ?V(ret)                   %% Put the actual return value
-                      ]})}
+        {ifte, ?EQ(n1, 0),
+            ?V(s2), %% First string is empty return second string
+            {ifte, ?EQ(n2, 0),
+                ?V(s1), %% Second string is empty return first string
+                ?LET(ret, {inline_asm, [?A(?MSIZE)]},
+                    {seq, [?ADD(n1, n2), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]}, %% Store total len
+                           ?call(string_concat_inner1, [?V(n1), ?NXT(s1), ?V(n2), ?NXT(s2)]),
+                           {inline_asm, [?A(?POP)]}, %% Discard fun ret val
+                           ?V(ret)                   %% Put the actual return value
+                          ]})}
+        }
      )),
      word}.
 
@@ -337,33 +342,33 @@ builtin_string_concat_inner1() ->
     %% Copy all whole words from the first string, and set up for word fusion
     %% Special case when the length of the first string is divisible by 32.
     {[{"n1", word}, {"p1", pointer}, {"n2", word}, {"p2", pointer}],
-     ?DEREF(w1, p1,
-        {ifte, ?GT(n1, 32),
-            {seq, [?V(w1), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
-                   ?call(string_concat_inner1, [?SUB(n1, 32), ?NXT(p1), ?V(n2), ?V(p2)])]},
-            {ifte, ?EQ(n1, 0),
-                ?call(string_concat_inner2, [?I(32), ?I(0), ?V(n2), ?V(p2)]),
-                ?call(string_concat_inner2, [?SUB(32, n1), ?V(w1), ?V(n2), ?V(p2)])}
+     ?LET(w1, ?call(string_copy, [?V(n1), ?V(p1)]),
+        ?LET(nx, ?MOD(n1, 32),
+        {ifte, ?EQ(nx, 0),
+            ?LET(w2, ?call(string_copy, [?V(n2), ?V(p2)]),
+                {seq, [?V(w2), {inline_asm, [?A(?MSIZE), ?A(?MSTORE), ?A(?MSIZE)]}]}),
+            ?call(string_shift_copy, [?V(nx), ?V(w1), ?V(n2), ?V(p2)])
+        })),
+     word}.
+
+builtin_string_copy() ->
+    {[{"n", word}, {"p", pointer}],
+     ?DEREF(w, p,
+        {ifte, ?GT(n, 31),
+            {seq, [?V(w), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
+                   ?call(string_copy, [?SUB(n, 32), ?NXT(p)])]},
+            ?V(w)
         }),
      word}.
 
-builtin_string_concat_inner2() ->
-    %% Current "work in progess" word 'x', has 'o' bytes that are "free" - fill them from
-    %% words of the second string.
-    {[{"o", word}, {"x", word}, {"n2", word}, {"p2", pointer}],
-     {ifte, ?LT(n2, 1),
-        {seq, [?V(x), {inline_asm, [?A(?MSIZE), ?A(?MSTORE), ?A(?MSIZE)]}]}, %% Use MSIZE as dummy return value
-        ?DEREF(w2, p2,
-            {ifte, ?GT(n2, o),
-                {seq, [?ADD(x, ?BSR(w2, ?SUB(32, o))),
-                       {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
-                       ?call(string_concat_inner2,
-                             [?V(o), ?BSL(w2, o), ?SUB(n2, 32), ?NXT(p2)])
-                      ]},
-                {seq, [?ADD(x, ?BSR(w2, ?SUB(32, o))),
-                       {inline_asm, [?A(?MSIZE), ?A(?MSTORE), ?A(?MSIZE)]}]} %% Use MSIZE as dummy return value
-            })
-     },
+builtin_string_shift_copy() ->
+    {[{"off", word}, {"dst", word}, {"n", word}, {"p", pointer}],
+     ?DEREF(w, p,
+        {seq, [?ADD(dst, ?BSR(w, off)), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
+               {ifte, ?GT(n, ?SUB(32, off)),
+                    ?call(string_shift_copy, [?V(off), ?BSL(w, ?SUB(32, off)), ?SUB(n, 32), ?NXT(p)]),
+                    {inline_asm, [?A(?MSIZE)]}}]
+        }),
      word}.
 
 builtin_str_equal_p() ->
@@ -393,6 +398,17 @@ builtin_str_equal() ->
          ?AND(?EQ(n1, n2), ?call(str_equal_p, [?V(n1), ?NXT(s1), ?NXT(s2)]))
      )),
      word}.
+
+%% Count the number of 1s in a bit field.
+builtin_popcount() ->
+    %% function popcount(bits, acc) =
+    %%   if (bits == 0) acc
+    %%   else popcount(bits bsr 1, acc + bits band 1)
+    {[{"bits", word}, {"acc", word}],
+     {ifte, ?EQ(bits, 0),
+        ?V(acc),
+        ?call(popcount, [op('bsr', 1, bits), ?ADD(acc, op('band', bits, 1))])
+     }, word}.
 
 builtin_int_to_str() ->
     {[{"i", word}], ?call({baseX_int, 10}, [?V(i)]), word}.
