@@ -17,7 +17,7 @@
 i(Code) -> aeb_opcodes:mnemonic(Code).
 
 %% We don't track purity or statefulness in the type checker yet.
-is_stateful({FName, _, _, _, _}) -> FName /= "init".
+is_stateful({FName, _, _, _, _}) -> lists:last(FName) /= "init".
 
 is_public({_Name, Attrs, _Args, _Body, _Type}) -> not lists:member(private, Attrs).
 
@@ -105,7 +105,7 @@ make_args(Args) ->
 
 fun_hash({FName, _, Args, _, TypeRep}) ->
     ArgType = {tuple, [T || {_, T} <- Args]},
-    <<Hash:256>> = aeso_abi:function_type_hash(list_to_binary(FName), ArgType, TypeRep),
+    <<Hash:256>> = aeso_abi:function_type_hash(list_to_binary(lists:last(FName)), ArgType, TypeRep),
     {integer, Hash}.
 
 %% Expects two return addresses below N elements on the stack. Picks the top

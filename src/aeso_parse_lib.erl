@@ -19,7 +19,7 @@
 
 -export_type([parser/1, parser_expr/1, pos/0, token/0, tokens/0]).
 
--type pos()    :: {integer(), integer()}.
+-type pos()    :: {string() | no_file, integer(), integer()} | {integer(), integer()}.
 -type token()  :: {atom(), pos(), term()} | {atom(), pos()}.
 -type tokens() :: [token()].
 -type error()  :: {pos(), string() | no_error}.

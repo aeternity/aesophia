@@ -17,11 +17,19 @@
 
 -spec convert_typed(aeso_syntax:ast(), list()) -> aeso_icode:icode().
 convert_typed(TypedTree, Options) ->
-    code(TypedTree, aeso_icode:new(Options)).
+    Name = case lists:last(TypedTree) of
+               {contract, _, {con, _, Con}, _} -> Con;
+               _ -> gen_error(last_declaration_must_be_contract)
+           end,
+    Icode = code(TypedTree, aeso_icode:set_name(Name, aeso_icode:new(Options))),
+    deadcode_elimination(Icode).
 
-code([{contract, _Attribs, {con, _, Name}, Code}|Rest], Icode) ->
-    NewIcode = contract_to_icode(Code,
-                                 aeso_icode:set_name(Name, Icode)),
+code([{contract, _Attribs, Con, Code}|Rest], Icode) ->
+    NewIcode = contract_to_icode(Code, aeso_icode:set_namespace(Con, Icode)),
+    code(Rest, NewIcode);
+code([{namespace, _Ann, Name, Code}|Rest], Icode) ->
+                                            %% TODO: nested namespaces
+    NewIcode = contract_to_icode(Code, aeso_icode:set_namespace(Name, Icode)),
     code(Rest, NewIcode);
 code([], Icode) ->
     add_default_init_function(add_builtins(Icode)).
@@ -33,30 +41,38 @@ gen_error(Error) ->
 
 %% Create default init function (only if state is unit).
 add_default_init_function(Icode = #{functions := Funs, state_type := State}) ->
-    case lists:keymember("init", 1, Funs) of
+    {_, _, QInit} = aeso_icode:qualify({id, [], "init"}, Icode),
+    case lists:keymember(QInit, 1, Funs) of
         true -> Icode;
-        false when State /= {tuple, []} -> gen_error(missing_init_function);
+        false when State /= {tuple, []} ->
+            gen_error(missing_init_function);
         false ->
             Type  = {tuple, [typerep, {tuple, []}]},
             Value = #tuple{ cpts = [type_value({tuple, []}), {tuple, []}] },
-            DefaultInit = {"init", [], [], Value, Type},
+            DefaultInit = {QInit, [], [], Value, Type},
             Icode#{ functions => [DefaultInit | Funs] }
     end.
 
 -spec contract_to_icode(aeso_syntax:ast(), aeso_icode:icode()) ->
                                aeso_icode:icode().
-contract_to_icode([{type_def, _Attrib, {id, _, Name}, Args, Def} | Rest],
+contract_to_icode([{namespace, _, Name, Defs} | Rest], Icode) ->
+    NS = aeso_icode:get_namespace(Icode),
+    Icode1 = contract_to_icode(Defs, aeso_icode:enter_namespace(Name, Icode)),
+    contract_to_icode(Rest, aeso_icode:set_namespace(NS, Icode1));
+contract_to_icode([{type_def, _Attrib, Id = {id, _, Name}, Args, Def} | Rest],
                   Icode = #{ types := Types, constructors := Constructors }) ->
     TypeDef = make_type_def(Args, Def, Icode),
     NewConstructors =
         case Def of
             {variant_t, Cons} ->
                 Tags = lists:seq(0, length(Cons) - 1),
-                GetName = fun({constr_t, _, {con, _, C}, _}) -> C end,
-                maps:from_list([ {GetName(Con), Tag} || {Tag, Con} <- lists:zip(Tags, Cons) ]);
+                GetName = fun({constr_t, _, C, _}) -> C end,
+                QName = fun(Con) -> {_, _, Xs} = aeso_icode:qualify(GetName(Con), Icode), Xs end,
+                maps:from_list([ {QName(Con), Tag} || {Tag, Con} <- lists:zip(Tags, Cons) ]);
             _ -> #{}
         end,
-    Icode1 = Icode#{ types := Types#{ Name => TypeDef },
+    {_, _, TName} = aeso_icode:qualify(Id, Icode),
+    Icode1 = Icode#{ types := Types#{ TName => TypeDef },
                      constructors := maps:merge(Constructors, NewConstructors) },
     Icode2 = case Name of
                 "state" when Args == [] -> Icode1#{ state_type => ast_typerep(Def, Icode) };
@@ -68,8 +84,7 @@ contract_to_icode([{type_def, _Attrib, {id, _, Name}, Args, Def} | Rest],
     contract_to_icode(Rest, Icode2);
 contract_to_icode([{letfun, Attrib, Name, Args, _What, Body={typed,_,_,T}}|Rest], Icode) ->
     FunAttrs = [ stateful || proplists:get_value(stateful, Attrib, false) ] ++
-               [ private  || proplists:get_value(private, Attrib, false) orelse
-                             proplists:get_value(internal, Attrib, false) ],
+               [ private  || is_private(Attrib, Icode) ],
     %% TODO: Handle types
     FunName = ast_id(Name),
     %% TODO: push funname to env
@@ -84,7 +99,8 @@ contract_to_icode([{letfun, Attrib, Name, Args, _What, Body={typed,_,_,T}}|Rest]
                  {tuple, [typerep, ast_typerep(T, Icode)]}};
             _ -> {ast_body(Body, Icode), ast_typerep(T, Icode)}
         end,
-    NewIcode = ast_fun_to_icode(FunName, FunAttrs, FunArgs, FunBody, TypeRep, Icode),
+    QName    = aeso_icode:qualify(Name, Icode),
+    NewIcode = ast_fun_to_icode(ast_id(QName), FunAttrs, FunArgs, FunBody, TypeRep, Icode),
     contract_to_icode(Rest, NewIcode);
 contract_to_icode([{letrec,_,Defs}|Rest], Icode) ->
     %% OBS! This code ignores the letrec structure of the source,
@@ -94,11 +110,14 @@ contract_to_icode([{letrec,_,Defs}|Rest], Icode) ->
     %% just to parse a list of (mutually recursive) definitions.
     contract_to_icode(Defs++Rest, Icode);
 contract_to_icode([], Icode) -> Icode;
-contract_to_icode(_Code, Icode) ->
-    %% TODO debug output for debug("Unhandled code ~p~n",[Code]),
-    Icode.
+contract_to_icode([{fun_decl, _, _, _} | Code], Icode) ->
+    contract_to_icode(Code, Icode);
+contract_to_icode([Decl | Code], Icode) ->
+    io:format("Unhandled declaration: ~p\n", [Decl]),
+    contract_to_icode(Code, Icode).
 
-ast_id({id, _, Id}) -> Id.
+ast_id({id, _, Id}) -> Id;
+ast_id({qid, _, Id}) -> Id.
 
 ast_args([{arg, _, Name, Type}|Rest], Acc, Icode) ->
     ast_args(Rest, [{ast_id(Name), ast_type(Type, Icode)}| Acc], Icode);
@@ -121,7 +140,7 @@ ast_type(T, Icode) ->
 ast_body(?qid_app(["Chain","spend"], [To, Amount], _, _), Icode) ->
     prim_call(?PRIM_CALL_SPEND, ast_body(Amount, Icode), [ast_body(To, Icode)], [word], {tuple, []});
 
-ast_body(?qid_app(["Chain","event"], [Event], _, _), Icode) ->
+ast_body(?qid_app([Con, "Chain", "event"], [Event], _, _), Icode = #{ contract_name := Con }) ->
     aeso_builtins:check_event_type(Icode),
     builtin_call({event, maps:get(event_type, Icode)}, [ast_body(Event, Icode)]);
 
@@ -152,10 +171,10 @@ ast_body({qid, _, ["Chain", "spend"]}, _Icode) ->
     gen_error({underapplied_primitive, 'Chain.spend'});
 
 %% State
-ast_body({id, _, "state"}, _Icode) -> prim_state;
-ast_body(?id_app("put", [NewState], _, _), Icode) ->
+ast_body({qid, _, [Con, "state"]}, #{ contract_name := Con }) -> prim_state;
+ast_body(?qid_app([Con, "put"], [NewState], _, _), Icode = #{ contract_name := Con }) ->
     #prim_put{ state = ast_body(NewState, Icode) };
-ast_body({id, _, "put"}, _Icode) ->
+ast_body({qid, _, [Con, "put"]}, #{ contract_name := Con }) ->
     gen_error({underapplied_primitive, put});   %% TODO: eta
 
 %% Abort
@@ -384,7 +403,8 @@ ast_body(?qid_app(["Address", "to_str"], [Addr], _, _), Icode) ->
 
 %% Other terms
 ast_body({id, _, Name}, _Icode) ->
-    %% TODO Look up id in env
+    #var_ref{name = Name};
+ast_body({qid, _, Name}, _Icode) ->
     #var_ref{name = Name};
 ast_body({bool, _, Bool}, _Icode) ->        %BOOL as ints
     Value = if Bool -> 1 ; true -> 0 end,
@@ -441,9 +461,15 @@ ast_body({proj, _, {typed, _, _, {con, _, Contract}}, {id, _, FunName}}, _Icode)
                string:join([Contract, FunName], ".")});
 
 ast_body({con, _, Name}, Icode) ->
+    Tag = aeso_icode:get_constructor_tag([Name], Icode),
+    #tuple{cpts = [#integer{value = Tag}]};
+ast_body({qcon, _, Name}, Icode) ->
     Tag = aeso_icode:get_constructor_tag(Name, Icode),
     #tuple{cpts = [#integer{value = Tag}]};
 ast_body({app, _, {typed, _, {con, _, Name}, _}, Args}, Icode) ->
+    Tag = aeso_icode:get_constructor_tag([Name], Icode),
+    #tuple{cpts = [#integer{value = Tag} | [ ast_body(Arg, Icode) || Arg <- Args ]]};
+ast_body({app, _, {typed, _, {qcon, _, Name}, _}, Args}, Icode) ->
     Tag = aeso_icode:get_constructor_tag(Name, Icode),
     #tuple{cpts = [#integer{value = Tag} | [ ast_body(Arg, Icode) || Arg <- Args ]]};
 ast_body({app,As,Fun,Args}, Icode) ->
@@ -745,6 +771,15 @@ has_maps({list, T})     -> has_maps(T);
 has_maps({tuple, Ts})   -> lists:any(fun has_maps/1, Ts);
 has_maps({variant, Cs}) -> lists:any(fun has_maps/1, lists:append(Cs)).
 
+%% A function is private if marked 'private' or 'internal', or if it's not
+%% defined in the main contract name space. (NOTE: changes when we introduce
+%% inheritance).
+is_private(Ann, #{ contract_name := MainContract } = Icode) ->
+    {_, _, CurrentNamespace} = aeso_icode:get_namespace(Icode),
+    proplists:get_value(private,  Ann, false) orelse
+    proplists:get_value(internal, Ann, false) orelse
+    MainContract /= CurrentNamespace.
+
 %% -------------------------------------------------------------------
 %% Builtins
 %% -------------------------------------------------------------------
@@ -756,3 +791,39 @@ builtin_call(Builtin, Args) ->
 add_builtins(Icode = #{functions := Funs}) ->
     Builtins = aeso_builtins:used_builtins(Funs),
     Icode#{functions := [ aeso_builtins:builtin_function(B) || B <- Builtins ] ++ Funs}.
+
+
+%% -------------------------------------------------------------------
+%% Deadcode elimination
+%% -------------------------------------------------------------------
+
+deadcode_elimination(Icode = #{ functions := Funs }) ->
+    PublicNames = [ Name || {Name, Ann, _, _, _} <- Funs, not lists:member(private, Ann) ],
+    ArgsToPat   = fun(Args) -> [ #var_ref{ name = X } || {X, _} <- Args ] end,
+    Defs        = maps:from_list([ {Name, {binder, ArgsToPat(Args), Body}} || {Name, _, Args, Body, _} <- Funs ]),
+    UsedNames   = chase_names(Defs, PublicNames, #{}),
+    UsedFuns    = [ Def || Def = {Name, _, _, _, _} <- Funs, maps:is_key(Name, UsedNames) ],
+    Icode#{ functions := UsedFuns }.
+
+chase_names(_Defs, [], Used) -> Used;
+chase_names(Defs, [X | Xs], Used) ->
+                              %% can happen when compiling __call contracts
+    case maps:is_key(X, Used) orelse not maps:is_key(X, Defs) of
+        true  -> chase_names(Defs, Xs, Used); %% already chased
+        false ->
+            Def  = maps:get(X, Defs),
+            Vars = maps:keys(free_vars(Def)),
+            chase_names(Defs, Vars ++ Xs, Used#{ X => true })
+    end.
+
+free_vars(#var_ref{ name = X }) -> #{ X => true };
+free_vars(#arg{ name = X }) -> #{ X => true };
+free_vars({binder, Pat, Body}) ->
+    maps:without(maps:keys(free_vars(Pat)), free_vars(Body));
+free_vars(#switch{ expr = E, cases = Cases }) ->
+    free_vars([E | [{binder, P, B} || {P, B} <- Cases]]);
+free_vars(#lambda{ args = Xs, body = E }) ->
+    free_vars({binder, Xs, E});
+free_vars(T) when is_tuple(T) -> free_vars(tuple_to_list(T));
+free_vars([H | T]) -> maps:merge(free_vars(H), free_vars(T));
+free_vars(_) -> #{}.

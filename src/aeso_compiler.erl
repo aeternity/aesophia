@@ -21,8 +21,16 @@
 -include("aeso_icode.hrl").
 
 
--type option() :: pp_sophia_code | pp_ast | pp_types | pp_typed_ast |
-                  pp_icode| pp_assembler | pp_bytecode.
+-type option() :: pp_sophia_code
+                | pp_ast
+                | pp_types
+                | pp_typed_ast
+                | pp_icode
+                | pp_assembler
+                | pp_bytecode
+                | {include, {file_system, [string()]} |
+                            {explicit_files, #{string() => binary()}}}
+                | {src_file, string()}.
 -type options() :: [option()].
 
 -export_type([ option/0
@@ -40,12 +48,14 @@ version() ->
 
 -spec file(string()) -> {ok, map()} | {error, binary()}.
 file(Filename) ->
-    file(Filename, []).
+    Dir = filename:dirname(Filename),
+    {ok, Cwd} = file:get_cwd(),
+    file(Filename, [{include, {file_system, [Cwd, Dir]}}]).
 
 -spec file(string(), options()) -> {ok, map()} | {error, binary()}.
 file(File, Options) ->
     case read_contract(File) of
-        {ok, Bin} -> from_string(Bin, Options);
+        {ok, Bin} -> from_string(Bin, [{src_file, File} | Options]);
         {error, Error} ->
 	    ErrorString = [File,": ",file:format_error(Error)],
 	    {error, join_errors("File errors", [ErrorString], fun(E) -> E end)}
@@ -152,7 +162,7 @@ create_calldata(Contract, Function, Argument) when is_map(Contract) ->
         [FunName | _] ->
             Args    = lists:map(fun($\n) -> 32; (X) -> X end, Argument),    %% newline to space
             CallContract = lists:flatten(
-                [ "contract Call =\n"
+                [ "contract MakeCall =\n"
                 , "  function ", Function, "\n"
                 , "  function __call() = ", FunName, "(", Args, ")"
                 ]),
@@ -161,15 +171,17 @@ create_calldata(Contract, Function, Argument) when is_map(Contract) ->
 
 
 get_arg_icode(Funs) ->
-    [Args] = [ Args || {?CALL_NAME, _, _, {funcall, _, Args}, _} <- Funs ],
-    Args.
+    case [ Args || {[_, ?CALL_NAME], _, _, {funcall, _, Args}, _} <- Funs ] of
+        [Args] -> Args;
+        []     -> error({missing_call_function, Funs})
+    end.
 
 get_call_type([{contract, _, _, Defs}]) ->
-    case [ {FunName, FunType}
+    case [ {lists:last(QFunName), FunType}
           || {letfun, _, {id, _, ?CALL_NAME}, [], _Ret,
                 {typed, _,
                     {app, _,
-                        {typed, _, {id, _, FunName}, FunType}, _}, _}} <- Defs ] of
+                        {typed, _, {qid, _, QFunName}, FunType}, _}, _}} <- Defs ] of
         [Call] -> {ok, Call};
         []     -> {error, missing_call_function}
     end;
@@ -211,9 +223,6 @@ icode_to_term(T, V) ->
 icodes_to_terms(Ts, Vs) ->
     [ icode_to_term(T, V) || {T, V} <- lists:zip(Ts, Vs) ].
 
-parse(C,_Options) ->
-    parse_string(C).
-
 to_icode(TypedAst, Options) ->
     aeso_ast_to_icode:convert_typed(TypedAst, Options).
 
@@ -228,7 +237,7 @@ to_bytecode([Op|Rest], Options) ->
 to_bytecode([], _) -> [].
 
 extract_type_info(#{functions := Functions} =_Icode) ->
-    TypeInfo = [aeso_abi:function_type_info(list_to_binary(Name), Args, TypeRep)
+    TypeInfo = [aeso_abi:function_type_info(list_to_binary(lists:last(Name)), Args, TypeRep)
                 || {Name, Attrs, Args,_Body, TypeRep} <- Functions,
                    not is_tuple(Name),
                    not lists:member(private, Attrs)
@@ -263,9 +272,9 @@ sophia_type_to_typerep(String) ->
     catch _:_ -> {error, bad_type}
     end.
 
-parse_string(Text) ->
+parse(Text, Options) ->
     %% Try and return something sensible here!
-    case aeso_parser:string(Text) of
+    case aeso_parser:string(Text, Options) of
         %% Yay, it worked!
         {ok, Contract} -> Contract;
         %% Scan errors.
@@ -278,12 +287,23 @@ parse_string(Text) ->
             parse_error(Pos, Error);
         {error, {Pos, ambiguous_parse, As}} ->
             ErrorString = io_lib:format("Ambiguous ~p", [As]),
-            parse_error(Pos, ErrorString)
+            parse_error(Pos, ErrorString);
+        %% Include error
+        {error, {Pos, include_error, File}} ->
+            parse_error(Pos, io_lib:format("could not find include file '~s'", [File]))
     end.
 
-parse_error({Line, Pos}, ErrorString) ->
-    Error = io_lib:format("line ~p, column ~p: ~s", [Line, Pos, ErrorString]),
+parse_error(Pos, ErrorString) ->
+    Error = io_lib:format("~s: ~s", [pos_error(Pos), ErrorString]),
     error({parse_errors, [Error]}).
 
 read_contract(Name) ->
     file:read_file(Name).
+
+pos_error({Line, Pos}) ->
+    io_lib:format("line ~p, column ~p", [Line, Pos]);
+pos_error({no_file, Line, Pos}) ->
+    pos_error({Line, Pos});
+pos_error({File, Line, Pos}) ->
+    io_lib:format("file ~s, line ~p, column ~p", [File, Line, Pos]).
+

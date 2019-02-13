@@ -66,7 +66,7 @@ encode_decode_sophia_test() ->
 
 encode_decode_sophia_string(SophiaType, String) ->
     io:format("String ~p~n", [String]),
-    Code = [ "contract Call =\n"
+    Code = [ "contract MakeCall =\n"
            , "  function foo : ", SophiaType, " => _\n"
            , "  function __call() = foo(", String, ")\n" ],
     {ok, _, {Types, _}, Args} = aeso_compiler:check_call(lists:flatten(Code), []),

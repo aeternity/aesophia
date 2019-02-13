@@ -9,7 +9,18 @@
 %%%-------------------------------------------------------------------
 -module(aeso_icode).
 
--export([new/1, pp/1, set_name/2, set_functions/2, map_typerep/2, option_typerep/1, get_constructor_tag/2]).
+-export([new/1,
+         pp/1,
+         set_name/2,
+         set_namespace/2,
+         enter_namespace/2,
+         get_namespace/1,
+         qualify/2,
+         set_functions/2,
+         map_typerep/2,
+         option_typerep/1,
+         get_constructor_tag/2]).
+
 -export_type([icode/0]).
 
 -include("aeso_icode.hrl").
@@ -29,12 +40,13 @@
 
 -type icode() :: #{ contract_name => string()
                   , functions => [fun_dec()]
+                  , namespace => aeso_syntax:con() | aeso_syntax:qcon()
                   , env => [bindings()]
                   , state_type => aeso_sophia:type()
                   , event_type => aeso_sophia:type()
                   , types => #{ type_name() => type_def() }
                   , type_vars => #{ string() => aeso_sophia:type() }
-                  , constructors => #{ string() => integer() }  %% name to tag
+                  , constructors => #{ [string()] => integer() }  %% name to tag
                   , options => [any()]
                   }.
 
@@ -73,10 +85,10 @@ builtin_types() ->
      }.
 
 builtin_constructors() ->
-    #{ "RelativeTTL" => 0
-     , "FixedTTL"    => 1
-     , "None"        => 0
-     , "Some"        => 1 }.
+    #{ ["RelativeTTL"] => 0
+     , ["FixedTTL"]    => 1
+     , ["None"]        => 0
+     , ["Some"]        => 1 }.
 
 map_typerep(K, V) ->
     {map, K, V}.
@@ -91,11 +103,30 @@ new_env() ->
 set_name(Name, Icode) ->
     maps:put(contract_name, Name, Icode).
 
+-spec set_namespace(aeso_syntax:con() | aeso_syntax:qcon(), icode()) -> icode().
+set_namespace(NS, Icode) -> Icode#{ namespace => NS }.
+
+-spec enter_namespace(aeso_syntax:con(), icode()) -> icode().
+enter_namespace(NS, Icode = #{ namespace := NS1 }) ->
+    Icode#{ namespace => aeso_syntax:qualify(NS1, NS) };
+enter_namespace(NS, Icode) ->
+    Icode#{ namespace => NS }.
+
+-spec get_namespace(icode()) -> false | aeso_syntax:con() | aeso_syntax:qcon().
+get_namespace(Icode) -> maps:get(namespace, Icode, false).
+
+-spec qualify(aeso_syntax:id() | aeso_syntax:con(), icode()) -> aeso_syntax:id() | aeso_syntax:qid() | aeso_syntax:con() | aeso_syntax:qcon().
+qualify(X, Icode) ->
+    case get_namespace(Icode) of
+        false -> X;
+        NS    -> aeso_syntax:qualify(NS, X)
+    end.
+
 -spec set_functions([fun_dec()], icode()) -> icode().
 set_functions(NewFuns, Icode) ->
     maps:put(functions, NewFuns, Icode).
 
--spec get_constructor_tag(string(), icode()) -> integer().
+-spec get_constructor_tag([string()], icode()) -> integer().
 get_constructor_tag(Name, #{constructors := Constructors}) ->
     case maps:get(Name, Constructors, undefined) of
         undefined -> error({undefined_constructor, Name});

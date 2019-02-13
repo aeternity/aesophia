@@ -1,0 +1,9 @@
+include "included.aes"
+include "../contracts/included2.aes"
+
+contract Include =
+  function foo() =
+    Included.foo() < Included2a.bar()
+
+  function bar() =
+    Included2b.foo() > Included.foo()

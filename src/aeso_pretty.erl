@@ -147,6 +147,8 @@ decl(D, Options) ->
 -spec decl(aeso_syntax:decl()) -> doc().
 decl({contract, _, C, Ds}) ->
     block(follow(text("contract"), hsep(name(C), text("="))), decls(Ds));
+decl({namespace, _, C, Ds}) ->
+    block(follow(text("namespace"), hsep(name(C), text("="))), decls(Ds));
 decl({type_decl, _, T, Vars}) -> typedecl(alias_t, T, Vars);
 decl({type_def, _, T, Vars, Def}) ->
     Kind = element(1, Def),
@@ -234,8 +236,10 @@ type({app_t, _, Type, Args}) ->
     beside(type(Type), tuple_type(Args));
 type({tuple_t, _, Args}) ->
     tuple_type(Args);
-type({named_arg_t, _, Name, Type, Default}) ->
-    follow(hsep(typed(name(Name), Type), text("=")), expr(Default));
+type({named_arg_t, _, Name, Type, _Default}) ->
+    %% Drop the default value
+    %% follow(hsep(typed(name(Name), Type), text("=")), expr(Default));
+    typed(name(Name), Type);
 
 type(R = {record_t, _}) -> typedef(R);
 type(T = {id, _, _})   -> name(T);

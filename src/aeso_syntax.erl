@@ -8,14 +8,14 @@
 
 -module(aeso_syntax).
 
--export([get_ann/1, get_ann/2, get_ann/3, set_ann/2]).
+-export([get_ann/1, get_ann/2, get_ann/3, set_ann/2, qualify/2]).
 
 -export_type([ann_line/0, ann_col/0, ann_origin/0, ann_format/0, ann/0]).
 -export_type([name/0, id/0, con/0, qid/0, qcon/0, tvar/0, op/0]).
 -export_type([bin_op/0, un_op/0]).
 -export_type([decl/0, letbind/0, typedef/0]).
--export_type([arg/0, field_t/0, constructor_t/0]).
--export_type([type/0, constant/0, expr/0, arg_expr/0, field/1, stmt/0, alt/0, lvalue/0, pat/0]).
+-export_type([arg/0, field_t/0, constructor_t/0, named_arg_t/0]).
+-export_type([type/0, constant/0, expr/0, arg_expr/0, field/1, stmt/0, alt/0, lvalue/0, elim/0, pat/0]).
 -export_type([ast/0]).
 
 -type ast() :: [decl()].
@@ -35,6 +35,7 @@
 -type tvar() :: {tvar, ann(), name()}.
 
 -type decl() :: {contract, ann(), con(), [decl()]}
+              | {namespace, ann(), con(), [decl()]}
               | {type_decl, ann(), id(), [tvar()]}
               | {type_def, ann(), id(), [tvar()], typedef()}
               | {fun_decl, ann(), id(), type()}
@@ -140,3 +141,8 @@ get_ann(Key, Node) ->
 
 get_ann(Key, Node, Default) ->
     proplists:get_value(Key, get_ann(Node), Default).
+
+qualify({con, Ann, N}, X)             -> qualify({qcon, Ann, [N]}, X);
+qualify({qcon, _, NS}, {con, Ann, C}) -> {qcon, Ann, NS ++ [C]};
+qualify({qcon, _, NS}, {id, Ann, X})  -> {qid, Ann, NS ++ [X]}.
+

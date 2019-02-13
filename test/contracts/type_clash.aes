@@ -1,0 +1,13 @@
+
+contract Remote =
+
+  type themap = map(int, string)
+  function foo : () => themap
+
+contract Main =
+
+  type themap = map(string, int)
+
+  // Should fail
+  function foo(r : Remote) : themap = r.foo()
+
