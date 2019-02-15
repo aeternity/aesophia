@@ -1,7 +1,7 @@
 {"1.1.0",
 [{<<"aebytecode">>,
   {git,"https://github.com/aeternity/aebytecode.git",
-       {ref,"720510a24de32c9bad6486f34ca7babde124bf1e"}},
+       {ref,"c5a9878bd9c56f623fe2caad30a1ead3dac1f391"}},
   0},
  {<<"getopt">>,{pkg,<<"getopt">>,<<"1.0.1">>},0},
  {<<"jsx">>,
