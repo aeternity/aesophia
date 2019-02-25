@@ -121,8 +121,8 @@ binop_type_r(Op) -> element(2, binop_types(Op)).
 
 binop_to_scode('+') -> add_a_a_a();  %% Optimization introduces other variants
 binop_to_scode('-') -> sub_a_a_a();
-binop_to_scode('==') -> eq_a_a_a();
-binop_to_scode(Op) -> ?TODO(Op).
+binop_to_scode('==') -> eq_a_a_a().
+% binop_to_scode(Op) -> ?TODO(Op).
 
 add_a_a_a() -> aeb_fate_code:add(?a, ?a, ?a).
 sub_a_a_a() -> aeb_fate_code:sub(?a, ?a, ?a).
@@ -174,7 +174,7 @@ simpl_top({'ADD', ?a, ?i(N), ?a}, [{'ADD', ?a, ?i(M), ?a} | Code]) ->
 simpl_top(I, Code) -> [I | Code].
 
 %% Desugar and specialize
-desugar({'ADD', ?a, ?i(1), ?a})     -> [aeb_fate_code:inca()];
+desugar({'ADD', ?a, ?i(1), ?a})     -> [aeb_fate_code:inc()];
 desugar({ifte, Then, Else}) -> [{ifte, desugar(Then), desugar(Else)}];
 desugar(Code) when is_list(Code) ->
     lists:flatmap(fun desugar/1, Code);
