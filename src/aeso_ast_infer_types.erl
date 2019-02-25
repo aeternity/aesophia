@@ -12,7 +12,7 @@
 
 -module(aeso_ast_infer_types).
 
--export([infer/1, infer/2, infer_constant/1]).
+-export([infer/1, infer/2, infer_constant/1, unfold_types_in_type/3]).
 
 -type utype() :: {fun_t, aeso_syntax:ann(), named_args_t(), [utype()], utype()}
                | {app_t, aeso_syntax:ann(), utype(), [utype()]}
@@ -491,7 +491,7 @@ map_t(As, K, V) -> {app_t, As, {id, As, "map"}, [K, V]}.
 infer(Contracts) ->
     infer(Contracts, []).
 
--type option() :: permissive_address_literals.
+-type option() :: permissive_address_literals | return_env.
 
 -spec init_env(list(option())) -> env().
 init_env(Options) ->
@@ -515,13 +515,17 @@ infer(Contracts, Options) ->
         Env = init_env(Options),
         create_options(Options),
         ets_new(type_vars, [set]),
-        infer1(Env, Contracts, [])
+        {Env1, Decls} = infer1(Env, Contracts, []),
+        case proplists:get_value(return_env, Options, false) of
+            false -> Decls;
+            true  -> {Env1, Decls}
+        end
     after
         clean_up_ets()
     end.
 
--spec infer1(env(), [aeso_syntax:decl()], [aeso_syntax:decl()]) -> [aeso_syntax:decl()].
-infer1(_, [], Acc) -> lists:reverse(Acc);
+-spec infer1(env(), [aeso_syntax:decl()], [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
+infer1(Env, [], Acc) -> {Env, lists:reverse(Acc)};
 infer1(Env, [{contract, Ann, ConName, Code} | Rest], Acc) ->
     %% do type inference on each contract independently.
     check_scope_name_clash(Env, contract, ConName),
@@ -1548,7 +1552,8 @@ unfold_types_in_type(Env, T) ->
     unfold_types_in_type(Env, T, []).
 
 unfold_types_in_type(Env, {app_t, Ann, Id, Args}, Options) when ?is_type_id(Id) ->
-    UnfoldRecords = proplists:get_value(unfold_record_types, Options, false),
+    UnfoldRecords  = proplists:get_value(unfold_record_types, Options, false),
+    UnfoldVariants = proplists:get_value(unfold_variant_types, Options, false),
     case lookup_type(Env, Id) of
         {_, {_, {Formals, {record_t, Fields}}}} when UnfoldRecords, length(Formals) == length(Args) ->
             {record_t,
@@ -1556,6 +1561,11 @@ unfold_types_in_type(Env, {app_t, Ann, Id, Args}, Options) when ?is_type_id(Id) 
                subst_tvars(lists:zip(Formals, Args), Fields), Options)};
         {_, {_, {Formals, {alias_t, Type}}}} when length(Formals) == length(Args) ->
             unfold_types_in_type(Env, subst_tvars(lists:zip(Formals, Args), Type), Options);
+        {_, {_, {Formals, {variant_t, Constrs}}}} when UnfoldVariants, length(Formals) == length(Args) ->
+            %% TODO: unfolding variant types will not work well if we add recursive types!
+            {variant_t,
+             unfold_types_in_type(Env,
+                subst_tvars(lists:zip(Formals, Args), Constrs), Options)};
         _ ->
             %% Not a record type, or ill-formed record type.
             {app_t, Ann, Id, unfold_types_in_type(Env, Args, Options)}
@@ -1563,9 +1573,12 @@ unfold_types_in_type(Env, {app_t, Ann, Id, Args}, Options) when ?is_type_id(Id) 
 unfold_types_in_type(Env, Id, Options) when ?is_type_id(Id) ->
     %% Like the case above, but for types without parameters.
     UnfoldRecords = proplists:get_value(unfold_record_types, Options, false),
+    UnfoldVariants = proplists:get_value(unfold_variant_types, Options, false),
     case lookup_type(Env, Id) of
         {_, {_, {[], {record_t, Fields}}}} when UnfoldRecords ->
             {record_t, unfold_types_in_type(Env, Fields, Options)};
+        {_, {_, {[], {variant_t, Constrs}}}} when UnfoldVariants ->
+            {variant_t, unfold_types_in_type(Env, Constrs, Options)};
         {_, {_, {[], {alias_t, Type1}}}} ->
             unfold_types_in_type(Env, Type1, Options);
         _ ->
@@ -1574,6 +1587,8 @@ unfold_types_in_type(Env, Id, Options) when ?is_type_id(Id) ->
     end;
 unfold_types_in_type(Env, {field_t, Attr, Name, Type}, Options) ->
     {field_t, Attr, Name, unfold_types_in_type(Env, Type, Options)};
+unfold_types_in_type(Env, {constr_t, Ann, Con, Types}, Options) ->
+    {constr_t, Ann, Con, unfold_types_in_type(Env, Types, Options)};
 unfold_types_in_type(Env, T, Options) when is_tuple(T) ->
     list_to_tuple(unfold_types_in_type(Env, tuple_to_list(T), Options));
 unfold_types_in_type(Env, [H|T], Options) ->
