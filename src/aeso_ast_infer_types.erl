@@ -508,7 +508,7 @@ init_env(Options) ->
                         end, global_env(), [{"oracle", 2}, {"oracle_query", 2}])
     end.
 
--spec infer(aeso_syntax:ast(), list(option())) -> aeso_syntax:ast().
+-spec infer(aeso_syntax:ast(), list(option())) -> aeso_syntax:ast() | {env(), aeso_syntax:ast()}.
 infer(Contracts, Options) ->
     ets_init(), %% Init the ETS table state
     try
