@@ -92,6 +92,24 @@ encode_decode_sophia_string(SophiaType, String) ->
             {error, Err}
     end.
 
+calldata_test() ->
+    [42, <<"foobar">>] = encode_decode_calldata(["int", "string"], ["42", "\"foobar\""]),
+    Map = #{ <<"a">> => 4 },
+    [{variant, 1, [Map]}, {{<<"b">>, 5}, {variant, 0, []}}] =
+        encode_decode_calldata(["variant", "r"], ["Blue({[\"a\"] = 4})", "{x = (\"b\", 5), y = Red}"]),
+    ok.
+
+encode_decode_calldata(Types, Args) ->
+    Code = lists:flatten(
+        ["contract Dummy =\n",
+         "  type an_alias('a) = (string, 'a)\n"
+         "  record r = {x : an_alias(int), y : variant}\n"
+         "  datatype variant = Red | Blue(map(string, int))\n"
+         "  function foo : (", string:join(Types, ", "), ") => int\n" ]),
+    {ok, Calldata, CalldataType, word} = aeso_compiler:create_calldata(Code, "foo", Args),
+    {ok, {_Hash, ArgTuple}} = aeso_heap:from_binary(CalldataType, Calldata),
+    tuple_to_list(ArgTuple).
+
 encode_decode(T, D) ->
     ?assertEqual(D, decode(T, encode(D))),
     D.
