@@ -54,27 +54,49 @@ encode_decode_test() ->
     ok.
 
 encode_decode_sophia_test() ->
-    {42} = encode_decode_sophia_string("int", "42"),
-    {1} = encode_decode_sophia_string("bool", "true"),
-    {0} = encode_decode_sophia_string("bool", "false"),
-    {<<"Hello">>} = encode_decode_sophia_string("string", "\"Hello\""),
-    {<<"Hello">>, [1,2,3], {variant, 1, [1]}} =
-        encode_decode_sophia_string(
-          "(string, list(int), option(bool))",
-          "\"Hello\", [1,2,3], Some(true)"),
+    Check = fun(Type, Str) -> case {encode_decode_sophia_string(Type, Str), Str} of
+                                {X, X} -> ok;
+                                Other -> Other
+                              end end,
+    ok = Check("int", "42"),
+    ok = Check("bool", "true"),
+    ok = Check("bool", "false"),
+    ok = Check("string", "\"Hello\""),
+    ok = Check("(string, list(int), option(bool))",
+               "(\"Hello\", [1, 2, 3], Some(true))"),
+    ok = Check("variant", "Blue({[\"x\"] = 1})"),
+    ok = Check("r", "{x = (\"foo\", 0), y = Red}"),
     ok.
 
 encode_decode_sophia_string(SophiaType, String) ->
     io:format("String ~p~n", [String]),
+    TypeDefs = ["  type an_alias('a) = (string, 'a)\n",
+                "  record r = {x : an_alias(int), y : variant}\n"
+                "  datatype variant = Red | Blue(map(string, int))\n"],
     Code = [ "contract MakeCall =\n"
-           , "  function foo : ", SophiaType, " => _\n"
+           , "  type arg_type = ", SophiaType, "\n"
+           , TypeDefs
+           , "  function foo : arg_type => _\n"
            , "  function __call() = foo(", String, ")\n" ],
-    {ok, _, {Types, _}, Args} = aeso_compiler:check_call(lists:flatten(Code), []),
-    Arg  = list_to_tuple(Args),
-    Type = {tuple, Types},
-    io:format("Type ~p~n", [Type]),
-    Data = encode(Arg),
-    decode(Type, Data).
+    case aeso_compiler:check_call(lists:flatten(Code), []) of
+        {ok, _, {[Type], _}, [Arg]} ->
+            io:format("Type ~p~n", [Type]),
+            Data = encode(Arg),
+            Decoded = decode(Type, Data),
+            DecodeCode = [ "contract Decode =\n",
+                           TypeDefs,
+                           "  function __decode(_ : ", SophiaType, ") = ()\n" ],
+            case aeso_compiler:to_sophia_value(DecodeCode, Decoded) of
+                {ok, Sophia} ->
+                    lists:flatten(io_lib:format("~s", [prettypr:format(aeso_pretty:expr(Sophia))]));
+                {error, Err} ->
+                    io:format("~s\n", [Err]),
+                    {error, Err}
+            end;
+        {error, Err} ->
+            io:format("~s\n", [Err]),
+            {error, Err}
+    end.
 
 encode_decode(T, D) ->
     ?assertEqual(D, decode(T, encode(D))),
