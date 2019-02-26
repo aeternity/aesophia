@@ -40,8 +40,8 @@
 %%% Handle calldata
 
 create_calldata(FunName, Args, ArgTypes, RetType) ->
-    <<TypeHashInt:?HASH_SIZE/unit:8>> =
-        function_type_hash(list_to_binary(FunName), ArgTypes, RetType),
+    {<<TypeHashInt:?HASH_SIZE/unit:8>>, _, _, _} =
+        function_type_info(list_to_binary(FunName), ArgTypes, RetType),
     Data = aeso_heap:to_binary({TypeHashInt, list_to_tuple(Args)}),
     {ok, Data, {tuple, [word, {tuple, ArgTypes}]}, RetType}.
 

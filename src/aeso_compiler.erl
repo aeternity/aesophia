@@ -273,7 +273,7 @@ translate_vm_value(_VmType, _Type, _Data) ->
 
 -spec create_calldata(string(), string(), [string()]) ->
                              {ok, binary(), aeso_sophia:type(), aeso_sophia:type()}
-                                 | {error, argument_syntax_error}.
+                             | {error, term()}.
 create_calldata(Code, Fun, Args) ->
     case check_call(Code, Fun, Args, []) of
         {ok, FunName, {ArgTypes, RetType}, VMArgs} ->
