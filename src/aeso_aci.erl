@@ -15,6 +15,7 @@
 %% the code easier but don't seem to exist elsewhere.
 
 -record(contract, {ann,con,decls}).
+-record(namespace, {ann,con,decls}).
 -record(letfun, {ann,id,args,type,body}).
 -record(type_def, {ann,id,vars,typedef}).
 
@@ -29,9 +30,12 @@
 -record(arg, {ann,id,type}).
 -record(id, {ann,name}).
 -record(con, {ann,name}).
+-record(qid, {ann,names}).
+-record(qcon, {ann,names}).
 -record(tvar, {ann,name}).
 
-%% encode(ContractString) -> JSON.
+%% encode(ContractString) -> {ok,JSON} | {error,String}.
+%% encode(ContractString, Options) -> {ok,JSON} | {error,String}.
 %%  Build a JSON structure with lists and tuples, not maps, as this
 %%  allows us to order the fields in the contructed JSON string.
 
@@ -39,23 +43,40 @@ encode(ContractString) when is_binary(ContractString) ->
     encode(binary_to_list(ContractString));
 encode(ContractString) ->
     Options = [],                               %No options yet
-    Ast = parse_string(ContractString),
-    TypedAst = aeso_ast_infer_types:infer(Ast, Options),
-    %% io:format("~p\n", [Ast]),
-    %% io:format("~p\n", [TypedAst]),
-    %% aeso_ast:pp(Ast),
-    %% aeso_ast:pp_typed(TypedAst),
-    %% We look at the first contract.
-    Contract = hd(TypedAst),
-    Cname = contract_name(Contract),
-    Tdefs = [ encode_typedef(T) || T <- sort_decls(contract_types(Contract)) ],
-    Fdefs = [ encode_func(F) || F <- sort_decls(contract_funcs(Contract)),
-                                not is_private_func(F) ],
-    Jmap = [{<<"contract">>, [{<<"name">>, list_to_binary(Cname)},
-                              {<<"type_defs">>, Tdefs},
-                              {<<"functions">>, Fdefs}]}],
-    %% io:format("~p\n", [Jmap]),
-    jsx:encode(Jmap).
+    try
+	Ast = parse_string(ContractString),
+	TypedAst = aeso_ast_infer_types:infer(Ast, Options),
+	%% io:format("~p\n", [Ast]),
+	%% io:format("~p\n", [TypedAst]),
+	%% aeso_ast:pp(Ast),
+	%% aeso_ast:pp_typed(TypedAst),
+	%% We find and look at the last contract.
+	Contract = lists:last(TypedAst),
+	Cname = contract_name(Contract),
+	Tdefs = [ encode_typedef(T) ||
+		    T <- sort_decls(contract_types(Contract)) ],
+	Fdefs = [ encode_func(F) || F <- sort_decls(contract_funcs(Contract)),
+				    not is_private_func(F) ],
+	Jmap = [{<<"contract">>, [{<<"name">>, list_to_binary(Cname)},
+				  {<<"type_defs">>, Tdefs},
+				  {<<"functions">>, Fdefs}]}],
+	%% io:format("~p\n", [Jmap]),
+	{ok,jsx:encode(Jmap)}
+    catch
+        %% The compiler errors.
+        error:{parse_errors, Errors} ->
+            {error, join_errors("Parse errors", Errors, fun(E) -> E end)};
+        error:{type_errors, Errors} ->
+            {error, join_errors("Type errors", Errors, fun(E) -> E end)};
+        error:{code_errors, Errors} ->
+            {error, join_errors("Code errors", Errors,
+                                fun (E) -> io_lib:format("~p", [E]) end)}
+        %% General programming errors in the compiler just signal error.
+    end.
+
+join_errors(Prefix, Errors, Pfun) ->
+    Ess = [ Pfun(E) || E <- Errors ],
+    list_to_binary(string:join([Prefix|Ess], "\n")).
 
 encode_func(Fdef) ->
     Name = function_name(Fdef),
@@ -79,6 +100,10 @@ encode_types(Types) ->
 encode_type(#tvar{name=N}) -> N;
 encode_type(#id{name=N}) -> N;
 encode_type(#con{name=N}) -> N;
+encode_type(#qid{names=Ns}) ->
+    lists:join(".", Ns);
+encode_type(#qcon{names=Ns}) ->
+    lists:join(".", Ns);                        %?
 encode_type(#tuple_t{args=As}) ->
     Eas = encode_types(As),
     [$(,lists:join(",", Eas),$)];
@@ -173,6 +198,14 @@ contract_funcs(#contract{decls=Decls}) ->
     [ D || D <- Decls, is_record(D, letfun) ].
 
 contract_types(#contract{decls=Decls}) ->
+    [ D || D <- Decls, is_record(D, type_def) ].
+
+namespace_name(#namespace{con=#con{name=N}}) -> N.
+
+namespace_funcs(#namespace{decls=Decls}) ->
+    [ D || D <- Decls, is_record(D, letfun) ].
+
+namespace_types(#namespace{decls=Decls}) ->
     [ D || D <- Decls, is_record(D, type_def) ].
 
 sort_decls(Ds) ->

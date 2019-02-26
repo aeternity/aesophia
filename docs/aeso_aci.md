@@ -85,7 +85,7 @@ json_string() = binary()
 
 ### Exports
 
-#### encode(ContractString) -> JSONstring
+#### encode(ContractString) -> {ok,JSONstring} | {error,ErrorString}
 
 Types
 
@@ -114,7 +114,7 @@ This is an example of using the ACI generator from an Erlang shell. The file cal
 ``` erlang
 1> {ok,Contract} = file:read_file("aci_test.aes").
 {ok,<<"contract Answers =\n  record state = { a : answers }\n  type answers() = map(string, int)\n\n  stateful function"...>>}
-2> Encoding = aeso_aci:encode(Contract).
+2> {ok,Encoding} = aeso_aci:encode(Contract).
 <<"{\"contract\":{\"name\":\"Answers\",\"type_defs\":[{\"name\":\"state\",\"vars\":[],\"typedef\":\"{a : map(string,int)}\"},{\"name\":\"ans"...>>
 3> file:write_file("aci_test.aci", Encoding).
 ok
