@@ -12,7 +12,7 @@
         , file/2
         , from_string/2
         , check_call/4
-        , create_calldata/4
+        , create_calldata/3
         , version/0
         , sophia_type_to_typerep/1
         , to_sophia_value/4
@@ -271,13 +271,13 @@ translate_vm_value(VmTypes, {constr_t, _, Con, Types}, Args)
 translate_vm_value(_VmType, _Type, _Data) ->
     throw(cannot_translate_to_sophia).
 
--spec create_calldata(map(), string(), string(), [string()]) ->
+-spec create_calldata(string(), string(), [string()]) ->
                              {ok, binary(), aeso_sophia:type(), aeso_sophia:type()}
                                  | {error, argument_syntax_error}.
-create_calldata(Contract, Code, Fun, Args) when is_map(Contract) ->
+create_calldata(Code, Fun, Args) ->
     case check_call(Code, Fun, Args, []) of
-        {ok, FunName, {ArgTypes, RetType}, Args} ->
-            aeso_abi:create_calldata(Contract, FunName, Args, ArgTypes, RetType);
+        {ok, FunName, {ArgTypes, RetType}, VMArgs} ->
+            aeso_abi:create_calldata(FunName, VMArgs, ArgTypes, RetType);
         {error, _} = Err -> Err
     end.
 

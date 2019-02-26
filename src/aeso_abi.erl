@@ -11,7 +11,7 @@
 -define(HASH_SIZE, 32).
 
 -export([ old_create_calldata/3
-        , create_calldata/5
+        , create_calldata/4
         , check_calldata/2
         , function_type_info/3
         , function_type_hash/3
@@ -39,22 +39,11 @@
 %%%===================================================================
 %%% Handle calldata
 
-create_calldata(Contract, FunName, Args, ArgTypes, RetType) ->
-    case get_type_info_and_hash(Contract, FunName) of
-        {ok, TypeInfo, TypeHashInt} ->
-            Data = aeso_heap:to_binary({TypeHashInt, list_to_tuple(Args)}),
-            case check_calldata(Data, TypeInfo) of
-                {ok, CallDataType, OutType} ->
-                    case check_given_type(FunName, ArgTypes, RetType, CallDataType, OutType) of
-                        ok ->
-                            {ok, Data, CallDataType, OutType};
-                        {error, _} = Err ->
-                            Err
-                    end;
-                {error,_What} = Err -> Err
-            end;
-        {error, _} = Err -> Err
-    end.
+create_calldata(FunName, Args, ArgTypes, RetType) ->
+    <<TypeHashInt:?HASH_SIZE/unit:8>> =
+        function_type_hash(list_to_binary(FunName), ArgTypes, RetType),
+    Data = aeso_heap:to_binary({TypeHashInt, list_to_tuple(Args)}),
+    {ok, Data, {tuple, [word, {tuple, ArgTypes}]}, RetType}.
 
 get_type_info_and_hash(#{type_info := TypeInfo}, FunName) ->
     FunBin = list_to_binary(FunName),
@@ -62,26 +51,6 @@ get_type_info_and_hash(#{type_info := TypeInfo}, FunName) ->
         {ok, <<TypeHashInt:?HASH_SIZE/unit:8>>} -> {ok, TypeInfo, TypeHashInt};
         {ok, _}                   -> {error, bad_type_hash};
         {error, _} = Err          -> Err
-    end.
-
-%% Check that the given type matches the type from the metadata.
-check_given_type(FunName, GivenArgs, GivenRet, CalldataType, ExpectRet) ->
-    {tuple, [word, {tuple, ExpectArgs}]} = CalldataType,
-    ReturnOk = if FunName == "init" -> true;
-                  GivenRet == any   -> true;
-                  true              -> GivenRet == ExpectRet
-               end,
-    ArgsOk   = ExpectArgs == GivenArgs,
-    case ReturnOk andalso ArgsOk of
-        true -> ok;
-        false when FunName == "init" ->
-            {error, {init_args_mismatch,
-                        {given,    GivenArgs},
-                        {expected, ExpectArgs}}};
-        false ->
-            {error, {call_type_mismatch,
-                        {given,    GivenArgs,  '=>', GivenRet},
-                        {expected, ExpectArgs, '=>', ExpectRet}}}
     end.
 
 -spec check_calldata(binary(), type_info()) ->
