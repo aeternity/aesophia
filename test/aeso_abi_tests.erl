@@ -76,17 +76,13 @@ encode_decode_sophia_string(SophiaType, String) ->
     Code = [ "contract MakeCall =\n"
            , "  type arg_type = ", SophiaType, "\n"
            , TypeDefs
-           , "  function foo : arg_type => _\n"
+           , "  function foo : arg_type => arg_type\n"
            , "  function __call() = foo(", String, ")\n" ],
     case aeso_compiler:check_call(lists:flatten(Code), []) of
         {ok, _, {[Type], _}, [Arg]} ->
             io:format("Type ~p~n", [Type]),
             Data = encode(Arg),
-            Decoded = decode(Type, Data),
-            DecodeCode = [ "contract Decode =\n",
-                           TypeDefs,
-                           "  function __decode(_ : ", SophiaType, ") = ()\n" ],
-            case aeso_compiler:to_sophia_value(DecodeCode, Decoded) of
+            case aeso_compiler:to_sophia_value(Code, "foo", ok, Data) of
                 {ok, Sophia} ->
                     lists:flatten(io_lib:format("~s", [prettypr:format(aeso_pretty:expr(Sophia))]));
                 {error, Err} ->
