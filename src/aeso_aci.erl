@@ -200,13 +200,14 @@ contract_funcs(#contract{decls=Decls}) ->
 contract_types(#contract{decls=Decls}) ->
     [ D || D <- Decls, is_record(D, type_def) ].
 
-namespace_name(#namespace{con=#con{name=N}}) -> N.
-
-namespace_funcs(#namespace{decls=Decls}) ->
-    [ D || D <- Decls, is_record(D, letfun) ].
-
-namespace_types(#namespace{decls=Decls}) ->
-    [ D || D <- Decls, is_record(D, type_def) ].
+%% To keep dialyzer happy and quiet.
+%% namespace_name(#namespace{con=#con{name=N}}) -> N.
+%%
+%% namespace_funcs(#namespace{decls=Decls}) ->
+%%     [ D || D <- Decls, is_record(D, letfun) ].
+%%
+%% namespace_types(#namespace{decls=Decls}) ->
+%%     [ D || D <- Decls, is_record(D, type_def) ].
 
 sort_decls(Ds) ->
     Sort = fun (D1, D2) ->
