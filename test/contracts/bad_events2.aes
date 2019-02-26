@@ -8,6 +8,7 @@ contract Events =
     | Event2(alias_string, indexed alias_address)
     | BadEvent1(string, string)
     | BadEvent2(indexed int, indexed int, indexed int, indexed address)
+    | BadEvent3(address, int)
 
   function f1(x : int, y : string) =
     Chain.event(Event1(x, x+1, y))

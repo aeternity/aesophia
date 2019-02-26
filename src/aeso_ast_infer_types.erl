@@ -1864,7 +1864,7 @@ pp_error({event_0_to_3_indexed_values, Constr}) ->
     io_lib:format("The event constructor ~s (at ~s) has too many indexed values (max 3)\n",
         [name(Constr), pp_loc(Constr)]);
 pp_error({event_0_to_1_string_values, Constr}) ->
-    io_lib:format("The event constructor ~s (at ~s) has too many string values (max 1)\n",
+    io_lib:format("The event constructor ~s (at ~s) has too many non-indexed values (max 1)\n",
         [name(Constr), pp_loc(Constr)]);
 pp_error({repeated_constructor, Cs}) ->
     io_lib:format("Variant types must have distinct constructor names\n~s",
