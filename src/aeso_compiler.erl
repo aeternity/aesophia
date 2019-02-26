@@ -11,8 +11,8 @@
 -export([ file/1
         , file/2
         , from_string/2
-        , check_call/2
-        , create_calldata/3
+        , check_call/4
+        , create_calldata/4
         , version/0
         , sophia_type_to_typerep/1
         , to_sophia_value/4
@@ -110,10 +110,11 @@ join_errors(Prefix, Errors, Pfun) ->
 %% function (foo, say) and a function __call() = foo(args) calling this
 %% function. Returns the name of the called functions, typereps and Erlang
 %% terms for the arguments.
--spec check_call(string(), options()) -> {ok, string(), {[Type], Type | any}, [term()]} | {error, term()}
+-spec check_call(string(), string(), [string()], options()) -> {ok, string(), {[Type], Type | any}, [term()]} | {error, term()}
     when Type :: term().
-check_call(ContractString, Options) ->
+check_call(ContractString0, FunName, Args, Options) ->
     try
+        ContractString = insert_call_function(ContractString0, FunName, Args, Options),
         Ast = parse(ContractString, Options),
         ok = pp_sophia_code(Ast, Options),
         ok = pp_ast(Ast, Options),
@@ -143,6 +144,24 @@ check_call(ContractString, Options) ->
         throw:Error ->                          %Don't ask
             {error, join_errors("Code errors", [Error],
                                 fun (E) -> io_lib:format("~p", [E]) end)}
+    end.
+
+%% Add the __call function to a contract.
+-spec insert_call_function(string(), string(), [string()], options()) -> string().
+insert_call_function(Code, FunName, Args, Options) ->
+    Ast = parse(Code, Options),
+    Ind = last_contract_indent(Ast),
+    lists:flatten(
+        [ Code,
+          "\n\n",
+          lists:duplicate(Ind, " "),
+          "function __call() = ", FunName, "(", string:join(Args, ","), ")\n"
+        ]).
+
+last_contract_indent(Decls) ->
+    case lists:last(Decls) of
+        {_, _, _, [Decl | _]} -> aeso_syntax:get_ann(col, Decl, 1) - 1;
+        _                     -> 0
     end.
 
 -spec to_sophia_value(string(), string(), ok | error | revert, aeso_sophia:data()) ->
@@ -252,33 +271,15 @@ translate_vm_value(VmTypes, {constr_t, _, Con, Types}, Args)
 translate_vm_value(_VmType, _Type, _Data) ->
     throw(cannot_translate_to_sophia).
 
--spec create_calldata(map(), string(), string()) ->
+-spec create_calldata(map(), string(), string(), [string()]) ->
                              {ok, binary(), aeso_sophia:type(), aeso_sophia:type()}
                                  | {error, argument_syntax_error}.
-create_calldata(Contract, "", CallCode) when is_map(Contract) ->
-    case check_call(CallCode, []) of
+create_calldata(Contract, Code, Fun, Args) when is_map(Contract) ->
+    case check_call(Code, Fun, Args, []) of
         {ok, FunName, {ArgTypes, RetType}, Args} ->
             aeso_abi:create_calldata(Contract, FunName, Args, ArgTypes, RetType);
         {error, _} = Err -> Err
-    end;
-create_calldata(Contract, Function, Argument) when is_map(Contract) ->
-    %% Slightly hacky shortcut to let you get away without writing the full
-    %% call contract code.
-    %% Function should be "foo : type", and
-    %% Argument should be "Arg1, Arg2, .., ArgN" (no parens)
-    case string:lexemes(Function, ": ") of
-        %% If function is a single word fallback to old calldata generation
-        [FunName] -> aeso_abi:old_create_calldata(Contract, FunName, Argument);
-        [FunName | _] ->
-            Args    = lists:map(fun($\n) -> 32; (X) -> X end, Argument),    %% newline to space
-            CallContract = lists:flatten(
-                [ "contract MakeCall =\n"
-                , "  function ", Function, "\n"
-                , "  function __call() = ", FunName, "(", Args, ")"
-                ]),
-            create_calldata(Contract, "", CallContract)
     end.
-
 
 get_arg_icode(Funs) ->
     case [ Args || {[_, ?CALL_NAME], _, _, {funcall, _, Args}, _} <- Funs ] of

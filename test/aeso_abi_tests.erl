@@ -70,15 +70,13 @@ encode_decode_sophia_test() ->
 
 encode_decode_sophia_string(SophiaType, String) ->
     io:format("String ~p~n", [String]),
-    TypeDefs = ["  type an_alias('a) = (string, 'a)\n",
-                "  record r = {x : an_alias(int), y : variant}\n"
-                "  datatype variant = Red | Blue(map(string, int))\n"],
     Code = [ "contract MakeCall =\n"
            , "  type arg_type = ", SophiaType, "\n"
-           , TypeDefs
-           , "  function foo : arg_type => arg_type\n"
-           , "  function __call() = foo(", String, ")\n" ],
-    case aeso_compiler:check_call(lists:flatten(Code), []) of
+           , "  type an_alias('a) = (string, 'a)\n"
+           , "  record r = {x : an_alias(int), y : variant}\n"
+           , "  datatype variant = Red | Blue(map(string, int))\n"
+           , "  function foo : arg_type => arg_type\n" ],
+    case aeso_compiler:check_call(lists:flatten(Code), "foo", [String], []) of
         {ok, _, {[Type], _}, [Arg]} ->
             io:format("Type ~p~n", [Type]),
             Data = encode(Arg),
