@@ -1,14 +1,24 @@
 {"1.1.0",
 [{<<"aebytecode">>,
   {git,"https://github.com/aeternity/aebytecode.git",
-       {ref,"a35307f61bec285d742e312743b7a4d822dec190"}},
+       {ref,"01ae99f7e8be7917d213e1ef04dc6d613a046b98"}},
   0},
- {<<"getopt">>,{pkg,<<"getopt">>,<<"1.0.1">>},0},
  {<<"jsx">>,
   {git,"https://github.com/talentdeficit/jsx.git",
        {ref,"3074d4865b3385a050badf7828ad31490d860df5"}},
   0}]}.
+ {<<"aeserialization">>,
+  {git,"https://github.com/aeternity/aeserialization.git",
+       {ref,"b55c3726f4a21063721c68d6fa7fda39121edf11"}},
+  1},
+ {<<"base58">>,
+  {git,"https://github.com/aeternity/erl-base58.git",
+       {ref,"60a335668a60328a29f9731b67c4a0e9e3d50ab6"}},
+  2},
+ {<<"eblake2">>,{pkg,<<"eblake2">>,<<"1.0.0">>},1},
+ {<<"getopt">>,{pkg,<<"getopt">>,<<"1.0.1">>},0}]}.
 [
 {pkg_hash,[
+ {<<"eblake2">>, <<"EC8AD20E438AAB3F2E8D5D118C366A0754219195F8A0F536587440F8F9BCF2EF">>},
  {<<"getopt">>, <<"C73A9FA687B217F2FF79F68A3B637711BB1936E712B521D8CE466B29CBF7808A">>}]}
 ].
