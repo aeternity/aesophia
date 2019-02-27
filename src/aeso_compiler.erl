@@ -304,7 +304,6 @@ get_decode_type(FunName, [{contract, _, _, Defs}]) ->
     GetType = fun({letfun, _, {id, _, Name}, _, Ret, _})               when Name == FunName -> [Ret];
                  ({fun_decl, _, {id, _, Name}, {fun_t, _, _, _, Ret}}) when Name == FunName -> [Ret];
                  (_) -> [] end,
-    io:format("~p\n", [Defs]),
     case lists:flatmap(GetType, Defs) of
         [Type] -> {ok, Type};
         []     -> {error, missing_function}
