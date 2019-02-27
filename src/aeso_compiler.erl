@@ -107,12 +107,27 @@ join_errors(Prefix, Errors, Pfun) ->
 -define(DECODE_NAME, "__decode").
 
 %% Takes a string containing a contract with a declaration/prototype of a
-%% function (foo, say) and a function __call() = foo(args) calling this
+%% function (foo, say) and adds function __call() = foo(args) calling this
 %% function. Returns the name of the called functions, typereps and Erlang
 %% terms for the arguments.
+%% NOTE: Special treatment for "init" since it might be implicit and has
+%%       a special return type (typerep, T)
 -spec check_call(string(), string(), [string()], options()) -> {ok, string(), {[Type], Type | any}, [term()]} | {error, term()}
     when Type :: term().
-check_call(ContractString0, FunName, Args, Options) ->
+check_call(Source, "init" = FunName, Args, Options) ->
+    PatchFun = fun(T) -> {tuple, [typerep, T]} end,
+    case check_call(Source, FunName, Args, Options, PatchFun) of
+        {error, _} when Args == [] ->
+            %% Try with default init-function
+            check_call(insert_init_function(Source, Options), FunName, Args, Options, PatchFun);
+        Res ->
+            Res
+    end;
+check_call(Source, FunName, Args, Options) ->
+    PatchFun = fun(T) -> T end,
+    check_call(Source, FunName, Args, Options, PatchFun).
+
+check_call(ContractString0, FunName, Args, Options, PatchFun) ->
     try
         ContractString = insert_call_function(ContractString0, FunName, Args, Options),
         Ast = parse(ContractString, Options),
@@ -132,7 +147,7 @@ check_call(ContractString0, FunName, Args, Options) ->
         ArgIcode = get_arg_icode(Funs),
         ArgTerms = [ icode_to_term(T, Arg) ||
                        {T, Arg} <- lists:zip(ArgVMTypes, ArgIcode) ],
-        {ok, FunName, {ArgVMTypes, RetVMType}, ArgTerms}
+        {ok, FunName, {ArgVMTypes, PatchFun(RetVMType)}, ArgTerms}
     catch
         error:{parse_errors, Errors} ->
             {error, join_errors("Parse errors", Errors, fun (E) -> E end)};
@@ -156,6 +171,16 @@ insert_call_function(Code, FunName, Args, Options) ->
           "\n\n",
           lists:duplicate(Ind, " "),
           "function __call() = ", FunName, "(", string:join(Args, ","), ")\n"
+        ]).
+
+-spec insert_init_function(string(), options()) -> string().
+insert_init_function(Code, Options) ->
+    Ast = parse(Code, Options),
+    Ind = last_contract_indent(Ast),
+    lists:flatten(
+        [ Code,
+          "\n\n",
+          lists:duplicate(Ind, " "), "function init() = ()\n"
         ]).
 
 last_contract_indent(Decls) ->

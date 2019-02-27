@@ -93,20 +93,36 @@ encode_decode_sophia_string(SophiaType, String) ->
     end.
 
 calldata_test() ->
-    [42, <<"foobar">>] = encode_decode_calldata(["int", "string"], ["42", "\"foobar\""]),
+    [42, <<"foobar">>] = encode_decode_calldata("foo", ["int", "string"], ["42", "\"foobar\""]),
     Map = #{ <<"a">> => 4 },
     [{variant, 1, [Map]}, {{<<"b">>, 5}, {variant, 0, []}}] =
-        encode_decode_calldata(["variant", "r"], ["Blue({[\"a\"] = 4})", "{x = (\"b\", 5), y = Red}"]),
+        encode_decode_calldata("foo", ["variant", "r"], ["Blue({[\"a\"] = 4})", "{x = (\"b\", 5), y = Red}"]),
     ok.
 
-encode_decode_calldata(Types, Args) ->
-    Code = lists:flatten(
+calldata_init_test() ->
+    encode_decode_calldata("init", ["int"], ["42"], {tuple, [typerep, word]}),
+
+    Code = parameterized_contract("foo", ["int"]),
+    encode_decode_calldata_(Code, "init", [], {tuple, [typerep, {tuple, []}]}).
+
+parameterized_contract(FunName, Types) ->
+    lists:flatten(
         ["contract Dummy =\n",
          "  type an_alias('a) = (string, 'a)\n"
          "  record r = {x : an_alias(int), y : variant}\n"
          "  datatype variant = Red | Blue(map(string, int))\n"
-         "  function foo : (", string:join(Types, ", "), ") => int\n" ]),
-    {ok, Calldata, CalldataType, word} = aeso_compiler:create_calldata(Code, "foo", Args),
+         "  function ", FunName, " : (", string:join(Types, ", "), ") => int\n" ]).
+
+encode_decode_calldata(FunName, Types, Args) ->
+    encode_decode_calldata(FunName, Types, Args, word).
+
+encode_decode_calldata(FunName, Types, Args, RetType) ->
+    Code = parameterized_contract(FunName, Types),
+    encode_decode_calldata_(Code, FunName, Args, RetType).
+
+encode_decode_calldata_(Code, FunName, Args, RetVMType) ->
+    {ok, Calldata, CalldataType, RetVMType1} = aeso_compiler:create_calldata(Code, FunName, Args),
+    ?assertEqual(RetVMType1, RetVMType),
     {ok, {_Hash, ArgTuple}} = aeso_heap:from_binary(CalldataType, Calldata),
     tuple_to_list(ArgTuple).
 
