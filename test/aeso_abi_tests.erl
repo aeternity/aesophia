@@ -70,23 +70,17 @@ encode_decode_sophia_test() ->
 
 encode_decode_sophia_string(SophiaType, String) ->
     io:format("String ~p~n", [String]),
-    TypeDefs = ["  type an_alias('a) = (string, 'a)\n",
-                "  record r = {x : an_alias(int), y : variant}\n"
-                "  datatype variant = Red | Blue(map(string, int))\n"],
     Code = [ "contract MakeCall =\n"
            , "  type arg_type = ", SophiaType, "\n"
-           , TypeDefs
-           , "  function foo : arg_type => _\n"
-           , "  function __call() = foo(", String, ")\n" ],
-    case aeso_compiler:check_call(lists:flatten(Code), []) of
+           , "  type an_alias('a) = (string, 'a)\n"
+           , "  record r = {x : an_alias(int), y : variant}\n"
+           , "  datatype variant = Red | Blue(map(string, int))\n"
+           , "  function foo : arg_type => arg_type\n" ],
+    case aeso_compiler:check_call(lists:flatten(Code), "foo", [String], []) of
         {ok, _, {[Type], _}, [Arg]} ->
             io:format("Type ~p~n", [Type]),
             Data = encode(Arg),
-            Decoded = decode(Type, Data),
-            DecodeCode = [ "contract Decode =\n",
-                           TypeDefs,
-                           "  function __decode(_ : ", SophiaType, ") = ()\n" ],
-            case aeso_compiler:to_sophia_value(DecodeCode, Decoded) of
+            case aeso_compiler:to_sophia_value(Code, "foo", ok, Data) of
                 {ok, Sophia} ->
                     lists:flatten(io_lib:format("~s", [prettypr:format(aeso_pretty:expr(Sophia))]));
                 {error, Err} ->
@@ -97,6 +91,24 @@ encode_decode_sophia_string(SophiaType, String) ->
             io:format("~s\n", [Err]),
             {error, Err}
     end.
+
+calldata_test() ->
+    [42, <<"foobar">>] = encode_decode_calldata(["int", "string"], ["42", "\"foobar\""]),
+    Map = #{ <<"a">> => 4 },
+    [{variant, 1, [Map]}, {{<<"b">>, 5}, {variant, 0, []}}] =
+        encode_decode_calldata(["variant", "r"], ["Blue({[\"a\"] = 4})", "{x = (\"b\", 5), y = Red}"]),
+    ok.
+
+encode_decode_calldata(Types, Args) ->
+    Code = lists:flatten(
+        ["contract Dummy =\n",
+         "  type an_alias('a) = (string, 'a)\n"
+         "  record r = {x : an_alias(int), y : variant}\n"
+         "  datatype variant = Red | Blue(map(string, int))\n"
+         "  function foo : (", string:join(Types, ", "), ") => int\n" ]),
+    {ok, Calldata, CalldataType, word} = aeso_compiler:create_calldata(Code, "foo", Args),
+    {ok, {_Hash, ArgTuple}} = aeso_heap:from_binary(CalldataType, Calldata),
+    tuple_to_list(ArgTuple).
 
 encode_decode(T, D) ->
     ?assertEqual(D, decode(T, encode(D))),
