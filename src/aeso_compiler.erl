@@ -117,9 +117,12 @@ join_errors(Prefix, Errors, Pfun) ->
 check_call(Source, "init" = FunName, Args, Options) ->
     PatchFun = fun(T) -> {tuple, [typerep, T]} end,
     case check_call(Source, FunName, Args, Options, PatchFun) of
-        {error, _} when Args == [] ->
+        Err = {error, _} when Args == [] ->
             %% Try with default init-function
-            check_call(insert_init_function(Source, Options), FunName, Args, Options, PatchFun);
+            case check_call(insert_init_function(Source, Options), FunName, Args, Options, PatchFun) of
+                {error, _} -> Err; %% The first error is most likely better...
+                Res        -> Res
+            end;
         Res ->
             Res
     end;
