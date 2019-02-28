@@ -3,7 +3,11 @@
   {git,"https://github.com/aeternity/aebytecode.git",
        {ref,"720510a24de32c9bad6486f34ca7babde124bf1e"}},
   0},
- {<<"getopt">>,{pkg,<<"getopt">>,<<"1.0.1">>},0}]}.
+ {<<"getopt">>,{pkg,<<"getopt">>,<<"1.0.1">>},0},
+ {<<"jsx">>,
+  {git,"https://github.com/talentdeficit/jsx.git",
+       {ref,"3074d4865b3385a050badf7828ad31490d860df5"}},
+  0}]}.
 [
 {pkg_hash,[
  {<<"getopt">>, <<"C73A9FA687B217F2FF79F68A3B637711BB1936E712B521D8CE466B29CBF7808A">>}]}
