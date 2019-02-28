@@ -39,11 +39,12 @@
 %%%===================================================================
 %%% Handle calldata
 
-create_calldata(FunName, Args, ArgTypes, RetType) ->
-    {<<TypeHashInt:?HASH_SIZE/unit:8>>, _, _, _} =
-        function_type_info(list_to_binary(FunName), ArgTypes, RetType),
+create_calldata(FunName, Args, ArgTypes0, RetType) ->
+    ArgTypes = {tuple, ArgTypes0},
+    <<TypeHashInt:?HASH_SIZE/unit:8>> =
+        function_type_hash(list_to_binary(FunName), ArgTypes, RetType),
     Data = aeso_heap:to_binary({TypeHashInt, list_to_tuple(Args)}),
-    {ok, Data, {tuple, [word, {tuple, ArgTypes}]}, RetType}.
+    {ok, Data, {tuple, [word, ArgTypes]}, RetType}.
 
 get_type_info_and_hash(#{type_info := TypeInfo}, FunName) ->
     FunBin = list_to_binary(FunName),
@@ -90,8 +91,8 @@ get_function_hash_from_calldata(CallData) ->
 
 -spec function_type_info(function_name(), [typerep()], typerep()) ->
                             function_type_info().
-function_type_info(Name, Args, OutType) ->
-    ArgType = {tuple, [T || {_, T} <- Args]},
+function_type_info(Name, ArgTypes, OutType) ->
+    ArgType = {tuple, ArgTypes},
     { function_type_hash(Name, ArgType, OutType)
     , Name
     , aeso_heap:to_binary(ArgType)

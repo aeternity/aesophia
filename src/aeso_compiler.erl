@@ -388,7 +388,9 @@ to_bytecode([Op|Rest], Options) ->
 to_bytecode([], _) -> [].
 
 extract_type_info(#{functions := Functions} =_Icode) ->
-    TypeInfo = [aeso_abi:function_type_info(list_to_binary(lists:last(Name)), Args, TypeRep)
+    ArgTypesOnly = fun(As) -> [ T || {_, T} <- As ] end,
+    TypeInfo = [aeso_abi:function_type_info(list_to_binary(lists:last(Name)),
+                                            ArgTypesOnly(Args), TypeRep)
                 || {Name, Attrs, Args,_Body, TypeRep} <- Functions,
                    not is_tuple(Name),
                    not lists:member(private, Attrs)
