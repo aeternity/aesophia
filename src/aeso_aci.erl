@@ -9,7 +9,7 @@
 
 -module(aeso_aci).
 
--export([encode/1,decode/1]).
+-export([encode/1,encode/2,decode/1]).
 
 %% Define records for the various typed syntactic forms. These make
 %% the code easier but don't seem to exist elsewhere.
@@ -26,6 +26,7 @@
 -record(alias_t, {type}).
 -record(variant_t, {cons}).
 -record(constr_t, {ann,con,args}).
+-record(fun_t, {ann,named,args,type}).
 
 -record(arg, {ann,id,type}).
 -record(id, {ann,name}).
@@ -39,29 +40,30 @@
 %%  Build a JSON structure with lists and tuples, not maps, as this
 %%  allows us to order the fields in the contructed JSON string.
 
-encode(ContractString) when is_binary(ContractString) ->
-    encode(binary_to_list(ContractString));
-encode(ContractString) ->
-    Options = [],                               %No options yet
+encode(ContractString) -> encode(ContractString, []).
+
+encode(ContractString, Options) when is_binary(ContractString) ->
+    encode(binary_to_list(ContractString), Options);
+encode(ContractString, Options) ->
     try
-	Ast = parse_string(ContractString),
-	TypedAst = aeso_ast_infer_types:infer(Ast, Options),
-	%% io:format("~p\n", [Ast]),
-	%% io:format("~p\n", [TypedAst]),
-	%% aeso_ast:pp(Ast),
-	%% aeso_ast:pp_typed(TypedAst),
-	%% We find and look at the last contract.
-	Contract = lists:last(TypedAst),
-	Cname = contract_name(Contract),
-	Tdefs = [ encode_typedef(T) ||
-		    T <- sort_decls(contract_types(Contract)) ],
-	Fdefs = [ encode_func(F) || F <- sort_decls(contract_funcs(Contract)),
-				    not is_private_func(F) ],
-	Jmap = [{<<"contract">>, [{<<"name">>, list_to_binary(Cname)},
-				  {<<"type_defs">>, Tdefs},
-				  {<<"functions">>, Fdefs}]}],
-	%% io:format("~p\n", [Jmap]),
-	{ok,jsx:encode(Jmap)}
+        Ast = parse(ContractString, Options),
+        %%io:format("~p\n", [Ast]),
+        %% aeso_ast:pp(Ast),
+        TypedAst = aeso_ast_infer_types:infer(Ast, Options),
+        %% io:format("~p\n", [TypedAst]),
+        %% aeso_ast:pp_typed(TypedAst),
+        %% We find and look at the last contract.
+        Contract = lists:last(TypedAst),
+        Cname = contract_name(Contract),
+        Tdefs = [ encode_typedef(T) ||
+                    T <- sort_decls(contract_types(Contract)) ],
+        Fdefs = [ encode_func(F) || F <- sort_decls(contract_funcs(Contract)),
+                                    not is_private_func(F) ],
+        Jmap = [{<<"contract">>, [{<<"name">>, list_to_binary(Cname)},
+                                  {<<"type_defs">>, Tdefs},
+                                  {<<"functions">>, Fdefs}]}],
+        %% io:format("~p\n", [Jmap]),
+        {ok,jsx:encode(Jmap)}
     catch
         %% The compiler errors.
         error:{parse_errors, Errors} ->
@@ -122,7 +124,11 @@ encode_type(#variant_t{cons=Cs}) ->
 encode_type(#constr_t{con=C,args=As}) ->
     Ec = encode_type(C),
     Eas = encode_types(As),
-    [Ec,$(,lists:join(", ", Eas),$)].
+    [Ec,$(,lists:join(", ", Eas),$)];
+encode_type(#fun_t{args=As,type=T}) ->
+    Eas = encode_types(As),
+    Et = encode_type(T),
+    [$(,lists:join(", ", Eas),") => ",Et].
 
 encode_typedef(Type) ->
     Name = typedef_name(Type),
@@ -236,9 +242,9 @@ typedef_vars(#type_def{vars=Vars}) -> Vars.
 
 typedef_def(#type_def{typedef=Def}) -> Def.
 
-parse_string(Text) ->
+parse(Text, Options) ->
     %% Try and return something sensible here!
-    case aeso_parser:string(Text) of
+    case aeso_parser:string(Text, Options) of
         %% Yay, it worked!
         {ok, Contract} -> Contract;
         %% Scan errors.
@@ -251,9 +257,20 @@ parse_string(Text) ->
             parse_error(Pos, Error);
         {error, {Pos, ambiguous_parse, As}} ->
             ErrorString = io_lib:format("Ambiguous ~p", [As]),
-            parse_error(Pos, ErrorString)
+            parse_error(Pos, ErrorString);
+        %% Include error
+        {error, {Pos, include_error, File}} ->
+            parse_error(Pos, io_lib:format("could not find include file '~s'", [File]))
     end.
 
-parse_error({Line,Pos}, ErrorString) ->
-    Error = io_lib:format("line ~p, column ~p: ~s", [Line,Pos,ErrorString]),
-    error({parse_errors,[Error]}).
+parse_error(Pos, ErrorString) ->
+    io:format("Error ~p ~p\n", [Pos,ErrorString]),
+    Error = io_lib:format("~s: ~s", [pos_error(Pos), ErrorString]),
+    error({parse_errors, [Error]}).
+
+pos_error({Line, Pos}) ->
+    io_lib:format("line ~p, column ~p", [Line, Pos]);
+pos_error({no_file, Line, Pos}) ->
+    pos_error({Line, Pos});
+pos_error({File, Line, Pos}) ->
+    io_lib:format("file ~s, line ~p, column ~p", [File, Line, Pos]).
