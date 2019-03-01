@@ -117,7 +117,7 @@ join_errors(Prefix, Errors, Pfun) ->
 %% terms for the arguments.
 %% NOTE: Special treatment for "init" since it might be implicit and has
 %%       a special return type (typerep, T)
--spec check_call(string(), string(), [string()], options()) -> {ok, string(), {[Type], Type | any}, [term()]} | {error, term()}
+-spec check_call(string(), string(), [string()], options()) -> {ok, string(), {[Type], Type}, [term()]} | {error, term()}
     when Type :: term().
 check_call(Source, "init" = FunName, Args, Options) ->
     PatchFun = fun(T) -> {tuple, [typerep, T]} end,

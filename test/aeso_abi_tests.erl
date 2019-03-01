@@ -107,11 +107,29 @@ calldata_init_test() ->
 
 parameterized_contract(FunName, Types) ->
     lists:flatten(
-        ["contract Dummy =\n",
+        ["contract Dummy =\n"
          "  type an_alias('a) = (string, 'a)\n"
          "  record r = {x : an_alias(int), y : variant}\n"
          "  datatype variant = Red | Blue(map(string, int))\n"
          "  function ", FunName, " : (", string:join(Types, ", "), ") => int\n" ]).
+
+oracle_test() ->
+    Contract =
+        "contract OracleTest =\n"
+        "  function question(o, q : oracle_query(list(string), option(int))) =\n"
+        "    Oracle.get_question(o, q)\n",
+    {ok, _, {[word, word], {list, string}}, [16#123, 16#456]} =
+        aeso_compiler:check_call(Contract, "question", ["#123", "#456"], []),
+    ok.
+
+permissive_literals_fail_test() ->
+    Contract =
+        "contract OracleTest =\n"
+        "  function haxx(o : oracle(list(string), option(int))) =\n"
+        "    Chain.spend(o, 1000000)\n",
+        {error, <<"Type errors\nCannot unify address\n         and oracle", _/binary>>} =
+            aeso_compiler:check_call(Contract, "haxx", ["#123"], []),
+    ok.
 
 encode_decode_calldata(FunName, Types, Args) ->
     encode_decode_calldata(FunName, Types, Args, word).
