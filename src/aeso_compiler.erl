@@ -92,11 +92,13 @@ from_string(ContractString, Options) ->
         %% General programming errors in the compiler just signal error.
     end.
 
-string_to_icode(ContractString, Options) ->
+-spec string_to_icode(string(), [option() | permissive_address_literals]) -> map().
+string_to_icode(ContractString, Options0) ->
+    {InferOptions, Options} = lists:partition(fun(Opt) -> Opt == permissive_address_literals end, Options0),
     Ast = parse(ContractString, Options),
     pp_sophia_code(Ast, Options),
     pp_ast(Ast, Options),
-    {TypeEnv, TypedAst} = aeso_ast_infer_types:infer(Ast, [return_env | Options]),
+    {TypeEnv, TypedAst} = aeso_ast_infer_types:infer(Ast, [return_env | InferOptions]),
     pp_typed_ast(TypedAst, Options),
     Icode = ast_to_icode(TypedAst, Options),
     pp_icode(Icode, Options),
