@@ -105,9 +105,28 @@ calldata_init_test() ->
     Code = parameterized_contract("foo", ["int"]),
     encode_decode_calldata_(Code, "init", [], {tuple, [typerep, {tuple, []}]}).
 
+calldata_indent_test() ->
+    Test = fun(Extra) ->
+            encode_decode_calldata_(
+                parameterized_contract(Extra, "foo", ["int"]),
+                "foo", ["42"], word)
+           end,
+    Test("  stateful function bla() = ()"),
+    Test("  type x = int"),
+    Test("  private function bla : int => int"),
+    Test("  public stateful function bla(x : int) =\n"
+         "    x + 1"),
+    Test("  stateful private function bla(x : int) : int =\n"
+         "    x + 1"),
+    ok.
+
 parameterized_contract(FunName, Types) ->
+    parameterized_contract([], FunName, Types).
+
+parameterized_contract(ExtraCode, FunName, Types) ->
     lists:flatten(
-        ["contract Dummy =\n"
+        ["contract Dummy =\n",
+         ExtraCode, "\n",
          "  type an_alias('a) = (string, 'a)\n"
          "  record r = {x : an_alias(int), y : variant}\n"
          "  datatype variant = Red | Blue(map(string, int))\n"
@@ -127,7 +146,7 @@ permissive_literals_fail_test() ->
         "contract OracleTest =\n"
         "  function haxx(o : oracle(list(string), option(int))) =\n"
         "    Chain.spend(o, 1000000)\n",
-        {error, <<"Type errors\nCannot unify address\n         and oracle", _/binary>>} =
+        {error, <<"Type errors\nCannot unify", _/binary>>} =
             aeso_compiler:check_call(Contract, "haxx", ["#123"], []),
     ok.
 
