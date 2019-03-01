@@ -494,19 +494,7 @@ infer(Contracts) ->
 -type option() :: permissive_address_literals | return_env.
 
 -spec init_env(list(option())) -> env().
-init_env(Options) ->
-    case proplists:get_value(permissive_address_literals, Options, false) of
-        false -> global_env();
-        true ->
-            %% Treat oracle and query ids as address to allow address literals for these
-            Ann = [{origin, system}],
-            Tag = fun(Tag, Val) -> {Tag, Ann, Val} end,
-            lists:foldl(fun({Name, Arity}, E) ->
-                            bind_type(Name, [{origin, system}],
-                                {lists:duplicate(Arity, Tag(tvar, "_")),
-                                    {alias_t, Tag(id, "address")}}, E)
-                        end, global_env(), [{"oracle", 2}, {"oracle_query", 2}])
-    end.
+init_env(_Options) -> global_env().
 
 -spec infer(aeso_syntax:ast(), list(option())) -> aeso_syntax:ast() | {env(), aeso_syntax:ast()}.
 infer(Contracts, Options) ->
@@ -1667,9 +1655,16 @@ unify1(_Env, A, B, When) ->
                 Kind = fun({qcon, _, _})       -> con;
                           ({con, _, _})        -> con;
                           ({id, _, "address"}) -> addr;
+                          ({id, _, "hash"})    -> hash;
+                          ({app_t, _, {id, _, "oracle"}, _})       -> oracle;
+                          ({app_t, _, {id, _, "oracle_query"}, _}) -> query;
                           (_)                  -> other end,
-                %% If permissive_address_literals we allow unifying contract types and address
-                [addr, con] == lists:usort([Kind(A), Kind(B)]);
+                %% If permissive_address_literals we allow unifying adresses
+                %% with contract types or oracles/oracle queries
+                case lists:usort([Kind(A), Kind(B)]) of
+                    [addr, K] -> K /= other;
+                    _ -> false
+                end;
             false -> false
         end,
     [ cannot_unify(A, B, When) || not Ok ],

@@ -97,6 +97,7 @@ calldata_test() ->
     Map = #{ <<"a">> => 4 },
     [{variant, 1, [Map]}, {{<<"b">>, 5}, {variant, 0, []}}] =
         encode_decode_calldata("foo", ["variant", "r"], ["Blue({[\"a\"] = 4})", "{x = (\"b\", 5), y = Red}"]),
+    [16#123, 16#456] = encode_decode_calldata("foo", ["hash", "address"], ["#123", "#456"]),
     ok.
 
 calldata_init_test() ->
@@ -105,13 +106,50 @@ calldata_init_test() ->
     Code = parameterized_contract("foo", ["int"]),
     encode_decode_calldata_(Code, "init", [], {tuple, [typerep, {tuple, []}]}).
 
+calldata_indent_test() ->
+    Test = fun(Extra) ->
+            encode_decode_calldata_(
+                parameterized_contract(Extra, "foo", ["int"]),
+                "foo", ["42"], word)
+           end,
+    Test("  stateful function bla() = ()"),
+    Test("  type x = int"),
+    Test("  private function bla : int => int"),
+    Test("  public stateful function bla(x : int) =\n"
+         "    x + 1"),
+    Test("  stateful private function bla(x : int) : int =\n"
+         "    x + 1"),
+    ok.
+
 parameterized_contract(FunName, Types) ->
+    parameterized_contract([], FunName, Types).
+
+parameterized_contract(ExtraCode, FunName, Types) ->
     lists:flatten(
         ["contract Dummy =\n",
+         ExtraCode, "\n",
          "  type an_alias('a) = (string, 'a)\n"
          "  record r = {x : an_alias(int), y : variant}\n"
          "  datatype variant = Red | Blue(map(string, int))\n"
          "  function ", FunName, " : (", string:join(Types, ", "), ") => int\n" ]).
+
+oracle_test() ->
+    Contract =
+        "contract OracleTest =\n"
+        "  function question(o, q : oracle_query(list(string), option(int))) =\n"
+        "    Oracle.get_question(o, q)\n",
+    {ok, _, {[word, word], {list, string}}, [16#123, 16#456]} =
+        aeso_compiler:check_call(Contract, "question", ["#123", "#456"], []),
+    ok.
+
+permissive_literals_fail_test() ->
+    Contract =
+        "contract OracleTest =\n"
+        "  function haxx(o : oracle(list(string), option(int))) =\n"
+        "    Chain.spend(o, 1000000)\n",
+        {error, <<"Type errors\nCannot unify", _/binary>>} =
+            aeso_compiler:check_call(Contract, "haxx", ["#123"], []),
+    ok.
 
 encode_decode_calldata(FunName, Types, Args) ->
     encode_decode_calldata(FunName, Types, Args, word).

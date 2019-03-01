@@ -68,20 +68,13 @@ from_string(ContractBin, Options) when is_binary(ContractBin) ->
     from_string(binary_to_list(ContractBin), Options);
 from_string(ContractString, Options) ->
     try
-        Ast = parse(ContractString, Options),
-        ok = pp_sophia_code(Ast, Options),
-        ok = pp_ast(Ast, Options),
-        TypedAst = aeso_ast_infer_types:infer(Ast, Options),
-        %% pp_types is handled inside aeso_ast_infer_types.
-        ok = pp_typed_ast(TypedAst, Options),
-        ICode = to_icode(TypedAst, Options),
-        TypeInfo = extract_type_info(ICode),
-        ok = pp_icode(ICode, Options),
-        Assembler =  assemble(ICode, Options),
-        ok = pp_assembler(Assembler, Options),
+        #{icode := Icode} = string_to_icode(ContractString, Options),
+        TypeInfo  = extract_type_info(Icode),
+        Assembler = assemble(Icode, Options),
+        pp_assembler(Assembler, Options),
         ByteCodeList = to_bytecode(Assembler, Options),
         ByteCode = << << B:8 >> || B <- ByteCodeList >>,
-        ok = pp_bytecode(ByteCode, Options),
+        pp_bytecode(ByteCode, Options),
         {ok, #{byte_code => ByteCode,
                compiler_version => version(),
                contract_source => ContractString,
@@ -99,6 +92,20 @@ from_string(ContractString, Options) ->
         %% General programming errors in the compiler just signal error.
     end.
 
+-spec string_to_icode(string(), [option() | permissive_address_literals]) -> map().
+string_to_icode(ContractString, Options0) ->
+    {InferOptions, Options} = lists:partition(fun(Opt) -> Opt == permissive_address_literals end, Options0),
+    Ast = parse(ContractString, Options),
+    pp_sophia_code(Ast, Options),
+    pp_ast(Ast, Options),
+    {TypeEnv, TypedAst} = aeso_ast_infer_types:infer(Ast, [return_env | InferOptions]),
+    pp_typed_ast(TypedAst, Options),
+    Icode = ast_to_icode(TypedAst, Options),
+    pp_icode(Icode, Options),
+    #{ typed_ast => TypedAst,
+       type_env  => TypeEnv,
+       icode     => Icode }.
+
 join_errors(Prefix, Errors, Pfun) ->
     Ess = [ Pfun(E) || E <- Errors ],
     list_to_binary(string:join([Prefix|Ess], "\n")).
@@ -112,7 +119,7 @@ join_errors(Prefix, Errors, Pfun) ->
 %% terms for the arguments.
 %% NOTE: Special treatment for "init" since it might be implicit and has
 %%       a special return type (typerep, T)
--spec check_call(string(), string(), [string()], options()) -> {ok, string(), {[Type], Type | any}, [term()]} | {error, term()}
+-spec check_call(string(), string(), [string()], options()) -> {ok, string(), {[Type], Type}, [term()]} | {error, term()}
     when Type :: term().
 check_call(Source, "init" = FunName, Args, Options) ->
     PatchFun = fun(T) -> {tuple, [typerep, T]} end,
@@ -132,20 +139,17 @@ check_call(Source, FunName, Args, Options) ->
 
 check_call(ContractString0, FunName, Args, Options, PatchFun) ->
     try
+        %% First check the contract without the __call function and no permissive literals
+        #{} = string_to_icode(ContractString0, Options),
         ContractString = insert_call_function(ContractString0, FunName, Args, Options),
-        Ast = parse(ContractString, Options),
-        ok = pp_sophia_code(Ast, Options),
-        ok = pp_ast(Ast, Options),
-        TypedAst = aeso_ast_infer_types:infer(Ast, [permissive_address_literals]),
+        #{typed_ast := TypedAst,
+          icode     := Icode} = string_to_icode(ContractString, [permissive_address_literals | Options]),
         {ok, {FunName, {fun_t, _, _, ArgTypes, RetType}}} = get_call_type(TypedAst),
-        ok = pp_typed_ast(TypedAst, Options),
-        Icode = to_icode(TypedAst, Options),
         ArgVMTypes = [ aeso_ast_to_icode:ast_typerep(T, Icode) || T <- ArgTypes ],
         RetVMType  = case RetType of
                          {id, _, "_"} -> any;
                          _            -> aeso_ast_to_icode:ast_typerep(RetType, Icode)
                      end,
-        ok = pp_icode(Icode, Options),
         #{ functions := Funs } = Icode,
         ArgIcode = get_arg_icode(Funs),
         ArgTerms = [ icode_to_term(T, Arg) ||
@@ -208,16 +212,12 @@ to_sophia_value(_, _, revert, Data, _Options) ->
     end;
 to_sophia_value(ContractString, FunName, ok, Data, Options) ->
     try
-        Ast = parse(ContractString, Options),
-        ok = pp_sophia_code(Ast, Options),
-        ok = pp_ast(Ast, Options),
-        {Env, TypedAst} = aeso_ast_infer_types:infer(Ast, [return_env]),
-        ok = pp_typed_ast(TypedAst, Options),
+        #{ typed_ast := TypedAst,
+           type_env  := TypeEnv,
+           icode     := Icode } = string_to_icode(ContractString, Options),
         {ok, Type0} = get_decode_type(FunName, TypedAst),
-        Type = aeso_ast_infer_types:unfold_types_in_type(Env, Type0, [unfold_record_types, unfold_variant_types]),
-        Icode = to_icode(TypedAst, Options),
+        Type   = aeso_ast_infer_types:unfold_types_in_type(TypeEnv, Type0, [unfold_record_types, unfold_variant_types]),
         VmType = aeso_ast_to_icode:ast_typerep(Type, Icode),
-        ok = pp_icode(Icode, Options),
         case aeso_heap:from_binary(VmType, Data) of
             {ok, VmValue} ->
                 try
@@ -374,7 +374,7 @@ icode_to_term(T, V) ->
 icodes_to_terms(Ts, Vs) ->
     [ icode_to_term(T, V) || {T, V} <- lists:zip(Ts, Vs) ].
 
-to_icode(TypedAst, Options) ->
+ast_to_icode(TypedAst, Options) ->
     aeso_ast_to_icode:convert_typed(TypedAst, Options).
 
 assemble(Icode, Options) ->
