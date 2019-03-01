@@ -320,6 +320,7 @@ expr_p(_, E = {int, _, N}) ->
     text(S);
 expr_p(_, {bool, _, B}) -> text(atom_to_list(B));
 expr_p(_, {hash, _, <<N:256>>}) -> text("#" ++ integer_to_list(N, 16));
+expr_p(_, {hash, _, <<N:512>>}) -> text("#" ++ integer_to_list(N, 16));
 expr_p(_, {unit, _}) -> text("()");
 expr_p(_, {string, _, S}) -> term(binary_to_list(S));
 expr_p(_, {char, _, C}) ->
