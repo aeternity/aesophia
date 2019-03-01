@@ -97,6 +97,7 @@ calldata_test() ->
     Map = #{ <<"a">> => 4 },
     [{variant, 1, [Map]}, {{<<"b">>, 5}, {variant, 0, []}}] =
         encode_decode_calldata("foo", ["variant", "r"], ["Blue({[\"a\"] = 4})", "{x = (\"b\", 5), y = Red}"]),
+    [16#123, 16#456] = encode_decode_calldata("foo", ["hash", "address"], ["#123", "#456"]),
     ok.
 
 calldata_init_test() ->

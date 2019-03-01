@@ -1655,6 +1655,7 @@ unify1(_Env, A, B, When) ->
                 Kind = fun({qcon, _, _})       -> con;
                           ({con, _, _})        -> con;
                           ({id, _, "address"}) -> addr;
+                          ({id, _, "hash"})    -> hash;
                           ({app_t, _, {id, _, "oracle"}, _})       -> oracle;
                           ({app_t, _, {id, _, "oracle_query"}, _}) -> query;
                           (_)                  -> other end,
