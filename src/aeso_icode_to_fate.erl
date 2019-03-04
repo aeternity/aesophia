@@ -95,7 +95,7 @@ to_scode(_Env, #integer{ value = N }) ->
 to_scode(Env, #var_ref{name = X}) ->
     case lookup_var(Env, X) of
         false      -> error({unbound_variable, X, Env});
-        {stack, N} -> [aeb_fate_code:dup(N)];
+        {stack, N} -> [aeb_fate_code:dup(?i(N))];
         {arg, N}   -> [aeb_fate_code:push({arg, N})]
     end;
 to_scode(Env, #binop{ op = Op, left = A, right = B }) ->
