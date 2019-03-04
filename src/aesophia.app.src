@@ -1,6 +1,6 @@
 {application, aesophia,
  [{description, "Contract Language for Aethernity"},
-  {vsn, "1.2.0"},
+  {vsn, {cmd, "cat VERSION | tr -d '[:space:]'"}},
   {registered, []},
   {applications,
    [kernel,
