@@ -39,14 +39,24 @@
              , options/0
              ]).
 
--define(COMPILER_VERSION_1, 1).
--define(COMPILER_VERSION_2, 2).
-
--define(COMPILER_VERSION, ?COMPILER_VERSION_2).
-
--spec version() -> pos_integer().
+-spec version() -> {ok, binary()} | {error, term()}.
 version() ->
-    ?COMPILER_VERSION.
+    case lists:keyfind(aesophia, 1, application:loaded_applications()) of
+        false ->
+            case application:load(aesophia) of
+                ok ->
+                    case application:get_key(aesophia, vsn) of
+                        {ok, VsnString} ->
+                            {ok, list_to_binary(VsnString)};
+                        undefined ->
+                            {error, failed_to_load_aesophia}
+                    end;
+                Err = {error, _} ->
+                    Err
+            end;
+        {_App, _Des, VsnString} ->
+            {ok, list_to_binary(VsnString)}
+    end.
 
 -spec file(string()) -> {ok, map()} | {error, binary()}.
 file(Filename) ->
@@ -75,8 +85,9 @@ from_string(ContractString, Options) ->
         ByteCodeList = to_bytecode(Assembler, Options),
         ByteCode = << << B:8 >> || B <- ByteCodeList >>,
         pp_bytecode(ByteCode, Options),
+        {ok, Version} = version(),
         {ok, #{byte_code => ByteCode,
-               compiler_version => version(),
+               compiler_version => Version,
                contract_source => ContractString,
                type_info => TypeInfo
               }}
