@@ -15,7 +15,7 @@ returns the compiled module in a map which can then be loaded.
 ``` erlang
 contract_string() = string() | binary()
 contract_map() = #{bytecode => binary(),
-                   compiler_version => string(),
+                   compiler_version => binary(),
                    contract_souce => string(),
                    type_info => type_info()}
 type_info()
@@ -75,12 +75,12 @@ Types
 
 Get the type representation of a type declaration.
 
-#### version() -> Version
+#### version() -> {ok, Version} | {error, term()}
 
 Types
 
 ``` erlang
-Version = integer()
+Version = binary()
 ```
 
 Get the current version of the Sophia compiler.

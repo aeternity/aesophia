@@ -202,8 +202,11 @@ failing_contracts() ->
          <<"The indexed type string (at line 9, column 25) is not a word type">>,
          <<"The indexed type alias_string (at line 11, column 25) equals string which is not a word type">>]}
     , {"bad_events2",
-        [<<"The event constructor BadEvent1 (at line 9, column 7) has too many string values (max 1)">>,
-         <<"The event constructor BadEvent2 (at line 10, column 7) has too many indexed values (max 3)">>]}
+        [<<"The event constructor BadEvent1 (at line 9, column 7) has too many non-indexed values (max 1)">>,
+         <<"The event constructor BadEvent2 (at line 10, column 7) has too many indexed values (max 3)">>,
+         <<"The event constructor BadEvent3 (at line 11, column 7) has too many non-indexed values (max 1)">>,
+         <<"The payload type address (at line 11, column 17) should be string">>,
+         <<"The payload type int (at line 11, column 26) should be string">>]}
     , {"type_clash",
         [<<"Cannot unify int\n"
            "         and string\n"

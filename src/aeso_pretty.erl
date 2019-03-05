@@ -307,6 +307,8 @@ expr_p(P, E = {app, _, F = {Op, _}, Args}) when is_atom(Op) ->
         {prefix, [A]}   -> prefix(P, Op, A);
         _               -> app(P, F, Args)
     end;
+expr_p(_, {app, _, C={Tag, _, _}, []}) when Tag == con; Tag == qcon ->
+    expr_p(0, C);
 expr_p(P, {app, _, F, Args}) ->
     app(P, F, Args);
 %% -- Constants
@@ -318,6 +320,7 @@ expr_p(_, E = {int, _, N}) ->
     text(S);
 expr_p(_, {bool, _, B}) -> text(atom_to_list(B));
 expr_p(_, {hash, _, <<N:256>>}) -> text("#" ++ integer_to_list(N, 16));
+expr_p(_, {hash, _, <<N:512>>}) -> text("#" ++ integer_to_list(N, 16));
 expr_p(_, {unit, _}) -> text("()");
 expr_p(_, {string, _, S}) -> term(binary_to_list(S));
 expr_p(_, {char, _, C}) ->

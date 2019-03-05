@@ -12,7 +12,11 @@
        {ref,"60a335668a60328a29f9731b67c4a0e9e3d50ab6"}},
   2},
  {<<"eblake2">>,{pkg,<<"eblake2">>,<<"1.0.0">>},1},
- {<<"getopt">>,{pkg,<<"getopt">>,<<"1.0.1">>},0}]}.
+ {<<"getopt">>,{pkg,<<"getopt">>,<<"1.0.1">>},0},
+ {<<"jsx">>,
+  {git,"https://github.com/talentdeficit/jsx.git",
+       {ref,"3074d4865b3385a050badf7828ad31490d860df5"}},
+  0}]}.
 [
 {pkg_hash,[
  {<<"eblake2">>, <<"EC8AD20E438AAB3F2E8D5D118C366A0754219195F8A0F536587440F8F9BCF2EF">>},

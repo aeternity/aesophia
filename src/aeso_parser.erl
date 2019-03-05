@@ -68,9 +68,14 @@ decl() ->
 modifiers() ->
     many(choice([token(stateful), token(public), token(private), token(internal)])).
 
-add_modifiers(Mods, Node) ->
-    lists:foldl(fun({Mod, _}, X) -> set_ann(Mod, true, X) end,
-                Node, Mods).
+add_modifiers([], Node) -> Node;
+add_modifiers(Mods = [Tok | _], Node) ->
+    %% Set the position to the position of the first modifier. This is
+    %% important for code transformation tools (like what we do in
+    %% create_calldata) to be able to get the indentation of the declaration.
+    set_pos(get_pos(Tok),
+        lists:foldl(fun({Mod, _}, X) -> set_ann(Mod, true, X) end,
+                    Node, Mods)).
 
 %% -- Type declarations ------------------------------------------------------
 
