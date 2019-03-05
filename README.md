@@ -14,3 +14,4 @@ can then be loaded into the æternity system.
 The basic modules for interfacing the compiler:
 
 * [aeso_compiler: the Sophia compiler](./docs/aeso_compiler.md)
+* [aeso_aci: the ACI interface](./docs/aeso_aci.md)

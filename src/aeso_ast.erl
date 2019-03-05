@@ -17,7 +17,6 @@ line({symbol, Line, _}) -> Line.
 symbol_name({symbol, _, Name}) -> Name.
 
 pp(Ast) ->
-    %% io:format("Tree:\n~p\n",[Ast]),
     String = prettypr:format(aeso_pretty:decls(Ast, [])),
     io:format("Ast:\n~s\n", [String]).
 

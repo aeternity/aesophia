@@ -1,10 +1,11 @@
 {application, aesophia,
  [{description, "Contract Language for aeternity"},
-  {vsn, "2.0.0"},
+  {vsn, {cmd, "cat VERSION | tr -d '[:space:]'"}},
   {registered, []},
   {applications,
    [kernel,
     stdlib,
+    jsx,
     syntax_tools,
     getopt,
     aebytecode

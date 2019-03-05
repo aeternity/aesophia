@@ -4,6 +4,7 @@
 
 -define(OPT_SPEC,
     [ {src_file, undefined, undefined, string, "Sophia source code file"}
+    , {version, $V, "version", undefined, "Print compiler version"}
     , {verbose, $v, "verbose", undefined, "Verbose output"}
     , {help, $h, "help", undefined, "Show this message"}
     , {outfile, $o, "out", string, "Output file (experimental)"} ]).
@@ -14,11 +15,13 @@ usage() ->
 main(Args) ->
     case getopt:parse(?OPT_SPEC, Args) of
         {ok, {Opts, []}} ->
-            case proplists:get_value(help, Opts, false) of
-                false ->
-                    compile(Opts);
-                true ->
-                    usage()
+            case Opts of
+                [version] ->
+                    print_vsn();
+                [help] ->
+                    usage();
+                _ ->
+                    compile(Opts)
             end;
 
         {ok, {_, NonOpts}} ->
@@ -69,3 +72,7 @@ write_outfile(Out, ResMap)  ->
     %% Lazy approach
     file:write_file(Out, term_to_binary(ResMap)),
     io:format("Output written to: ~s\n", [Out]).
+
+print_vsn() ->
+    {ok, Vsn} = aeso_compiler:version(),
+    io:format("Compiler version: ~s\n", [Vsn]).
