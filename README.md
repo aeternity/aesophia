@@ -9,6 +9,14 @@ It is an OTP application written in Erlang and is by default included in
 also be included in other systems to compile contracts coded in sophia which
 can then be loaded into the æternity system.
 
+## Versioning
+
+`aesophia` has a version that is only loosely connected to the version of the
+Aeternity node - in principle they will share the major version but not
+minor/patch version. The `aesophia` compiler version MUST be bumped whenever
+there is a change in how byte code is generated, but it MAY also be bumped upon
+API changes etc.
+
 ## Interface Modules
 
 The basic modules for interfacing the compiler:
