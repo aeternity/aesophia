@@ -1,5 +1,5 @@
 {application, aesophia,
- [{description, "Contract Language for Aethernity"},
+ [{description, "Contract Language for aeternity"},
   {vsn, {cmd, "cat VERSION | tr -d '[:space:]'"}},
   {registered, []},
   {applications,

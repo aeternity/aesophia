@@ -19,16 +19,16 @@ jobs:
             - dialyzer-cache-v2-
       - run:
           name: Build
-          command: rebar3 compile
+          command: ./rebar3 compile
       - run:
           name: Static Analysis
-          command: rebar3 dialyzer
+          command: ./rebar3 dialyzer
       - run:
           name: Eunit
-          command: rebar3 eunit
+          command: ./rebar3 eunit
       - run:
           name: Common Tests
-          command: rebar3 ct
+          command: ./rebar3 ct
       - save_cache:
           key: dialyzer-cache-v2-{{ .Branch }}-{{ .Revision }}
           paths:
