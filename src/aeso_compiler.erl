@@ -260,6 +260,7 @@ to_sophia_value(ContractString, FunName, ok, Data, Options) ->
 address_literal(N) -> {hash, [], <<N:256>>}.  % TODO
 
 %% TODO: somewhere else
+-spec translate_vm_value(aeso_sophia:type(), aeso_syntax:type(), aeso_sophia:data()) -> aeso_syntax:expr().
 translate_vm_value(word,   {id, _, "address"},                     N) -> address_literal(N);
 translate_vm_value(word,   {app_t, _, {id, _, "oracle"}, _},       N) -> address_literal(N);
 translate_vm_value(word,   {app_t, _, {id, _, "oracle_query"}, _}, N) -> address_literal(N);
@@ -322,7 +323,7 @@ create_calldata(Code, Fun, Args) ->
     end.
 
 -spec decode_calldata(string(), string(), binary()) ->
-                             {ok, [aeso_syntax:type()], [aeso_syntax:ast()]}
+                             {ok, [aeso_syntax:type()], [aeso_syntax:expr()]}
                              | {error, term()}.
 decode_calldata(ContractString, FunName, Calldata) ->
     try
