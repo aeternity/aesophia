@@ -17,6 +17,7 @@
         , sophia_type_to_typerep/1
         , to_sophia_value/4
         , to_sophia_value/5
+        , decode_calldata/3
         ]).
 
 -include_lib("aebytecode/include/aeb_opcodes.hrl").
@@ -226,7 +227,7 @@ to_sophia_value(ContractString, FunName, ok, Data, Options) ->
         #{ typed_ast := TypedAst,
            type_env  := TypeEnv,
            icode     := Icode } = string_to_icode(ContractString, Options),
-        {ok, Type0} = get_decode_type(FunName, TypedAst),
+        {ok, _, Type0} = get_decode_type(FunName, TypedAst),
         Type   = aeso_ast_infer_types:unfold_types_in_type(TypeEnv, Type0, [unfold_record_types, unfold_variant_types]),
         VmType = aeso_ast_to_icode:ast_typerep(Type, Icode),
         case aeso_heap:from_binary(VmType, Data) of
@@ -320,6 +321,49 @@ create_calldata(Code, Fun, Args) ->
         {error, _} = Err -> Err
     end.
 
+-spec decode_calldata(string(), string(), binary()) ->
+                             {ok, [aeso_syntax:type()], [aeso_syntax:ast()]}
+                             | {error, term()}.
+decode_calldata(ContractString, FunName, Calldata) ->
+    try
+        #{ typed_ast := TypedAst,
+           type_env  := TypeEnv,
+           icode     := Icode } = string_to_icode(ContractString, []),
+        {ok, Args, _} = get_decode_type(FunName, TypedAst),
+        DropArg       = fun({arg, _, _, T}) -> T; (T) -> T end,
+        ArgTypes      = lists:map(DropArg, Args),
+        Type0         = {tuple_t, [], ArgTypes},
+        Type   = aeso_ast_infer_types:unfold_types_in_type(TypeEnv, Type0, [unfold_record_types, unfold_variant_types]),
+        VmType = aeso_ast_to_icode:ast_typerep(Type, Icode),
+        case aeso_heap:from_binary({tuple, [word, VmType]}, Calldata) of
+            {ok, {_, VmValue}} ->
+                try
+                    {tuple, [], Values} = translate_vm_value(VmType, Type, VmValue),
+                    {ok, ArgTypes, Values}
+                catch throw:cannot_translate_to_sophia ->
+                    Type0Str = prettypr:format(aeso_pretty:type(Type0)),
+                    {error, join_errors("Translation error", [lists:flatten(io_lib:format("Cannot translate VM value ~p\n  of type ~p\n  to Sophia type ~s\n",
+                                                                            [VmValue, VmType, Type0Str]))],
+                                        fun (E) -> E end)}
+                end;
+            {error, _Err} ->
+                {error, join_errors("Decode errors", [lists:flatten(io_lib:format("Failed to decode binary at type ~p", [VmType]))],
+                                    fun(E) -> E end)}
+        end
+    catch
+        error:{parse_errors, Errors} ->
+            {error, join_errors("Parse errors", Errors, fun (E) -> E end)};
+        error:{type_errors, Errors} ->
+            {error, join_errors("Type errors", Errors, fun (E) -> E end)};
+        error:{badmatch, {error, missing_function}} ->
+            {error, join_errors("Type errors", ["no function: '" ++ FunName ++ "'"],
+                                fun (E) -> E end)};
+        throw:Error ->                          %Don't ask
+            {error, join_errors("Code errors", [Error],
+                                fun (E) -> io_lib:format("~p", [E]) end)}
+    end.
+
+
 get_arg_icode(Funs) ->
     case [ Args || {[_, ?CALL_NAME], _, _, {funcall, _, Args}, _} <- Funs ] of
         [Args] -> Args;
@@ -340,12 +384,12 @@ get_call_type([_ | Contracts]) ->
     get_call_type(Contracts).
 
 get_decode_type(FunName, [{contract, _, _, Defs}]) ->
-    GetType = fun({letfun, _, {id, _, Name}, _, Ret, _})               when Name == FunName -> [Ret];
-                 ({fun_decl, _, {id, _, Name}, {fun_t, _, _, _, Ret}}) when Name == FunName -> [Ret];
+    GetType = fun({letfun, _, {id, _, Name}, Args, Ret, _})               when Name == FunName -> [{Args, Ret}];
+                 ({fun_decl, _, {id, _, Name}, {fun_t, _, _, Args, Ret}}) when Name == FunName -> [{Args, Ret}];
                  (_) -> [] end,
     case lists:flatmap(GetType, Defs) of
-        [Type] -> {ok, Type};
-        []     -> {error, missing_function}
+        [{Args, Ret}] -> {ok, Args, Ret};
+        []            -> {error, missing_function}
     end;
 get_decode_type(FunName, [_ | Contracts]) ->
     %% The __decode should be in the final contract
