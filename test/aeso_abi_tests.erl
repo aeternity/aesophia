@@ -162,6 +162,14 @@ encode_decode_calldata_(Code, FunName, Args, RetVMType) ->
     {ok, Calldata, CalldataType, RetVMType1} = aeso_compiler:create_calldata(Code, FunName, Args),
     ?assertEqual(RetVMType1, RetVMType),
     {ok, {_Hash, ArgTuple}} = aeso_heap:from_binary(CalldataType, Calldata),
+    case FunName of
+        "init" ->
+            ok;
+        _ ->
+            {ok, _ArgTypes, ValueASTs} = aeso_compiler:decode_calldata(Code, FunName, Calldata),
+            Values = [ prettypr:format(aeso_pretty:expr(V)) || V <- ValueASTs ],
+            ?assertMatch({X, X}, {Args, Values})
+    end,
     tuple_to_list(ArgTuple).
 
 encode_decode(T, D) ->
