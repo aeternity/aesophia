@@ -218,7 +218,7 @@ to_sophia_value(ContractString, Fun, ResType, Data) ->
 to_sophia_value(_, _, error, Err, _Options) ->
     {ok, {app, [], {id, [], "error"}, [{string, [], Err}]}};
 to_sophia_value(_, _, revert, Data, _Options) ->
-    case aeso_heap:from_binary(string, Data) of
+    case aeb_heap:from_binary(string, Data) of
         {ok, Err} -> {ok, {app, [], {id, [], "abort"}, [{string, [], Err}]}};
         {error, _} = Err -> Err
     end;
@@ -230,7 +230,7 @@ to_sophia_value(ContractString, FunName, ok, Data, Options) ->
         {ok, _, Type0} = get_decode_type(FunName, TypedAst),
         Type   = aeso_ast_infer_types:unfold_types_in_type(TypeEnv, Type0, [unfold_record_types, unfold_variant_types]),
         VmType = aeso_ast_to_icode:ast_typerep(Type, Icode),
-        case aeso_heap:from_binary(VmType, Data) of
+        case aeb_heap:from_binary(VmType, Data) of
             {ok, VmValue} ->
                 try
                     {ok, translate_vm_value(VmType, Type, VmValue)}
@@ -318,7 +318,7 @@ translate_vm_value(_VmType, _Type, _Data) ->
 create_calldata(Code, Fun, Args) ->
     case check_call(Code, Fun, Args, []) of
         {ok, FunName, {ArgTypes, RetType}, VMArgs} ->
-            aeso_abi:create_calldata(FunName, VMArgs, ArgTypes, RetType);
+            aeb_abi:create_calldata(FunName, VMArgs, ArgTypes, RetType);
         {error, _} = Err -> Err
     end.
 
@@ -336,7 +336,7 @@ decode_calldata(ContractString, FunName, Calldata) ->
         Type0         = {tuple_t, [], ArgTypes},
         Type   = aeso_ast_infer_types:unfold_types_in_type(TypeEnv, Type0, [unfold_record_types, unfold_variant_types]),
         VmType = aeso_ast_to_icode:ast_typerep(Type, Icode),
-        case aeso_heap:from_binary({tuple, [word, VmType]}, Calldata) of
+        case aeb_heap:from_binary({tuple, [word, VmType]}, Calldata) of
             {ok, {_, VmValue}} ->
                 try
                     {tuple, [], Values} = translate_vm_value(VmType, Type, VmValue),
@@ -397,7 +397,7 @@ get_decode_type(FunName, [_ | Contracts]) ->
     get_decode_type(FunName, Contracts).
 
 %% Translate an icode value (error if not value) to an Erlang term that can be
-%% consumed by aeso_heap:to_binary().
+%% consumed by aeb_heap:to_binary().
 icode_to_term(word, {integer, N}) -> N;
 icode_to_term(string, {tuple, [{integer, Len} | Words]}) ->
     <<Str:Len/binary, _/binary>> = << <<W:256>> || {integer, W} <- Words >>,
@@ -445,7 +445,7 @@ to_bytecode([], _) -> [].
 
 extract_type_info(#{functions := Functions} =_Icode) ->
     ArgTypesOnly = fun(As) -> [ T || {_, T} <- As ] end,
-    TypeInfo = [aeso_abi:function_type_info(list_to_binary(lists:last(Name)),
+    TypeInfo = [aeb_abi:function_type_info(list_to_binary(lists:last(Name)),
                                             ArgTypesOnly(Args), TypeRep)
                 || {Name, Attrs, Args,_Body, TypeRep} <- Functions,
                    not is_tuple(Name),
