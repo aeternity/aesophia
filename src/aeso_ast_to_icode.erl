@@ -182,6 +182,11 @@ ast_body(?id_app("abort", [String], _, _), Icode) ->
     #funcall{ function = #var_ref{ name = {builtin, abort} },
               args     = [ast_body(String, Icode)] };
 
+%% Authentication
+ast_body({qid, _, ["Auth", "tx_hash"]}, _Icode) ->
+    prim_call(?PRIM_CALL_AUTH_TX_HASH, #integer{value = 0},
+              [], [], aeso_icode:option_typerep(word));
+
 %% Oracles
 ast_body(?qid_app(["Oracle", "register"], Args, _, ?oracle_t(QType, RType)), Icode) ->
     {Sign, [Acct, QFee, TTL]} = get_signature_arg(Args),

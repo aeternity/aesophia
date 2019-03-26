@@ -443,8 +443,13 @@ global_env() ->
                       {"sha256",   Fun1(A, Hash)},
                       {"blake2b",  Fun1(A, Hash)}]) },
 
-     %% Strings
-     StringScope = #scope
+    %% Authentication
+    AuthScope = #scope
+        { funs = MkDefs(
+                     [{"tx_hash", Option(Hash)}]) },
+
+    %% Strings
+    StringScope = #scope
         { funs = MkDefs(
                      [{"length",  Fun1(String, Int)},
                       {"concat",  Fun([String, String], String)},
@@ -452,8 +457,8 @@ global_env() ->
                       {"sha256",  Fun1(String, Hash)},
                       {"blake2b", Fun1(String, Hash)}]) },
 
-     %% Bits
-     BitsScope = #scope
+    %% Bits
+    BitsScope = #scope
         { funs = MkDefs(
                      [{"set",          Fun([Bits, Int], Bits)},
                       {"clear",        Fun([Bits, Int], Bits)},
@@ -465,9 +470,9 @@ global_env() ->
                       {"none",         Bits},
                       {"all",          Bits}]) },
 
-     %% Conversion
-     IntScope     = #scope{ funs = MkDefs([{"to_str", Fun1(Int,     String)}]) },
-     AddressScope = #scope{ funs = MkDefs([{"to_str", Fun1(Address, String)}]) },
+    %% Conversion
+    IntScope     = #scope{ funs = MkDefs([{"to_str", Fun1(Int,     String)}]) },
+    AddressScope = #scope{ funs = MkDefs([{"to_str", Fun1(Address, String)}]) },
 
     #env{ scopes =
             #{ []           => TopScope
@@ -477,6 +482,7 @@ global_env() ->
              , ["Oracle"]   => OracleScope
              , ["AENS"]     => AENSScope
              , ["Map"]      => MapScope
+             , ["Auth"]     => AuthScope
              , ["Crypto"]   => CryptoScope
              , ["String"]   => StringScope
              , ["Bits"]     => BitsScope
