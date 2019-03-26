@@ -97,7 +97,8 @@ compilable_contracts() ->
      "variant_types",
      "state_handling",
      "events",
-     "include"
+     "include",
+     "basic_auth"
     ].
 
 %% Contracts that should produce type errors
