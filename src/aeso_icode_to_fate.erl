@@ -40,12 +40,19 @@ compile(ICode, Options) ->
        functions     := Functions } = ICode,
     SFuns  = functions_to_scode(Functions, Options),
     SFuns1 = optimize_scode(SFuns, Options),
-    to_basic_blocks(SFuns1, Options).
+    BBFuns = to_basic_blocks(SFuns1, Options),
+    #{ functions => BBFuns }.
+
+is_init([_, "init"]) -> true;
+is_init(_Other)      -> false.
+
+make_function_name([_, Name]) -> list_to_binary(Name);
+make_function_name(Other) -> error({todo, namespace_stuff, Other}).
 
 functions_to_scode(Functions, Options) ->
     maps:from_list(
-        [ {list_to_binary(Name), function_to_scode(Name, Args, Body, Type, Options)}
-        || {Name, _Ann, Args, Body, Type} <- Functions, Name /= "init" ]).  %% TODO: skip init for now
+        [ {make_function_name(Name), function_to_scode(Name, Args, Body, Type, Options)}
+        || {Name, _Ann, Args, Body, Type} <- Functions, not is_init(Name) ]).  %% TODO: skip init for now
 
 function_to_scode(Name, Args, Body, Type, Options) ->
     debug(Options, "Compiling ~p ~p : ~p ->\n  ~p\n", [Name, Args, Type, Body]),
