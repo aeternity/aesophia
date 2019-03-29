@@ -1,5 +1,5 @@
 
--define(Type(), aeso_sophia:type()).
+-define(Type(), aeb_aevm_data:type()).
 
 -define(TYPEREP_WORD_TAG,   0).
 -define(TYPEREP_STRING_TAG, 1).

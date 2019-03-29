@@ -208,7 +208,7 @@ last_contract_indent(Decls) ->
         _                     -> 0
     end.
 
--spec to_sophia_value(string(), string(), ok | error | revert, aeso_sophia:data()) ->
+-spec to_sophia_value(string(), string(), ok | error | revert, aeb_aevm_data:data()) ->
         {ok, aeso_syntax:expr()} | {error, term()}.
 to_sophia_value(ContractString, Fun, ResType, Data) ->
     to_sophia_value(ContractString, Fun, ResType, Data, []).
@@ -260,7 +260,7 @@ to_sophia_value(ContractString, FunName, ok, Data, Options) ->
 address_literal(N) -> {hash, [], <<N:256>>}.  % TODO
 
 %% TODO: somewhere else
--spec translate_vm_value(aeso_sophia:type(), aeso_syntax:type(), aeso_sophia:data()) -> aeso_syntax:expr().
+-spec translate_vm_value(aeb_aevm_data:type(), aeso_syntax:type(), aeb_aevm_data:data()) -> aeso_syntax:expr().
 translate_vm_value(word,   {id, _, "address"},                     N) -> address_literal(N);
 translate_vm_value(word,   {app_t, _, {id, _, "oracle"}, _},       N) -> address_literal(N);
 translate_vm_value(word,   {app_t, _, {id, _, "oracle_query"}, _}, N) -> address_literal(N);
@@ -313,7 +313,7 @@ translate_vm_value(_VmType, _Type, _Data) ->
     throw(cannot_translate_to_sophia).
 
 -spec create_calldata(string(), string(), [string()]) ->
-                             {ok, binary(), aeso_sophia:type(), aeso_sophia:type()}
+                             {ok, binary(), aeb_aevm_data:type(), aeb_aevm_data:type()}
                              | {error, term()}.
 create_calldata(Code, Fun, Args) ->
     case check_call(Code, Fun, Args, []) of

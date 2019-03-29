@@ -25,14 +25,14 @@
 
 -include("aeso_icode.hrl").
 
--type type_def() :: fun(([aeso_sophia:type()]) -> aeso_sophia:type()).
+-type type_def() :: fun(([aeb_aevm_data:type()]) -> aeb_aevm_data:type()).
 
 -type bindings() :: any().
 -type fun_dec() :: { string()
                    , [modifier()]
                    , arg_list()
                    , expr()
-                   , aeso_sophia:type()}.
+                   , aeb_aevm_data:type()}.
 
 -type modifier() :: private | stateful.
 
@@ -42,10 +42,10 @@
                   , functions => [fun_dec()]
                   , namespace => aeso_syntax:con() | aeso_syntax:qcon()
                   , env => [bindings()]
-                  , state_type => aeso_sophia:type()
-                  , event_type => aeso_sophia:type()
+                  , state_type => aeb_aevm_data:type()
+                  , event_type => aeb_aevm_data:type()
                   , types => #{ type_name() => type_def() }
-                  , type_vars => #{ string() => aeso_sophia:type() }
+                  , type_vars => #{ string() => aeb_aevm_data:type() }
                   , constructors => #{ [string()] => integer() }  %% name to tag
                   , options => [any()]
                   }.

@@ -674,7 +674,7 @@ make_type_def(Args, Def, Icode = #{ type_vars := TypeEnv }) ->
         ast_typerep(Def, Icode#{ type_vars := maps:merge(TypeEnv, TypeEnv1) })
     end.
 
--spec ast_typerep(aeso_syntax:type()) -> aeso_sophia:type().
+-spec ast_typerep(aeso_syntax:type()) -> aeb_aevm_data:type().
 ast_typerep(Type) -> ast_typerep(Type, aeso_icode:new([])).
 
 ast_typerep({id, _, Name}, Icode) ->
