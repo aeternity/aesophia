@@ -56,7 +56,11 @@ compile(ICode, Options) ->
     SFuns  = functions_to_scode(Functions, Options),
     SFuns1 = optimize_scode(SFuns, Options),
     BBFuns = to_basic_blocks(SFuns1, Options),
-    #{ functions => BBFuns }.
+    FateCode = #{ functions   => BBFuns,
+                  symbols     => #{},
+                  annotations => #{} },
+    debug(Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
+    FateCode.
 
 make_function_name(init)               -> <<"init">>;
 make_function_name({entrypoint, Name}) -> Name;
@@ -123,10 +127,22 @@ to_scode(Env, {switch, Expr, Alts}) ->
 
 to_scode(_Env, Icode) -> ?TODO(Icode).
 
-alts_to_scode(Env, [{{var, X}, Body}]) ->
+alts_to_scode(Env, [{'case', {var, X}, Body}]) ->
     {I, Env1} = bind_local(X, Env),
     [ aeb_fate_code:store({var, I}, {stack, 0}),
       to_scode(Env1, Body) ];
+alts_to_scode(Env, Alts = [{'case', {tuple, Pats}, Body}]) ->
+    Xs = lists:flatmap(fun({var, X}) -> [X]; (_) -> [] end, Pats),
+    case length(Xs) == length(Pats) of
+        false -> ?TODO(Alts);
+        true  ->
+            {Is, Env1} = lists:foldl(fun(X, {Is, E}) -> {I, E1} = bind_local(X, E), {[I|Is], E1} end,
+                                     {[], Env}, Xs),
+            [ [[aeb_fate_code:dup(),
+                aeb_fate_code:element_op({var, X}, ?i(J), ?a)]
+                || {J, X} <- with_ixs(lists:reverse(Is))],
+              to_scode(Env1, Body) ]
+    end;
 alts_to_scode(_Env, Alts) ->
     ?TODO(Alts).
 
@@ -201,12 +217,11 @@ to_basic_blocks(Funs, Options) ->
                              bb(Name, Code ++ [aeb_fate_code:return()], Options)}}
                      || {Name, {{Args, Res}, Code}} <- maps:to_list(Funs) ]).
 
-bb(Name, Code, Options) ->
+bb(_Name, Code, _Options) ->
     Blocks0 = blocks(Code),
     Blocks  = optimize_blocks(Blocks0),
     Labels  = maps:from_list([ {Ref, I} || {I, {Ref, _}} <- with_ixs(Blocks) ]),
     BBs     = [ set_labels(Labels, B) || B <- Blocks ],
-    debug(Options, "Final code for ~s:\n  ~p\n", [Name, BBs]),
     maps:from_list(BBs).
 
 %% -- Break up scode into basic blocks --

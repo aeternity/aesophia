@@ -33,9 +33,10 @@
                | {'if', fexpr(), fexpr(), fexpr()}
                | {switch, fexpr(), [falt()]}.
 
--type fpat() :: {var, var_name()}.
+-type fpat() :: {var, var_name()}
+              | {tuple, [fpat()]}.
 
--type falt() :: {fpat(), fexpr()}.
+-type falt() :: {'case', fpat(), fexpr()}.
 
 -type ftype() :: aeb_fate_data:fate_type_type().
 
@@ -151,6 +152,8 @@ type_to_fcode(Env, {app_t, T = {Id, _, _}, Types}) when Id == id; Id == qid ->
     lookup_type(Env, T, [type_to_fcode(Env, Type) || Type <- Types]);
 type_to_fcode(Env, T = {Id, _, _}) when Id == id; Id == qid ->
     lookup_type(Env, T, []);
+type_to_fcode(Env, {tuple_t, _, Types}) ->
+    {tuple, [type_to_fcode(Env, T) || T <- Types]};
 type_to_fcode(_Env, Type) ->
     {todo, Type}.
 
@@ -179,6 +182,11 @@ expr_to_fcode(Env, _Type, {'if', _, Cond, Then, Else}) ->
            expr_to_fcode(Env, Then),
            expr_to_fcode(Env, Else)};
 
+%% Switch
+expr_to_fcode(Env, _Type, {switch, _, Expr, Alts}) ->
+    {switch, expr_to_fcode(Env, Expr),
+             [ alt_to_fcode(Env, Alt) || Alt <- Alts ]};
+
 %% Blocks
 expr_to_fcode(Env, _Type, {block, _, Stmts}) ->
     stmts_to_fcode(Env, Stmts);
@@ -193,6 +201,10 @@ expr_to_fcode(_Env, Type, Expr) ->
 
 binop_to_fcode(Op) when Op == '+'; Op == '-'; Op == '==' -> Op.
 
+-spec alt_to_fcode(env(), aeso_syntax:alt()) -> falt().
+alt_to_fcode(Env, {'case', _, Pat, Expr}) ->
+    {'case', pat_to_fcode(Env, Pat), expr_to_fcode(Env, Expr)}.
+
 -spec pat_to_fcode(env(), aeso_syntax:pattern()) -> fpat().
 pat_to_fcode(Env, {typed, _, Pat, Type}) ->
     pat_to_fcode(Env, type_to_fcode(Env, Type), Pat);
@@ -201,6 +213,8 @@ pat_to_fcode(Env, Pat) ->
 
 -spec pat_to_fcode(env(), ftype() | no_type, aeso_syntax:pattern()) -> fpat().
 pat_to_fcode(_Env, _Type, {id, _, X}) -> {var, X};
+pat_to_fcode(Env, _Type, {tuple, _, Pats}) ->
+    {tuple, [ pat_to_fcode(Env, Pat) || Pat <- Pats ]};
 pat_to_fcode(_Env, Type, Pat) -> {todo, Pat, ':', Type}.
 
 -spec stmts_to_fcode(env(), [aeso_syntax:stmt()]) -> fexpr().
