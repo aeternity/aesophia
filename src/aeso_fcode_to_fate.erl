@@ -7,9 +7,7 @@
 %%% Created : 11 Jan 2019
 %%%
 %%%-------------------------------------------------------------------
--module(aeso_icode_to_fate).
-
--include("aeso_icode.hrl").
+-module(aeso_fcode_to_fate).
 
 -export([compile/2]).
 
@@ -43,36 +41,24 @@ compile(ICode, Options) ->
     BBFuns = to_basic_blocks(SFuns1, Options),
     #{ functions => BBFuns }.
 
-is_init([_, "init"]) -> true;
-is_init(_Other)      -> false.
-
-make_function_name([_, Name]) -> list_to_binary(Name);
-make_function_name(Other) -> error({todo, namespace_stuff, Other}).
+make_function_name(init)               -> <<"init">>;
+make_function_name({entrypoint, Name}) -> Name;
+make_function_name({local_fun, Xs})    -> list_to_binary("." ++ string:join(Xs, ".")).
 
 functions_to_scode(Functions, Options) ->
     maps:from_list(
         [ {make_function_name(Name), function_to_scode(Name, Args, Body, Type, Options)}
-        || {Name, _Ann, Args, Body, Type} <- Functions, not is_init(Name) ]).  %% TODO: skip init for now
+        || {Name, #{args   := Args,
+                    body   := Body,
+                    return := Type}} <- maps:to_list(Functions),
+           Name /= init ]).  %% TODO: skip init for now
 
-function_to_scode(Name, Args, Body, Type, Options) ->
-    debug(Options, "Compiling ~p ~p : ~p ->\n  ~p\n", [Name, Args, Type, Body]),
-    ArgTypes = [ icode_type_to_fate(T) || {_, T} <- Args ],
-    ResType  = icode_type_to_fate(Type),
+function_to_scode(Name, Args, Body, ResType, Options) ->
+    debug(Options, "Compiling ~p ~p : ~p ->\n  ~p\n", [Name, Args, ResType, Body]),
+    ArgTypes = [ T || {_, T} <- Args ],
     SCode    = to_scode(init_env(Args), Body),
     debug(Options, "  scode: ~p\n", [SCode]),
     {{ArgTypes, ResType}, SCode}.
-
-%% -- Types ------------------------------------------------------------------
-
-%% TODO: the Fate types don't seem to be specified anywhere...
-icode_type_to_fate(word)           -> integer;
-icode_type_to_fate(string)         -> string;
-icode_type_to_fate({tuple, Types}) ->
-    {tuple, lists:map(fun icode_type_to_fate/1, Types)};
-icode_type_to_fate({list, Type})   ->
-    {list, icode_type_to_fate(Type)};
-icode_type_to_fate(typerep) -> typerep;
-icode_type_to_fate(Type) -> ?TODO(Type).
 
 %% -- Phase I ----------------------------------------------------------------
 %%  Icode to structured assembly
@@ -96,35 +82,28 @@ lookup_var(#env{ args = Args, stack = S }, X) ->
 
 %% -- The compiler --
 
-to_scode(_Env, #integer{ value = N }) ->
+to_scode(_Env, {integer, N}) ->
     [aeb_fate_code:push(?i(N))];    %% Doesn't exist (yet), translated by desugaring
 
-to_scode(Env, #var_ref{name = X}) ->
+to_scode(Env, {var, X}) ->
     case lookup_var(Env, X) of
         false      -> error({unbound_variable, X, Env});
         {stack, N} -> [aeb_fate_code:dup(?i(N))];
         {arg, N}   -> [aeb_fate_code:push({arg, N})]
     end;
-to_scode(Env, #binop{ op = Op, left = A, right = B }) ->
+
+to_scode(Env, {binop, Type, Op, A, B}) ->
     [ to_scode(notail(Env), B)
-    , to_scode(push_env(binop_type_r(Op), Env), A)
+    , to_scode(push_env(Type, Env), A)
     , binop_to_scode(Op) ];
 
-to_scode(Env, #ifte{decision = Dec, then = Then, else = Else}) ->
+to_scode(Env, {'if', Dec, Then, Else}) ->
     [ to_scode(notail(Env), Dec)
     , {ifte, to_scode(Env, Then), to_scode(Env, Else)} ];
 
 to_scode(_Env, Icode) -> ?TODO(Icode).
 
 %% -- Operators --
-
-binop_types('+')  -> {word, word};
-binop_types('-')  -> {word, word};
-binop_types('==') -> {word, word};
-binop_types(Op)   -> ?TODO(Op).
-
-%% binop_type_l(Op) -> element(1, binop_types(Op)).
-binop_type_r(Op) -> element(2, binop_types(Op)).
 
 binop_to_scode('+') -> add_a_a_a();  %% Optimization introduces other variants
 binop_to_scode('-') -> sub_a_a_a();
