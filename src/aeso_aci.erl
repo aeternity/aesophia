@@ -15,7 +15,7 @@
 %% the code easier but don't seem to exist elsewhere.
 
 -record(contract, {ann,con,decls}).
--record(namespace, {ann,con,decls}).
+%% -record(namespace, {ann,con,decls}).
 -record(letfun, {ann,id,args,type,body}).
 -record(type_def, {ann,id,vars,typedef}).
 
