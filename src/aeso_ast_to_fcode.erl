@@ -31,8 +31,14 @@
                | {var, var_name()}
                | {binop, ftype(), binop(), fexpr(), fexpr()}
                | {'if', fexpr(), fexpr(), fexpr()}
-               | {todo, term()}.
+               | {switch, fexpr(), [falt()]}.
+
+-type fpat() :: {var, var_name()}.
+
+-type falt() :: {fpat(), fexpr()}.
+
 -type ftype() :: aeb_fate_data:fate_type_type().
+
 
 -type fun_def() :: #{ attrs  := [attribute()],
                       args   := [{var_name(), ftype()}],
@@ -173,20 +179,43 @@ expr_to_fcode(Env, _Type, {'if', _, Cond, Then, Else}) ->
            expr_to_fcode(Env, Then),
            expr_to_fcode(Env, Else)};
 
+%% Blocks
+expr_to_fcode(Env, _Type, {block, _, Stmts}) ->
+    stmts_to_fcode(Env, Stmts);
+
 %% Binary operator
 expr_to_fcode(Env, Type, {app, _Ann, {Op, _}, [A, B]}) when is_atom(Op) ->
     FOp = binop_to_fcode(Op),
     {binop, Type, FOp, expr_to_fcode(Env, A), expr_to_fcode(Env, B)};
 
 expr_to_fcode(_Env, Type, Expr) ->
-    {todo, {Expr, '::', Type}}.
+    {todo, {Expr, ':', Type}}.
 
 binop_to_fcode(Op) when Op == '+'; Op == '-'; Op == '==' -> Op.
+
+-spec pat_to_fcode(env(), aeso_syntax:pattern()) -> fpat().
+pat_to_fcode(Env, {typed, _, Pat, Type}) ->
+    pat_to_fcode(Env, type_to_fcode(Env, Type), Pat);
+pat_to_fcode(Env, Pat) ->
+    pat_to_fcode(Env, no_type, Pat).
+
+-spec pat_to_fcode(env(), ftype() | no_type, aeso_syntax:pattern()) -> fpat().
+pat_to_fcode(_Env, _Type, {id, _, X}) -> {var, X};
+pat_to_fcode(_Env, Type, Pat) -> {todo, Pat, ':', Type}.
+
+-spec stmts_to_fcode(env(), [aeso_syntax:stmt()]) -> fexpr().
+stmts_to_fcode(Env, [{letval, _, Pat, _, Expr} | Stmts]) ->
+    {switch, expr_to_fcode(Env, Expr),
+        [{pat_to_fcode(Env, Pat), stmts_to_fcode(Env, Stmts)}]};
+
+stmts_to_fcode(Env, [Expr]) ->
+    expr_to_fcode(Env, Expr).
 
 %% -- Optimisations ----------------------------------------------------------
 
 %% - Translate && and || to ifte
 %% - Deadcode elimination
+%% - Simplified case trees (FATE has special instructions for shallow matching)
 
 %% -- Helper functions -------------------------------------------------------
 

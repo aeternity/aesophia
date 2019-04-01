@@ -18,7 +18,7 @@
 -define(i(__X__), {immediate, __X__}).
 -define(a, {stack, 0}).
 
--record(env, { args = [], stack = [], tailpos = true }).
+-record(env, { args = [], stack = [], locals = [], tailpos = true }).
 
 %% -- Debugging --------------------------------------------------------------
 
@@ -69,15 +69,18 @@ init_env(Args) ->
     #env{ args = Args, stack = [], tailpos = true }.
 
 push_env(Type, Env) ->
-    Env#env{ stack = [{"_", Type} | Env#env.stack] }.
+    Env#env{ stack = [Type | Env#env.stack] }.
+
+bind_local(Name, Env = #env{ locals = Locals }) ->
+    {length(Locals), Env#env{ locals = Locals ++ [Name] }}.
 
 notail(Env) -> Env#env{ tailpos = false }.
 
-lookup_var(#env{ args = Args, stack = S }, X) ->
-    case {keyfind_index(X, 1, S), keyfind_index(X, 1, Args)} of
-        {false, false} -> false;
+lookup_var(Env = #env{ args = Args, locals = Locals }, X) ->
+    case {find_index(X, Locals), keyfind_index(X, 1, Args)} of
+        {false, false} -> error({unbound_variable, X, Env});
         {false, Arg}   -> {arg, Arg};
-        {Local, _}     -> {stack, Local}
+        {Local, _}     -> {var, Local}
     end.
 
 %% -- The compiler --
@@ -86,22 +89,29 @@ to_scode(_Env, {integer, N}) ->
     [aeb_fate_code:push(?i(N))];    %% Doesn't exist (yet), translated by desugaring
 
 to_scode(Env, {var, X}) ->
-    case lookup_var(Env, X) of
-        false      -> error({unbound_variable, X, Env});
-        {stack, N} -> [aeb_fate_code:dup(?i(N))];
-        {arg, N}   -> [aeb_fate_code:push({arg, N})]
-    end;
+    [aeb_fate_code:push(lookup_var(Env, X))];
 
 to_scode(Env, {binop, Type, Op, A, B}) ->
-    [ to_scode(notail(Env), B)
-    , to_scode(push_env(Type, Env), A)
-    , binop_to_scode(Op) ];
+    [ to_scode(notail(Env), B),
+      to_scode(push_env(Type, Env), A),
+      binop_to_scode(Op) ];
 
 to_scode(Env, {'if', Dec, Then, Else}) ->
-    [ to_scode(notail(Env), Dec)
-    , {ifte, to_scode(Env, Then), to_scode(Env, Else)} ];
+    [ to_scode(notail(Env), Dec),
+      {ifte, to_scode(Env, Then), to_scode(Env, Else)} ];
+
+to_scode(Env, {switch, Expr, Alts}) ->
+    [ to_scode(notail(Env), Expr),
+      alts_to_scode(Env, Alts) ];
 
 to_scode(_Env, Icode) -> ?TODO(Icode).
+
+alts_to_scode(Env, [{{var, X}, Body}]) ->
+    {I, Env1} = bind_local(X, Env),
+    [ aeb_fate_code:store({var, I}, {stack, 0}),
+      to_scode(Env1, Body) ];
+alts_to_scode(_Env, Alts) ->
+    ?TODO(Alts).
 
 %% -- Operators --
 
@@ -281,5 +291,11 @@ keyfind_index(X, J, Xs) ->
     case [ I || {I, E} <- with_ixs(Xs), X == element(J, E) ] of
         [I | _] -> I;
         []      -> false
+    end.
+
+find_index(X, Xs) ->
+    case lists:keyfind(X, 2, with_ixs(Xs)) of
+        {I, _} -> I;
+        false  -> false
     end.
 
