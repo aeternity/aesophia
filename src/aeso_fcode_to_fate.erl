@@ -15,8 +15,25 @@
 
 -define(TODO(What), error({todo, ?FILE, ?LINE, ?FUNCTION_NAME, What})).
 
--define(i(__X__), {immediate, __X__}).
+-define(i(X), {immediate, X}).
 -define(a, {stack, 0}).
+-define(IsStackArg(X), (element(1, X) =:= stack)).
+
+-define(IsBinOp(Op),
+    (Op =:= 'ADD' orelse
+     Op =:= 'SUB' orelse
+     Op =:= 'MUL' orelse
+     Op =:= 'DIV' orelse
+     Op =:= 'MOD' orelse
+     Op =:= 'POW' orelse
+     Op =:= 'LT' orelse
+     Op =:= 'GT' orelse
+     Op =:= 'EQ' orelse
+     Op =:= 'ELT' orelse
+     Op =:= 'EGT' orelse
+     Op =:= 'NEQ' orelse
+     Op =:= 'AND' orelse
+     Op =:= 'OR')).
 
 -record(env, { args = [], stack = [], locals = [], tailpos = true }).
 
@@ -122,7 +139,7 @@ binop_to_scode('==') -> eq_a_a_a().
 
 add_a_a_a() -> aeb_fate_code:add(?a, ?a, ?a).
 sub_a_a_a() -> aeb_fate_code:sub(?a, ?a, ?a).
-eq_a_a_a() -> aeb_fate_code:eq(?a, ?a, ?a).
+eq_a_a_a()  -> aeb_fate_code:eq(?a, ?a, ?a).
 
 %% -- Phase II ---------------------------------------------------------------
 %%  Optimize
@@ -154,23 +171,23 @@ simpl_s({ifte, Then, Else}) ->
     {ifte, simplify(Then), simplify(Else)};
 simpl_s(I) -> I.
 
-%% add_i 0 --> nop
-simpl_top({'ADD', _, ?i(0), _}, Code) -> Code;
-%% push n, add_a --> add_i n
-simpl_top({'PUSH', ?a, ?i(N)},
-          [{'ADD', ?a, ?a, ?a} | Code]) ->
-    simpl_top( aeb_fate_code:add(?a, ?i(N), ?a), Code);
-%% push n, add_i m --> add_i (n + m)
-simpl_top({'PUSH', ?a, ?i(N)}, [{'ADD', ?a, ?i(M), ?a} | Code]) ->
-    simpl_top(aeb_fate_code:push(?i(N + M)), Code);
-%% add_i n, add_i m --> add_i (n + m)
-simpl_top({'ADD', ?a, ?i(N), ?a}, [{'ADD', ?a, ?i(M), ?a} | Code]) ->
-    simpl_top({'ADD', ?a, ?i(N + M), ?a}, Code);
+%% Removing pushes that are immediately consumed.
+simpl_top({'PUSH', A}, [{Op, R, ?a, B} | Code]) when ?IsBinOp(Op) ->
+    simpl_top({Op, R, A, B}, Code);
+simpl_top({'PUSH', B}, [{Op, R, A, ?a} | Code]) when not ?IsStackArg(A), ?IsBinOp(Op) ->
+    simpl_top({Op, R, A, B}, Code);
+simpl_top({'PUSH', A}, [{Op1, ?a, B, C}, {Op2, R, ?a, ?a} | Code]) when ?IsBinOp(Op1), ?IsBinOp(Op2) ->
+    simpl_top({Op1, ?a, B, C}, [{Op2, R, ?a, A} | Code]);
+
+%% Writing directly to memory instead of going through the accumulator.
+simpl_top({Op, ?a, A, B}, [{'STORE', R, ?a} | Code]) when ?IsBinOp(Op) ->
+    simpl_top({Op, R, A, B}, Code);
 
 simpl_top(I, Code) -> [I | Code].
 
 %% Desugar and specialize
 desugar({'ADD', ?a, ?i(1), ?a})     -> [aeb_fate_code:inc()];
+desugar({'SUB', ?a, ?a, ?i(1)})     -> [aeb_fate_code:dec()];
 desugar({ifte, Then, Else}) -> [{ifte, desugar(Then), desugar(Else)}];
 desugar(Code) when is_list(Code) ->
     lists:flatmap(fun desugar/1, Code);
