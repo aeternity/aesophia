@@ -420,7 +420,7 @@ ast_body({hash, _, Hash}, _Icode) ->
                            #integer{value = Lo}]}
     end;
 ast_body({string,_,Bin}, _Icode) ->
-    Cpts = [size(Bin) | aeso_memory:binary_to_words(Bin)],
+    Cpts = [size(Bin) | aeb_memory:binary_to_words(Bin)],
     #tuple{cpts = [#integer{value=X} || X <- Cpts]};
 ast_body({tuple,_,Args}, Icode) ->
     #tuple{cpts = [ast_body(A, Icode) || A <- Args]};
@@ -444,7 +444,7 @@ ast_body({app, _, {typed, _, {proj, _, {typed, _, Addr, {con, _, Contract}}, {id
     Gas    = proplists:get_value("gas",   ArgOpts ++ Defaults),
     Value  = proplists:get_value("value", ArgOpts ++ Defaults),
     OutType = ast_typerep(OutT, Icode),
-    <<TypeHash:256>> = aeso_abi:function_type_hash(list_to_binary(FunName), ArgType, OutType),
+    <<TypeHash:256>> = aeb_abi:function_type_hash(list_to_binary(FunName), ArgType, OutType),
     %% The function is represented by its type hash (which includes the name)
     Fun    = #integer{value = TypeHash},
     #prim_call_contract{
@@ -645,7 +645,7 @@ prim_call(Prim, Amount, Args, ArgTypes, OutType) ->
             true ->
                 PrimBin = binary:encode_unsigned(Prim),
                 ArgType = {tuple, ArgTypes},
-                <<TH:256>> = aeso_abi:function_type_hash(PrimBin, ArgType, OutType),
+                <<TH:256>> = aeb_abi:function_type_hash(PrimBin, ArgType, OutType),
                 TH;
             false ->
                 0
@@ -674,7 +674,7 @@ make_type_def(Args, Def, Icode = #{ type_vars := TypeEnv }) ->
         ast_typerep(Def, Icode#{ type_vars := maps:merge(TypeEnv, TypeEnv1) })
     end.
 
--spec ast_typerep(aeso_syntax:type()) -> aeso_sophia:type().
+-spec ast_typerep(aeso_syntax:type()) -> aeb_aevm_data:type().
 ast_typerep(Type) -> ast_typerep(Type, aeso_icode:new([])).
 
 ast_typerep({id, _, Name}, Icode) ->

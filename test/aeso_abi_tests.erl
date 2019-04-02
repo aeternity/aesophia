@@ -19,8 +19,8 @@ sandbox(Code) ->
 
 malicious_from_binary_test() ->
     CircularList = from_words([32, 1, 32]), %% Xs = 1 :: Xs
-    {ok, {error, circular_references}}   = ?SANDBOX(aeso_heap:from_binary({list, word}, CircularList)),
-    {ok, {error, {binary_too_short, _}}} = ?SANDBOX(aeso_heap:from_binary(word, <<1, 2, 3, 4>>)),
+    {ok, {error, circular_references}}   = ?SANDBOX(aeb_heap:from_binary({list, word}, CircularList)),
+    {ok, {error, {binary_too_short, _}}} = ?SANDBOX(aeb_heap:from_binary(word, <<1, 2, 3, 4>>)),
     ok.
 
 from_words(Ws) ->
@@ -161,7 +161,7 @@ encode_decode_calldata(FunName, Types, Args, RetType) ->
 encode_decode_calldata_(Code, FunName, Args, RetVMType) ->
     {ok, Calldata, CalldataType, RetVMType1} = aeso_compiler:create_calldata(Code, FunName, Args),
     ?assertEqual(RetVMType1, RetVMType),
-    {ok, {_Hash, ArgTuple}} = aeso_heap:from_binary(CalldataType, Calldata),
+    {ok, {_Hash, ArgTuple}} = aeb_heap:from_binary(CalldataType, Calldata),
     case FunName of
         "init" ->
             ok;
@@ -177,8 +177,8 @@ encode_decode(T, D) ->
     D.
 
 encode(D) ->
-    aeso_heap:to_binary(D).
+    aeb_heap:to_binary(D).
 
 decode(T,B) ->
-    {ok, D} = aeso_heap:from_binary(T, B),
+    {ok, D} = aeb_heap:from_binary(T, B),
     D.
