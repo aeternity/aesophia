@@ -190,12 +190,20 @@ flatten_s(I) -> I.
 optimize_fun(_Funs, Name, {{Args, Res}, Code}, Options) ->
     Code0 = flatten(Code),
     debug(opt, Options, "Optimizing ~s\n", [Name]),
-    ACode = annotate_code(Code0),
-    debug(opt, Options, "  original:\n~s\n", [pp_ann("    ", ACode)]),
-    Code1 = simplify(ACode, Options),
-    debug(opt, Options, "  optimized:\n~s\n", [pp_ann("    ", Code1)]),
+    Code1 = simpl_loop(Code0, Options),
     Code2 = desugar(Code1),
     {{Args, Res}, Code2}.
+
+simpl_loop(Code, Options) ->
+    ACode = annotate_code(Code),
+    debug(opt, Options, "  annotated:\n~s\n", [pp_ann("    ", ACode)]),
+    Code1 = simplify(ACode, Options),
+    [ debug(opt, Options, "  optimized:\n~s\n", [pp_ann("    ", Code1)]) || Code1 /= ACode ],
+    Code2 = unannotate(Code1),
+    case Code == Code2 of
+        true  -> Code2;
+        false -> simpl_loop(Code2, Options)
+    end.
 
 pp_ann(Ind, [{ifte, Then, Else} | Code]) ->
     [Ind, "IF-THEN\n",
@@ -548,12 +556,18 @@ r_write_to_dead_var(_, _) -> false.
 
 
 %% Desugar and specialize and remove annotations
-desugar({_Ann, {'ADD', ?a, ?i(1), ?a}})     -> [aeb_fate_code:inc()];
-desugar({_Ann, {'SUB', ?a, ?a, ?i(1)}})     -> [aeb_fate_code:dec()];
+unannotate({ifte, Then, Else}) -> [{ifte, unannotate(Then), unannotate(Else)}];
+unannotate(Code) when is_list(Code) ->
+    lists:flatmap(fun unannotate/1, Code);
+unannotate({_Ann, I}) -> [I].
+
+%% Desugar and specialize and remove annotations
+desugar({'ADD', ?a, ?i(1), ?a})     -> [aeb_fate_code:inc()];
+desugar({'SUB', ?a, ?a, ?i(1)})     -> [aeb_fate_code:dec()];
 desugar({ifte, Then, Else}) -> [{ifte, desugar(Then), desugar(Else)}];
 desugar(Code) when is_list(Code) ->
     lists:flatmap(fun desugar/1, Code);
-desugar({_Ann, I}) -> [I].
+desugar(I) -> [I].
 
 %% -- Phase III --------------------------------------------------------------
 %%  Constructing basic blocks
