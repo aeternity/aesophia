@@ -220,7 +220,7 @@ pat_to_fcode(_Env, Type, Pat) -> {todo, Pat, ':', Type}.
 -spec stmts_to_fcode(env(), [aeso_syntax:stmt()]) -> fexpr().
 stmts_to_fcode(Env, [{letval, _, Pat, _, Expr} | Stmts]) ->
     {switch, expr_to_fcode(Env, Expr),
-        [{pat_to_fcode(Env, Pat), stmts_to_fcode(Env, Stmts)}]};
+        [{'case', pat_to_fcode(Env, Pat), stmts_to_fcode(Env, Stmts)}]};
 
 stmts_to_fcode(Env, [Expr]) ->
     expr_to_fcode(Env, Expr).
