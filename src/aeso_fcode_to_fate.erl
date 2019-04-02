@@ -39,9 +39,9 @@
 
 %% -- Debugging --------------------------------------------------------------
 
-%% debug(Options, Fmt) -> debug(Options, Fmt, []).
-debug(Options, Fmt, Args) ->
-    case proplists:get_value(debug, Options, true) of
+debug(Tag, Options, Fmt, Args) ->
+    Tags = proplists:get_value(debug, Options, []),
+    case Tags == all orelse lists:member(Tag, Tags) orelse Tag == any andalso Tags /= [] of
         true  -> io:format(Fmt, Args);
         false -> ok
     end.
@@ -59,7 +59,7 @@ compile(ICode, Options) ->
     FateCode = #{ functions   => BBFuns,
                   symbols     => #{},
                   annotations => #{} },
-    debug(Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
+    debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
     FateCode.
 
 make_function_name(init)               -> <<"init">>;
@@ -75,10 +75,10 @@ functions_to_scode(Functions, Options) ->
            Name /= init ]).  %% TODO: skip init for now
 
 function_to_scode(Name, Args, Body, ResType, Options) ->
-    debug(Options, "Compiling ~p ~p : ~p ->\n  ~p\n", [Name, Args, ResType, Body]),
+    debug(scode, Options, "Compiling ~p ~p : ~p ->\n  ~p\n", [Name, Args, ResType, Body]),
     ArgTypes = [ T || {_, T} <- Args ],
     SCode    = to_scode(init_env(Args), Body),
-    debug(Options, "  scode: ~p\n", [SCode]),
+    debug(scode, Options, "  scode: ~p\n", [SCode]),
     {{ArgTypes, ResType}, SCode}.
 
 %% -- Phase I ----------------------------------------------------------------
@@ -183,11 +183,11 @@ flatten_s(I) -> I.
 
 optimize_fun(_Funs, Name, {{Args, Res}, Code}, Options) ->
     Code0 = flatten(Code),
-    debug(Options, "Optimizing ~s\n", [Name]),
+    debug(opt, Options, "Optimizing ~s\n", [Name]),
     ACode = annotate_code(Code0),
-    debug(Options, "  original:\n~s\n", [pp_ann("    ", ACode)]),
-    Code1 = simplify(ACode),
-    debug(Options, "  optimized:\n~s\n", [pp_ann("    ", Code1)]),
+    debug(opt, Options, "  original:\n~s\n", [pp_ann("    ", ACode)]),
+    Code1 = simplify(ACode, Options),
+    debug(opt, Options, "  optimized:\n~s\n", [pp_ann("    ", Code1)]),
     Code2 = desugar(Code1),
     {{Args, Res}, Code2}.
 
@@ -221,7 +221,7 @@ ann_writes([{ifte, Then, Else} | Code], Writes, Acc) ->
     Writes1 = ordsets:union(Writes, ordsets:intersection(WritesThen, WritesElse)),
     ann_writes(Code, Writes1, [{ifte, Then1, Else1} | Acc]);
 ann_writes([I | Code], Writes, Acc) ->
-    #{ write := Ws } = readwrite(I),
+    #{ write := Ws } = attributes(I),
     Writes1 = ordsets:union(Writes, Ws),
     Ann = #{ writes_in => Writes, writes_out => Writes1 },
     ann_writes(Code, Writes1, [{Ann, I} | Acc]);
@@ -236,11 +236,12 @@ ann_reads([{ifte, Then, Else} | Code], Reads, Acc) ->
     ann_reads(Code, Reads1, [{ifte, Then1, Else1} | Acc]);
 ann_reads([{Ann, I} | Code], Reads, Acc) ->
     #{ writes_in := WritesIn, writes_out := WritesOut } = Ann,
-    #{ read := Rs, write := Ws } = readwrite(I),
+    #{ read := Rs, write := Ws, pure := Pure } = attributes(I),
     Reads1  =
-        case length(Ws) == 1 andalso not ordsets:is_element(hd(Ws), Reads) of
+        case Pure andalso length(Ws) == 1 andalso not ordsets:is_element(hd(Ws), Reads) of
             %% This is a little bit dangerous: if writing to a dead variable, we ignore
-            %% the reads. Relies on dead writes to be removed by the optimisations below.
+            %% the reads. Relies on dead writes to be removed by the
+            %% optimisations below (r_write_to_dead_var).
             true  -> Reads;
             false -> ordsets:union(Reads, Rs)
         end,
@@ -250,15 +251,15 @@ ann_reads([{Ann, I} | Code], Reads, Acc) ->
     ann_reads(Code, Reads1, [{Ann1, I} | Acc]);
 ann_reads([], Reads, Acc) -> {Acc, Reads}.
 
-%% Which variables/args does an instruction read/write. Stack usage is more
-%% complicated so not tracked.
-readwrite(I) ->
+%% Read/write to variables and purity.
+attributes(I) ->
     Set  = fun(L) when is_list(L) -> ordsets:from_list([X || X <- L, X /= ?a]);
               (X)                 -> ordsets:from_list([X || X /= ?a]) end,
-    WR   = fun(W, R) -> #{read => Set(R),  write => Set(W)}  end,
+    WR   = fun(W, R) -> #{read => Set(R), write => Set(W), pure => false}  end,
     R    = fun(X) -> WR([], X) end,
     W    = fun(X) -> WR(X, []) end,
     None = WR([], []),
+    Pure = fun(A) -> A#{ pure := true } end,
     case I of
         'RETURN'                              -> None;
         {'RETURNR', A}                        -> R(A);
@@ -266,84 +267,84 @@ readwrite(I) ->
         {'CALL_R', A, _}                      -> R(A);
         {'CALL_T', _}                         -> None;
         {'CALL_TR', A, _}                     -> R(A);
-        {'JUMP', _}                           -> None;
-        {'JUMPIF', A, _}                      -> R(A);
-        {'SWITCH_V2', A, _, _}                -> R(A);
-        {'SWITCH_V3', A, _, _, _}             -> R(A);
-        {'SWITCH_VN', A, _}                   -> R(A);
-        {'PUSH', A}                           -> R(A);
-        'DUPA'                                -> None;
-        {'DUP', A}                            -> R(A);
-        {'POP', A}                            -> W(A);
-        {'STORE', A, B}                       -> WR(A, B);
-        'INCA'                                -> None;
-        {'INC', A}                            -> WR(A, A);
-        'DECA'                                -> None;
-        {'DEC', A}                            -> WR(A, A);
-        {'ADD', A, B, C}                      -> WR(A, [B, C]);
-        {'SUB', A, B, C}                      -> WR(A, [B, C]);
-        {'MUL', A, B, C}                      -> WR(A, [B, C]);
-        {'DIV', A, B, C}                      -> WR(A, [B, C]);
-        {'MOD', A, B, C}                      -> WR(A, [B, C]);
-        {'POW', A, B, C}                      -> WR(A, [B, C]);
-        {'LT', A, B, C}                       -> WR(A, [B, C]);
-        {'GT', A, B, C}                       -> WR(A, [B, C]);
-        {'EQ', A, B, C}                       -> WR(A, [B, C]);
-        {'ELT', A, B, C}                      -> WR(A, [B, C]);
-        {'EGT', A, B, C}                      -> WR(A, [B, C]);
-        {'NEQ', A, B, C}                      -> WR(A, [B, C]);
-        {'AND', A, B, C}                      -> WR(A, [B, C]);
-        {'OR', A, B, C}                       -> WR(A, [B, C]);
-        {'NOT', A, B}                         -> WR(A, B);
-        {'TUPLE', _}                          -> None;
-        {'ELEMENT', A, B, C}                  -> WR(A, [B, C]);
-        {'MAP_EMPTY', A}                      -> W(A);
-        {'MAP_LOOKUP', A, B, C}               -> WR(A, [B, C]);
-        {'MAP_LOOKUPD', A, B, C, D}           -> WR(A, [B, C, D]);
-        {'MAP_UPDATE', A, B, C, D}            -> WR(A, [B, C, D]);
-        {'MAP_DELETE', A, B, C}               -> WR(A, [B, C]);
-        {'MAP_MEMBER', A, B, C}               -> WR(A, [B, C]);
-        {'MAP_FROM_LIST', A, B}               -> WR(A, B);
-        {'NIL', A}                            -> W(A);
-        {'IS_NIL', A, B}                      -> WR(A, B);
-        {'CONS', A, B, C}                     -> WR(A, [B, C]);
-        {'HD', A, B}                          -> WR(A, B);
-        {'TL', A, B}                          -> WR(A, B);
-        {'LENGTH', A, B}                      -> WR(A, B);
-        {'STR_EQ', A, B, C}                   -> WR(A, [B, C]);
-        {'STR_JOIN', A, B, C}                 -> WR(A, [B, C]);
-        {'INT_TO_STR', A, B}                  -> WR(A, B);
-        {'ADDR_TO_STR', A, B}                 -> WR(A, B);
-        {'STR_REVERSE', A, B}                 -> WR(A, B);
-        {'INT_TO_ADDR', A, B}                 -> WR(A, B);
-        {'VARIANT', A, B, C, D}               -> WR(A, [B, C, D]);
-        {'VARIANT_TEST', A, B, C}             -> WR(A, [B, C]);
-        {'VARIANT_ELEMENT', A, B, C}          -> WR(A, [B, C]);
-        'BITS_NONEA'                          -> None;
-        {'BITS_NONE', A}                      -> W(A);
-        'BITS_ALLA'                           -> None;
-        {'BITS_ALL', A}                       -> W(A);
-        {'BITS_ALL_N', A, B}                  -> WR(A, B);
-        {'BITS_SET', A, B, C}                 -> WR(A, [B, C]);
-        {'BITS_CLEAR', A, B, C}               -> WR(A, [B, C]);
-        {'BITS_TEST', A, B, C}                -> WR(A, [B, C]);
-        {'BITS_SUM', A, B}                    -> WR(A, B);
-        {'BITS_OR', A, B, C}                  -> WR(A, [B, C]);
-        {'BITS_AND', A, B, C}                 -> WR(A, [B, C]);
-        {'BITS_DIFF', A, B, C}                -> WR(A, [B, C]);
-        {'ADDRESS', A}                        -> W(A);
-        {'BALANCE', A}                        -> W(A);
-        {'ORIGIN', A}                         -> W(A);
-        {'CALLER', A}                         -> W(A);
-        {'GASPRICE', A}                       -> W(A);
-        {'BLOCKHASH', A}                      -> W(A);
-        {'BENEFICIARY', A}                    -> W(A);
-        {'TIMESTAMP', A}                      -> W(A);
-        {'GENERATION', A}                     -> W(A);
-        {'MICROBLOCK', A}                     -> W(A);
-        {'DIFFICULTY', A}                     -> W(A);
-        {'GASLIMIT', A}                       -> W(A);
-        {'GAS', A}                            -> W(A);
+        {'JUMP', _}                           -> Pure(None);
+        {'JUMPIF', A, _}                      -> Pure(R(A));
+        {'SWITCH_V2', A, _, _}                -> Pure(R(A));
+        {'SWITCH_V3', A, _, _, _}             -> Pure(R(A));
+        {'SWITCH_VN', A, _}                   -> Pure(R(A));
+        {'PUSH', A}                           -> Pure(R(A));
+        'DUPA'                                -> Pure(None);
+        {'DUP', A}                            -> Pure(R(A));
+        {'POP', A}                            -> Pure(W(A));
+        {'STORE', A, B}                       -> Pure(WR(A, B));
+        'INCA'                                -> Pure(None);
+        {'INC', A}                            -> Pure(WR(A, A));
+        'DECA'                                -> Pure(None);
+        {'DEC', A}                            -> Pure(WR(A, A));
+        {'ADD', A, B, C}                      -> Pure(WR(A, [B, C]));
+        {'SUB', A, B, C}                      -> Pure(WR(A, [B, C]));
+        {'MUL', A, B, C}                      -> Pure(WR(A, [B, C]));
+        {'DIV', A, B, C}                      -> Pure(WR(A, [B, C]));
+        {'MOD', A, B, C}                      -> Pure(WR(A, [B, C]));
+        {'POW', A, B, C}                      -> Pure(WR(A, [B, C]));
+        {'LT', A, B, C}                       -> Pure(WR(A, [B, C]));
+        {'GT', A, B, C}                       -> Pure(WR(A, [B, C]));
+        {'EQ', A, B, C}                       -> Pure(WR(A, [B, C]));
+        {'ELT', A, B, C}                      -> Pure(WR(A, [B, C]));
+        {'EGT', A, B, C}                      -> Pure(WR(A, [B, C]));
+        {'NEQ', A, B, C}                      -> Pure(WR(A, [B, C]));
+        {'AND', A, B, C}                      -> Pure(WR(A, [B, C]));
+        {'OR', A, B, C}                       -> Pure(WR(A, [B, C]));
+        {'NOT', A, B}                         -> Pure(WR(A, B));
+        {'TUPLE', _}                          -> Pure(None);
+        {'ELEMENT', A, B, C}                  -> Pure(WR(A, [B, C]));
+        {'MAP_EMPTY', A}                      -> Pure(W(A));
+        {'MAP_LOOKUP', A, B, C}               -> Pure(WR(A, [B, C]));
+        {'MAP_LOOKUPD', A, B, C, D}           -> Pure(WR(A, [B, C, D]));
+        {'MAP_UPDATE', A, B, C, D}            -> Pure(WR(A, [B, C, D]));
+        {'MAP_DELETE', A, B, C}               -> Pure(WR(A, [B, C]));
+        {'MAP_MEMBER', A, B, C}               -> Pure(WR(A, [B, C]));
+        {'MAP_FROM_LIST', A, B}               -> Pure(WR(A, B));
+        {'NIL', A}                            -> Pure(W(A));
+        {'IS_NIL', A, B}                      -> Pure(WR(A, B));
+        {'CONS', A, B, C}                     -> Pure(WR(A, [B, C]));
+        {'HD', A, B}                          -> Pure(WR(A, B));
+        {'TL', A, B}                          -> Pure(WR(A, B));
+        {'LENGTH', A, B}                      -> Pure(WR(A, B));
+        {'STR_EQ', A, B, C}                   -> Pure(WR(A, [B, C]));
+        {'STR_JOIN', A, B, C}                 -> Pure(WR(A, [B, C]));
+        {'INT_TO_STR', A, B}                  -> Pure(WR(A, B));
+        {'ADDR_TO_STR', A, B}                 -> Pure(WR(A, B));
+        {'STR_REVERSE', A, B}                 -> Pure(WR(A, B));
+        {'INT_TO_ADDR', A, B}                 -> Pure(WR(A, B));
+        {'VARIANT', A, B, C, D}               -> Pure(WR(A, [B, C, D]));
+        {'VARIANT_TEST', A, B, C}             -> Pure(WR(A, [B, C]));
+        {'VARIANT_ELEMENT', A, B, C}          -> Pure(WR(A, [B, C]));
+        'BITS_NONEA'                          -> Pure(None);
+        {'BITS_NONE', A}                      -> Pure(W(A));
+        'BITS_ALLA'                           -> Pure(None);
+        {'BITS_ALL', A}                       -> Pure(W(A));
+        {'BITS_ALL_N', A, B}                  -> Pure(WR(A, B));
+        {'BITS_SET', A, B, C}                 -> Pure(WR(A, [B, C]));
+        {'BITS_CLEAR', A, B, C}               -> Pure(WR(A, [B, C]));
+        {'BITS_TEST', A, B, C}                -> Pure(WR(A, [B, C]));
+        {'BITS_SUM', A, B}                    -> Pure(WR(A, B));
+        {'BITS_OR', A, B, C}                  -> Pure(WR(A, [B, C]));
+        {'BITS_AND', A, B, C}                 -> Pure(WR(A, [B, C]));
+        {'BITS_DIFF', A, B, C}                -> Pure(WR(A, [B, C]));
+        {'ADDRESS', A}                        -> Pure(W(A));
+        {'BALANCE', A}                        -> Pure(W(A));
+        {'ORIGIN', A}                         -> Pure(W(A));
+        {'CALLER', A}                         -> Pure(W(A));
+        {'GASPRICE', A}                       -> Pure(W(A));
+        {'BLOCKHASH', A}                      -> Pure(W(A));
+        {'BENEFICIARY', A}                    -> Pure(W(A));
+        {'TIMESTAMP', A}                      -> Pure(W(A));
+        {'GENERATION', A}                     -> Pure(W(A));
+        {'MICROBLOCK', A}                     -> Pure(W(A));
+        {'DIFFICULTY', A}                     -> Pure(W(A));
+        {'GASLIMIT', A}                       -> Pure(W(A));
+        {'GAS', A}                            -> Pure(W(A));
         {'LOG0', A, B}                        -> R([A, B]);
         {'LOG1', A, B, C}                     -> R([A, B, C]);
         {'LOG2', A, B, C, D}                  -> R([A, B, C, D]);
@@ -364,72 +365,102 @@ readwrite(I) ->
         'AENS_UPDATE'                         -> None;  %% TODO
         'AENS_TRANSFER'                       -> None;  %% TODO
         'AENS_REVOKE'                         -> None;  %% TODO
-        'ECVERIFY'                            -> None;  %% TODO
-        'SHA3'                                -> None;  %% TODO
-        'SHA256'                              -> None;  %% TODO
-        'BLAKE2B'                             -> None;  %% TODO
+        'ECVERIFY'                            -> Pure(None);  %% TODO
+        'SHA3'                                -> Pure(None);  %% TODO
+        'SHA256'                              -> Pure(None);  %% TODO
+        'BLAKE2B'                             -> Pure(None);  %% TODO
         {'ABORT', A}                          -> R(A);
         {'EXIT', A}                           -> R(A);
-        'NOP'                                 -> None
+        'NOP'                                 -> Pure(None)
     end.
 
 merge_ann(#{ live_in := LiveIn }, #{ live_out := LiveOut }) ->
     #{ live_in => LiveIn, live_out => LiveOut }.
+
+%% When swapping two instructions
+swap_ann(#{ live_in := Live1, live_out := Live2 }, #{ live_in := Live2, live_out := Live3 }) ->
+    Live2_ = ordsets:union([Live1, Live2, Live3]), %% Conservative approximation
+    {#{ live_in => Live1,  live_out => Live2_ },
+     #{ live_in => Live2_, live_out => Live3 }}.
 
 %% live_in(R,  #{ live_in  := LiveIn  }) -> ordsets:is_element(R, LiveIn).
 live_out(R, #{ live_out := LiveOut }) -> ordsets:is_element(R, LiveOut).
 
 %% -- Optimizations --
 
-simplify([]) -> [];
-simplify([I | Code]) ->
-    simpl_top(simpl_s(I), simplify(Code)).
+simplify([], _) -> [];
+simplify([I | Code], Options) ->
+    simpl_top(simpl_s(I, Options), simplify(Code, Options), Options).
 
-simpl_s({ifte, Then, Else}) ->
-    {ifte, simplify(Then), simplify(Else)};
-simpl_s(I) -> I.
+simpl_s({ifte, Then, Else}, Options) ->
+    {ifte, simplify(Then, Options), simplify(Else, Options)};
+simpl_s(I, _) -> I.
 
-simpl_top(I, Code) ->
-    %% io:format("simpl_top\n  I  = ~120p\n  Is = ~120p\n", [I, Code]),
-    simpl_top1(I, Code).
+simpl_top(I, Code, Options) ->
+    apply_rules(rules(), I, Code, Options).
+
+apply_rules([], I, Code, _) ->
+    [I | Code];
+apply_rules([{_RName, Rule} | Rules], I, Code, Options) ->
+    Cons = fun(X, Xs) -> simpl_top(X, Xs, Options) end,
+    case Rule(I, Code) of
+        false       -> apply_rules(Rules, I, Code, Options);
+        {New, Rest} ->
+            debug(opt_rules, Options, "Applied ~p:\n~s  ==>\n~s", [_RName, pp_ann("    ", [I | Code]), pp_ann("    ", New ++ Rest)]),
+            lists:foldr(Cons, Rest, New)
+    end.
+
+-define(RULE(Name), {Name, fun Name/2}).
+
+rules() ->
+    [?RULE(r_push_consume),
+     ?RULE(r_dup_to_push),
+     ?RULE(r_swap_instrs),
+     ?RULE(r_one_shot_var),
+     ?RULE(r_write_to_dead_var)
+    ].
 
 %% Removing pushes that are immediately consumed.
-simpl_top1({Ann1, {'PUSH', A}}, [{Ann2, {Op, R, ?a, B}} | Code]) when ?IsBinOp(Op) ->
-    simpl_top({merge_ann(Ann1, Ann2), {Op, R, A, B}}, Code);
-simpl_top1({Ann1, {'PUSH', B}}, [{Ann2, {Op, R, A, ?a}} | Code]) when A /= ?a, ?IsBinOp(Op) ->
-    simpl_top({merge_ann(Ann1, Ann2), {Op, R, A, B}}, Code);
-simpl_top1({Ann, {'PUSH', A}}, [{Ann1, {Op1, ?a, B, C}}, {Ann2, {Op2, R, ?a, ?a}} | Code]) when ?IsBinOp(Op1), ?IsBinOp(Op2) ->
-    simpl_top({merge_ann(Ann, Ann1), {Op1, ?a, B, C}}, [{Ann2, {Op2, R, ?a, A}} | Code]);
-
-%% Simplify PUSH followed by POP
-simpl_top1({Ann1, {'PUSH', A}}, [{Ann2, {'POP', B}} | Code]) ->
+r_push_consume({Ann1, {'PUSH', A}}, [{Ann2, {Op, R, ?a, B}} | Code]) when ?IsBinOp(Op) ->
+    {[{merge_ann(Ann1, Ann2), {Op, R, A, B}}], Code};
+r_push_consume({Ann1, {'PUSH', B}}, [{Ann2, {Op, R, A, ?a}} | Code]) when A /= ?a, ?IsBinOp(Op) ->
+    {[{merge_ann(Ann1, Ann2), {Op, R, A, B}}], Code};
+r_push_consume({Ann1, {'PUSH', A}}, [{Ann2, {'POP', B}} | Code]) ->
     case live_out(B, Ann2) of
-        true  -> simpl_top({merge_ann(Ann1, Ann2), {'STORE', B, A}}, Code);
-        false -> Code
+        true  -> {[{merge_ann(Ann1, Ann2), {'STORE', B, A}}], Code};
+        false -> {[], Code}
     end;
+%% Writing directly to memory instead of going through the accumulator.
+r_push_consume({Ann1, {Op, ?a, A, B}}, [{Ann2, {'STORE', R, ?a}} | Code]) when ?IsBinOp(Op) ->
+    {[{merge_ann(Ann1, Ann2), {Op, R, A, B}}], Code};
+
+r_push_consume(_, _) -> false.
 
 %% Changing PUSH A, DUPA to PUSH A, PUSH A enables further optimisations
-simpl_top1(I = {Ann, {'PUSH', A}}, [{_, 'DUPA'} | Code]) ->
+r_dup_to_push(I = {Ann, {'PUSH', A}}, [{_, 'DUPA'} | Code]) ->
     #{ live_in := Live } = Ann,
     Ann1 = #{ live_in => Live, live_out => Live },
-    simpl_top({Ann1, {'PUSH', A}}, simpl_top(I, Code));
+    {[{Ann1, {'PUSH', A}}, I], Code};
+r_dup_to_push(_, _) -> false.
 
 %% Move PUSH A past an operator. Make sure the next instruction isn't writing
 %% to A, pushing to the stack or reading the accumulator.
-simpl_top1({Ann1, {'PUSH', A}}, [{Ann2, I = {Op, R, B, C}} | Code]) when ?IsBinOp(Op), A /= R, A /= ?a, B /= ?a, C /= ?a ->
-    #{ live_in := Live1, live_out := Live2 } = Ann1,
-    #{ live_in := Live2, live_out := Live3 } = Ann2,
-    Live2_ = ordsets:union([Live1, Live2, Live3]), %% Conservative approximation
-    Ann1_  = #{ live_in => Live1,  live_out => Live2_ },
-    Ann2_  = #{ live_in => Live2_, live_out => Live3 },
-    simpl_top({Ann1_, I}, simpl_top({Ann2_, {'PUSH', A}}, Code));
+r_swap_instrs({Ann1, {'PUSH', A}}, [{Ann2, I = {Op, R, B, C}} | Code]) when ?IsBinOp(Op), A /= R, A /= ?a, B /= ?a, C /= ?a ->
+    {Ann1_, Ann2_} = swap_ann(Ann1, Ann2),
+    {[{Ann1_, I}, {Ann2_, {'PUSH', A}}], Code};
 
-%% Writing directly to memory instead of going through the accumulator.
-simpl_top1({Ann1, {Op, ?a, A, B}}, [{Ann2, {'STORE', R, ?a}} | Code]) when ?IsBinOp(Op) ->
-    simpl_top({merge_ann(Ann1, Ann2), {Op, R, A, B}}, Code);
+%% Move writes to a variable as late as possible
+r_swap_instrs({Ann1, I1 = {Op1, R = {var, _}, A, B}}, [{Ann2, I2 = {Op2, S, C, D}} | Code])
+        when ?IsBinOp(Op1), ?IsBinOp(Op2),
+             element(1, S) /= var orelse S < R,
+             S /= A, S /= B, C /= R, D /= R,
+             A /= ?a andalso B /= ?a orelse S /= ?a andalso C /= ?a andalso D /= ?a ->
+    {Ann1_, Ann2_} = swap_ann(Ann1, Ann2),
+    {[{Ann1_, I2}, {Ann2_, I1}], Code};
+r_swap_instrs(_, _) -> false.
 
 %% Shortcut write followed by final read
-simpl_top1(I = {Ann1, {Op, R = {var, _}, A, B}}, Code0 = [{Ann2, J} | Code]) when ?IsBinOp(Op) ->
+r_one_shot_var({Ann1, {Op, R = {var, _}, A, B}}, [{Ann2, J} | Code]) when ?IsBinOp(Op) ->
     Copy = case J of
                {'PUSH', R}     -> {write_to, ?a};
                {'STORE', S, R} -> {write_to, S};
@@ -437,24 +468,22 @@ simpl_top1(I = {Ann1, {Op, R = {var, _}, A, B}}, Code0 = [{Ann2, J} | Code]) whe
            end,
     case {live_out(R, Ann2), Copy} of
         {false, {write_to, X}} ->
-            simpl_top({merge_ann(Ann1, Ann2), {Op, X, A, B}}, Code);
-        _ -> simpl_top2(I, Code0)
+            {[{merge_ann(Ann1, Ann2), {Op, X, A, B}}], Code};
+        _ -> false
     end;
-
-simpl_top1(I, Code) -> simpl_top2(I, Code).  %% simpl_top2 to get fallthrough
+r_one_shot_var(_, _) -> false.
 
 %% Remove writes to dead variables
-simpl_top2(I = {Ann, {Op, R = {var, _}, A, B}}, Code) when ?IsBinOp(Op) ->
+r_write_to_dead_var({Ann, {Op, R = {var, _}, A, B}}, Code) when ?IsBinOp(Op) ->
     case live_out(R, Ann) of
         false ->
             %% Subtle: we still have to pop the stack if any of the arguments
             %% came from there. In this case we pop to R, which we know is
             %% unused.
-            lists:foldr(fun simpl_top/2, Code,
-                        [{Ann, {'POP', R}} || X <- [A, B], X == ?a]);
-        true -> [I | Code]
+            {[{Ann, {'POP', R}} || X <- [A, B], X == ?a], Code};
+        true -> false
     end;
-simpl_top2(I, Code) -> [I | Code].
+r_write_to_dead_var(_, _) -> false.
 
 
 %% Desugar and specialize and remove annotations
