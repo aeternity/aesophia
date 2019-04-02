@@ -10,36 +10,38 @@ do_test() ->
 test_contract(N) ->
     {Contract,DecACI} = test_cases(N),
     {ok,Enc} = aeso_aci:encode(Contract),
-    ?assertEqual(DecACI, jsx:decode(Enc)).
+    ?assertEqual(DecACI, jsx:decode(Enc, [return_maps])).
 
 test_cases(1) ->
     Contract = <<"contract C =\n"
 		 "  function a(i : int) = i+1\n">>,
-    DecodedACI = [{<<"contract">>,
-		   [{<<"name">>,<<"C">>},
-		    {<<"type_defs">>,[]},
-		    {<<"functions">>,
-		     [[{<<"name">>,<<"a">>},
-		       {<<"arguments">>,
-			[[{<<"name">>,<<"i">>},{<<"type">>,<<"int">>}]]},
-		       {<<"type">>,<<"int">>},
-		       {<<"stateful">>,false}]]}]}],
+    DecodedACI = #{<<"contract">> =>
+		   #{<<"name">> => <<"C">>,
+		     <<"type_defs">> => [],
+		     <<"functions">> =>
+			 [#{<<"name">> => <<"a">>,
+			    <<"arguments">> => 
+				[#{<<"name">> => <<"i">>,
+				   <<"type">> => [<<"int">>]}],
+			    <<"returns">> => <<"int">>,
+			    <<"stateful">> => false}]}},
     {Contract,DecodedACI};
 
 test_cases(2) ->
     Contract = <<"contract C =\n"
 		 "  type allan = int\n"
 		 "  function a(i : allan) = i+1\n">>,
-    DecodedACI = [{<<"contract">>,
-		   [{<<"name">>,<<"C">>},
-		    {<<"type_defs">>,
-		     [[{<<"name">>,<<"allan">>},
-		       {<<"vars">>,[]},
-		       {<<"typedef">>,<<"int">>}]]},
-		    {<<"functions">>,
-		     [[{<<"name">>,<<"a">>},
-		       {<<"arguments">>,
-			[[{<<"name">>,<<"i">>},{<<"type">>,<<"int">>}]]},
-		       {<<"type">>,<<"int">>},
-		       {<<"stateful">>,false}]]}]}],
+    DecodedACI = #{<<"contract">> =>
+                       #{<<"name">> => <<"C">>,
+                         <<"type_defs">> =>
+                             [#{<<"name">> => <<"allan">>,
+                                <<"typedef">> => <<"int">>,
+                                <<"vars">> => []}],
+			 <<"functions">> =>
+                             [#{<<"arguments">> =>
+                                    [#{<<"name">> => <<"i">>,
+                                       <<"type">> => [<<"int">>]}],
+                                <<"name">> => <<"a">>,
+                                <<"returns">> => <<"int">>,
+                                <<"stateful">> => false}]}},
     {Contract,DecodedACI}.
