@@ -197,7 +197,8 @@ optimize_fun(_Funs, Name, {{Args, Res}, Code}, Options) ->
 
 annotate_code(Code) ->
     {WCode, _} = ann_writes(Code, ordsets:new(), []),
-    ann_reads(WCode, ordsets:new(), []).
+    {RCode, _} = ann_reads(WCode, ordsets:new(), []),
+    RCode.
 
 %% Reverses the code
 ann_writes([{ifte, Then, Else} | Code], Writes, Acc) ->
@@ -233,7 +234,7 @@ ann_reads([{Ann, I} | Code], Reads, Acc) ->
     LiveOut = ordsets:intersection(Reads, WritesOut),
     Ann1    = #{ live_in => LiveIn, live_out => LiveOut },
     ann_reads(Code, Reads1, [{Ann1, I} | Acc]);
-ann_reads([], _, Acc) -> Acc.
+ann_reads([], Reads, Acc) -> {Acc, Reads}.
 
 %% Which variables/args does an instruction read/write. Stack usage is more
 %% complicated so not tracked.
@@ -500,7 +501,8 @@ optimize_blocks(Blocks) ->
     RBlocks1  = reorder_blocks(RBlocks, []),
     RBlocks2  = [ {Ref, inline_block(RBlockMap, Ref, Code)} || {Ref, Code} <- RBlocks1 ],
     RBlocks3  = remove_dead_blocks(RBlocks2),
-    Rev(RBlocks3).
+    RBlocks4  = [ {Ref, use_returnr(Code)} || {Ref, Code} <- RBlocks3 ],
+    Rev(RBlocks4).
 
 %% Choose the next block based on the final jump.
 reorder_blocks([], Acc) ->
@@ -547,6 +549,10 @@ chase_labels([L | Ls], Map, Live) ->
     New  = lists:flatmap(Jump, Code),
     chase_labels(New ++ Ls, Map, Live#{ L => true }).
 
+%% Replace PUSH, RETURN by RETURNR
+use_returnr(['RETURN', {'PUSH', A} | Code]) ->
+    [{'RETURNR', A} | Code];
+use_returnr(Code) -> Code.
 
 %% -- Translate label refs to indices --
 
