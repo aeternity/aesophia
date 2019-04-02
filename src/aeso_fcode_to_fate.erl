@@ -112,6 +112,11 @@ to_scode(_Env, {integer, N}) ->
 to_scode(Env, {var, X}) ->
     [aeb_fate_code:push(lookup_var(Env, X))];
 
+to_scode(Env, {tuple, As}) ->
+    N = length(As),
+    [[ to_scode(Env, A) || A <- As ],
+     aeb_fate_code:tuple(N)];
+
 to_scode(Env, {binop, Type, Op, A, B}) ->
     [ to_scode(notail(Env), B),
       to_scode(push_env(Type, Env), A),

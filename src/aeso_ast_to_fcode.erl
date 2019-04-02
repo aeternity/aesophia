@@ -176,6 +176,10 @@ expr_to_fcode(_Env, _Type, {bool, _, B}) -> {bool, B};
 %% Variables
 expr_to_fcode(_Env, _Type, {id, _, X}) -> {var, X};
 
+%% Tuples
+expr_to_fcode(Env, _Type, {tuple, _, Es}) ->
+    {tuple, [expr_to_fcode(Env, E) || E <- Es]};
+
 %% Conditionals
 expr_to_fcode(Env, _Type, {'if', _, Cond, Then, Else}) ->
     {'if', expr_to_fcode(Env, Cond),
