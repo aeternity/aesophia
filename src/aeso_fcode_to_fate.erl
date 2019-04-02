@@ -184,14 +184,28 @@ flatten_s(I) -> I.
 optimize_fun(_Funs, Name, {{Args, Res}, Code}, Options) ->
     Code0 = flatten(Code),
     debug(Options, "Optimizing ~s\n", [Name]),
-    debug(Options, "  original  : ~p\n", [Code0]),
     ACode = annotate_code(Code0),
-    debug(Options, "  annotated : ~p\n", [ACode]),
+    debug(Options, "  original:\n~s\n", [pp_ann("    ", ACode)]),
     Code1 = simplify(ACode),
-    debug(Options, "  simplified: ~p\n", [Code1]),
+    debug(Options, "  optimized:\n~s\n", [pp_ann("    ", Code1)]),
     Code2 = desugar(Code1),
-    debug(Options, "  desugared : ~p\n", [Code2]),
     {{Args, Res}, Code2}.
+
+pp_ann(Ind, [{ifte, Then, Else} | Code]) ->
+    [Ind, "IF-THEN\n",
+     pp_ann("  " ++ Ind, Then),
+     Ind, "ELSE\n",
+     pp_ann("  " ++ Ind, Else),
+     pp_ann(Ind, Code)];
+pp_ann(Ind, [{#{ live_in := In, live_out := Out }, I} | Code]) ->
+    Fmt = fun([]) -> "()";
+             (Xs) -> string:join([lists:concat(["var", N]) || {var, N} <- Xs], " ")
+          end,
+    Op  = [Ind, aeb_fate_pp:format_op(I, #{})],
+    Ann = [["   % ", Fmt(In), " -> ", Fmt(Out)] || In ++ Out /= []],
+    [io_lib:format("~-40s~s\n", [Op, Ann]),
+     pp_ann(Ind, Code)];
+pp_ann(_, []) -> [].
 
 %% -- Analysis --
 
@@ -406,7 +420,7 @@ simpl_top1({Ann1, {'PUSH', A}}, [{Ann2, I = {Op, R, B, C}} | Code]) when ?IsBinO
     #{ live_in := Live1, live_out := Live2 } = Ann1,
     #{ live_in := Live2, live_out := Live3 } = Ann2,
     Live2_ = ordsets:union([Live1, Live2, Live3]), %% Conservative approximation
-    Ann1_  = #{ live_in => Live1, live_out => Live2_ },
+    Ann1_  = #{ live_in => Live1,  live_out => Live2_ },
     Ann2_  = #{ live_in => Live2_, live_out => Live3 },
     simpl_top({Ann1_, I}, simpl_top({Ann2_, {'PUSH', A}}, Code));
 
@@ -436,7 +450,6 @@ simpl_top2(I = {Ann, {Op, R = {var, _}, A, B}}, Code) when ?IsBinOp(Op) ->
             %% Subtle: we still have to pop the stack if any of the arguments
             %% came from there. In this case we pop to R, which we know is
             %% unused.
-            io:format("Removing write to dead var: ~p\n", [I]),
             lists:foldr(fun simpl_top/2, Code,
                         [{Ann, {'POP', R}} || X <- [A, B], X == ?a]);
         true -> [I | Code]
