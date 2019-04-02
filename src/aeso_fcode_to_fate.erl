@@ -10,6 +10,7 @@
 -module(aeso_fcode_to_fate).
 
 -export([compile/2]).
+-compile([export_all, no_warn_export_all]).
 
 %% -- Preamble ---------------------------------------------------------------
 
@@ -226,7 +227,7 @@ ann_writes([{ifte, Then, Else} | Code], Writes, Acc) ->
     Writes1 = ordsets:union(Writes, ordsets:intersection(WritesThen, WritesElse)),
     ann_writes(Code, Writes1, [{ifte, Then1, Else1} | Acc]);
 ann_writes([I | Code], Writes, Acc) ->
-    #{ write := Ws } = attributes(I),
+    Ws = var_writes(I),
     Writes1 = ordsets:union(Writes, Ws),
     Ann = #{ writes_in => Writes, writes_out => Writes1 },
     ann_writes(Code, Writes1, [{Ann, I} | Acc]);
@@ -241,14 +242,14 @@ ann_reads([{ifte, Then, Else} | Code], Reads, Acc) ->
     ann_reads(Code, Reads1, [{ifte, Then1, Else1} | Acc]);
 ann_reads([{Ann, I} | Code], Reads, Acc) ->
     #{ writes_in := WritesIn, writes_out := WritesOut } = Ann,
-    #{ read := Rs, write := Ws, pure := Pure } = attributes(I),
+    #{ read := Rs, write := W, pure := Pure } = attributes(I),
     Reads1  =
-        case Pure andalso length(Ws) == 1 andalso not ordsets:is_element(hd(Ws), Reads) of
+        case {W, Pure andalso not ordsets:is_element(W, Reads)} of
             %% This is a little bit dangerous: if writing to a dead variable, we ignore
             %% the reads. Relies on dead writes to be removed by the
             %% optimisations below (r_write_to_dead_var).
-            true  -> Reads;
-            false -> ordsets:union(Reads, Rs)
+            {{var, _}, true} -> Reads;
+            _                -> ordsets:union(Reads, Rs)
         end,
     LiveIn  = ordsets:intersection(Reads1, WritesIn),
     LiveOut = ordsets:intersection(Reads, WritesOut),
@@ -256,127 +257,151 @@ ann_reads([{Ann, I} | Code], Reads, Acc) ->
     ann_reads(Code, Reads1, [{Ann1, I} | Acc]);
 ann_reads([], Reads, Acc) -> {Acc, Reads}.
 
-%% Read/write to variables and purity.
+%% Instruction attributes: reads, writes and purity (pure means no side-effects
+%% aside from the reads and writes).
 attributes(I) ->
-    Set  = fun(L) when is_list(L) -> ordsets:from_list([X || X <- L, X /= ?a]);
-              (X)                 -> ordsets:from_list([X || X /= ?a]) end,
-    WR   = fun(W, R) -> #{read => Set(R), write => Set(W), pure => false}  end,
-    R    = fun(X) -> WR([], X) end,
-    W    = fun(X) -> WR(X, []) end,
-    None = WR([], []),
-    Pure = fun(A) -> A#{ pure := true } end,
+    Set  = fun(L) when is_list(L) -> ordsets:from_list(L);
+              (X)                 -> ordsets:from_list([X]) end,
+    Attr = fun(W, R, P) -> #{read => Set(R), write => W, pure => P}  end,
+    Pure   = fun(W, R) -> Attr(W, R, true) end,
+    Impure = fun(W, R) -> Attr(W, R, false) end,
     case I of
-        'RETURN'                              -> None;
-        {'RETURNR', A}                        -> R(A);
-        {'CALL', _}                           -> None;
-        {'CALL_R', A, _}                      -> R(A);
-        {'CALL_T', _}                         -> None;
-        {'CALL_TR', A, _}                     -> R(A);
-        {'JUMP', _}                           -> Pure(None);
-        {'JUMPIF', A, _}                      -> Pure(R(A));
-        {'SWITCH_V2', A, _, _}                -> Pure(R(A));
-        {'SWITCH_V3', A, _, _, _}             -> Pure(R(A));
-        {'SWITCH_VN', A, _}                   -> Pure(R(A));
-        {'PUSH', A}                           -> Pure(R(A));
-        'DUPA'                                -> Pure(None);
-        {'DUP', A}                            -> Pure(R(A));
-        {'POP', A}                            -> Pure(W(A));
-        {'STORE', A, B}                       -> Pure(WR(A, B));
-        'INCA'                                -> Pure(None);
-        {'INC', A}                            -> Pure(WR(A, A));
-        'DECA'                                -> Pure(None);
-        {'DEC', A}                            -> Pure(WR(A, A));
-        {'ADD', A, B, C}                      -> Pure(WR(A, [B, C]));
-        {'SUB', A, B, C}                      -> Pure(WR(A, [B, C]));
-        {'MUL', A, B, C}                      -> Pure(WR(A, [B, C]));
-        {'DIV', A, B, C}                      -> Pure(WR(A, [B, C]));
-        {'MOD', A, B, C}                      -> Pure(WR(A, [B, C]));
-        {'POW', A, B, C}                      -> Pure(WR(A, [B, C]));
-        {'LT', A, B, C}                       -> Pure(WR(A, [B, C]));
-        {'GT', A, B, C}                       -> Pure(WR(A, [B, C]));
-        {'EQ', A, B, C}                       -> Pure(WR(A, [B, C]));
-        {'ELT', A, B, C}                      -> Pure(WR(A, [B, C]));
-        {'EGT', A, B, C}                      -> Pure(WR(A, [B, C]));
-        {'NEQ', A, B, C}                      -> Pure(WR(A, [B, C]));
-        {'AND', A, B, C}                      -> Pure(WR(A, [B, C]));
-        {'OR', A, B, C}                       -> Pure(WR(A, [B, C]));
-        {'NOT', A, B}                         -> Pure(WR(A, B));
-        {'TUPLE', _}                          -> Pure(None);
-        {'ELEMENT', A, B, C}                  -> Pure(WR(A, [B, C]));
-        {'MAP_EMPTY', A}                      -> Pure(W(A));
-        {'MAP_LOOKUP', A, B, C}               -> Pure(WR(A, [B, C]));
-        {'MAP_LOOKUPD', A, B, C, D}           -> Pure(WR(A, [B, C, D]));
-        {'MAP_UPDATE', A, B, C, D}            -> Pure(WR(A, [B, C, D]));
-        {'MAP_DELETE', A, B, C}               -> Pure(WR(A, [B, C]));
-        {'MAP_MEMBER', A, B, C}               -> Pure(WR(A, [B, C]));
-        {'MAP_FROM_LIST', A, B}               -> Pure(WR(A, B));
-        {'NIL', A}                            -> Pure(W(A));
-        {'IS_NIL', A, B}                      -> Pure(WR(A, B));
-        {'CONS', A, B, C}                     -> Pure(WR(A, [B, C]));
-        {'HD', A, B}                          -> Pure(WR(A, B));
-        {'TL', A, B}                          -> Pure(WR(A, B));
-        {'LENGTH', A, B}                      -> Pure(WR(A, B));
-        {'STR_EQ', A, B, C}                   -> Pure(WR(A, [B, C]));
-        {'STR_JOIN', A, B, C}                 -> Pure(WR(A, [B, C]));
-        {'INT_TO_STR', A, B}                  -> Pure(WR(A, B));
-        {'ADDR_TO_STR', A, B}                 -> Pure(WR(A, B));
-        {'STR_REVERSE', A, B}                 -> Pure(WR(A, B));
-        {'INT_TO_ADDR', A, B}                 -> Pure(WR(A, B));
-        {'VARIANT', A, B, C, D}               -> Pure(WR(A, [B, C, D]));
-        {'VARIANT_TEST', A, B, C}             -> Pure(WR(A, [B, C]));
-        {'VARIANT_ELEMENT', A, B, C}          -> Pure(WR(A, [B, C]));
-        'BITS_NONEA'                          -> Pure(None);
-        {'BITS_NONE', A}                      -> Pure(W(A));
-        'BITS_ALLA'                           -> Pure(None);
-        {'BITS_ALL', A}                       -> Pure(W(A));
-        {'BITS_ALL_N', A, B}                  -> Pure(WR(A, B));
-        {'BITS_SET', A, B, C}                 -> Pure(WR(A, [B, C]));
-        {'BITS_CLEAR', A, B, C}               -> Pure(WR(A, [B, C]));
-        {'BITS_TEST', A, B, C}                -> Pure(WR(A, [B, C]));
-        {'BITS_SUM', A, B}                    -> Pure(WR(A, B));
-        {'BITS_OR', A, B, C}                  -> Pure(WR(A, [B, C]));
-        {'BITS_AND', A, B, C}                 -> Pure(WR(A, [B, C]));
-        {'BITS_DIFF', A, B, C}                -> Pure(WR(A, [B, C]));
-        {'ADDRESS', A}                        -> Pure(W(A));
-        {'BALANCE', A}                        -> Pure(W(A));
-        {'ORIGIN', A}                         -> Pure(W(A));
-        {'CALLER', A}                         -> Pure(W(A));
-        {'GASPRICE', A}                       -> Pure(W(A));
-        {'BLOCKHASH', A}                      -> Pure(W(A));
-        {'BENEFICIARY', A}                    -> Pure(W(A));
-        {'TIMESTAMP', A}                      -> Pure(W(A));
-        {'GENERATION', A}                     -> Pure(W(A));
-        {'MICROBLOCK', A}                     -> Pure(W(A));
-        {'DIFFICULTY', A}                     -> Pure(W(A));
-        {'GASLIMIT', A}                       -> Pure(W(A));
-        {'GAS', A}                            -> Pure(W(A));
-        {'LOG0', A, B}                        -> R([A, B]);
-        {'LOG1', A, B, C}                     -> R([A, B, C]);
-        {'LOG2', A, B, C, D}                  -> R([A, B, C, D]);
-        {'LOG3', A, B, C, D, E}               -> R([A, B, C, D, E]);
-        {'LOG4', A, B, C, D, E, F}            -> R([A, B, C, D, E, F]);
-        'DEACTIVATE'                          -> None;
-        {'SPEND', A, B}                       -> R([A, B]);
-        {'ORACLE_REGISTER', A, B, C, D, E, F} -> WR(A, [B, C, D, E, F]);
-        'ORACLE_QUERY'                        -> None;  %% TODO
-        'ORACLE_RESPOND'                      -> None;  %% TODO
-        'ORACLE_EXTEND'                       -> None;  %% TODO
-        'ORACLE_GET_ANSWER'                   -> None;  %% TODO
-        'ORACLE_GET_QUESTION'                 -> None;  %% TODO
-        'ORACLE_QUERY_FEE'                    -> None;  %% TODO
-        'AENS_RESOLVE'                        -> None;  %% TODO
-        'AENS_PRECLAIM'                       -> None;  %% TODO
-        'AENS_CLAIM'                          -> None;  %% TODO
-        'AENS_UPDATE'                         -> None;  %% TODO
-        'AENS_TRANSFER'                       -> None;  %% TODO
-        'AENS_REVOKE'                         -> None;  %% TODO
-        'ECVERIFY'                            -> Pure(None);  %% TODO
-        'SHA3'                                -> Pure(None);  %% TODO
-        'SHA256'                              -> Pure(None);  %% TODO
-        'BLAKE2B'                             -> Pure(None);  %% TODO
-        {'ABORT', A}                          -> R(A);
-        {'EXIT', A}                           -> R(A);
-        'NOP'                                 -> Pure(None)
+        'RETURN'                              -> Impure(pc, []);
+        {'RETURNR', A}                        -> Impure(pc, A);
+        {'CALL', _}                           -> Impure(?a, []);
+        {'CALL_R', A, _}                      -> Impure(?a, A);
+        {'CALL_T', _}                         -> Impure(pc, []);
+        {'CALL_TR', A, _}                     -> Impure(pc, A);
+        {'JUMP', _}                           -> Impure(pc, []);
+        {'JUMPIF', A, _}                      -> Impure(pc, A);
+        {'SWITCH_V2', A, _, _}                -> Impure(pc, A);
+        {'SWITCH_V3', A, _, _, _}             -> Impure(pc, A);
+        {'SWITCH_VN', A, _}                   -> Impure(pc, A);
+        {'PUSH', A}                           -> Pure(?a, A);
+        'DUPA'                                -> Pure(?a, []);
+        {'DUP', A}                            -> Pure(?a, A);
+        {'POP', A}                            -> Pure(A, ?a);
+        {'STORE', A, B}                       -> Pure(A, B);
+        'INCA'                                -> Pure(?a, ?a);
+        {'INC', A}                            -> Pure(A, A);
+        'DECA'                                -> Pure(?a, []);
+        {'DEC', A}                            -> Pure(A, A);
+        {'ADD', A, B, C}                      -> Pure(A, [B, C]);
+        {'SUB', A, B, C}                      -> Pure(A, [B, C]);
+        {'MUL', A, B, C}                      -> Pure(A, [B, C]);
+        {'DIV', A, B, C}                      -> Pure(A, [B, C]);
+        {'MOD', A, B, C}                      -> Pure(A, [B, C]);
+        {'POW', A, B, C}                      -> Pure(A, [B, C]);
+        {'LT', A, B, C}                       -> Pure(A, [B, C]);
+        {'GT', A, B, C}                       -> Pure(A, [B, C]);
+        {'EQ', A, B, C}                       -> Pure(A, [B, C]);
+        {'ELT', A, B, C}                      -> Pure(A, [B, C]);
+        {'EGT', A, B, C}                      -> Pure(A, [B, C]);
+        {'NEQ', A, B, C}                      -> Pure(A, [B, C]);
+        {'AND', A, B, C}                      -> Pure(A, [B, C]);
+        {'OR', A, B, C}                       -> Pure(A, [B, C]);
+        {'NOT', A, B}                         -> Pure(A, B);
+        {'TUPLE', _}                          -> Pure(?a, []);
+        {'ELEMENT', A, B, C}                  -> Pure(A, [B, C]);
+        {'MAP_EMPTY', A}                      -> Pure(A, []);
+        {'MAP_LOOKUP', A, B, C}               -> Pure(A, [B, C]);
+        {'MAP_LOOKUPD', A, B, C, D}           -> Pure(A, [B, C, D]);
+        {'MAP_UPDATE', A, B, C, D}            -> Pure(A, [B, C, D]);
+        {'MAP_DELETE', A, B, C}               -> Pure(A, [B, C]);
+        {'MAP_MEMBER', A, B, C}               -> Pure(A, [B, C]);
+        {'MAP_FROM_LIST', A, B}               -> Pure(A, B);
+        {'NIL', A}                            -> Pure(A, []);
+        {'IS_NIL', A, B}                      -> Pure(A, B);
+        {'CONS', A, B, C}                     -> Pure(A, [B, C]);
+        {'HD', A, B}                          -> Pure(A, B);
+        {'TL', A, B}                          -> Pure(A, B);
+        {'LENGTH', A, B}                      -> Pure(A, B);
+        {'STR_EQ', A, B, C}                   -> Pure(A, [B, C]);
+        {'STR_JOIN', A, B, C}                 -> Pure(A, [B, C]);
+        {'INT_TO_STR', A, B}                  -> Pure(A, B);
+        {'ADDR_TO_STR', A, B}                 -> Pure(A, B);
+        {'STR_REVERSE', A, B}                 -> Pure(A, B);
+        {'INT_TO_ADDR', A, B}                 -> Pure(A, B);
+        {'VARIANT', A, B, C, D}               -> Pure(A, [B, C, D]);
+        {'VARIANT_TEST', A, B, C}             -> Pure(A, [B, C]);
+        {'VARIANT_ELEMENT', A, B, C}          -> Pure(A, [B, C]);
+        'BITS_NONEA'                          -> Pure(?a, []);
+        {'BITS_NONE', A}                      -> Pure(A, []);
+        'BITS_ALLA'                           -> Pure(?a, []);
+        {'BITS_ALL', A}                       -> Pure(A, []);
+        {'BITS_ALL_N', A, B}                  -> Pure(A, B);
+        {'BITS_SET', A, B, C}                 -> Pure(A, [B, C]);
+        {'BITS_CLEAR', A, B, C}               -> Pure(A, [B, C]);
+        {'BITS_TEST', A, B, C}                -> Pure(A, [B, C]);
+        {'BITS_SUM', A, B}                    -> Pure(A, B);
+        {'BITS_OR', A, B, C}                  -> Pure(A, [B, C]);
+        {'BITS_AND', A, B, C}                 -> Pure(A, [B, C]);
+        {'BITS_DIFF', A, B, C}                -> Pure(A, [B, C]);
+        {'ADDRESS', A}                        -> Pure(A, []);
+        {'BALANCE', A}                        -> Pure(A, []);
+        {'ORIGIN', A}                         -> Pure(A, []);
+        {'CALLER', A}                         -> Pure(A, []);
+        {'GASPRICE', A}                       -> Pure(A, []);
+        {'BLOCKHASH', A}                      -> Pure(A, []);
+        {'BENEFICIARY', A}                    -> Pure(A, []);
+        {'TIMESTAMP', A}                      -> Pure(A, []);
+        {'GENERATION', A}                     -> Pure(A, []);
+        {'MICROBLOCK', A}                     -> Pure(A, []);
+        {'DIFFICULTY', A}                     -> Pure(A, []);
+        {'GASLIMIT', A}                       -> Pure(A, []);
+        {'GAS', A}                            -> Impure(?a, A);
+        {'LOG0', A, B}                        -> Impure(none, [A, B]);
+        {'LOG1', A, B, C}                     -> Impure(none, [A, B, C]);
+        {'LOG2', A, B, C, D}                  -> Impure(none, [A, B, C, D]);
+        {'LOG3', A, B, C, D, E}               -> Impure(none, [A, B, C, D, E]);
+        {'LOG4', A, B, C, D, E, F}            -> Impure(none, [A, B, C, D, E, F]);
+        'DEACTIVATE'                          -> Impure(none, []);
+        {'SPEND', A, B}                       -> Impure(none, [A, B]);
+        {'ORACLE_REGISTER', A, B, C, D, E, F} -> Impure(A, [B, C, D, E, F]);
+        'ORACLE_QUERY'                        -> Impure(?a, []);  %% TODO
+        'ORACLE_RESPOND'                      -> Impure(?a, []);  %% TODO
+        'ORACLE_EXTEND'                       -> Impure(?a, []);  %% TODO
+        'ORACLE_GET_ANSWER'                   -> Impure(?a, []);  %% TODO
+        'ORACLE_GET_QUESTION'                 -> Impure(?a, []);  %% TODO
+        'ORACLE_QUERY_FEE'                    -> Impure(?a, []);  %% TODO
+        'AENS_RESOLVE'                        -> Impure(?a, []);  %% TODO
+        'AENS_PRECLAIM'                       -> Impure(?a, []);  %% TODO
+        'AENS_CLAIM'                          -> Impure(?a, []);  %% TODO
+        'AENS_UPDATE'                         -> Impure(?a, []);  %% TODO
+        'AENS_TRANSFER'                       -> Impure(?a, []);  %% TODO
+        'AENS_REVOKE'                         -> Impure(?a, []);  %% TODO
+        'ECVERIFY'                            -> Pure(?a, []);  %% TODO
+        'SHA3'                                -> Pure(?a, []);  %% TODO
+        'SHA256'                              -> Pure(?a, []);  %% TODO
+        'BLAKE2B'                             -> Pure(?a, []);  %% TODO
+        {'ABORT', A}                          -> Impure(pc, A);
+        {'EXIT', A}                           -> Impure(pc, A);
+        'NOP'                                 -> Pure(none, [])
+    end.
+
+var_writes(I) ->
+    #{ write := W } = attributes(I),
+    case W of
+        {var, _} -> [W];
+        _        -> []
+    end.
+
+independent({ifte, _, _}, _) -> false;
+independent(_, {ifte, _, _}) -> false;
+independent(I, J) ->
+    #{ write := WI, read := RI, pure := PureI } = attributes(I),
+    #{ write := WJ, read := RJ, pure := PureJ } = attributes(J),
+
+    StackI = lists:member(?a, [WI | RI]),
+    StackJ = lists:member(?a, [WJ | RJ]),
+
+    if  WI == pc; WJ == pc   -> false;     %% no jumps
+        not (PureI or PureJ) -> false;     %% at least one is pure
+        StackI and StackJ    -> false;     %% cannot both use the stack
+        true                 ->
+            %% and cannot write to each other's inputs
+            not lists:member(WI, RJ) andalso
+            not lists:member(WJ, RI)
     end.
 
 merge_ann(#{ live_in := LiveIn }, #{ live_out := LiveOut }) ->
@@ -404,25 +429,36 @@ simpl_s(I, _) -> I.
 simpl_top(I, Code, Options) ->
     apply_rules(rules(), I, Code, Options).
 
-apply_rules([], I, Code, _) ->
-    [I | Code];
-apply_rules([{_RName, Rule} | Rules], I, Code, Options) ->
+apply_rules(Rules, I, Code, Options) ->
     Cons = fun(X, Xs) -> simpl_top(X, Xs, Options) end,
-    case Rule(I, Code) of
-        false       -> apply_rules(Rules, I, Code, Options);
-        {New, Rest} ->
-            debug(opt_rules, Options, "Applied ~p:\n~s  ==>\n~s", [_RName, pp_ann("    ", [I | Code]), pp_ann("    ", New ++ Rest)]),
+    case apply_rules_once(Rules, I, Code) of
+        false -> [I | Code];
+        {RName, New, Rest} ->
+            debug(opt_rules, Options, "Applied ~p:\n~s  ==>\n~s", [RName, pp_ann("    ", [I | Code]), pp_ann("    ", New ++ Rest)]),
             lists:foldr(Cons, Rest, New)
+    end.
+
+apply_rules_once([], _, _) ->
+    false;
+apply_rules_once([{RName, Rule} | Rules], I, Code) ->
+    case Rule(I, Code) of
+        false       -> apply_rules_once(Rules, I, Code);
+        {New, Rest} -> {RName, New, Rest}
     end.
 
 -define(RULE(Name), {Name, fun Name/2}).
 
-rules() ->
+merge_rules() ->
     [?RULE(r_push_consume),
-     ?RULE(r_dup_to_push),
-     ?RULE(r_swap_instrs),
      ?RULE(r_one_shot_var),
      ?RULE(r_write_to_dead_var)
+    ].
+
+rules() ->
+    merge_rules() ++
+    [?RULE(r_dup_to_push),
+     ?RULE(r_swap_push),
+     ?RULE(r_swap_write)
     ].
 
 %% Removing pushes that are immediately consumed.
@@ -442,27 +478,45 @@ r_push_consume({Ann1, {Op, ?a, A, B}}, [{Ann2, {'STORE', R, ?a}} | Code]) when ?
 r_push_consume(_, _) -> false.
 
 %% Changing PUSH A, DUPA to PUSH A, PUSH A enables further optimisations
-r_dup_to_push(I = {Ann, {'PUSH', A}}, [{_, 'DUPA'} | Code]) ->
-    #{ live_in := Live } = Ann,
-    Ann1 = #{ live_in => Live, live_out => Live },
-    {[{Ann1, {'PUSH', A}}, I], Code};
+r_dup_to_push({Ann1, Push={'PUSH', _}}, [{Ann2, 'DUPA'} | Code]) ->
+    #{ live_in  := LiveIn  } = Ann1,
+    Ann1_ = Ann1#{ live_out => LiveIn },
+    Ann2_ = Ann2#{ live_in  => LiveIn },
+    {[{Ann1_, Push}, {Ann2_, Push}], Code};
 r_dup_to_push(_, _) -> false.
 
-%% Move PUSH A past an operator. Make sure the next instruction isn't writing
-%% to A, pushing to the stack or reading the accumulator.
-r_swap_instrs({Ann1, {'PUSH', A}}, [{Ann2, I = {Op, R, B, C}} | Code]) when ?IsBinOp(Op), A /= R, A /= ?a, B /= ?a, C /= ?a ->
-    {Ann1_, Ann2_} = swap_ann(Ann1, Ann2),
-    {[{Ann1_, I}, {Ann2_, {'PUSH', A}}], Code};
+%% Move PUSH A past non-stack instructions.
+r_swap_push({Ann1, Push = {'PUSH', _}}, [{Ann2, I} | Code]) ->
+    case independent(Push, I) of
+        true ->
+            {Ann1_, Ann2_} = swap_ann(Ann1, Ann2),
+            {[{Ann1_, I}, {Ann2_, Push}], Code};
+        false -> false
+    end;
+r_swap_push(_, _) -> false.
 
-%% Move writes to a variable as late as possible
-r_swap_instrs({Ann1, I1 = {Op1, R = {var, _}, A, B}}, [{Ann2, I2 = {Op2, S, C, D}} | Code])
-        when ?IsBinOp(Op1), ?IsBinOp(Op2),
-             element(1, S) /= var orelse S < R,
-             S /= A, S /= B, C /= R, D /= R,
-             A /= ?a andalso B /= ?a orelse S /= ?a andalso C /= ?a andalso D /= ?a ->
-    {Ann1_, Ann2_} = swap_ann(Ann1, Ann2),
-    {[{Ann1_, I2}, {Ann2_, I1}], Code};
-r_swap_instrs(_, _) -> false.
+%% Match up writes to variables with instructions further down.
+r_swap_write({AnnI, I}, [{AnnJ, J} | Code]) ->
+    case {var_writes(I), independent(I, J)} of
+        {[_], true} ->
+            {AnnJ_, AnnI_} = swap_ann(AnnI, AnnJ),
+            r_swap_write([{AnnJ_, J}], {AnnI_, I}, Code);
+        _ -> false
+    end;
+r_swap_write(_, _) -> false.
+
+r_swap_write(Pre, {AnnI, I}, Code0 = [{AnnJ, J} | Code]) ->
+    case apply_rules_once(merge_rules(), {AnnI, I}, Code0) of
+        {_, New, Rest} -> {lists:reverse(Pre) ++ New, Rest};
+        false ->
+            case independent(I, J) of
+                false -> false;
+                true  ->
+                    {AnnJ_, AnnI_} = swap_ann(AnnI, AnnJ),
+                    r_swap_write([{AnnJ_, J} | Pre], {AnnI_, I}, Code)
+            end
+    end;
+r_swap_write(_, _, []) -> false.
 
 %% Shortcut write followed by final read
 r_one_shot_var({Ann1, {Op, R = {var, _}, A, B}}, [{Ann2, J} | Code]) when ?IsBinOp(Op) ->
