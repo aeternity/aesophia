@@ -229,6 +229,7 @@ stmts_to_fcode(Env, [Expr]) ->
 
 %% - Translate && and || to ifte
 %% - Deadcode elimination
+%% - Unused variable analysis (replace by _)
 %% - Simplified case trees (FATE has special instructions for shallow matching)
 %% - Constant propagation
 

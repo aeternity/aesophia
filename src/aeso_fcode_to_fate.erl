@@ -17,7 +17,6 @@
 
 -define(i(X), {immediate, X}).
 -define(a, {stack, 0}).
--define(IsStackArg(X), (element(1, X) =:= stack)).
 
 -define(IsBinOp(Op),
     (Op =:= 'ADD' orelse
@@ -26,14 +25,15 @@
      Op =:= 'DIV' orelse
      Op =:= 'MOD' orelse
      Op =:= 'POW' orelse
-     Op =:= 'LT' orelse
-     Op =:= 'GT' orelse
-     Op =:= 'EQ' orelse
+     Op =:= 'LT'  orelse
+     Op =:= 'GT'  orelse
+     Op =:= 'EQ'  orelse
      Op =:= 'ELT' orelse
      Op =:= 'EGT' orelse
      Op =:= 'NEQ' orelse
      Op =:= 'AND' orelse
-     Op =:= 'OR')).
+     Op =:= 'OR'  orelse
+     Op =:= 'ELEMENT')).
 
 -record(env, { args = [], stack = [], locals = [], tailpos = true }).
 
@@ -133,18 +133,30 @@ alts_to_scode(Env, [{'case', {var, X}, Body}]) ->
       to_scode(Env1, Body) ];
 alts_to_scode(Env, Alts = [{'case', {tuple, Pats}, Body}]) ->
     Xs = lists:flatmap(fun({var, X}) -> [X]; (_) -> [] end, Pats),
-    case length(Xs) == length(Pats) of
+    N  = length(Pats),
+    case length(Xs) == N of
         false -> ?TODO(Alts);
         true  ->
-            {Is, Env1} = lists:foldl(fun(X, {Is, E}) -> {I, E1} = bind_local(X, E), {[I|Is], E1} end,
-                                     {[], Env}, Xs),
-            [ [[aeb_fate_code:dup(),
-                aeb_fate_code:element_op({var, X}, ?i(J), ?a)]
-                || {J, X} <- with_ixs(lists:reverse(Is))],
-              to_scode(Env1, Body) ]
+            {Code, Env1} = match_tuple(Env, Xs),
+            [Code, to_scode(Env1, Body)]
     end;
 alts_to_scode(_Env, Alts) ->
     ?TODO(Alts).
+
+%% Tuple is in the accumulator. Arguments are the variable names.
+match_tuple(Env, Xs) ->
+    match_tuple(Env, 0, Xs).
+
+match_tuple(Env, I, ["_" | Xs]) ->
+    match_tuple(Env, I + 1, Xs);
+match_tuple(Env, I, [X | Xs]) ->
+    {J,    Env1} = bind_local(X, Env),
+    {Code, Env2} = match_tuple(Env1, I + 1, Xs),
+    {[ [aeb_fate_code:dup() || [] /= [Y || Y <- Xs, Y /= "_"]],  %% Don't DUP the last one
+       aeb_fate_code:element_op({var, J}, ?i(I), ?a),
+       Code], Env2};
+match_tuple(Env, _, []) ->
+    {[], Env}.
 
 %% -- Operators --
 
