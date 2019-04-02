@@ -94,15 +94,16 @@ push_env(Type, Env) ->
     Env#env{ stack = [Type | Env#env.stack] }.
 
 bind_local(Name, Env = #env{ locals = Locals }) ->
-    {length(Locals), Env#env{ locals = Locals ++ [Name] }}.
+    I = length(Locals),
+    {I, Env#env{ locals = [{Name, I} | Locals] }}.
 
 notail(Env) -> Env#env{ tailpos = false }.
 
 lookup_var(Env = #env{ args = Args, locals = Locals }, X) ->
-    case {find_index(X, Locals), keyfind_index(X, 1, Args)} of
-        {false, false} -> error({unbound_variable, X, Env});
-        {false, Arg}   -> {arg, Arg};
-        {Local, _}     -> {var, Local}
+    case {lists:keyfind(X, 1, Locals), keyfind_index(X, 1, Args)} of
+        {false, false}  -> error({unbound_variable, X, Env});
+        {false, Arg}    -> {arg, Arg};
+        {{_, Local}, _} -> {var, Local}
     end.
 
 %% -- The compiler --
@@ -127,27 +128,26 @@ to_scode(Env, {'if', Dec, Then, Else}) ->
     [ to_scode(notail(Env), Dec),
       {ifte, to_scode(Env, Then), to_scode(Env, Else)} ];
 
-to_scode(Env, {switch, Expr, Alts}) ->
-    [ to_scode(notail(Env), Expr),
-      alts_to_scode(Env, Alts) ];
+to_scode(Env, {'let', X, Expr, Body}) ->
+    {I, Env1} = bind_local(X, Env),
+    [ to_scode(Env, Expr),
+      aeb_fate_code:store({var, I}, {stack, 0}),
+      to_scode(Env1, Body) ];
+
+to_scode(Env, {switch, Case}) ->
+    case_to_scode(Env, Case);
 
 to_scode(_Env, Icode) -> ?TODO(Icode).
 
-alts_to_scode(Env, [{'case', {var, X}, Body}]) ->
-    {I, Env1} = bind_local(X, Env),
-    [ aeb_fate_code:store({var, I}, {stack, 0}),
-      to_scode(Env1, Body) ];
-alts_to_scode(Env, Alts = [{'case', {tuple, Pats}, Body}]) ->
-    Xs = lists:flatmap(fun({var, X}) -> [X]; (_) -> [] end, Pats),
-    N  = length(Pats),
-    case length(Xs) == N of
-        false -> ?TODO(Alts);
-        true  ->
-            {Code, Env1} = match_tuple(Env, Xs),
-            [Code, to_scode(Env1, Body)]
-    end;
-alts_to_scode(_Env, Alts) ->
-    ?TODO(Alts).
+case_to_scode(Env, {nosplit, _Xs, Expr}) ->
+    %% TODO: need to worry about variable names?
+    to_scode(Env, Expr);
+case_to_scode(Env, {split, _Type, X, [{'case', {tuple, Xs}, Case}], nodefault}) ->
+    {Code, Env1} = match_tuple(Env, Xs),
+    [aeb_fate_code:push(lookup_var(Env, X)),
+     Code, case_to_scode(Env1, Case)];
+case_to_scode(_, Split = {split, _, _, _, _}) ->
+    ?TODO({'case', Split}).
 
 %% Tuple is in the accumulator. Arguments are the variable names.
 match_tuple(Env, Xs) ->
@@ -466,6 +466,8 @@ r_push_consume({Ann1, {'PUSH', A}}, [{Ann2, {Op, R, ?a, B}} | Code]) when ?IsBin
     {[{merge_ann(Ann1, Ann2), {Op, R, A, B}}], Code};
 r_push_consume({Ann1, {'PUSH', B}}, [{Ann2, {Op, R, A, ?a}} | Code]) when A /= ?a, ?IsBinOp(Op) ->
     {[{merge_ann(Ann1, Ann2), {Op, R, A, B}}], Code};
+r_push_consume({Ann1, {'PUSH', A}}, [{Ann2, {'STORE', R, ?a}} | Code]) ->
+    {[{merge_ann(Ann1, Ann2), {'STORE', R, A}}], Code};
 r_push_consume({Ann1, {'PUSH', A}}, [{Ann2, {'POP', B}} | Code]) ->
     case live_out(B, Ann2) of
         true  -> {[{merge_ann(Ann1, Ann2), {'STORE', B, A}}], Code};

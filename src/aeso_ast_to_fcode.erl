@@ -31,12 +31,21 @@
                | {var, var_name()}
                | {binop, ftype(), binop(), fexpr(), fexpr()}
                | {'if', fexpr(), fexpr(), fexpr()}
-               | {switch, fexpr(), [falt()]}.
+               | {'let', var_name(), fexpr(), fexpr()}
+               | {switch, fcase()}.
 
+-type fcase() :: {split, ftype(), var_name(), [fsplit_case()], fdefault()}
+               | {nosplit, [var_name()], fexpr()}.
+
+-type fsplit_case() :: {'case', fsplit_pat(), fcase()}.
+-type fsplit_pat()  :: {tuple, [var_name()]}.
+
+-type fdefault() :: nodefault | {default, fcase()}.
+
+%% Intermediate format before case trees (fcase() and fsplit()).
+-type falt() :: {'case', [fpat()], fexpr()}.
 -type fpat() :: {var, var_name()}
               | {tuple, [fpat()]}.
-
--type falt() :: {'case', fpat(), fexpr()}.
 
 -type ftype() :: aeb_fate_data:fate_type_type().
 
@@ -126,8 +135,12 @@ decls_to_fcode(Env, Decls) ->
     %% First compute mapping from Sophia names to fun_names and add it to the
     %% environment.
     Env1 = add_fun_env(Env, Decls),
-    lists:foldl(fun(D, E) -> decl_to_fcode(E, D) end,
-                Env1, Decls).
+    lists:foldl(fun(D, E) ->
+                    init_fresh_names(),
+                    R = decl_to_fcode(E, D),
+                    clear_fresh_names(),
+                    R
+                end, Env1, Decls).
 
 -spec decl_to_fcode(env(), aeso_syntax:decl()) -> env().
 decl_to_fcode(Env, {type_decl, _, _, _}) -> Env;
@@ -187,9 +200,10 @@ expr_to_fcode(Env, _Type, {'if', _, Cond, Then, Else}) ->
            expr_to_fcode(Env, Else)};
 
 %% Switch
-expr_to_fcode(Env, _Type, {switch, _, Expr, Alts}) ->
-    {switch, expr_to_fcode(Env, Expr),
-             [ alt_to_fcode(Env, Alt) || Alt <- Alts ]};
+expr_to_fcode(Env, _, {switch, _, Expr = {typed, _, _, Type}, Alts}) ->
+    X = fresh_name(),
+    {'let', X, expr_to_fcode(Env, Expr),
+     {switch, alts_to_fcode(Env, type_to_fcode(Env, Type), X, Alts)}};
 
 %% Blocks
 expr_to_fcode(Env, _Type, {block, _, Stmts}) ->
@@ -205,9 +219,68 @@ expr_to_fcode(_Env, Type, Expr) ->
 
 binop_to_fcode(Op) when Op == '+'; Op == '-'; Op == '==' -> Op.
 
+-spec alts_to_fcode(env(), ftype(), var_name(), [aeso_syntax:alt()]) -> fcase().
+alts_to_fcode(Env, Type, X, Alts) ->
+    split_tree(Env, [{X, Type}], [alt_to_fcode(Env, Alt) || Alt <- Alts]).
+
+%% Invariant: the number of variables matches the number of patterns in each falt.
+-spec split_tree(env(), [{var_name(), ftype()}], [falt()]) -> fcase().
+split_tree(_Env, [], [{'case', [], Expr}]) ->
+    {nosplit, Expr};
+split_tree(Env, Vars, Alts) ->
+    case next_split(Alts) of
+        {nosplit, Xs, Expr} -> {nosplit, Xs, Expr};
+        {split, I, Splits} ->
+            {Vars1, [{X, T} | Vars2]} = lists:split(I, Vars),
+            Cases = [{'case', Pat, split_tree(Env, Vars1 ++ split_vars(Pat, T) ++ Vars2, As)}
+                     || {Pat, As} <- Splits],
+            {split, T, X, Cases, nodefault}
+    end.
+
+-spec split_vars(fsplit_pat(), ftype()) -> [{var_name(), ftype()}].
+split_vars({tuple, Xs}, {tuple, Ts}) ->
+    lists:zip(Xs, Ts).
+
+%% TODO: catchalls
+-spec next_split([falt()]) -> {nosplit, [var_name()], fexpr()} | {split, integer(), [{fsplit_pat(), [falt()]}]}.
+next_split([]) ->
+    {nosplit, {abort, <<"Non-exhaustive pattern">>}};
+next_split(Alts = [{'case', Pats, Body} | _]) ->
+    NotMatch  = fun({var, _}) -> true; (_) -> false end,
+    case lists:splitwith(NotMatch, Pats) of
+        {Vars, []} -> {nosplit, [X || {var, X} <- Vars], Body};
+        {Vars, _} ->
+            I = length(Vars),
+            Splits = group_by_split_pat([ split_alt(I, Alt) || Alt <- Alts ]),
+            {split, I, Splits}
+    end.
+
+-spec split_alt(integer(), falt()) -> {fsplit_pat() | default, falt()}.
+split_alt(I, {'case', Pats, Body}) ->
+    {Pats1, [Pat | Pats2]} = lists:split(I, Pats),
+    {FPat, InnerPats} = split_pat(Pat),
+    {FPat, {'case', Pats1 ++ InnerPats ++ Pats2, Body}}.
+
+-spec split_pat(fpat()) -> {fsplit_pat() | default, [fpat()]}.
+split_pat({var, X})      -> {default, [{var, X}]};
+split_pat({tuple, Pats}) ->
+    Var = fun({var, X}) -> X; (_) -> fresh_name() end,
+    Xs = [Var(P) || P <- Pats],
+    {{tuple, Xs}, Pats}.
+
+-spec group_by_split_pat([{fsplit_pat() | default, falt()}]) -> [{fsplit_pat(), [falt()]}].
+group_by_split_pat(Alts) ->
+    Tag = fun(default)    -> default;
+             ({tuple, _}) -> tuple end,
+    Grouped = maps:values(lists:foldr(
+        fun({Pat, _} = Alt, Map) ->
+            maps:update_with(Tag(Pat), fun(As) -> [Alt | As] end, [Alt], Map)
+        end, #{}, Alts)),
+    [ {Pat, [As || {_, As} <- G]} || G = [{Pat, _} | _] <- Grouped ].
+
 -spec alt_to_fcode(env(), aeso_syntax:alt()) -> falt().
 alt_to_fcode(Env, {'case', _, Pat, Expr}) ->
-    {'case', pat_to_fcode(Env, Pat), expr_to_fcode(Env, Expr)}.
+    {'case', [pat_to_fcode(Env, Pat)], expr_to_fcode(Env, Expr)}.
 
 -spec pat_to_fcode(env(), aeso_syntax:pattern()) -> fpat().
 pat_to_fcode(Env, {typed, _, Pat, Type}) ->
@@ -222,9 +295,8 @@ pat_to_fcode(Env, _Type, {tuple, _, Pats}) ->
 pat_to_fcode(_Env, Type, Pat) -> {todo, Pat, ':', Type}.
 
 -spec stmts_to_fcode(env(), [aeso_syntax:stmt()]) -> fexpr().
-stmts_to_fcode(Env, [{letval, _, Pat, _, Expr} | Stmts]) ->
-    {switch, expr_to_fcode(Env, Expr),
-        [{'case', pat_to_fcode(Env, Pat), stmts_to_fcode(Env, Stmts)}]};
+stmts_to_fcode(Env, [{letval, _, {typed, _, {id, _, X}, _}, _, Expr} | Stmts]) ->
+    {'let', X, expr_to_fcode(Env, Expr), stmts_to_fcode(Env, Stmts)};
 
 stmts_to_fcode(Env, [Expr]) ->
     expr_to_fcode(Env, Expr).
@@ -301,6 +373,18 @@ lookup_fun(#{ fun_env := FunEnv }, Name) ->
         false -> error({unbound_name, Name});
         FName -> FName
     end.
+
+init_fresh_names() ->
+    put('%fresh', 0).
+
+clear_fresh_names() ->
+    erase('%fresh').
+
+-spec fresh_name() -> var_name().
+fresh_name() ->
+    N = get('%fresh'),
+    put('%fresh', N + 1),
+    lists:concat(["%", N]).
 
 %% -- Attributes --
 
