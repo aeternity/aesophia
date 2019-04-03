@@ -356,6 +356,9 @@ typedef_vars(#type_def{vars=Vars}) -> Vars.
 
 typedef_def(#type_def{typedef=Def}) -> Def.
 
+%% parse(ContractString, Options) -> {ok,AST}.
+%%  Signal errors, the sophia compiler way. Sigh!
+
 parse(Text, Options) ->
     %% Try and return something sensible here!
     case aeso_parser:string(Text, Options) of
