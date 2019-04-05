@@ -29,19 +29,20 @@
 -type fexpr() :: {integer, integer()}
                | {bool, false | true}
                | {var, var_name()}
+               | {tuple, [fexpr()]}
                | {binop, ftype(), binop(), fexpr(), fexpr()}
                | {'if', fexpr(), fexpr(), fexpr()}
                | {'let', var_name(), fexpr(), fexpr()}
-               | {switch, fcase()}.
+               | {switch, fsplit()}.
 
--type fcase() :: {split, ftype(), var_name(), [fsplit_case()], fdefault()}
-               | {nosplit, [var_name()], fexpr()}.
+-type fsplit() :: {split, ftype(), var_name(), [fcase()]}
+                | {nosplit, fexpr()}.
 
--type fsplit_case() :: {'case', fsplit_pat(), fcase()}.
+-type fcase() :: {'case', fsplit_pat(), fsplit()}.
+
 -type fsplit_pat()  :: {bool, false | true}
-                     | {tuple, [var_name()]}.
-
--type fdefault() :: nodefault | {default, fcase()}.
+                     | {tuple, [var_name()]}
+                     | {var, var_name()}.
 
 %% Intermediate format before case trees (fcase() and fsplit()).
 -type falt() :: {'case', [fpat()], fexpr()}.
@@ -202,10 +203,17 @@ expr_to_fcode(Env, _Type, {'if', _, Cond, Then, Else}) ->
            expr_to_fcode(Env, Else)};
 
 %% Switch
-expr_to_fcode(Env, _, {switch, _, Expr = {typed, _, _, Type}, Alts}) ->
-    X = fresh_name(),
-    {'let', X, expr_to_fcode(Env, Expr),
-     {switch, alts_to_fcode(Env, type_to_fcode(Env, Type), X, Alts)}};
+expr_to_fcode(Env, _, {switch, _, Expr = {typed, _, E, Type}, Alts}) ->
+    Switch = fun(X) ->
+                {switch, alts_to_fcode(Env, type_to_fcode(Env, Type), X, Alts)}
+             end,
+    case E of
+        {id, _, X} -> Switch(X);
+        _ ->
+            X = fresh_name(),
+            {'let', X, expr_to_fcode(Env, Expr),
+             Switch(X)}
+    end;
 
 %% Blocks
 expr_to_fcode(Env, _Type, {block, _, Stmts}) ->
@@ -221,68 +229,140 @@ expr_to_fcode(_Env, Type, Expr) ->
 
 binop_to_fcode(Op) when Op == '+'; Op == '-'; Op == '==' -> Op.
 
--spec alts_to_fcode(env(), ftype(), var_name(), [aeso_syntax:alt()]) -> fcase().
+-spec alts_to_fcode(env(), ftype(), var_name(), [aeso_syntax:alt()]) -> fsplit().
 alts_to_fcode(Env, Type, X, Alts) ->
-    split_tree(Env, [{X, Type}], [alt_to_fcode(Env, Alt) || Alt <- Alts]).
+    FAlts = [alt_to_fcode(Env, Alt) || Alt <- Alts],
+    split_tree(Env, [{X, Type}], FAlts).
 
-%% Invariant: the number of variables matches the number of patterns in each falt.
--spec split_tree(env(), [{var_name(), ftype()}], [falt()]) -> fcase().
-split_tree(_Env, [], [{'case', [], Expr}]) ->
-    {nosplit, Expr};
-split_tree(Env, Vars, Alts) ->
-    case next_split(Alts) of
-        {nosplit, Xs, Expr} -> {nosplit, Xs, Expr};
-        {split, I, Splits} ->
-            {Vars1, [{X, T} | Vars2]} = lists:split(I, Vars),
-            Cases = [{'case', Pat, split_tree(Env, Vars1 ++ split_vars(Pat, T) ++ Vars2, As)}
-                     || {Pat, As} <- Splits],
-            {split, T, X, Cases, nodefault}
+%% %% Invariant: the number of variables matches the number of patterns in each falt.
+-spec split_tree(env(), [{var_name(), ftype()}], [falt()]) -> fsplit().
+split_tree(_Env, _Vars, []) ->
+    error(non_exhaustive_patterns); %% TODO: nice error
+split_tree(Env, Vars, Alts = [{'case', Pats, Body} | _]) ->
+    io:format("split_tree\n  Vars = ~p\n  Alts = ~120p\n", [Vars, Alts]),
+    case next_split(Pats) of
+        false ->
+            Xs  = [ X || {X, _} <- Vars ],
+            Ys  = [ Y || {var, Y} <- Pats ],
+            Ren = [ {Y, X} || {Y, X} <- lists:zip(Ys, Xs), X /= Y, Y /= "_" ],
+            %% TODO: Unreachable clauses error
+            io:format("Renaming: ~p in\n  ~p\n", [Ren, Body]),
+            {nosplit, rename(Ren, Body)};
+        I when is_integer(I) ->
+            io:format("  split_at ~p\n", [I]),
+            {Vars0, [{X, Type} | Vars1]} = lists:split(I - 1, Vars),
+            SAlts = merge_alts(I, X, [ split_alt(I, A) || A <- Alts ]),
+            io:format("  SAlts = ~p\n", [SAlts]),
+            Cases = [ {'case', SPat, split_tree(Env, Vars0 ++ split_vars(SPat, Type) ++ Vars1, FAlts)}
+                      || {SPat, FAlts} <- SAlts ],
+            {split, Type, X, Cases}
     end.
+
+-spec merge_alts(integer(), var_name(), [{fsplit_pat(), falt()}]) -> [{fsplit_pat(), [falt()]}].
+merge_alts(I, X, Alts) ->
+    lists:foldr(fun(A, As) -> merge_alt(I, X, A, As) end,
+                [], Alts).
+
+-spec merge_alt(integer(), var_name(), {fsplit_pat(), falt()}, Alts) -> Alts
+        when Alts :: [{fsplit_pat(), [falt()]}].
+merge_alt(_, _, {P, A}, []) -> [{P, [A]}];
+merge_alt(I, X, {P, A}, [{Q, As} | Rest]) ->
+    Match = fun({var, _}, {var, _})     -> match;
+               ({tuple, _}, {tuple, _}) -> match;
+               ({bool, B}, {bool, B})   -> match;
+               ({var, _}, _)            -> expand;
+               (_, {var, _})            -> insert;
+               (_, _)                   -> mismatch
+            end,
+
+    case Match(P, Q) of
+        match    -> [{Q, [A | As]} | Rest];
+        mismatch -> [{Q, As} | merge_alt(I, X, {P, A}, Rest)];
+        expand   -> [{Q, [expand(I, X, Q, A) | As]} | Rest];
+        insert   -> [{P, [A]}, {Q, As} | Rest]
+    end.
+
+expand(I, X, Q, {'case', Ps, E}) ->
+    {Ps0, [{var, Y} | Ps1]} = lists:split(I - 1, Ps),
+    Qs = case Q of
+           {tuple, Xs} -> [{var, "_"} || _ <- Xs];
+           {bool, _}   -> []
+         end,
+    {'case', Ps0 ++ Qs ++ Ps1, rename([{Y, X}], E)}.
+
+-spec split_alt(integer(), falt()) -> {fsplit_pat(), falt()}.
+split_alt(I, {'case', Pats, Body}) ->
+    {Pats0, [Pat | Pats1]} = lists:split(I - 1, Pats),
+    {SPat, InnerPats} = split_pat(Pat),
+    {SPat, {'case', Pats0 ++ InnerPats ++ Pats1, Body}}.
+
+-spec split_pat(fpat()) -> {fsplit_pat(), [fpat()]}.
+split_pat(P = {var, X}) -> {{var, fresh_if_blank(X)}, [P]};
+split_pat({bool, B})    -> {{bool, B}, []};
+split_pat({tuple, Pats}) ->
+    Var = fun({var, X}) -> fresh_if_blank(X); (_) -> fresh_name() end,
+    Xs = [Var(P) || P <- Pats],
+    {{tuple, Xs}, Pats}.
 
 -spec split_vars(fsplit_pat(), ftype()) -> [{var_name(), ftype()}].
 split_vars({bool, _}, boolean) -> [];
 split_vars({tuple, Xs}, {tuple, Ts}) ->
-    lists:zip(Xs, Ts).
+    lists:zip(Xs, Ts);
+split_vars({var, X}, T) -> [{X, T}].
 
-%% TODO: catchalls
--spec next_split([falt()]) -> {nosplit, [var_name()], fexpr()} | {split, integer(), [{fsplit_pat(), [falt()]}]}.
-next_split([]) ->
-    {nosplit, {abort, <<"Non-exhaustive pattern">>}};
-next_split(Alts = [{'case', Pats, Body} | _]) ->
-    NotMatch  = fun({var, _}) -> true; (_) -> false end,
-    case lists:splitwith(NotMatch, Pats) of
-        {Vars, []} -> {nosplit, [X || {var, X} <- Vars], Body};
-        {Vars, _} ->
-            I = length(Vars),
-            Splits = group_by_split_pat([ split_alt(I, Alt) || Alt <- Alts ]),
-            {split, I, Splits}
+-spec rename([{var_name(), var_name()}], fexpr()) -> fexpr().
+rename(Ren, Expr) ->
+    case Expr of
+        {integer, _}           -> Expr;
+        {bool, _}              -> Expr;
+        {var, X}               -> {var, rename_var(Ren, X)};
+        {tuple, Es}            -> {tuple, [rename(Ren, E) || E <- Es]};
+        {binop, T, Op, E1, E2} -> {binop, T, Op, rename(Ren, E1), rename(Ren, E2)};
+        {'if', A, B, C}        -> {'if', rename(Ren, A), rename(Ren, B), rename(Ren, C)};
+        {'let', X, E, Body}    ->
+            {Z, Ren1} = rename_binding(Ren, X),
+            {'let', Z, rename(Ren, E), rename(Ren1, Body)};
+        {switch, Split} -> {switch, rename_split(Ren, Split)}
     end.
 
--spec split_alt(integer(), falt()) -> {fsplit_pat() | default, falt()}.
-split_alt(I, {'case', Pats, Body}) ->
-    {Pats1, [Pat | Pats2]} = lists:split(I, Pats),
-    {FPat, InnerPats} = split_pat(Pat),
-    {FPat, {'case', Pats1 ++ InnerPats ++ Pats2, Body}}.
+rename_var(Ren, X) -> proplists:get_value(X, Ren, X).
+rename_binding(Ren, X) ->
+    Ren1 = lists:keydelete(X, 1, Ren),
+    case lists:keymember(X, 2, Ren) of
+        false -> {X, Ren1};
+        true  ->
+            Z = fresh_name(),
+            {Z, [{X, Z} | Ren1]}
+    end.
 
--spec split_pat(fpat()) -> {fsplit_pat() | default, [fpat()]}.
-split_pat({var, X})      -> {default, [{var, X}]};
-split_pat({bool, B})     -> {{bool, B}, []};
-split_pat({tuple, Pats}) ->
-    Var = fun({var, X}) -> X; (_) -> fresh_name() end,
-    Xs = [Var(P) || P <- Pats],
-    {{tuple, Xs}, Pats}.
+rename_bindings(Ren, []) -> {[], Ren};
+rename_bindings(Ren, [X | Xs]) ->
+    {Z, Ren1}  = rename_binding(Ren, X),
+    {Zs, Ren2} = rename_bindings(Ren1, Xs),
+    {[Z | Zs], Ren2}.
 
--spec group_by_split_pat([{fsplit_pat() | default, falt()}]) -> [{fsplit_pat(), [falt()]}].
-group_by_split_pat(Alts) ->
-    Tag = fun(default)    -> default;
-             ({tuple, _}) -> tuple;
-             ({bool, B})  -> B
-          end,
-    Grouped = maps:values(lists:foldr(
-        fun({Pat, _} = Alt, Map) ->
-            maps:update_with(Tag(Pat), fun(As) -> [Alt | As] end, [Alt], Map)
-        end, #{}, Alts)),
-    [ {Pat, [As || {_, As} <- G]} || G = [{Pat, _} | _] <- Grouped ].
+rename_pat(Ren, P = {bool, _}) -> {P, Ren};
+rename_pat(Ren, {var, X}) ->
+    {Z, Ren1} = rename_binding(Ren, X),
+    {{var, Z}, Ren1};
+rename_pat(Ren, {tuple, Xs}) ->
+    {Zs, Ren1} = rename_bindings(Ren, Xs),
+    {{tuple, Zs}, Ren1}.
+
+rename_split(Ren, {split, Type, X, Cases}) ->
+    {split, Type, rename_var(Ren, X), [rename_case(Ren, C) || C <- Cases]}.
+
+rename_case(Ren, {'case', Pat, Split}) ->
+    {Pat1, Ren1} = rename_pat(Ren, Pat),
+    {'case', Pat1, rename_split(Ren1, Split)}.
+
+-spec next_split([fpat()]) -> integer() | false.
+next_split(Pats) ->
+    IsVar = fun({var, _}) -> true; (_) -> false end,
+    case [ I || {I, P} <- indexed(Pats), not IsVar(P) ] of
+        []      -> false;
+        [I | _] -> I
+    end.
 
 -spec alt_to_fcode(env(), aeso_syntax:alt()) -> falt().
 alt_to_fcode(Env, {'case', _, Pat, Expr}) ->
@@ -395,8 +475,17 @@ fresh_name() ->
     put('%fresh', N + 1),
     lists:concat(["%", N]).
 
+-spec fresh_if_blank(var_name()) -> var_name().
+fresh_if_blank("_") -> fresh_name();
+fresh_if_blank(X)   -> X.
+
 %% -- Attributes --
 
 get_attributes(Ann) ->
     [stateful || proplists:get_value(stateful, Ann, false)].
+
+%% -- Basic utilities --
+
+indexed(Xs) ->
+    lists:zip(lists:seq(1, length(Xs)), Xs).
 
