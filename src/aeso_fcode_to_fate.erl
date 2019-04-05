@@ -187,22 +187,30 @@ flatten(Code) -> lists:map(fun flatten_s/1, lists:flatten(Code)).
 flatten_s({ifte, Then, Else}) -> {ifte, flatten(Then), flatten(Else)};
 flatten_s(I) -> I.
 
+-define(MAX_SIMPL_ITERATIONS, 10).
+
 optimize_fun(_Funs, Name, {{Args, Res}, Code}, Options) ->
     Code0 = flatten(Code),
     debug(opt, Options, "Optimizing ~s\n", [Name]),
-    Code1 = simpl_loop(Code0, Options),
+    Code1 = simpl_loop(0, Code0, Options),
     Code2 = desugar(Code1),
     {{Args, Res}, Code2}.
 
-simpl_loop(Code, Options) ->
+simpl_loop(N, Code, Options) when N >= ?MAX_SIMPL_ITERATIONS ->
+    debug(opt, Options, "  No simpl_loop fixed_point after ~p iterations.\n\n", [N]),
+    Code;
+simpl_loop(N, Code, Options) ->
     ACode = annotate_code(Code),
-    debug(opt, Options, "  annotated:\n~s\n", [pp_ann("    ", ACode)]),
+    [ debug(opt, Options, "  annotated:\n~s\n", [pp_ann("    ", ACode)]) || N == 0 ],
     Code1 = simplify(ACode, Options),
     [ debug(opt, Options, "  optimized:\n~s\n", [pp_ann("    ", Code1)]) || Code1 /= ACode ],
     Code2 = unannotate(Code1),
     case Code == Code2 of
-        true  -> Code2;
-        false -> simpl_loop(Code2, Options)
+        true  ->
+            debug(opt, Options, "  Reached simpl_loop fixed point after ~p iteration~s.\n\n",
+                                [N, if N /= 1 -> "s"; true -> "" end]),
+            Code2;
+        false -> simpl_loop(N + 1, Code2, Options)
     end.
 
 pp_ann(Ind, [{ifte, Then, Else} | Code]) ->
