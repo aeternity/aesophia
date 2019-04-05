@@ -466,7 +466,8 @@ rules() ->
     merge_rules() ++
     [?RULE(r_dup_to_push),
      ?RULE(r_swap_push),
-     ?RULE(r_swap_write)
+     ?RULE(r_swap_write),
+     ?RULE(r_inline)
     ].
 
 %% Removing pushes that are immediately consumed.
@@ -528,6 +529,30 @@ r_swap_write(Pre, {AnnI, I}, Code0 = [{AnnJ, J} | Code]) ->
     end;
 r_swap_write(_, _, []) -> false.
 
+%% Inline stores
+r_inline(I = {_, {'STORE', R = {var, _}, A = {arg, _}}}, Code) ->
+    %% Not when A is var unless updating the annotations properly.
+    r_inline([I], R, A, Code);
+r_inline(_, _) -> false.
+
+r_inline(Acc, R, A, [{Ann, I} | Code]) ->
+    #{ write := W, pure := Pure } = attributes(I),
+    Inl = fun(X) when X == R -> A; (X) -> X end,
+    case not live_in(R, Ann) orelse not Pure orelse lists:member(W, [R, A]) of
+        true  -> false;
+        false ->
+            case I of
+                {Op, S, B, C} when ?IsBinOp(Op), B == R orelse C == R ->
+                    Acc1 = [{Ann, {Op, S, Inl(B), Inl(C)}} | Acc],
+                    case r_inline(Acc1, R, A, Code) of
+                        false -> {lists:reverse(Acc1), Code};
+                        {New, Rest} -> {New, Rest}
+                    end;
+                _ -> r_inline([{Ann, I} | Acc], R, A, Code)
+            end
+    end;
+r_inline(_Acc, _, _, []) -> false.
+
 %% Shortcut write followed by final read
 r_one_shot_var({Ann1, {Op, R = {var, _}, A, B}}, [{Ann2, J} | Code]) when ?IsBinOp(Op) ->
     Copy = case J of
@@ -551,6 +576,16 @@ r_write_to_dead_var({Ann, {Op, R = {var, _}, A, B}}, Code) when ?IsBinOp(Op) ->
             %% unused.
             {[{Ann, {'POP', R}} || X <- [A, B], X == ?a], Code};
         true -> false
+    end;
+r_write_to_dead_var({Ann, {'STORE', R = {var, _}, A}}, Code) when A /= ?a ->
+    case live_out(R, Ann) of
+        false ->
+            case Code of
+                []                  -> {[], []};
+                [{Ann1, I} | Code1] ->
+                    {[], [{merge_ann(Ann, Ann1), I} | Code1]}
+            end;
+        true  -> false
     end;
 r_write_to_dead_var(_, _) -> false.
 
