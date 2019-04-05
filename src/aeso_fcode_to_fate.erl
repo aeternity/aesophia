@@ -111,6 +111,9 @@ lookup_var(Env = #env{ args = Args, locals = Locals }, X) ->
 to_scode(_Env, {integer, N}) ->
     [aeb_fate_code:push(?i(N))];    %% Doesn't exist (yet), translated by desugaring
 
+to_scode(_Env, {bool, B}) ->
+    [aeb_fate_code:push(?i(B))];
+
 to_scode(Env, {var, X}) ->
     [aeb_fate_code:push(lookup_var(Env, X))];
 
@@ -146,6 +149,16 @@ case_to_scode(Env, {split, _Type, X, [{'case', {tuple, Xs}, Case}], nodefault}) 
     {Code, Env1} = match_tuple(Env, Xs),
     [aeb_fate_code:push(lookup_var(Env, X)),
      Code, case_to_scode(Env1, Case)];
+case_to_scode(Env, Split = {split, boolean, X, Cases, nodefault}) ->
+    Then = lists:keyfind({bool, true},  2, Cases),
+    Else = lists:keyfind({bool, false}, 2, Cases),
+    case {Then, Else} of
+        {{'case', _, ThenSplit}, {'case', _, ElseSplit}} ->
+            [aeb_fate_code:push(lookup_var(Env, X)),
+             {ifte, case_to_scode(Env, ThenSplit),
+                    case_to_scode(Env, ElseSplit)}];
+        _ -> ?TODO({'case', Split})
+    end;
 case_to_scode(_, Split = {split, _, _, _, _}) ->
     ?TODO({'case', Split}).
 
@@ -473,7 +486,8 @@ apply_rules_once([{RName, Rule} | Rules], I, Code) ->
 merge_rules() ->
     [?RULE(r_push_consume),
      ?RULE(r_one_shot_var),
-     ?RULE(r_write_to_dead_var)
+     ?RULE(r_write_to_dead_var),
+     ?RULE(r_write_single_branch)
     ].
 
 rules() ->
@@ -481,7 +495,7 @@ rules() ->
     [?RULE(r_dup_to_push),
      ?RULE(r_swap_push),
      ?RULE(r_swap_write),
-     ?RULE(r_inline)
+     ?RULE(r_inline_store)
     ].
 
 %% Removing pushes that are immediately consumed.
@@ -530,27 +544,28 @@ r_swap_write(IA = {_, I}, [JA = {_, J} | Code]) ->
     end;
 r_swap_write(_, _) -> false.
 
-r_swap_write(Pre, IA = {_, I}, Code0 = [JA = {_, J} | Code]) ->
-    case apply_rules_once(merge_rules(), IA, Code0) of
-        {_Rule, New, Rest} ->
+r_swap_write(Pre, IA = {_, I}, Code0 = [JA | Code]) ->
+    case {apply_rules_once(merge_rules(), IA, Code0), JA} of
+        {{_Rule, New, Rest}, _} ->
             {lists:reverse(Pre) ++ New, Rest};
-        false ->
+        {false, {_, J}} ->
             case independent(I, J) of
                 false -> false;
                 true  ->
                     {J1, I1} = swap_instrs(IA, JA),
                     r_swap_write([J1 | Pre], I1, Code)
-            end
+            end;
+        _ -> false
     end;
-r_swap_write(_, _, []) -> false.
+r_swap_write(_, _, _) -> false.
 
 %% Inline stores
-r_inline(I = {_, {'STORE', R = {var, _}, A = {arg, _}}}, Code) ->
+r_inline_store(I = {_, {'STORE', R = {var, _}, A = {arg, _}}}, Code) ->
     %% Not when A is var unless updating the annotations properly.
-    r_inline([I], R, A, Code);
-r_inline(_, _) -> false.
+    r_inline_store([I], R, A, Code);
+r_inline_store(_, _) -> false.
 
-r_inline(Acc, R, A, [{Ann, I} | Code]) ->
+r_inline_store(Acc, R, A, [{Ann, I} | Code]) ->
     #{ write := W, pure := Pure } = attributes(I),
     Inl = fun(X) when X == R -> A; (X) -> X end,
     case not live_in(R, Ann) orelse not Pure orelse lists:member(W, [R, A]) of
@@ -559,14 +574,14 @@ r_inline(Acc, R, A, [{Ann, I} | Code]) ->
             case I of
                 {Op, S, B, C} when ?IsBinOp(Op), B == R orelse C == R ->
                     Acc1 = [{Ann, {Op, S, Inl(B), Inl(C)}} | Acc],
-                    case r_inline(Acc1, R, A, Code) of
+                    case r_inline_store(Acc1, R, A, Code) of
                         false -> {lists:reverse(Acc1), Code};
                         {New, Rest} -> {New, Rest}
                     end;
-                _ -> r_inline([{Ann, I} | Acc], R, A, Code)
+                _ -> r_inline_store([{Ann, I} | Acc], R, A, Code)
             end
     end;
-r_inline(_Acc, _, _, []) -> false.
+r_inline_store(_Acc, _, _, _) -> false.
 
 %% Shortcut write followed by final read
 r_one_shot_var({Ann1, {Op, R = {var, _}, A, B}}, [{Ann2, J} | Code]) when ?IsBinOp(Op) ->
@@ -603,6 +618,22 @@ r_write_to_dead_var({Ann, {'STORE', R = {var, _}, A}}, Code) when A /= ?a ->
         true  -> false
     end;
 r_write_to_dead_var(_, _) -> false.
+
+%% Push variable writes that are only needed in a single branch inside the branch.
+r_write_single_branch(IA = {_Ann, I}, [{ifte, Then = [{AnnThen, _} | _], Else = [{AnnElse, _} | _]} | Code]) ->
+    #{ write := R } = attributes(I),
+    case R of
+        {var, _} ->
+            case {live_in(R, AnnThen), live_in(R, AnnElse)} of
+                {true, false} ->
+                    {[], [{ifte, [IA | Then], Else} | Code]};
+                {false, true} ->
+                    {[], [{ifte, Then, [IA | Else]} | Code]};
+                _ -> false
+            end;
+        _ -> false
+    end;
+r_write_single_branch(_, _) -> false.
 
 
 %% Desugar and specialize and remove annotations

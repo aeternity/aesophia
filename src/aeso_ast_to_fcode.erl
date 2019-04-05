@@ -38,13 +38,15 @@
                | {nosplit, [var_name()], fexpr()}.
 
 -type fsplit_case() :: {'case', fsplit_pat(), fcase()}.
--type fsplit_pat()  :: {tuple, [var_name()]}.
+-type fsplit_pat()  :: {bool, false | true}
+                     | {tuple, [var_name()]}.
 
 -type fdefault() :: nodefault | {default, fcase()}.
 
 %% Intermediate format before case trees (fcase() and fsplit()).
 -type falt() :: {'case', [fpat()], fexpr()}.
 -type fpat() :: {var, var_name()}
+              | {bool, false | true}
               | {tuple, [fpat()]}.
 
 -type ftype() :: aeb_fate_data:fate_type_type().
@@ -238,6 +240,7 @@ split_tree(Env, Vars, Alts) ->
     end.
 
 -spec split_vars(fsplit_pat(), ftype()) -> [{var_name(), ftype()}].
+split_vars({bool, _}, boolean) -> [];
 split_vars({tuple, Xs}, {tuple, Ts}) ->
     lists:zip(Xs, Ts).
 
@@ -263,6 +266,7 @@ split_alt(I, {'case', Pats, Body}) ->
 
 -spec split_pat(fpat()) -> {fsplit_pat() | default, [fpat()]}.
 split_pat({var, X})      -> {default, [{var, X}]};
+split_pat({bool, B})     -> {{bool, B}, []};
 split_pat({tuple, Pats}) ->
     Var = fun({var, X}) -> X; (_) -> fresh_name() end,
     Xs = [Var(P) || P <- Pats],
@@ -271,7 +275,9 @@ split_pat({tuple, Pats}) ->
 -spec group_by_split_pat([{fsplit_pat() | default, falt()}]) -> [{fsplit_pat(), [falt()]}].
 group_by_split_pat(Alts) ->
     Tag = fun(default)    -> default;
-             ({tuple, _}) -> tuple end,
+             ({tuple, _}) -> tuple;
+             ({bool, B})  -> B
+          end,
     Grouped = maps:values(lists:foldr(
         fun({Pat, _} = Alt, Map) ->
             maps:update_with(Tag(Pat), fun(As) -> [Alt | As] end, [Alt], Map)
@@ -292,6 +298,8 @@ pat_to_fcode(Env, Pat) ->
 pat_to_fcode(_Env, _Type, {id, _, X}) -> {var, X};
 pat_to_fcode(Env, _Type, {tuple, _, Pats}) ->
     {tuple, [ pat_to_fcode(Env, Pat) || Pat <- Pats ]};
+pat_to_fcode(_Env, _Type, {bool, _, B}) ->
+    {bool, B};
 pat_to_fcode(_Env, Type, Pat) -> {todo, Pat, ':', Type}.
 
 -spec stmts_to_fcode(env(), [aeso_syntax:stmt()]) -> fexpr().
@@ -307,6 +315,7 @@ stmts_to_fcode(Env, [Expr]) ->
 %% - Deadcode elimination
 %% - Unused variable analysis (replace by _)
 %% - Simplified case trees (FATE has special instructions for shallow matching)
+%% - Case specialization
 %% - Constant propagation
 
 %% -- Helper functions -------------------------------------------------------
