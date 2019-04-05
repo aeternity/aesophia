@@ -1,24 +1,27 @@
 %%%-------------------------------------------------------------------
 %%% @author Robert Virding
-%%% @copyright (C) 2017, Aeternity Anstalt
+%%% @copyright (C) 2019, Aeternity Anstalt
 %%% @doc
 %%%     ACI interface
 %%% @end
-%%% Created : 12 Dec 2017
+%%% Created : 12 Jan 2019
 %%%-------------------------------------------------------------------
 
 -module(aeso_aci).
 
 -export([encode/1,encode/2,decode/1]).
+-export([encode_type/1,encode_stmt/1,encode_expr/1]).
 
 %% Define records for the various typed syntactic forms. These make
 %% the code easier but don't seem to exist elsewhere.
 
+%% Top-level
 -record(contract, {ann,con,decls}).
 %% -record(namespace, {ann,con,decls}).
 -record(letfun, {ann,id,args,type,body}).
 -record(type_def, {ann,id,vars,typedef}).
 
+%% Types
 -record(app_t, {ann,id,fields}).
 -record(tuple_t, {ann,args}).
 -record(record_t, {fields}).
@@ -28,12 +31,23 @@
 -record(constr_t, {ann,con,args}).
 -record(fun_t, {ann,named,args,type}).
 
+%% Tokens
 -record(arg, {ann,id,type}).
 -record(id, {ann,name}).
 -record(con, {ann,name}).
 -record(qid, {ann,names}).
 -record(qcon, {ann,names}).
 -record(tvar, {ann,name}).
+
+%% Expressions
+-record(bool, {ann,bool}).
+-record(int, {ann,value}).
+-record(string, {ann,bin}).
+-record(hash, {ann,hash}).
+-record(tuple, {ann,args}).
+-record(list, {ann,args}).
+-record(app, {ann,func,args}).
+-record(typed, {ann,expr,type}).
 
 %% encode(ContractString) -> {ok,JSON} | {error,String}.
 %% encode(ContractString, Options) -> {ok,JSON} | {error,String}.
@@ -47,7 +61,7 @@ encode(ContractString, Options) when is_binary(ContractString) ->
 encode(ContractString, Options) ->
     try
         Ast = parse(ContractString, Options),
-        %%io:format("~p\n", [Ast]),
+        %% io:format("~p\n", [Ast]),
         %% aeso_ast:pp(Ast),
         TypedAst = aeso_ast_infer_types:infer(Ast, Options),
         %% io:format("~p\n", [TypedAst]),
@@ -59,7 +73,7 @@ encode(ContractString, Options) ->
                     T <- sort_decls(contract_types(Contract)) ],
         Fdefs = [ encode_func(F) || F <- sort_decls(contract_funcs(Contract)),
                                     not is_private_func(F) ],
-        Jmap = [{<<"contract">>, [{<<"name">>, list_to_binary(Cname)},
+        Jmap = [{<<"contract">>, [{<<"name">>, encode_name(Cname)},
                                   {<<"type_defs">>, Tdefs},
                                   {<<"functions">>, Fdefs}]}],
         %% io:format("~p\n", [Jmap]),
@@ -80,73 +94,134 @@ join_errors(Prefix, Errors, Pfun) ->
     Ess = [ Pfun(E) || E <- Errors ],
     list_to_binary(string:join([Prefix|Ess], "\n")).
 
+%% encode_func(Function) -> JSON
+%%  Encode a function definition. Currently we are only interested in
+%%  the interface and type.
+
 encode_func(Fdef) ->
     Name = function_name(Fdef),
     Args = function_args(Fdef),
     Type = function_type(Fdef),
-    [{<<"name">>, list_to_binary(Name)},
+    [{<<"name">>, encode_name(Name)},
      {<<"arguments">>, encode_args(Args)},
-     {<<"type">>, list_to_binary(encode_type(Type))},
+     {<<"returns">>, encode_type(Type)},
      {<<"stateful">>, is_stateful_func(Fdef)}].
+
+%% encode_args(Args) -> [JSON].
+%% encode_arg(Args) -> JSON.
 
 encode_args(Args) ->
     [ encode_arg(A) || A <- Args ].
 
 encode_arg(#arg{id=Id,type=T}) ->
-    [{<<"name">>,list_to_binary(encode_type(Id))},
-     {<<"type">>,list_to_binary(encode_type(T))}].
+    [{<<"name">>,encode_type(Id)},
+     {<<"type">>,[encode_type(T)]}].
+
+%% encode_types(Types) -> [JSON].
+%% encode_type(Type) -> JSON.
 
 encode_types(Types) ->
     [ encode_type(T) || T <- Types ].
 
-encode_type(#tvar{name=N}) -> N;
-encode_type(#id{name=N}) -> N;
-encode_type(#con{name=N}) -> N;
+encode_type(#tvar{name=N}) -> encode_name(N);
+encode_type(#id{name=N}) -> encode_name(N);
+encode_type(#con{name=N}) -> encode_name(N);
 encode_type(#qid{names=Ns}) ->
-    lists:join(".", Ns);
+    encode_name(lists:join(".", Ns));
 encode_type(#qcon{names=Ns}) ->
-    lists:join(".", Ns);                        %?
+    encode_name(lists:join(".", Ns));           %?
 encode_type(#tuple_t{args=As}) ->
     Eas = encode_types(As),
-    [$(,lists:join(",", Eas),$)];
+    [{<<"tuple">>,Eas}];
 encode_type(#record_t{fields=Fs}) ->
-    Efs = encode_types(Fs),
-    [${,lists:join(",", Efs),$}];
+    Efs = encode_fields(Fs),
+    [{<<"record">>,Efs}];
 encode_type(#app_t{id=Id,fields=Fs}) ->
     Name = encode_type(Id),
     Efs = encode_types(Fs),
-    [Name,"(",lists:join(",", Efs),")"];
-encode_type(#field_t{id=Id,type=T}) ->
-    [encode_type(Id)," : ",encode_type(T)];
+    [{Name,Efs}];
 encode_type(#variant_t{cons=Cs}) ->
     Ecs = encode_types(Cs),
-    lists:join(" | ", Ecs);
+    [{<<"variant">>,Ecs}];
 encode_type(#constr_t{con=C,args=As}) ->
     Ec = encode_type(C),
     Eas = encode_types(As),
-    [Ec,$(,lists:join(", ", Eas),$)];
+    [{Ec,Eas}];
 encode_type(#fun_t{args=As,type=T}) ->
     Eas = encode_types(As),
     Et = encode_type(T),
-    [$(,lists:join(", ", Eas),") => ",Et].
+    [{<<"function">>,[{<<"arguments">>,Eas},{<<"returns">>,Et}]}].
+
+encode_name(Name) ->
+    list_to_binary(Name).
+
+%% encode_fields(Fields) -> [JSON].
+%% encode_field(Field) -> JSON.
+%%  Encode a record field.
+
+encode_fields(Fs) ->
+    [ encode_field(F) || F <- Fs ].
+
+encode_field(#field_t{id=Id,type=T}) ->
+    [{<<"name">>,encode_type(Id)},
+     {<<"type">>,[encode_type(T)]}].
+
+%% encode_typedef(TypeDef) -> JSON.
 
 encode_typedef(Type) ->
     Name = typedef_name(Type),
     Vars = typedef_vars(Type),
     Def = typedef_def(Type),
-    [{<<"name">>, list_to_binary(Name)},
+    [{<<"name">>, encode_name(Name)},
      {<<"vars">>, encode_tvars(Vars)},
-     {<<"typedef">>, list_to_binary(encode_alias(Def))}].
+     {<<"typedef">>, encode_alias(Def)}].
 
 encode_tvars(Vars) ->
     [ encode_tvar(V) || V <- Vars ].
 
 encode_tvar(#tvar{name=N}) ->
-    [{<<"name">>, list_to_binary(N)}].
+    [{<<"name">>, encode_name(N)}].
 
 encode_alias(#alias_t{type=T}) ->
     encode_type(T);
 encode_alias(A) -> encode_type(A).
+
+%% encode_stmt(Stmt) -> JSON.
+
+encode_stmt(E) ->
+    encode_expr(E).
+
+%% encode_exprs(Exprs) -> [JSON].
+%% encode_expr(Expr) -> JSON.
+
+encode_exprs(Es) ->
+    [ encode_expr(E) || E <- Es ].
+
+encode_expr(#id{name=N}) -> encode_name(N);
+encode_expr(#con{name=N}) -> encode_name(N);
+encode_expr(#qid{names=Ns}) ->
+    encode_name(lists:join(".", Ns));
+encode_expr(#qcon{names=Ns}) ->
+    encode_name(lists:join(".", Ns));           %?
+encode_expr(#typed{expr=E}) ->
+    encode_expr(E);
+encode_expr(#bool{bool=B}) -> B;
+encode_expr(#int{value=V}) -> V;
+encode_expr(#string{bin=B}) -> B;
+encode_expr(#hash{hash=H}) -> H;
+encode_expr(#tuple{args=As}) ->
+    Eas = encode_exprs(As),
+    [{<<"tuple">>,Eas}];
+encode_expr(#list{args=As}) ->
+    Eas = encode_exprs(As),
+    [{<<"list">>,Eas}];
+encode_expr(#app{func=F,args=As}) ->
+    Ef = encode_expr(F),
+    Eas = encode_exprs(As),
+    [{<<"apply">>,[{<<"function">>,Ef},
+		   {<<"arguments">>,Eas}]}];
+encode_expr({Op,_Ann}) ->
+    list_to_binary(atom_to_list(Op)).
 
 %% decode(JSON) -> ContractString.
 %%  Decode a JSON string and generate a suitable contract string which
@@ -160,42 +235,81 @@ decode(Json) ->
     list_to_binary(decode_contract(C)).
 
 decode_contract(#{<<"name">> := Name,
-                  <<"type_defs">> := _Ts,
+                  <<"type_defs">> := Ts,
                   <<"functions">> := Fs}) ->
     ["contract"," ",io_lib:format("~s", [Name])," =\n",
-     [],                                        %Don't include types yet.
-     %% decode_tdefs(Ts),
+     decode_tdefs(Ts),
      decode_funcs(Fs)].
 
 decode_funcs(Fs) -> [ decode_func(F) || F <- Fs ].
 
 decode_func(#{<<"name">> := <<"init">>}) -> [];
-decode_func(#{<<"name">> := Name,<<"arguments">> := As,<<"type">> := T}) ->
+decode_func(#{<<"name">> := Name,<<"arguments">> := As,<<"returns">> := T}) ->
     ["  function"," ",io_lib:format("~s", [Name])," : ",
      decode_args(As)," => ",decode_type(T),$\n].
-
-decode_type(T) -> io_lib:format("~s", [T]).
 
 decode_args(As) ->
     Das = [ decode_arg(A) || A <- As ],
     [$(,lists:join(", ", Das),$)].
 
-decode_arg(#{<<"type">> := T}) -> decode_type(T).
+decode_arg(#{<<"type">> := [T]}) -> decode_type(T).
 
-%% To keep dialyzer happy and quiet.
-%% decode_tdefs(Ts) -> [ decode_tdef(T) || T <- Ts ].
-%%
-%% decode_tdef(#{<<"name">> := Name,<<"vars">> := Vs,<<"typedef">> := T}) ->
-%%     ["  type"," ",io_lib:format("~s", [Name]),decode_tvars(Vs),
-%%      " = ",decode_type(T),$\n].
-%%
-%% decode_tvars([]) -> [];                         %No tvars, no parentheses
-%% decode_tvars(Vs) ->
-%%     Dvs = [ decode_tvar(V) || V <- Vs ],
-%%     [$(,lists:join(", ", Dvs),$)].
-%%
-%% decode_tvar(#{<<"name">> := N}) -> io_lib:format("~s", [N]).
-%%
+decode_types(Ets) ->
+    [ decode_type(Et) || Et <- Ets ].
+
+decode_type(#{<<"tuple">> := Ets}) ->
+    Ts = decode_types(Ets),
+    [$(,lists:join(",", Ts),$)];
+decode_type(#{<<"record">> := Efs}) ->
+    Fs = decode_fields(Efs),
+    [${,lists:join(",", Fs),$}];
+decode_type(#{<<"list">> := [Et]}) ->
+    T = decode_type(Et),
+    ["list",$(,T,$)];
+decode_type(#{<<"map">> := Ets}) ->
+    Ts = decode_types(Ets),
+    ["map",$(,lists:join(",", Ts),$)];
+decode_type(#{<<"variant">> := Ets}) ->
+    Ts = decode_types(Ets),
+    lists:join(" | ", Ts);
+decode_type(Econs) when is_map(Econs) ->	%General constructor
+    [{Ec,Ets}] = maps:to_list(Econs),
+    C = decode_name(Ec),
+    Ts = decode_types(Ets),
+    [C,$(,lists:join(",", Ts),$)];
+decode_type(T) ->				%Just raw names.
+    decode_name(T).
+
+decode_name(En) ->
+    binary_to_list(En).
+
+decode_fields(Efs) ->
+    [ decode_field(Ef) || Ef <- Efs ].
+
+decode_field(#{<<"name">> := En,<<"type">> := [Et]}) ->
+    Name = decode_name(En),
+    Type = decode_type(Et),
+    [Name," : ",Type].
+
+%% decode_tdefs(Json) -> [TypeString].
+%%  Here we are only interested in the type definitions and ignore the
+%%  aliases. We find them as they always have variants.
+
+decode_tdefs(Ts) -> [ decode_tdef(T) ||
+			#{<<"typedef">> := #{<<"variant">> := _}} = T <- Ts
+		    ].
+
+decode_tdef(#{<<"name">> := Name,<<"vars">> := Vs,<<"typedef">> := T}) ->
+    ["  datatype"," ",decode_name(Name),decode_tvars(Vs),
+     " = ",decode_type(T),$\n].
+
+decode_tvars([]) -> [];                         %No tvars, no parentheses
+decode_tvars(Vs) ->
+    Dvs = [ decode_tvar(V) || V <- Vs ],
+    [$(,lists:join(", ", Dvs),$)].
+
+decode_tvar(#{<<"name">> := N}) -> io_lib:format("~s", [N]).
+
 %% #contract{Ann, Con, [Declarations]}.
 
 contract_name(#contract{con=#con{name=N}}) -> N.
@@ -242,6 +356,9 @@ typedef_vars(#type_def{vars=Vars}) -> Vars.
 
 typedef_def(#type_def{typedef=Def}) -> Def.
 
+%% parse(ContractString, Options) -> {ok,AST}.
+%%  Signal errors, the sophia compiler way. Sigh!
+
 parse(Text, Options) ->
     %% Try and return something sensible here!
     case aeso_parser:string(Text, Options) of
@@ -264,7 +381,7 @@ parse(Text, Options) ->
     end.
 
 parse_error(Pos, ErrorString) ->
-    io:format("Error ~p ~p\n", [Pos,ErrorString]),
+    %% io:format("Error ~p ~p\n", [Pos,ErrorString]),
     Error = io_lib:format("~s: ~s", [pos_error(Pos), ErrorString]),
     error({parse_errors, [Error]}).
 
