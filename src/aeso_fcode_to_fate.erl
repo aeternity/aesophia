@@ -415,13 +415,19 @@ independent(I, J) ->
 merge_ann(#{ live_in := LiveIn }, #{ live_out := LiveOut }) ->
     #{ live_in => LiveIn, live_out => LiveOut }.
 
-%% When swapping two instructions
-swap_ann(#{ live_in := Live1, live_out := Live2 }, #{ live_in := Live2, live_out := Live3 }) ->
-    Live2_ = ordsets:union([Live1, Live2, Live3]), %% Conservative approximation
-    {#{ live_in => Live1,  live_out => Live2_ },
-     #{ live_in => Live2_, live_out => Live3 }}.
+%% Swap two instructions. Precondition: the instructions are independent/2.
+swap_instrs({#{ live_in := Live1, live_out := Live2 }, I}, {#{ live_in := Live2, live_out := Live3 }, J}) ->
+    %% Since I and J are independent the J can't read or write anything in
+    %% that I writes.
+    WritesI = ordsets:subtract(Live2, Live1),
+    %% Any final reads by J, that I does not read should be removed from Live2.
+    #{ read := ReadsI } = attributes(I),
+    ReadsJ  = ordsets:subtract(Live2, ordsets:union(Live3, ReadsI)),
+    Live2_  = ordsets:subtract(ordsets:union([Live1, Live2, Live3]), ordsets:union(WritesI, ReadsJ)),
+    {{#{ live_in => Live1,  live_out => Live2_ }, J},
+     {#{ live_in => Live2_, live_out => Live3  }, I}}.
 
-%% live_in(R,  #{ live_in  := LiveIn  }) -> ordsets:is_element(R, LiveIn).
+live_in(R,  #{ live_in  := LiveIn  }) -> ordsets:is_element(R, LiveIn).
 live_out(R, #{ live_out := LiveOut }) -> ordsets:is_element(R, LiveOut).
 
 %% -- Optimizations --
@@ -442,7 +448,7 @@ apply_rules(Rules, I, Code, Options) ->
     case apply_rules_once(Rules, I, Code) of
         false -> [I | Code];
         {RName, New, Rest} ->
-            debug(opt_rules, Options, "Applied ~p:\n~s  ==>\n~s", [RName, pp_ann("    ", [I | Code]), pp_ann("    ", New ++ Rest)]),
+            debug(opt_rules, Options, "  Applied ~p:\n~s  ==>\n~s\n", [RName, pp_ann("    ", [I | Code]), pp_ann("    ", New ++ Rest)]),
             lists:foldr(Cons, Rest, New)
     end.
 
@@ -497,34 +503,35 @@ r_dup_to_push({Ann1, Push={'PUSH', _}}, [{Ann2, 'DUPA'} | Code]) ->
 r_dup_to_push(_, _) -> false.
 
 %% Move PUSH A past non-stack instructions.
-r_swap_push({Ann1, Push = {'PUSH', _}}, [{Ann2, I} | Code]) ->
+r_swap_push(PushA = {_, Push = {'PUSH', _}}, [IA = {_, I} | Code]) ->
     case independent(Push, I) of
         true ->
-            {Ann1_, Ann2_} = swap_ann(Ann1, Ann2),
-            {[{Ann1_, I}, {Ann2_, Push}], Code};
+            {I1, Push1} = swap_instrs(PushA, IA),
+            {[I1, Push1], Code};
         false -> false
     end;
 r_swap_push(_, _) -> false.
 
 %% Match up writes to variables with instructions further down.
-r_swap_write({AnnI, I}, [{AnnJ, J} | Code]) ->
+r_swap_write(IA = {_, I}, [JA = {_, J} | Code]) ->
     case {var_writes(I), independent(I, J)} of
         {[_], true} ->
-            {AnnJ_, AnnI_} = swap_ann(AnnI, AnnJ),
-            r_swap_write([{AnnJ_, J}], {AnnI_, I}, Code);
+            {J1, I1} = swap_instrs(IA, JA),
+            r_swap_write([J1], I1, Code);
         _ -> false
     end;
 r_swap_write(_, _) -> false.
 
-r_swap_write(Pre, {AnnI, I}, Code0 = [{AnnJ, J} | Code]) ->
-    case apply_rules_once(merge_rules(), {AnnI, I}, Code0) of
-        {_, New, Rest} -> {lists:reverse(Pre) ++ New, Rest};
+r_swap_write(Pre, IA = {_, I}, Code0 = [JA = {_, J} | Code]) ->
+    case apply_rules_once(merge_rules(), IA, Code0) of
+        {_Rule, New, Rest} ->
+            {lists:reverse(Pre) ++ New, Rest};
         false ->
             case independent(I, J) of
                 false -> false;
                 true  ->
-                    {AnnJ_, AnnI_} = swap_ann(AnnI, AnnJ),
-                    r_swap_write([{AnnJ_, J} | Pre], {AnnI_, I}, Code)
+                    {J1, I1} = swap_instrs(IA, JA),
+                    r_swap_write([J1 | Pre], I1, Code)
             end
     end;
 r_swap_write(_, _, []) -> false.
