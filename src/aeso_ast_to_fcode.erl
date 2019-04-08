@@ -350,7 +350,8 @@ rename_pat(Ren, {tuple, Xs}) ->
     {{tuple, Zs}, Ren1}.
 
 rename_split(Ren, {split, Type, X, Cases}) ->
-    {split, Type, rename_var(Ren, X), [rename_case(Ren, C) || C <- Cases]}.
+    {split, Type, rename_var(Ren, X), [rename_case(Ren, C) || C <- Cases]};
+rename_split(Ren, {nosplit, E}) -> {nosplit, rename(Ren, E)}.
 
 rename_case(Ren, {'case', Pat, Split}) ->
     {Pat1, Ren1} = rename_pat(Ren, Pat),
