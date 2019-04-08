@@ -14,6 +14,13 @@
 
 %% -- Preamble ---------------------------------------------------------------
 
+-type scode() :: {switch, stype(), [maybe_scode()], maybe_scode()}  %% last arg is catch-all
+               | switch_body
+               | tuple().    %% FATE instruction
+
+-type stype()       :: tuple | boolean.
+-type maybe_scode() :: missing | scode().
+
 -define(TODO(What), error({todo, ?FILE, ?LINE, ?FUNCTION_NAME, What})).
 
 -define(i(X), {immediate, X}).
@@ -129,7 +136,7 @@ to_scode(Env, {binop, Type, Op, A, B}) ->
 
 to_scode(Env, {'if', Dec, Then, Else}) ->
     [ to_scode(notail(Env), Dec),
-      {ifte, to_scode(Env, Then), to_scode(Env, Else)} ];
+      {switch, boolean, [to_scode(Env, Else), to_scode(Env, Then)], missing} ];
 
 to_scode(Env, {'let', X, Expr, Body}) ->
     {I, Env1} = bind_local(X, Env),
@@ -138,29 +145,49 @@ to_scode(Env, {'let', X, Expr, Body}) ->
       to_scode(Env1, Body) ];
 
 to_scode(Env, {switch, Case}) ->
-    case_to_scode(Env, Case);
+    split_to_scode(Env, Case);
 
 to_scode(_Env, Icode) -> ?TODO(Icode).
 
-case_to_scode(Env, {nosplit, _Xs, Expr}) ->
-    %% TODO: need to worry about variable names?
-    to_scode(Env, Expr);
-case_to_scode(Env, {split, _Type, X, [{'case', {tuple, Xs}, Case}], nodefault}) ->
-    {Code, Env1} = match_tuple(Env, Xs),
+split_to_scode(Env, {nosplit, Expr}) ->
+    [switch_body, to_scode(Env, Expr)];
+split_to_scode(Env, {split, {tuple, _}, X, Alts}) ->
+    {Def, Alts1} = catchall_to_scode(Env, X, Alts),
+    Alt = case [ {Xs, Split} || {'case', {tuple, Xs}, Split} <- Alts1 ] of
+            []            -> missing;
+            [{Xs, S} | _] ->
+                {Code, Env1} = match_tuple(Env, Xs),
+                [Code, split_to_scode(Env1, S)]
+          end,
     [aeb_fate_code:push(lookup_var(Env, X)),
-     Code, case_to_scode(Env1, Case)];
-case_to_scode(Env, Split = {split, boolean, X, Cases, nodefault}) ->
-    Then = lists:keyfind({bool, true},  2, Cases),
-    Else = lists:keyfind({bool, false}, 2, Cases),
-    case {Then, Else} of
-        {{'case', _, ThenSplit}, {'case', _, ElseSplit}} ->
-            [aeb_fate_code:push(lookup_var(Env, X)),
-             {ifte, case_to_scode(Env, ThenSplit),
-                    case_to_scode(Env, ElseSplit)}];
-        _ -> ?TODO({'case', Split})
-    end;
-case_to_scode(_, Split = {split, _, _, _, _}) ->
+     case Def == missing andalso Alt /= missing of
+        true  -> Alt;   % skip the switch if single tuple pattern
+        false -> {switch, tuple, [Alt], Def}
+     end];
+split_to_scode(Env, {split, boolean, X, Alts}) ->
+    {Def, Alts1} = catchall_to_scode(Env, X, Alts),
+    GetAlt = fun(B) ->
+                 case lists:keyfind({bool, B}, 2, Alts1) of
+                     false          -> missing;
+                     {'case', _, S} -> split_to_scode(Env, S)
+                 end
+             end,
+    SAlts = [GetAlt(false), GetAlt(true)],
+    [aeb_fate_code:push(lookup_var(Env, X)),
+     {switch, boolean, SAlts, Def}];
+split_to_scode(_, Split = {split, _, _, _}) ->
     ?TODO({'case', Split}).
+
+catchall_to_scode(Env, X, Alts) -> catchall_to_scode(Env, X, Alts, []).
+
+catchall_to_scode(Env, X, [{'case', {var, Y}, Split} | _], Acc) ->
+    I = lookup_var(Env, X),
+    {J, Env1} = bind_local(Y, Env),
+    {[aeb_fate_code:store({var, J}, I),
+      split_to_scode(Env1, Split)], lists:reverse(Acc)};
+catchall_to_scode(Env, X, [Alt | Alts], Acc) ->
+    catchall_to_scode(Env, X, Alts, [Alt | Acc]);
+catchall_to_scode(_, _, [], Acc) -> {missing, lists:reverse(Acc)}.
 
 %% Tuple is in the accumulator. Arguments are the variable names.
 match_tuple(Env, Xs) ->
@@ -195,9 +222,11 @@ optimize_scode(Funs, Options) ->
     maps:map(fun(Name, Def) -> optimize_fun(Funs, Name, Def, Options) end,
              Funs).
 
-flatten(Code) -> lists:map(fun flatten_s/1, lists:flatten(Code)).
+flatten(missing) -> missing;
+flatten(Code)    -> lists:map(fun flatten_s/1, lists:flatten(Code)).
 
-flatten_s({ifte, Then, Else}) -> {ifte, flatten(Then), flatten(Else)};
+flatten_s({switch, Type, Alts, Catch}) ->
+    {switch, Type, [flatten(Alt) || Alt <- Alts], flatten(Catch)};
 flatten_s(I) -> I.
 
 -define(MAX_SIMPL_ITERATIONS, 10).
@@ -226,12 +255,18 @@ simpl_loop(N, Code, Options) ->
         false -> simpl_loop(N + 1, Code2, Options)
     end.
 
-pp_ann(Ind, [{ifte, Then, Else} | Code]) ->
-    [Ind, "IF-THEN\n",
-     pp_ann("  " ++ Ind, Then),
-     Ind, "ELSE\n",
-     pp_ann("  " ++ Ind, Else),
+pp_ann(Ind, [{switch, Type, Alts, Def} | Code]) ->
+    Tags =
+        case Type of
+            boolean -> ["FALSE", "TRUE"];
+            tuple   -> ["(_)"]
+        end,
+    [[[Ind, Tag, " =>\n", pp_ann("  " ++ Ind, Alt)]
+      || {Tag, Alt} <- lists:zip(Tags, Alts), Alt /= missing],
+     [[Ind, "_ =>\n", pp_ann("  " ++ Ind, Def)] || Def /= missing],
      pp_ann(Ind, Code)];
+pp_ann(Ind, [switch_body | Code]) ->
+    [Ind, "SWITCH-BODY\n", pp_ann(Ind, Code)];
 pp_ann(Ind, [{#{ live_in := In, live_out := Out }, I} | Code]) ->
     Fmt = fun([]) -> "()";
              (Xs) -> string:join([lists:concat(["var", N]) || {var, N} <- Xs], " ")
@@ -250,11 +285,14 @@ annotate_code(Code) ->
     RCode.
 
 %% Reverses the code
-ann_writes([{ifte, Then, Else} | Code], Writes, Acc) ->
-    {Then1, WritesThen} = ann_writes(Then, Writes, []),
-    {Else1, WritesElse} = ann_writes(Else, Writes, []),
-    Writes1 = ordsets:union(Writes, ordsets:intersection(WritesThen, WritesElse)),
-    ann_writes(Code, Writes1, [{ifte, Then1, Else1} | Acc]);
+ann_writes(missing, Writes, []) -> {missing, Writes};
+ann_writes([switch_body | Code], Writes, Acc) ->
+    ann_writes(Code, Writes, [switch_body | Acc]);
+ann_writes([{switch, Type, Alts, Def} | Code], Writes, Acc) ->
+    {Alts1, WritesAlts} = lists:unzip([ ann_writes(Alt, Writes, []) || Alt <- Alts ]),
+    {Def1, WritesDef}   = ann_writes(Def, Writes, []),
+    Writes1 = ordsets:union(Writes, ordsets:intersection([WritesDef | WritesAlts])),
+    ann_writes(Code, Writes1, [{switch, Type, Alts1, Def1} | Acc]);
 ann_writes([I | Code], Writes, Acc) ->
     Ws = var_writes(I),
     Writes1 = ordsets:union(Writes, Ws),
@@ -264,11 +302,14 @@ ann_writes([], Writes, Acc) ->
     {Acc, Writes}.
 
 %% Takes reversed code and unreverses it.
-ann_reads([{ifte, Then, Else} | Code], Reads, Acc) ->
-    {Then1, ReadsThen} = ann_reads(Then, Reads, []),
-    {Else1, ReadsElse} = ann_reads(Else, Reads, []),
-    Reads1 = ordsets:union(Reads, ordsets:union(ReadsThen, ReadsElse)),
-    ann_reads(Code, Reads1, [{ifte, Then1, Else1} | Acc]);
+ann_reads(missing, Reads, []) -> {missing, Reads};
+ann_reads([switch_body | Code], Reads, Acc) ->
+    ann_reads(Code, Reads, [switch_body | Acc]);
+ann_reads([{switch, Type, Alts, Def} | Code], Reads, Acc) ->
+    {Alts1, ReadsAlts} = lists:unzip([ ann_reads(Alt, Reads, []) || Alt <- Alts ]),
+    {Def1, ReadsDef}   = ann_reads(Def, Reads, []),
+    Reads1 = ordsets:union([Reads, ReadsDef | ReadsAlts]),
+    ann_reads(Code, Reads1, [{switch, Type, Alts1, Def1} | Acc]);
 ann_reads([{Ann, I} | Code], Reads, Acc) ->
     #{ writes_in := WritesIn, writes_out := WritesOut } = Ann,
     #{ read := Rs, write := W, pure := Pure } = attributes(I),
@@ -415,8 +456,10 @@ var_writes(I) ->
         _        -> []
     end.
 
-independent({ifte, _, _}, _) -> false;
-independent(_, {ifte, _, _}) -> false;
+independent({switch, _, _, _}, _) -> false;
+independent(_, {switch, _, _, _}) -> false;
+independent(switch_body, _) -> true;
+independent(_, switch_body) -> true;
 independent(I, J) ->
     #{ write := WI, read := RI, pure := PureI } = attributes(I),
     #{ write := WJ, read := RJ, pure := PureJ } = attributes(J),
@@ -454,11 +497,12 @@ live_out(R, #{ live_out := LiveOut }) -> ordsets:is_element(R, LiveOut).
 %% -- Optimizations --
 
 simplify([], _) -> [];
+simplify(missing, _) -> missing;
 simplify([I | Code], Options) ->
     simpl_top(simpl_s(I, Options), simplify(Code, Options), Options).
 
-simpl_s({ifte, Then, Else}, Options) ->
-    {ifte, simplify(Then, Options), simplify(Else, Options)};
+simpl_s({switch, Type, Alts, Def}, Options) ->
+    {switch, Type, [simplify(A, Options) || A <- Alts], simplify(Def, Options)};
 simpl_s(I, _) -> I.
 
 simpl_top(I, Code, Options) ->
@@ -565,6 +609,8 @@ r_inline_store(I = {_, {'STORE', R = {var, _}, A = {arg, _}}}, Code) ->
     r_inline_store([I], R, A, Code);
 r_inline_store(_, _) -> false.
 
+r_inline_store(Acc, R, A, [switch_body | Code]) ->
+    r_inline_store([switch_body | Acc], R, A, Code);
 r_inline_store(Acc, R, A, [{Ann, I} | Code]) ->
     #{ write := W, pure := Pure } = attributes(I),
     Inl = fun(X) when X == R -> A; (X) -> X end,
@@ -637,15 +683,20 @@ r_write_single_branch(_, _) -> false.
 
 
 %% Desugar and specialize and remove annotations
-unannotate({ifte, Then, Else}) -> [{ifte, unannotate(Then), unannotate(Else)}];
+unannotate(switch_body) -> [switch_body];
+unannotate({switch, Type, Alts, Def}) ->
+    [{switch, Type, [unannotate(A) || A <- Alts], unannotate(Def)}];
+unannotate(missing) -> missing;
 unannotate(Code) when is_list(Code) ->
     lists:flatmap(fun unannotate/1, Code);
 unannotate({_Ann, I}) -> [I].
 
-%% Desugar and specialize and remove annotations
+%% Desugar and specialize
 desugar({'ADD', ?a, ?i(1), ?a})     -> [aeb_fate_code:inc()];
 desugar({'SUB', ?a, ?a, ?i(1)})     -> [aeb_fate_code:dec()];
-desugar({ifte, Then, Else}) -> [{ifte, desugar(Then), desugar(Else)}];
+desugar({switch, Type, Alts, Def}) ->
+    [{switch, Type, [desugar(A) || A <- Alts], desugar(Def)}];
+desugar(missing) -> missing;
 desugar(Code) when is_list(Code) ->
     lists:flatmap(fun desugar/1, Code);
 desugar(I) -> [I].
@@ -659,6 +710,7 @@ to_basic_blocks(Funs, Options) ->
                      || {Name, {{Args, Res}, Code}} <- maps:to_list(Funs) ]).
 
 bb(_Name, Code, _Options) ->
+    io:format("Code = ~p\n", [Code]),
     Blocks0 = blocks(Code),
     Blocks  = optimize_blocks(Blocks0),
     Labels  = maps:from_list([ {Ref, I} || {I, {Ref, _}} <- with_ixs(Blocks) ]),
@@ -667,27 +719,73 @@ bb(_Name, Code, _Options) ->
 
 %% -- Break up scode into basic blocks --
 
+-type bbref() :: reference().
+
+%% Code to be turned into blocks.
+-record(blk, { ref             :: bbref(),        %% block id
+               code            :: scode(),
+               catchall = none :: bbref() | none  %% closest catchall
+             }).
+
+-type bb()     :: {bbref(), bcode()}.
+-type bcode()  :: [binstr()].
+-type binstr() :: {jump, bbref()}
+                | {jumpif, bbref()}
+                | tuple().   %% FATE instruction
+
+-spec blocks(scode()) -> [bb()].
 blocks(Code) ->
     Top = make_ref(),
-    blocks([{Top, Code}], []).
+    blocks([#blk{ref = Top, code = Code}], []).
 
+-spec blocks([#blk{}], [bb()]) -> [bb()].
 blocks([], Acc) ->
     lists:reverse(Acc);
-blocks([{Ref, Code} | Blocks], Acc) ->
-    block(Ref, Code, [], Blocks, Acc).
+blocks([Blk | Blocks], Acc) ->
+    block(Blk, [], Blocks, Acc).
 
-block(Ref, [], CodeAcc, Blocks, BlockAcc) ->
+-spec block(#blk{}, bcode(), [#blk{}], [bb()]) -> bb().
+block(#blk{ref = Ref, code = []}, CodeAcc, Blocks, BlockAcc) ->
     blocks(Blocks, [{Ref, lists:reverse(CodeAcc)} | BlockAcc]);
-block(Ref, [{ifte, Then, Else} | Code], Acc, Blocks, BlockAcc) ->
-    ThenLbl = make_ref(),
-    RestLbl = make_ref(),
-    block(Ref, Else ++ [{jump, RestLbl}],
-               [{jumpif, ThenLbl} | Acc],
-               [{ThenLbl, Then ++ [{jump, RestLbl}]},
-                {RestLbl, Code} | Blocks],
-               BlockAcc);
-block(Ref, [I | Code], Acc, Blocks, BlockAcc) ->
-    block(Ref, Code, [I | Acc], Blocks, BlockAcc).
+block(Blk = #blk{code = [switch_body | Code]}, Acc, Blocks, BlockAcc) ->
+    %% Reached the body of a switch. Clear catchall ref.
+    block(Blk#blk{code = Code, catchall = none}, Acc, Blocks, BlockAcc);
+block(Blk = #blk{code     = [{switch, Type, Alts, Default} | Code],
+                 catchall = Catchall}, Acc, Blocks, BlockAcc) ->
+    FreshBlk = fun(C, Ca) ->
+                   R = make_ref(),
+                   {R, [#blk{ref = R, code = C, catchall = Ca}]}
+               end,
+    {RestRef, RestBlk} = FreshBlk(Code, Catchall),
+    {DefRef, DefBlk} =
+        case Default of
+            missing -> {Catchall, []};
+            _       -> FreshBlk(Default ++ [{jump, RestRef}], Catchall)
+                       %% ^ fall-through to the outer catchall
+        end,
+    {Blk1, Code1, AltBlks} =
+        case Type of
+            boolean ->
+                [FalseCode, TrueCode] = Alts,
+                {ThenRef, ThenBlk} =
+                    case TrueCode of
+                        missing -> {DefRef, []};
+                        _       -> FreshBlk(TrueCode ++ [{jump, RestRef}], DefRef)
+                    end,
+                ElseCode =
+                    case FalseCode of
+                        missing -> [{jump, DefRef}];
+                        _       -> FalseCode ++ [{jump, RestRef}]
+                    end,
+                {Blk#blk{code = ElseCode}, [{jumpif, ThenRef}], ThenBlk};
+            tuple ->
+                [TCode] = Alts,
+                {Blk#blk{code = TCode ++ [{jump, RestRef}]}, [], []}
+        end,
+    Blk2 = Blk1#blk{catchall = DefRef}, %% Update catchall ref
+    block(Blk2, Code1 ++ Acc, DefBlk ++ RestBlk ++ AltBlks ++ Blocks, BlockAcc);
+block(Blk = #blk{code = [I | Code]}, Acc, Blocks, BlockAcc) ->
+    block(Blk#blk{code = Code}, [I | Acc], Blocks, BlockAcc).
 
 %% -- Reorder, inline, and remove dead blocks --
 
