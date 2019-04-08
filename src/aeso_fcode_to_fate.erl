@@ -41,7 +41,8 @@
      Op =:= 'NEQ' orelse
      Op =:= 'AND' orelse
      Op =:= 'OR'  orelse
-     Op =:= 'ELEMENT')).
+     Op =:= 'ELEMENT' orelse
+     Op =:= 'CONS')).
 
 -record(env, { vars = [], locals = [], tailpos = true }).
 
@@ -123,6 +124,8 @@ to_scode(_Env, {integer, N}) ->
 
 to_scode(_Env, {bool, B}) ->
     [aeb_fate_code:push(?i(B))];
+
+to_scode(_Env, nil) -> aeb_fate_code:nil(?a);
 
 to_scode(Env, {var, X}) ->
     [aeb_fate_code:push(lookup_var(Env, X))];
@@ -210,14 +213,11 @@ match_tuple(Env, _, []) ->
 
 %% -- Operators --
 
-binop_to_scode('+') -> add_a_a_a();  %% Optimization introduces other variants
-binop_to_scode('-') -> sub_a_a_a();
-binop_to_scode('==') -> eq_a_a_a().
+binop_to_scode('+') -> aeb_fate_code:add(?a, ?a, ?a);
+binop_to_scode('-') -> aeb_fate_code:sub(?a, ?a, ?a);
+binop_to_scode('==') -> aeb_fate_code:eq(?a, ?a, ?a);
+binop_to_scode('::') -> aeb_fate_code:cons(?a, ?a, ?a).
 % binop_to_scode(Op) -> ?TODO(Op).
-
-add_a_a_a() -> aeb_fate_code:add(?a, ?a, ?a).
-sub_a_a_a() -> aeb_fate_code:sub(?a, ?a, ?a).
-eq_a_a_a()  -> aeb_fate_code:eq(?a, ?a, ?a).
 
 %% -- Phase II ---------------------------------------------------------------
 %%  Optimize

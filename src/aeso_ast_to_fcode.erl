@@ -24,10 +24,11 @@
 -type var_name() :: string().
 -type sophia_name() :: [string()].
 
--type binop() :: '+' | '-' | '=='.
+-type binop() :: '+' | '-' | '==' | '::'.
 
 -type fexpr() :: {integer, integer()}
                | {bool, false | true}
+               | nil
                | {var, var_name()}
                | {tuple, [fexpr()]}
                | {binop, ftype(), binop(), fexpr(), fexpr()}
@@ -196,6 +197,12 @@ expr_to_fcode(_Env, _Type, {id, _, X}) -> {var, X};
 expr_to_fcode(Env, _Type, {tuple, _, Es}) ->
     {tuple, [expr_to_fcode(Env, E) || E <- Es]};
 
+%% Lists
+expr_to_fcode(Env, Type, {list, _, Es}) ->
+    FType = type_to_fcode(Env, Type),
+    lists:foldr(fun(E, L) -> {binop, FType, '::', expr_to_fcode(Env, E), L} end,
+                nil, Es);
+
 %% Conditionals
 expr_to_fcode(Env, _Type, {'if', _, Cond, Then, Else}) ->
     {'if', expr_to_fcode(Env, Cond),
@@ -315,6 +322,7 @@ rename(Ren, Expr) ->
     case Expr of
         {integer, _}           -> Expr;
         {bool, _}              -> Expr;
+        nil                    -> nil;
         {var, X}               -> {var, rename_var(Ren, X)};
         {tuple, Es}            -> {tuple, [rename(Ren, E) || E <- Es]};
         {binop, T, Op, E1, E2} -> {binop, T, Op, rename(Ren, E1), rename(Ren, E2)};
