@@ -484,7 +484,7 @@ merge_ann(#{ live_in := LiveIn }, #{ live_out := LiveOut }) ->
     #{ live_in => LiveIn, live_out => LiveOut }.
 
 %% Swap two instructions. Precondition: the instructions are independent/2.
-swap_instrs({#{ live_in := Live1, live_out := Live2 }, I}, {#{ live_in := Live2, live_out := Live3 }, J}) ->
+swap_instrs({#{ live_in := Live1 }, I}, {#{ live_in := Live2, live_out := Live3 }, J}) ->
     %% Since I and J are independent the J can't read or write anything in
     %% that I writes.
     WritesI = ordsets:subtract(Live2, Live1),
@@ -764,6 +764,8 @@ block(Blk = #blk{code     = [{switch, Type, Alts, Default} | Code],
     {RestRef, RestBlk} = FreshBlk(Code, Catchall),
     {DefRef, DefBlk} =
         case Default of
+            missing when Catchall == none ->
+                FreshBlk([aeb_fate_code:abort(?i(<<"Incomplete patterns">>))], none);
             missing -> {Catchall, []};
             _       -> FreshBlk(Default ++ [{jump, RestRef}], Catchall)
                        %% ^ fall-through to the outer catchall
@@ -816,6 +818,7 @@ reorder_blocks(Ref, Code, Blocks, Acc) ->
     case Code of
         ['RETURN'|_]        -> reorder_blocks(Blocks, Acc1);
         [{'RETURNR', _}|_]  -> reorder_blocks(Blocks, Acc1);
+        [{'ABORT', _}|_]    -> reorder_blocks(Blocks, Acc1);
         [{jump, L}|_]     ->
             NotL = fun({L1, _}) -> L1 /= L end,
             case lists:splitwith(NotL, Blocks) of

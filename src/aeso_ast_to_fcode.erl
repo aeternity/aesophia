@@ -165,14 +165,14 @@ decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, {id, _, Name}, Args, R
     Env#{ functions := NewFuns }.
 
 -spec type_to_fcode(env(), aeso_syntax:type()) -> ftype().
-type_to_fcode(Env, {app_t, T = {Id, _, _}, Types}) when Id == id; Id == qid ->
+type_to_fcode(Env, {app_t, _, T = {Id, _, _}, Types}) when Id == id; Id == qid ->
     lookup_type(Env, T, [type_to_fcode(Env, Type) || Type <- Types]);
 type_to_fcode(Env, T = {Id, _, _}) when Id == id; Id == qid ->
     lookup_type(Env, T, []);
 type_to_fcode(Env, {tuple_t, _, Types}) ->
     {tuple, [type_to_fcode(Env, T) || T <- Types]};
 type_to_fcode(_Env, Type) ->
-    {todo, Type}.
+    error({todo, Type}).
 
 -spec args_to_fcode(env(), [aeso_syntax:arg()]) -> [{var_name(), ftype()}].
 args_to_fcode(Env, Args) ->
@@ -199,8 +199,7 @@ expr_to_fcode(Env, _Type, {tuple, _, Es}) ->
 
 %% Lists
 expr_to_fcode(Env, Type, {list, _, Es}) ->
-    FType = type_to_fcode(Env, Type),
-    lists:foldr(fun(E, L) -> {binop, FType, '::', expr_to_fcode(Env, E), L} end,
+    lists:foldr(fun(E, L) -> {binop, Type, '::', expr_to_fcode(Env, E), L} end,
                 nil, Es);
 
 %% Conditionals
@@ -246,20 +245,17 @@ alts_to_fcode(Env, Type, X, Alts) ->
 split_tree(_Env, _Vars, []) ->
     error(non_exhaustive_patterns); %% TODO: nice error
 split_tree(Env, Vars, Alts = [{'case', Pats, Body} | _]) ->
-    io:format("split_tree\n  Vars = ~p\n  Alts = ~120p\n", [Vars, Alts]),
     case next_split(Pats) of
         false ->
             Xs  = [ X || {X, _} <- Vars ],
             Ys  = [ Y || {var, Y} <- Pats ],
             Ren = [ {Y, X} || {Y, X} <- lists:zip(Ys, Xs), X /= Y, Y /= "_" ],
             %% TODO: Unreachable clauses error
-            io:format("Renaming: ~p in\n  ~p\n", [Ren, Body]),
             {nosplit, rename(Ren, Body)};
         I when is_integer(I) ->
-            io:format("  split_at ~p\n", [I]),
+            Xs    = [X || {X, _} <- Vars],
             {Vars0, [{X, Type} | Vars1]} = lists:split(I - 1, Vars),
-            SAlts = merge_alts(I, X, [ split_alt(I, A) || A <- Alts ]),
-            io:format("  SAlts = ~p\n", [SAlts]),
+            SAlts = merge_alts(I, X, [ split_alt(Xs, I, A) || A <- Alts ]),
             Cases = [ {'case', SPat, split_tree(Env, Vars0 ++ split_vars(SPat, Type) ++ Vars1, FAlts)}
                       || {SPat, FAlts} <- SAlts ],
             {split, Type, X, Cases}
@@ -267,8 +263,11 @@ split_tree(Env, Vars, Alts = [{'case', Pats, Body} | _]) ->
 
 -spec merge_alts(integer(), var_name(), [{fsplit_pat(), falt()}]) -> [{fsplit_pat(), [falt()]}].
 merge_alts(I, X, Alts) ->
+    merge_alts(I, X, Alts, []).
+
+merge_alts(I, X, Alts, Alts1) ->
     lists:foldr(fun(A, As) -> merge_alt(I, X, A, As) end,
-                [], Alts).
+                Alts1, Alts).
 
 -spec merge_alt(integer(), var_name(), {fsplit_pat(), falt()}, Alts) -> Alts
         when Alts :: [{fsplit_pat(), [falt()]}].
@@ -281,33 +280,33 @@ merge_alt(I, X, {P, A}, [{Q, As} | Rest]) ->
                (_, {var, _})            -> insert;
                (_, _)                   -> mismatch
             end,
-
     case Match(P, Q) of
         match    -> [{Q, [A | As]} | Rest];
         mismatch -> [{Q, As} | merge_alt(I, X, {P, A}, Rest)];
-        expand   -> [{Q, [expand(I, X, Q, A) | As]} | Rest];
+        expand   -> merge_alts(I, X, expand(I, X, Q, A), [{Q, As} | Rest]);
         insert   -> [{P, [A]}, {Q, As} | Rest]
     end.
 
 expand(I, X, Q, {'case', Ps, E}) ->
     {Ps0, [{var, Y} | Ps1]} = lists:split(I - 1, Ps),
-    Qs = case Q of
-           {tuple, Xs} -> [{var, "_"} || _ <- Xs];
-           {bool, _}   -> []
-         end,
-    {'case', Ps0 ++ Qs ++ Ps1, rename([{Y, X}], E)}.
+    Splice = fun(Qs) -> Ps0 ++ Qs ++ Ps1 end,
+    E1 = rename([{Y, X}], E),
+    case Q of
+        {tuple, Xs} -> [{Q, {'case', Splice([{var, "_"} || _ <- Xs]), E1}}];
+        {bool, _}   -> [{{bool, B}, {'case', Splice([]), E1}} || B <- [false, true]]
+    end.
 
--spec split_alt(integer(), falt()) -> {fsplit_pat(), falt()}.
-split_alt(I, {'case', Pats, Body}) ->
+-spec split_alt([var_name()], integer(), falt()) -> {fsplit_pat(), falt()}.
+split_alt(Bound, I, {'case', Pats, Body}) ->
     {Pats0, [Pat | Pats1]} = lists:split(I - 1, Pats),
-    {SPat, InnerPats} = split_pat(Pat),
+    {SPat, InnerPats} = split_pat(Bound, Pat),
     {SPat, {'case', Pats0 ++ InnerPats ++ Pats1, Body}}.
 
--spec split_pat(fpat()) -> {fsplit_pat(), [fpat()]}.
-split_pat(P = {var, X}) -> {{var, fresh_if_blank(X)}, [P]};
-split_pat({bool, B})    -> {{bool, B}, []};
-split_pat({tuple, Pats}) ->
-    Var = fun({var, X}) -> fresh_if_blank(X); (_) -> fresh_name() end,
+-spec split_pat(var_name(), fpat()) -> {fsplit_pat(), [fpat()]}.
+split_pat(Bound, P = {var, X}) -> {{var, freshen(Bound, X)}, [P]};
+split_pat(_Bound, {bool, B})    -> {{bool, B}, []};
+split_pat(Bound, {tuple, Pats}) ->
+    Var = fun({var, X}) -> freshen(Bound, X); (_) -> fresh_name() end,
     Xs = [Var(P) || P <- Pats],
     {{tuple, Xs}, Pats}.
 
@@ -484,9 +483,11 @@ fresh_name() ->
     put('%fresh', N + 1),
     lists:concat(["%", N]).
 
--spec fresh_if_blank(var_name()) -> var_name().
-fresh_if_blank("_") -> fresh_name();
-fresh_if_blank(X)   -> X.
+freshen(Bound, X) ->
+    case lists:member(X, ["_" | Bound]) of
+        true  -> fresh_name();
+        false -> X
+    end.
 
 %% -- Attributes --
 
