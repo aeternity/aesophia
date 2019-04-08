@@ -43,7 +43,7 @@
      Op =:= 'OR'  orelse
      Op =:= 'ELEMENT')).
 
--record(env, { args = [], stack = [], locals = [], tailpos = true }).
+-record(env, { vars = [], locals = [], tailpos = true }).
 
 %% -- Debugging --------------------------------------------------------------
 
@@ -95,22 +95,25 @@ function_to_scode(Name, Args, Body, ResType, Options) ->
 %% -- Environment functions --
 
 init_env(Args) ->
-    #env{ args = Args, stack = [], tailpos = true }.
+    #env{ vars    = [ {X, {arg, I}} || {I, {X, _}} <- with_ixs(Args) ],
+          tailpos = true }.
 
-push_env(Type, Env) ->
-    Env#env{ stack = [Type | Env#env.stack] }.
+next_var(#env{ vars = Vars }) ->
+    1 + lists:max([-1 | [J || {_, {var, J}} <- Vars]]).
 
-bind_local(Name, Env = #env{ locals = Locals }) ->
-    I = length(Locals),
-    {I, Env#env{ locals = [{Name, I} | Locals] }}.
+bind_var(Name, Var, Env = #env{ vars = Vars }) ->
+    Env#env{ vars = [{Name, Var} | Vars] }.
+
+bind_local(Name, Env) ->
+    I = next_var(Env),
+    {I, bind_var(Name, {var, I}, Env)}.
 
 notail(Env) -> Env#env{ tailpos = false }.
 
-lookup_var(Env = #env{ args = Args, locals = Locals }, X) ->
-    case {lists:keyfind(X, 1, Locals), keyfind_index(X, 1, Args)} of
-        {false, false}  -> error({unbound_variable, X, Env});
-        {false, Arg}    -> {arg, Arg};
-        {{_, Local}, _} -> {var, Local}
+lookup_var(Env = #env{ vars = Vars }, X) ->
+    case lists:keyfind(X, 1, Vars) of
+        false    -> error({unbound_variable, X, Env});
+        {_, Var} -> Var
     end.
 
 %% -- The compiler --
@@ -129,9 +132,9 @@ to_scode(Env, {tuple, As}) ->
     [[ to_scode(Env, A) || A <- As ],
      aeb_fate_code:tuple(N)];
 
-to_scode(Env, {binop, Type, Op, A, B}) ->
+to_scode(Env, {binop, _Type, Op, A, B}) ->
     [ to_scode(notail(Env), B),
-      to_scode(push_env(Type, Env), A),
+      to_scode(Env, A),
       binop_to_scode(Op) ];
 
 to_scode(Env, {'if', Dec, Then, Else}) ->
@@ -181,10 +184,8 @@ split_to_scode(_, Split = {split, _, _, _}) ->
 catchall_to_scode(Env, X, Alts) -> catchall_to_scode(Env, X, Alts, []).
 
 catchall_to_scode(Env, X, [{'case', {var, Y}, Split} | _], Acc) ->
-    I = lookup_var(Env, X),
-    {J, Env1} = bind_local(Y, Env),
-    {[aeb_fate_code:store({var, J}, I),
-      split_to_scode(Env1, Split)], lists:reverse(Acc)};
+    Env1 = bind_var(Y, lookup_var(Env, X), Env),
+    {split_to_scode(Env1, Split), lists:reverse(Acc)};
 catchall_to_scode(Env, X, [Alt | Alts], Acc) ->
     catchall_to_scode(Env, X, Alts, [Alt | Acc]);
 catchall_to_scode(_, _, [], Acc) -> {missing, lists:reverse(Acc)}.
@@ -658,6 +659,8 @@ r_write_to_dead_var({Ann, {'STORE', R = {var, _}, A}}, Code) when A /= ?a ->
         false ->
             case Code of
                 []                  -> {[], []};
+                [switch_body, {Ann1, I} | Code1] ->
+                    {[], [switch_body, {merge_ann(Ann, Ann1), I} | Code1]};
                 [{Ann1, I} | Code1] ->
                     {[], [{merge_ann(Ann, Ann1), I} | Code1]}
             end;
@@ -710,7 +713,6 @@ to_basic_blocks(Funs, Options) ->
                      || {Name, {{Args, Res}, Code}} <- maps:to_list(Funs) ]).
 
 bb(_Name, Code, _Options) ->
-    io:format("Code = ~p\n", [Code]),
     Blocks0 = blocks(Code),
     Blocks  = optimize_blocks(Blocks0),
     Labels  = maps:from_list([ {Ref, I} || {I, {Ref, _}} <- with_ixs(Blocks) ]),
