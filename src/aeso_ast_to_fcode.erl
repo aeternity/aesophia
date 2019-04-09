@@ -289,8 +289,10 @@ merge_alt(I, X, {P, A}, [{Q, As} | Rest]) ->
 
 expand(I, X, Q, {'case', Ps, E}) ->
     {Ps0, [{var, Y} | Ps1]} = lists:split(I - 1, Ps),
-    Splice = fun(Qs) -> Ps0 ++ Qs ++ Ps1 end,
-    E1 = rename([{Y, X}], E),
+    {Ps0r, Ren1} = rename_pats([{Y, X}], Ps0),
+    {Ps1r, Ren2} = rename_pats(Ren1, Ps1),
+    E1 = rename(Ren2, E),
+    Splice = fun(Qs) -> Ps0r ++ Qs ++ Ps1r end,
     case Q of
         {tuple, Xs} -> [{Q, {'case', Splice([{var, "_"} || _ <- Xs]), E1}}];
         {bool, _}   -> [{{bool, B}, {'case', Splice([]), E1}} || B <- [false, true]]
@@ -347,6 +349,12 @@ rename_bindings(Ren, [X | Xs]) ->
     {Z, Ren1}  = rename_binding(Ren, X),
     {Zs, Ren2} = rename_bindings(Ren1, Xs),
     {[Z | Zs], Ren2}.
+
+rename_pats(Ren, []) -> {[], Ren};
+rename_pats(Ren, [P | Ps]) ->
+    {Q, Ren1}  = rename_pat(Ren, P),
+    {Qs, Ren2} = rename_pats(Ren1, Ps),
+    {[Q | Qs], Ren2}.
 
 rename_pat(Ren, P = {bool, _}) -> {P, Ren};
 rename_pat(Ren, {var, X}) ->
