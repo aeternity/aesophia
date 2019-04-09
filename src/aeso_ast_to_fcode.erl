@@ -274,9 +274,8 @@ split_tree(Env, Vars, Alts = [{'case', Pats, Body} | _]) ->
             %% TODO: Unreachable clauses error
             {nosplit, rename(Ren, Body)};
         I when is_integer(I) ->
-            Xs    = [X || {X, _} <- Vars],
             {Vars0, [{X, Type} | Vars1]} = lists:split(I - 1, Vars),
-            SAlts = merge_alts(I, X, [ split_alt(Xs, I, A) || A <- Alts ]),
+            SAlts = merge_alts(I, X, [ split_alt(I, A) || A <- Alts ]),
             Cases = [ {'case', SPat, split_tree(Env, Vars0 ++ split_vars(SPat, Type) ++ Vars1, FAlts)}
                       || {SPat, FAlts} <- SAlts ],
             {split, Type, X, Cases}
@@ -319,16 +318,16 @@ expand(I, X, Q, {'case', Ps, E}) ->
         {bool, _}   -> [{{bool, B}, {'case', Splice([]), E1}} || B <- [false, true]]
     end.
 
--spec split_alt([var_name()], integer(), falt()) -> {fsplit_pat(), falt()}.
-split_alt(Bound, I, {'case', Pats, Body}) ->
+-spec split_alt(integer(), falt()) -> {fsplit_pat(), falt()}.
+split_alt(I, {'case', Pats, Body}) ->
     {Pats0, [Pat | Pats1]} = lists:split(I - 1, Pats),
-    {SPat, InnerPats} = split_pat(Bound, Pat),
+    {SPat, InnerPats} = split_pat(Pat),
     {SPat, {'case', Pats0 ++ InnerPats ++ Pats1, Body}}.
 
--spec split_pat(var_name(), fpat()) -> {fsplit_pat(), [fpat()]}.
-split_pat(_Bound, P = {var, _}) -> {{var, fresh_name()}, [P]};
-split_pat(_Bound, {bool, B})    -> {{bool, B}, []};
-split_pat(_Bound, {tuple, Pats}) ->
+-spec split_pat(fpat()) -> {fsplit_pat(), [fpat()]}.
+split_pat(P = {var, _}) -> {{var, fresh_name()}, [P]};
+split_pat({bool, B})    -> {{bool, B}, []};
+split_pat({tuple, Pats}) ->
     Xs = [fresh_name() || _ <- Pats],
     {{tuple, Xs}, Pats}.
 
