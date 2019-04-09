@@ -32,7 +32,6 @@
                | {var, var_name()}
                | {tuple, [fexpr()]}
                | {binop, ftype(), binop(), fexpr(), fexpr()}
-               | {'if', fexpr(), fexpr(), fexpr()}
                | {'let', var_name(), fexpr(), fexpr()}
                | {switch, fsplit()}.
 
@@ -151,6 +150,7 @@ decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, {id, _, Name}, Args, R
     FName = lookup_fun(Env, qname(Env, Name)),
     FArgs = args_to_fcode(Env, Args),
     FBody = expr_to_fcode(Env, Body),
+    %% io:format("Body of ~s\n~s\n", [Name, format_fexpr(FBody)]),
     Def   = #{ attrs  => Attrs,
                args   => FArgs,
                return => type_to_fcode(Env, Ret),
@@ -198,9 +198,17 @@ expr_to_fcode(Env, Type, {list, _, Es}) ->
 
 %% Conditionals
 expr_to_fcode(Env, _Type, {'if', _, Cond, Then, Else}) ->
-    {'if', expr_to_fcode(Env, Cond),
-           expr_to_fcode(Env, Then),
-           expr_to_fcode(Env, Else)};
+    Switch = fun(X) ->
+                 {switch, {split, boolean, X,
+                    [{'case', {bool, false}, {nosplit, expr_to_fcode(Env, Else)}},
+                     {'case', {bool, true},  {nosplit, expr_to_fcode(Env, Then)}}]}}
+             end,
+    case Cond of
+        {var, X} -> Switch(X);
+        _        ->
+            X = fresh_name(),
+            {'let', X, expr_to_fcode(Env, Cond), Switch(X)}
+    end;
 
 %% Switch
 expr_to_fcode(Env, _, {switch, _, Expr = {typed, _, E, Type}, Alts}) ->
@@ -326,7 +334,6 @@ rename(Ren, Expr) ->
         {var, X}               -> {var, rename_var(Ren, X)};
         {tuple, Es}            -> {tuple, [rename(Ren, E) || E <- Es]};
         {binop, T, Op, E1, E2} -> {binop, T, Op, rename(Ren, E1), rename(Ren, E2)};
-        {'if', A, B, C}        -> {'if', rename(Ren, A), rename(Ren, B), rename(Ren, C)};
         {'let', X, E, Body}    ->
             {Z, Ren1} = rename_binding(Ren, X),
             {'let', Z, rename(Ren, E), rename(Ren1, Body)};
@@ -538,10 +545,6 @@ pp_fexpr({tuple, Es}) ->
     pp_parens(prettypr:par(pp_punctuate(pp_text(","), [pp_fexpr(E) || E <- Es])));
 pp_fexpr({binop, _Type, Op, A, B}) ->
     pp_parens(prettypr:par([pp_fexpr(A), pp_text(Op), pp_fexpr(B)]));
-pp_fexpr({'if', A, B, C}) ->
-    prettypr:par([pp_beside(pp_text("if "), pp_fexpr(A)),
-                  prettypr:nest(2, pp_beside(pp_text("then "), pp_fexpr(B))),
-                  prettypr:nest(2, pp_beside(pp_text("else "), pp_fexpr(C)))]);
 pp_fexpr({'let', X, A, B}) ->
     prettypr:par([pp_beside([pp_text("let "), pp_text(X), pp_text(" = "), pp_fexpr(A), pp_text(" in")]),
                   pp_fexpr(B)]);

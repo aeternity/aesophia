@@ -150,10 +150,6 @@ to_scode(Env, {binop, _Type, Op, A, B}) ->
       to_scode(Env, A),
       binop_to_scode(Op) ];
 
-to_scode(Env, {'if', Dec, Then, Else}) ->
-    [ to_scode(notail(Env), Dec),
-      {switch, boolean, [to_scode(Env, Else), to_scode(Env, Then)], missing} ];
-
 to_scode(Env, {'let', X, {var, Y}, Body}) ->
     Env1 = bind_var(X, lookup_var(Env, Y), Env),
     to_scode(Env1, Body);
