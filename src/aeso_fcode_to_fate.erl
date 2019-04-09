@@ -131,7 +131,7 @@ lookup_var(Env = #env{ vars = Vars }, X) ->
 
 %% -- The compiler --
 
-to_scode(_Env, {integer, N}) ->
+to_scode(_Env, {int, N}) ->
     [aeb_fate_code:push(?i(N))];    %% Doesn't exist (yet), translated by desugaring
 
 to_scode(_Env, {bool, B}) ->
@@ -192,8 +192,23 @@ split_to_scode(Env, {split, boolean, X, Alts}) ->
     SAlts = [GetAlt(false), GetAlt(true)],
     [aeb_fate_code:push(lookup_var(Env, X)),
      {switch, boolean, SAlts, Def}];
+split_to_scode(Env, {split, integer, X, Alts}) ->
+    {Def, Alts1} = catchall_to_scode(Env, X, Alts),
+    literal_split_to_scode(Env, integer, X, Alts1, Def);
 split_to_scode(_, Split = {split, _, _, _}) ->
     ?TODO({'case', Split}).
+
+literal_split_to_scode(_Env, _Type, _X, [], Def) ->
+    {switch, boolean, [missing, missing], Def};
+literal_split_to_scode(Env, integer, X, [{'case', {int, N}, Body} | Alts], Def) ->
+    True = split_to_scode(Env, Body),
+    False =
+        case Alts of
+            [] -> missing;
+            _  -> literal_split_to_scode(Env, integer, X, Alts, missing)
+        end,
+    [aeb_fate_code:eq(?a, lookup_var(Env, X), ?i(N)),
+     {switch, boolean, [False, True], Def}].
 
 catchall_to_scode(Env, X, Alts) -> catchall_to_scode(Env, X, Alts, []).
 

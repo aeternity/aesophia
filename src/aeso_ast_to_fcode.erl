@@ -26,7 +26,7 @@
 
 -type binop() :: '+' | '-' | '==' | '::'.
 
--type fexpr() :: {integer, integer()}
+-type fexpr() :: {int, integer()}
                | {bool, false | true}
                | nil
                | {var, var_name()}
@@ -41,6 +41,7 @@
 -type fcase() :: {'case', fsplit_pat(), fsplit()}.
 
 -type fsplit_pat()  :: {bool, false | true}
+                     | {int, integer()}
                      | {tuple, [var_name()]}
                      | {var, var_name()}.
 
@@ -163,7 +164,7 @@ decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, {id, _, Name}, Args, R
     FName = lookup_fun(Env, qname(Env, Name)),
     FArgs = args_to_fcode(Env, Args),
     FBody = expr_to_fcode(Env, Body),
-    %% io:format("Body of ~s\n~s\n", [Name, format_fexpr(FBody)]),
+    %% io:format("Body of ~s:\n~s\n", [Name, format_fexpr(FBody)]),
     Def   = #{ attrs  => Attrs,
                args   => FArgs,
                return => type_to_fcode(Env, Ret),
@@ -194,7 +195,7 @@ expr_to_fcode(Env, Expr) ->
 -spec expr_to_fcode(env(), ftype() | no_type, aeso_syntax:expr()) -> fexpr().
 
 %% Literals
-expr_to_fcode(_Env, _Type, {int, _, N})  -> {integer, N};
+expr_to_fcode(_Env, _Type, {int, _, N})  -> {int, N};
 expr_to_fcode(_Env, _Type, {bool, _, B}) -> {bool, B};
 
 %% Variables
@@ -259,6 +260,7 @@ alts_to_fcode(Env, Type, X, Alts) ->
 -type falt() :: {'case', [fpat()], fexpr()}.
 -type fpat() :: {var, var_name()}
               | {bool, false | true}
+              | {int, integer()}
               | {tuple, [fpat()]}.
 
 %% %% Invariant: the number of variables matches the number of patterns in each falt.
@@ -296,6 +298,7 @@ merge_alt(I, X, {P, A}, [{Q, As} | Rest]) ->
     Match = fun({var, _}, {var, _})     -> match;
                ({tuple, _}, {tuple, _}) -> match;
                ({bool, B}, {bool, B})   -> match;
+               ({int, N},  {int, N})    -> match;
                ({var, _}, _)            -> expand;
                (_, {var, _})            -> insert;
                (_, _)                   -> mismatch
@@ -303,19 +306,22 @@ merge_alt(I, X, {P, A}, [{Q, As} | Rest]) ->
     case Match(P, Q) of
         match    -> [{Q, [A | As]} | Rest];
         mismatch -> [{Q, As} | merge_alt(I, X, {P, A}, Rest)];
-        expand   -> merge_alts(I, X, expand(I, X, Q, A), [{Q, As} | Rest]);
+        expand   ->
+            {Before, After} = expand(I, X, P, Q, A),
+            merge_alts(I, X, Before, [{Q, As} | merge_alts(I, X, After, Rest)]);
         insert   -> [{P, [A]}, {Q, As} | Rest]
     end.
 
-expand(I, X, Q, {'case', Ps, E}) ->
+expand(I, X, P, Q, Case = {'case', Ps, E}) ->
     {Ps0, [{var, Y} | Ps1]} = lists:split(I - 1, Ps),
     {Ps0r, Ren1} = rename_pats([{Y, X} || Y /= X], Ps0),
     {Ps1r, Ren2} = rename_pats(Ren1, Ps1),
     E1 = rename(Ren2, E),
     Splice = fun(Qs) -> Ps0r ++ Qs ++ Ps1r end,
     case Q of
-        {tuple, Xs} -> [{Q, {'case', Splice([{var, "_"} || _ <- Xs]), E1}}];
-        {bool, _}   -> [{{bool, B}, {'case', Splice([]), E1}} || B <- [false, true]]
+        {tuple, Xs} -> {[{Q,         {'case', Splice([{var, "_"} || _ <- Xs]), E1}}], []};
+        {bool, _}   -> {[{{bool, B}, {'case', Splice([]), E1}} || B <- [false, true]], []};
+        {int, _}    -> {[{Q,         {'case', Splice([]), E1}}], [{P, Case}]}
     end.
 
 -spec split_alt(integer(), falt()) -> {fsplit_pat(), falt()}.
@@ -325,14 +331,16 @@ split_alt(I, {'case', Pats, Body}) ->
     {SPat, {'case', Pats0 ++ InnerPats ++ Pats1, Body}}.
 
 -spec split_pat(fpat()) -> {fsplit_pat(), [fpat()]}.
-split_pat(P = {var, _}) -> {{var, fresh_name()}, [P]};
-split_pat({bool, B})    -> {{bool, B}, []};
+split_pat(P = {var, _})  -> {{var, fresh_name()}, [P]};
+split_pat({bool, B})     -> {{bool, B}, []};
+split_pat({int, N})      -> {{int, N}, []};
 split_pat({tuple, Pats}) ->
     Xs = [fresh_name() || _ <- Pats],
     {{tuple, Xs}, Pats}.
 
 -spec split_vars(fsplit_pat(), ftype()) -> [{var_name(), ftype()}].
 split_vars({bool, _}, boolean) -> [];
+split_vars({int, _},  integer) -> [];
 split_vars({tuple, Xs}, {tuple, Ts}) ->
     lists:zip(Xs, Ts);
 split_vars({var, X}, T) -> [{X, T}].
@@ -340,7 +348,7 @@ split_vars({var, X}, T) -> [{X, T}].
 -spec rename([{var_name(), var_name()}], fexpr()) -> fexpr().
 rename(Ren, Expr) ->
     case Expr of
-        {integer, _}           -> Expr;
+        {int, _}               -> Expr;
         {bool, _}              -> Expr;
         nil                    -> nil;
         {var, X}               -> {var, rename_var(Ren, X)};
@@ -375,6 +383,7 @@ rename_pats(Ren, [P | Ps]) ->
     {[Q | Qs], Ren2}.
 
 rename_pat(Ren, P = {bool, _}) -> {P, Ren};
+rename_pat(Ren, P = {int, _})  -> {P, Ren};
 rename_pat(Ren, {var, X}) ->
     {Z, Ren1} = rename_binding(Ren, X),
     {{var, Z}, Ren1};
@@ -414,6 +423,8 @@ pat_to_fcode(Env, _Type, {tuple, _, Pats}) ->
     {tuple, [ pat_to_fcode(Env, Pat) || Pat <- Pats ]};
 pat_to_fcode(_Env, _Type, {bool, _, B}) ->
     {bool, B};
+pat_to_fcode(_Env, _Type, {int, _, N}) ->
+    {int, N};
 pat_to_fcode(_Env, Type, Pat) -> {todo, Pat, ':', Type}.
 
 -spec stmts_to_fcode(env(), [aeso_syntax:stmt()]) -> fexpr().
@@ -545,7 +556,7 @@ pp_punctuate(_Sep, [])      -> [];
 pp_punctuate(_Sep, [X])     -> [X];
 pp_punctuate(Sep, [X | Xs]) -> [pp_beside(X, Sep) | pp_punctuate(Sep, Xs)].
 
-pp_fexpr({integer, N}) ->
+pp_fexpr({int, N}) ->
     pp_text(N);
 pp_fexpr({bool, B}) ->
     pp_text(B);
