@@ -298,7 +298,7 @@ ann_writes([{switch, Type, Alts, Def} | Code], Writes, Acc) ->
     Writes1 = ordsets:union(Writes, ordsets:intersection([WritesDef | WritesAlts])),
     ann_writes(Code, Writes1, [{switch, Type, Alts1, Def1} | Acc]);
 ann_writes([I | Code], Writes, Acc) ->
-    Ws = var_writes(I),
+    Ws = var_writes({#{}, I}),
     Writes1 = ordsets:union(Writes, Ws),
     Ann = #{ writes_in => Writes, writes_out => Writes1 },
     ann_writes(Code, Writes1, [{Ann, I} | Acc]);
@@ -453,7 +453,7 @@ attributes(I) ->
         'NOP'                                 -> Pure(none, [])
     end.
 
-var_writes(I) ->
+var_writes({_, I}) ->
     #{ write := W } = attributes(I),
     case W of
         {var, _} -> [W];
@@ -464,7 +464,7 @@ independent({switch, _, _, _}, _) -> false;
 independent(_, {switch, _, _, _}) -> false;
 independent(switch_body, _) -> true;
 independent(_, switch_body) -> true;
-independent(I, J) ->
+independent({_, I}, {_, J}) ->
     #{ write := WI, read := RI, pure := PureI } = attributes(I),
     #{ write := WJ, read := RJ, pure := PureJ } = attributes(J),
 
@@ -484,6 +484,8 @@ merge_ann(#{ live_in := LiveIn }, #{ live_out := LiveOut }) ->
     #{ live_in => LiveIn, live_out => LiveOut }.
 
 %% Swap two instructions. Precondition: the instructions are independent/2.
+swap_instrs(I, switch_body) -> {switch_body, I};
+swap_instrs(switch_body, I) -> {I, switch_body};
 swap_instrs({#{ live_in := Live1 }, I}, {#{ live_in := Live2, live_out := Live3 }, J}) ->
     %% Since I and J are independent the J can't read or write anything in
     %% that I writes.
@@ -573,34 +575,36 @@ r_dup_to_push({Ann1, Push={'PUSH', _}}, [{Ann2, 'DUPA'} | Code]) ->
 r_dup_to_push(_, _) -> false.
 
 %% Move PUSH A past non-stack instructions.
-r_swap_push(PushA = {_, Push = {'PUSH', _}}, [IA = {_, I} | Code]) ->
+r_swap_push(Push = {_, {'PUSH', _}}, [I | Code]) ->
     case independent(Push, I) of
         true ->
-            {I1, Push1} = swap_instrs(PushA, IA),
+            {I1, Push1} = swap_instrs(Push, I),
             {[I1, Push1], Code};
         false -> false
     end;
 r_swap_push(_, _) -> false.
 
 %% Match up writes to variables with instructions further down.
-r_swap_write(IA = {_, I}, [JA = {_, J} | Code]) ->
+r_swap_write(I = {_, _}, [J | Code]) ->
     case {var_writes(I), independent(I, J)} of
         {[_], true} ->
-            {J1, I1} = swap_instrs(IA, JA),
+            {J1, I1} = swap_instrs(I, J),
             r_swap_write([J1], I1, Code);
         _ -> false
     end;
 r_swap_write(_, _) -> false.
 
-r_swap_write(Pre, IA = {_, I}, Code0 = [JA | Code]) ->
-    case {apply_rules_once(merge_rules(), IA, Code0), JA} of
-        {{_Rule, New, Rest}, _} ->
+r_swap_write(Pre, I, [switch_body | Code]) ->
+    r_swap_write([switch_body | Pre], I, Code);
+r_swap_write(Pre, I, Code0 = [J | Code]) ->
+    case apply_rules_once(merge_rules(), I, Code0) of
+        {_Rule, New, Rest} ->
             {lists:reverse(Pre) ++ New, Rest};
-        {false, {_, J}} ->
+        false ->
             case independent(I, J) of
                 false -> false;
                 true  ->
-                    {J1, I1} = swap_instrs(IA, JA),
+                    {J1, I1} = swap_instrs(I, J),
                     r_swap_write([J1 | Pre], I1, Code)
             end;
         _ -> false
