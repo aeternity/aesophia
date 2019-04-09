@@ -14,7 +14,7 @@
 
 %% -- Type definitions -------------------------------------------------------
 
--type option() :: none().
+-type option() :: term().
 
 -type attribute() :: stateful | pure.
 
@@ -44,8 +44,21 @@
                      | {tuple, [var_name()]}
                      | {var, var_name()}.
 
--type ftype() :: aeb_fate_data:fate_type_type().
-
+-type ftype() :: integer
+               | boolean
+               | {list, ftype()}
+               | {map, ftype(), ftype()}
+               | {tuple, [ftype()]}
+               | address
+               | hash
+               | signature
+               | contract
+               | oracle
+               | oracle_query
+               | name
+               | channel
+               | bits
+               | {variant, [[ftype()]]}.
 
 -type fun_def() :: #{ attrs  := [attribute()],
                       args   := [{var_name(), ftype()}],
@@ -66,7 +79,7 @@
 
 -type env() :: #{ type_env  := type_env(),
                   fun_env   := fun_env(),
-                  options   := [],
+                  options   := [option()],
                   context   => context(),
                   functions := #{ fun_name() => fun_def() } }.
 
@@ -390,13 +403,13 @@ next_split(Pats) ->
 alt_to_fcode(Env, {'case', _, Pat, Expr}) ->
     {'case', [pat_to_fcode(Env, Pat)], expr_to_fcode(Env, Expr)}.
 
--spec pat_to_fcode(env(), aeso_syntax:pattern()) -> fpat().
+-spec pat_to_fcode(env(), aeso_syntax:pat()) -> fpat().
 pat_to_fcode(Env, {typed, _, Pat, Type}) ->
     pat_to_fcode(Env, type_to_fcode(Env, Type), Pat);
 pat_to_fcode(Env, Pat) ->
     pat_to_fcode(Env, no_type, Pat).
 
--spec pat_to_fcode(env(), ftype() | no_type, aeso_syntax:pattern()) -> fpat().
+-spec pat_to_fcode(env(), ftype() | no_type, aeso_syntax:pat()) -> fpat().
 pat_to_fcode(_Env, _Type, {id, _, X}) -> {var, X};
 pat_to_fcode(Env, _Type, {tuple, _, Pats}) ->
     {tuple, [ pat_to_fcode(Env, Pat) || Pat <- Pats ]};
@@ -435,7 +448,7 @@ lookup_type(Env, Name, Args) ->
         Type      -> Type
     end.
 
--spec lookup_type(env(), sophia_name(), [ftype()], ftype()) -> ftype().
+-spec lookup_type(env(), sophia_name(), [ftype()], ftype() | A) -> ftype() | A.
 lookup_type(#{ type_env := TypeEnv }, Name, Args, Default) ->
     case maps:get(Name, TypeEnv, false) of
         false -> Default;
@@ -444,7 +457,7 @@ lookup_type(#{ type_env := TypeEnv }, Name, Args, Default) ->
 
 %% -- Names --
 
--spec add_fun_env(env(), [aeso_syntax:decl()]) -> fun_env().
+-spec add_fun_env(env(), [aeso_syntax:decl()]) -> env().
 add_fun_env(#{ context := {abstract_contract, _} }, _) -> #{};  %% no functions from abstract contracts
 add_fun_env(Env = #{ fun_env := FunEnv }, Decls) ->
     Entry = fun({letfun, Ann, {id, _, Name}, _, _, _}) ->

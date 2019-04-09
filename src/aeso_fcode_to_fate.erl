@@ -14,18 +14,20 @@
 
 %% -- Preamble ---------------------------------------------------------------
 
--type scode() :: {switch, stype(), [maybe_scode()], maybe_scode()}  %% last arg is catch-all
-               | switch_body
-               | tuple().    %% FATE instruction
+-type scode()  :: [sinstr()].
+-type sinstr() :: {switch, stype(), [maybe_scode()], maybe_scode()}  %% last arg is catch-all
+                | switch_body
+                | tuple().    %% FATE instruction
 
 %% Annotated scode
--type scode_a() :: {switch, stype(), [maybe_scode_a()], maybe_scode_a()}  %% last arg is catch-all
-                 | switch_body
-                 | {i, ann(), tuple()}.    %% FATE instruction
+-type scode_a()  :: [sinstr_a()].
+-type sinstr_a() :: {switch, stype(), [maybe_scode_a()], maybe_scode_a()}  %% last arg is catch-all
+                  | switch_body
+                  | {i, ann(), tuple()}.    %% FATE instruction
 
 -type ann() :: #{ live_in := vars(), live_out := vars() }.
 -type var() :: {var, integer()}.
--type vars() :: ordsets:set(var()).
+-type vars() :: ordsets:ordset(var()).
 
 -type stype()         :: tuple | boolean.
 -type maybe_scode()   :: missing | scode().
@@ -612,8 +614,7 @@ r_swap_write(Pre, I, Code0 = [J | Code]) ->
                 true  ->
                     {J1, I1} = swap_instrs(I, J),
                     r_swap_write([J1 | Pre], I1, Code)
-            end;
-        _ -> false
+            end
     end;
 r_swap_write(_, _, _) -> false.
 
@@ -683,7 +684,9 @@ r_write_to_dead_var(_, _) -> false.
 
 
 %% Desugar and specialize and remove annotations
--spec unannotate(scode_a()) -> scode().
+-spec unannotate(scode_a())  -> scode();
+                (sinstr_a()) -> sinstr();
+                (missing)    -> missing.
 unannotate(switch_body) -> [switch_body];
 unannotate({switch, Type, Alts, Def}) ->
     [{switch, Type, [unannotate(A) || A <- Alts], unannotate(Def)}];
@@ -744,7 +747,7 @@ blocks([], Acc) ->
 blocks([Blk | Blocks], Acc) ->
     block(Blk, [], Blocks, Acc).
 
--spec block(#blk{}, bcode(), [#blk{}], [bb()]) -> bb().
+-spec block(#blk{}, bcode(), [#blk{}], [bb()]) -> [bb()].
 block(#blk{ref = Ref, code = []}, CodeAcc, Blocks, BlockAcc) ->
     blocks(Blocks, [{Ref, lists:reverse(CodeAcc)} | BlockAcc]);
 block(Blk = #blk{code = [switch_body | Code]}, Acc, Blocks, BlockAcc) ->
