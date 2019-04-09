@@ -536,8 +536,7 @@ apply_rules_once([{RName, Rule} | Rules], I, Code) ->
 merge_rules() ->
     [?RULE(r_push_consume),
      ?RULE(r_one_shot_var),
-     ?RULE(r_write_to_dead_var),
-     ?RULE(r_write_single_branch)
+     ?RULE(r_write_to_dead_var)
     ].
 
 rules() ->
@@ -674,22 +673,6 @@ r_write_to_dead_var({Ann, {'STORE', R = {var, _}, A}}, Code) when A /= ?a ->
         true  -> false
     end;
 r_write_to_dead_var(_, _) -> false.
-
-%% Push variable writes that are only needed in a single branch inside the branch.
-r_write_single_branch(IA = {_Ann, I}, [{ifte, Then = [{AnnThen, _} | _], Else = [{AnnElse, _} | _]} | Code]) ->
-    #{ write := R } = attributes(I),
-    case R of
-        {var, _} ->
-            case {live_in(R, AnnThen), live_in(R, AnnElse)} of
-                {true, false} ->
-                    {[], [{ifte, [IA | Then], Else} | Code]};
-                {false, true} ->
-                    {[], [{ifte, Then, [IA | Else]} | Code]};
-                _ -> false
-            end;
-        _ -> false
-    end;
-r_write_single_branch(_, _) -> false.
 
 
 %% Desugar and specialize and remove annotations
