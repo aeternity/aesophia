@@ -9,7 +9,7 @@
 %%%-------------------------------------------------------------------
 -module(aeso_ast_to_fcode).
 
--export([ast_to_fcode/2]).
+-export([ast_to_fcode/2, format_fexpr/1]).
 -export_type([fcode/0, fexpr/0, fun_def/0]).
 
 %% -- Type definitions -------------------------------------------------------
@@ -498,4 +498,69 @@ get_attributes(Ann) ->
 
 indexed(Xs) ->
     lists:zip(lists:seq(1, length(Xs)), Xs).
+
+%% -- Pretty printing --------------------------------------------------------
+
+format_fexpr(E) ->
+    prettypr:format(pp_fexpr(E)).
+
+pp_text(S) -> prettypr:text(lists:concat([S])).
+
+pp_beside([])       -> prettypr:empty();
+pp_beside([X])      -> X;
+pp_beside([X | Xs]) -> pp_beside(X, pp_beside(Xs)).
+
+pp_beside(A, B) -> prettypr:beside(A, B).
+
+pp_above([])       -> prettypr:empty();
+pp_above([X])      -> X;
+pp_above([X | Xs]) -> pp_above(X, pp_above(Xs)).
+
+pp_above(A, B) -> prettypr:above(A, B).
+
+pp_parens(Doc) ->
+    pp_beside([pp_text("("), Doc, pp_text(")")]).
+
+pp_punctuate(_Sep, [])      -> [];
+pp_punctuate(_Sep, [X])     -> [X];
+pp_punctuate(Sep, [X | Xs]) -> [pp_beside(X, Sep) | pp_punctuate(Sep, Xs)].
+
+pp_fexpr({integer, N}) ->
+    pp_text(N);
+pp_fexpr({bool, B}) ->
+    pp_text(B);
+pp_fexpr(nil) ->
+    pp_text("[]");
+pp_fexpr({var, X}) ->
+    pp_text(X);
+pp_fexpr({tuple, Es}) ->
+    pp_parens(prettypr:par(pp_punctuate(pp_text(","), [pp_fexpr(E) || E <- Es])));
+pp_fexpr({binop, _Type, Op, A, B}) ->
+    pp_parens(prettypr:par([pp_fexpr(A), pp_text(Op), pp_fexpr(B)]));
+pp_fexpr({'if', A, B, C}) ->
+    prettypr:par([pp_beside(pp_text("if "), pp_fexpr(A)),
+                  prettypr:nest(2, pp_beside(pp_text("then "), pp_fexpr(B))),
+                  prettypr:nest(2, pp_beside(pp_text("else "), pp_fexpr(C)))]);
+pp_fexpr({'let', X, A, B}) ->
+    prettypr:par([pp_beside([pp_text("let "), pp_text(X), pp_text(" = "), pp_fexpr(A), pp_text(" in")]),
+                  pp_fexpr(B)]);
+pp_fexpr({switch, Split}) -> pp_split(Split).
+
+pp_ftype(T) when is_atom(T) -> pp_text(T);
+pp_ftype({tuple, Ts}) ->
+    pp_parens(prettypr:par(pp_punctuate(pp_text(","), [pp_ftype(T) || T <- Ts])));
+pp_ftype({list, T}) ->
+    pp_beside([pp_text("list("), pp_ftype(T), pp_text(")")]).
+
+pp_split({nosplit, E}) -> pp_fexpr(E);
+pp_split({split, Type, X, Alts}) ->
+    pp_above([pp_beside([pp_text("switch("), pp_text(X), pp_text(" : "), pp_ftype(Type), pp_text(")")])] ++
+             [prettypr:nest(2, pp_case(Alt)) || Alt <- Alts]).
+
+pp_case({'case', Pat, Split}) ->
+    pp_above(pp_beside(pp_pat(Pat), pp_text(" =>")),
+             prettypr:nest(2, pp_split(Split))).
+
+pp_pat({tuple, Xs}) -> pp_fexpr({tuple, [{var, X} || X <- Xs]});
+pp_pat(Pat) -> pp_fexpr(Pat).
 
