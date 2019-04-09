@@ -18,8 +18,18 @@
                | switch_body
                | tuple().    %% FATE instruction
 
--type stype()       :: tuple | boolean.
--type maybe_scode() :: missing | scode().
+%% Annotated scode
+-type scode_a() :: {switch, stype(), [maybe_scode_a()], maybe_scode_a()}  %% last arg is catch-all
+                 | switch_body
+                 | {i, ann(), tuple()}.    %% FATE instruction
+
+-type ann() :: #{ live_in := vars(), live_out := vars() }.
+-type var() :: {var, integer()}.
+-type vars() :: ordsets:set(var()).
+
+-type stype()         :: tuple | boolean.
+-type maybe_scode()   :: missing | scode().
+-type maybe_scode_a() :: missing | scode_a().
 
 -define(TODO(What), error({todo, ?FILE, ?LINE, ?FUNCTION_NAME, What})).
 
@@ -271,7 +281,7 @@ pp_ann(Ind, [{switch, Type, Alts, Def} | Code]) ->
      pp_ann(Ind, Code)];
 pp_ann(Ind, [switch_body | Code]) ->
     [Ind, "SWITCH-BODY\n", pp_ann(Ind, Code)];
-pp_ann(Ind, [{#{ live_in := In, live_out := Out }, I} | Code]) ->
+pp_ann(Ind, [{i, #{ live_in := In, live_out := Out }, I} | Code]) ->
     Fmt = fun([]) -> "()";
              (Xs) -> string:join([lists:concat(["var", N]) || {var, N} <- Xs], " ")
           end,
@@ -298,10 +308,10 @@ ann_writes([{switch, Type, Alts, Def} | Code], Writes, Acc) ->
     Writes1 = ordsets:union(Writes, ordsets:intersection([WritesDef | WritesAlts])),
     ann_writes(Code, Writes1, [{switch, Type, Alts1, Def1} | Acc]);
 ann_writes([I | Code], Writes, Acc) ->
-    Ws = var_writes({#{}, I}),
+    Ws = var_writes(I),
     Writes1 = ordsets:union(Writes, Ws),
     Ann = #{ writes_in => Writes, writes_out => Writes1 },
-    ann_writes(Code, Writes1, [{Ann, I} | Acc]);
+    ann_writes(Code, Writes1, [{i, Ann, I} | Acc]);
 ann_writes([], Writes, Acc) ->
     {Acc, Writes}.
 
@@ -314,7 +324,7 @@ ann_reads([{switch, Type, Alts, Def} | Code], Reads, Acc) ->
     {Def1, ReadsDef}   = ann_reads(Def, Reads, []),
     Reads1 = ordsets:union([Reads, ReadsDef | ReadsAlts]),
     ann_reads(Code, Reads1, [{switch, Type, Alts1, Def1} | Acc]);
-ann_reads([{Ann, I} | Code], Reads, Acc) ->
+ann_reads([{i, Ann, I} | Code], Reads, Acc) ->
     #{ writes_in := WritesIn, writes_out := WritesOut } = Ann,
     #{ read := Rs, write := W, pure := Pure } = attributes(I),
     Reads1  =
@@ -328,7 +338,7 @@ ann_reads([{Ann, I} | Code], Reads, Acc) ->
     LiveIn  = ordsets:intersection(Reads1, WritesIn),
     LiveOut = ordsets:intersection(Reads, WritesOut),
     Ann1    = #{ live_in => LiveIn, live_out => LiveOut },
-    ann_reads(Code, Reads1, [{Ann1, I} | Acc]);
+    ann_reads(Code, Reads1, [{i, Ann1, I} | Acc]);
 ann_reads([], Reads, Acc) -> {Acc, Reads}.
 
 %% Instruction attributes: reads, writes and purity (pure means no side-effects
@@ -453,7 +463,8 @@ attributes(I) ->
         'NOP'                                 -> Pure(none, [])
     end.
 
-var_writes({_, I}) ->
+var_writes({i, _, I}) -> var_writes(I);
+var_writes(I) ->
     #{ write := W } = attributes(I),
     case W of
         {var, _} -> [W];
@@ -464,7 +475,7 @@ independent({switch, _, _, _}, _) -> false;
 independent(_, {switch, _, _, _}) -> false;
 independent(switch_body, _) -> true;
 independent(_, switch_body) -> true;
-independent({_, I}, {_, J}) ->
+independent({i, _, I}, {i, _, J}) ->
     #{ write := WI, read := RI, pure := PureI } = attributes(I),
     #{ write := WJ, read := RJ, pure := PureJ } = attributes(J),
 
@@ -486,7 +497,7 @@ merge_ann(#{ live_in := LiveIn }, #{ live_out := LiveOut }) ->
 %% Swap two instructions. Precondition: the instructions are independent/2.
 swap_instrs(I, switch_body) -> {switch_body, I};
 swap_instrs(switch_body, I) -> {I, switch_body};
-swap_instrs({#{ live_in := Live1 }, I}, {#{ live_in := Live2, live_out := Live3 }, J}) ->
+swap_instrs({i, #{ live_in := Live1 }, I}, {i, #{ live_in := Live2, live_out := Live3 }, J}) ->
     %% Since I and J are independent the J can't read or write anything in
     %% that I writes.
     WritesI = ordsets:subtract(Live2, Live1),
@@ -494,8 +505,8 @@ swap_instrs({#{ live_in := Live1 }, I}, {#{ live_in := Live2, live_out := Live3 
     #{ read := ReadsI } = attributes(I),
     ReadsJ  = ordsets:subtract(Live2, ordsets:union(Live3, ReadsI)),
     Live2_  = ordsets:subtract(ordsets:union([Live1, Live2, Live3]), ordsets:union(WritesI, ReadsJ)),
-    {{#{ live_in => Live1,  live_out => Live2_ }, J},
-     {#{ live_in => Live2_, live_out => Live3  }, I}}.
+    {{i, #{ live_in => Live1,  live_out => Live2_ }, J},
+     {i, #{ live_in => Live2_, live_out => Live3  }, I}}.
 
 live_in(R,  #{ live_in  := LiveIn  }) -> ordsets:is_element(R, LiveIn).
 live_out(R, #{ live_out := LiveOut }) -> ordsets:is_element(R, LiveOut).
@@ -548,33 +559,33 @@ rules() ->
     ].
 
 %% Removing pushes that are immediately consumed.
-r_push_consume({Ann1, {'PUSH', A}}, [{Ann2, {Op, R, ?a, B}} | Code]) when ?IsBinOp(Op) ->
-    {[{merge_ann(Ann1, Ann2), {Op, R, A, B}}], Code};
-r_push_consume({Ann1, {'PUSH', B}}, [{Ann2, {Op, R, A, ?a}} | Code]) when A /= ?a, ?IsBinOp(Op) ->
-    {[{merge_ann(Ann1, Ann2), {Op, R, A, B}}], Code};
-r_push_consume({Ann1, {'PUSH', A}}, [{Ann2, {'STORE', R, ?a}} | Code]) ->
-    {[{merge_ann(Ann1, Ann2), {'STORE', R, A}}], Code};
-r_push_consume({Ann1, {'PUSH', A}}, [{Ann2, {'POP', B}} | Code]) ->
+r_push_consume({i, Ann1, {'PUSH', A}}, [{i, Ann2, {Op, R, ?a, B}} | Code]) when ?IsBinOp(Op) ->
+    {[{i, merge_ann(Ann1, Ann2), {Op, R, A, B}}], Code};
+r_push_consume({i, Ann1, {'PUSH', B}}, [{i, Ann2, {Op, R, A, ?a}} | Code]) when A /= ?a, ?IsBinOp(Op) ->
+    {[{i, merge_ann(Ann1, Ann2), {Op, R, A, B}}], Code};
+r_push_consume({i, Ann1, {'PUSH', A}}, [{Ann2, {'STORE', R, ?a}} | Code]) ->
+    {[{i, merge_ann(Ann1, Ann2), {'STORE', R, A}}], Code};
+r_push_consume({i, Ann1, {'PUSH', A}}, [{i, Ann2, {'POP', B}} | Code]) ->
     case live_out(B, Ann2) of
-        true  -> {[{merge_ann(Ann1, Ann2), {'STORE', B, A}}], Code};
+        true  -> {[{i, merge_ann(Ann1, Ann2), {'STORE', B, A}}], Code};
         false -> {[], Code}
     end;
 %% Writing directly to memory instead of going through the accumulator.
-r_push_consume({Ann1, {Op, ?a, A, B}}, [{Ann2, {'STORE', R, ?a}} | Code]) when ?IsBinOp(Op) ->
-    {[{merge_ann(Ann1, Ann2), {Op, R, A, B}}], Code};
+r_push_consume({i, Ann1, {Op, ?a, A, B}}, [{i, Ann2, {'STORE', R, ?a}} | Code]) when ?IsBinOp(Op) ->
+    {[{i, merge_ann(Ann1, Ann2), {Op, R, A, B}}], Code};
 
 r_push_consume(_, _) -> false.
 
 %% Changing PUSH A, DUPA to PUSH A, PUSH A enables further optimisations
-r_dup_to_push({Ann1, Push={'PUSH', _}}, [{Ann2, 'DUPA'} | Code]) ->
+r_dup_to_push({i, Ann1, Push={'PUSH', _}}, [{i, Ann2, 'DUPA'} | Code]) ->
     #{ live_in  := LiveIn  } = Ann1,
     Ann1_ = Ann1#{ live_out => LiveIn },
     Ann2_ = Ann2#{ live_in  => LiveIn },
-    {[{Ann1_, Push}, {Ann2_, Push}], Code};
+    {[{i, Ann1_, Push}, {i, Ann2_, Push}], Code};
 r_dup_to_push(_, _) -> false.
 
 %% Move PUSH A past non-stack instructions.
-r_swap_push(Push = {_, {'PUSH', _}}, [I | Code]) ->
+r_swap_push(Push = {i, _, {'PUSH', _}}, [I | Code]) ->
     case independent(Push, I) of
         true ->
             {I1, Push1} = swap_instrs(Push, I),
@@ -584,7 +595,7 @@ r_swap_push(Push = {_, {'PUSH', _}}, [I | Code]) ->
 r_swap_push(_, _) -> false.
 
 %% Match up writes to variables with instructions further down.
-r_swap_write(I = {_, _}, [J | Code]) ->
+r_swap_write(I = {i, _, _}, [J | Code]) ->
     case {var_writes(I), independent(I, J)} of
         {[_], true} ->
             {J1, I1} = swap_instrs(I, J),
@@ -611,14 +622,14 @@ r_swap_write(Pre, I, Code0 = [J | Code]) ->
 r_swap_write(_, _, _) -> false.
 
 %% Inline stores
-r_inline_store(I = {_, {'STORE', R = {var, _}, A = {arg, _}}}, Code) ->
+r_inline_store(I = {i, _, {'STORE', R = {var, _}, A = {arg, _}}}, Code) ->
     %% Not when A is var unless updating the annotations properly.
     r_inline_store([I], R, A, Code);
 r_inline_store(_, _) -> false.
 
 r_inline_store(Acc, R, A, [switch_body | Code]) ->
     r_inline_store([switch_body | Acc], R, A, Code);
-r_inline_store(Acc, R, A, [{Ann, I} | Code]) ->
+r_inline_store(Acc, R, A, [{i, Ann, I} | Code]) ->
     #{ write := W, pure := Pure } = attributes(I),
     Inl = fun(X) when X == R -> A; (X) -> X end,
     case not live_in(R, Ann) orelse not Pure orelse lists:member(W, [R, A]) of
@@ -626,18 +637,18 @@ r_inline_store(Acc, R, A, [{Ann, I} | Code]) ->
         false ->
             case I of
                 {Op, S, B, C} when ?IsBinOp(Op), B == R orelse C == R ->
-                    Acc1 = [{Ann, {Op, S, Inl(B), Inl(C)}} | Acc],
+                    Acc1 = [{i, Ann, {Op, S, Inl(B), Inl(C)}} | Acc],
                     case r_inline_store(Acc1, R, A, Code) of
                         false -> {lists:reverse(Acc1), Code};
                         {New, Rest} -> {New, Rest}
                     end;
-                _ -> r_inline_store([{Ann, I} | Acc], R, A, Code)
+                _ -> r_inline_store([{i, Ann, I} | Acc], R, A, Code)
             end
     end;
 r_inline_store(_Acc, _, _, _) -> false.
 
 %% Shortcut write followed by final read
-r_one_shot_var({Ann1, {Op, R = {var, _}, A, B}}, [{Ann2, J} | Code]) when ?IsBinOp(Op) ->
+r_one_shot_var({i, Ann1, {Op, R = {var, _}, A, B}}, [{i, Ann2, J} | Code]) when ?IsBinOp(Op) ->
     Copy = case J of
                {'PUSH', R}     -> {write_to, ?a};
                {'STORE', S, R} -> {write_to, S};
@@ -645,29 +656,29 @@ r_one_shot_var({Ann1, {Op, R = {var, _}, A, B}}, [{Ann2, J} | Code]) when ?IsBin
            end,
     case {live_out(R, Ann2), Copy} of
         {false, {write_to, X}} ->
-            {[{merge_ann(Ann1, Ann2), {Op, X, A, B}}], Code};
+            {[{i, merge_ann(Ann1, Ann2), {Op, X, A, B}}], Code};
         _ -> false
     end;
 r_one_shot_var(_, _) -> false.
 
 %% Remove writes to dead variables
-r_write_to_dead_var({Ann, {Op, R = {var, _}, A, B}}, Code) when ?IsBinOp(Op) ->
+r_write_to_dead_var({i, Ann, {Op, R = {var, _}, A, B}}, Code) when ?IsBinOp(Op) ->
     case live_out(R, Ann) of
         false ->
             %% Subtle: we still have to pop the stack if any of the arguments
             %% came from there. In this case we pop to R, which we know is
             %% unused.
-            {[{Ann, {'POP', R}} || X <- [A, B], X == ?a], Code};
+            {[{i, Ann, {'POP', R}} || X <- [A, B], X == ?a], Code};
         true -> false
     end;
-r_write_to_dead_var({Ann, {'STORE', R = {var, _}, A}}, Code) when A /= ?a ->
+r_write_to_dead_var({i, Ann, {'STORE', R = {var, _}, A}}, Code) when A /= ?a ->
     case live_out(R, Ann) of
         false ->
             case Code of
                 []                  -> {[], []};
                 [switch_body, {Ann1, I} | Code1] ->
-                    {[], [switch_body, {merge_ann(Ann, Ann1), I} | Code1]};
-                [{Ann1, I} | Code1] ->
+                    {[], [switch_body, {i, merge_ann(Ann, Ann1), I} | Code1]};
+                [{i, Ann1, I} | Code1] ->
                     {[], [{merge_ann(Ann, Ann1), I} | Code1]}
             end;
         true  -> false
@@ -676,13 +687,14 @@ r_write_to_dead_var(_, _) -> false.
 
 
 %% Desugar and specialize and remove annotations
+-spec unannotate(scode_a()) -> scode().
 unannotate(switch_body) -> [switch_body];
 unannotate({switch, Type, Alts, Def}) ->
     [{switch, Type, [unannotate(A) || A <- Alts], unannotate(Def)}];
 unannotate(missing) -> missing;
 unannotate(Code) when is_list(Code) ->
     lists:flatmap(fun unannotate/1, Code);
-unannotate({_Ann, I}) -> [I].
+unannotate({i, _Ann, I}) -> [I].
 
 %% Desugar and specialize
 desugar({'ADD', ?a, ?i(1), ?a})     -> [aeb_fate_code:inc()];
