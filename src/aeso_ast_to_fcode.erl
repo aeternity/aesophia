@@ -45,12 +45,6 @@
                      | {tuple, [var_name()]}
                      | {var, var_name()}.
 
-%% Intermediate format before case trees (fcase() and fsplit()).
--type falt() :: {'case', [fpat()], fexpr()}.
--type fpat() :: {var, var_name()}
-              | {bool, false | true}
-              | {tuple, [fpat()]}.
-
 -type ftype() :: aeb_fate_data:fate_type_type().
 
 
@@ -240,6 +234,12 @@ alts_to_fcode(Env, Type, X, Alts) ->
     FAlts = [alt_to_fcode(Env, Alt) || Alt <- Alts],
     split_tree(Env, [{X, Type}], FAlts).
 
+%% Intermediate format before case trees (fcase() and fsplit()).
+-type falt() :: {'case', [fpat()], fexpr()}.
+-type fpat() :: {var, var_name()}
+              | {bool, false | true}
+              | {tuple, [fpat()]}.
+
 %% %% Invariant: the number of variables matches the number of patterns in each falt.
 -spec split_tree(env(), [{var_name(), ftype()}], [falt()]) -> fsplit().
 split_tree(_Env, _Vars, []) ->
@@ -289,7 +289,7 @@ merge_alt(I, X, {P, A}, [{Q, As} | Rest]) ->
 
 expand(I, X, Q, {'case', Ps, E}) ->
     {Ps0, [{var, Y} | Ps1]} = lists:split(I - 1, Ps),
-    {Ps0r, Ren1} = rename_pats([{Y, X}], Ps0),
+    {Ps0r, Ren1} = rename_pats([{Y, X} || Y /= X], Ps0),
     {Ps1r, Ren2} = rename_pats(Ren1, Ps1),
     E1 = rename(Ren2, E),
     Splice = fun(Qs) -> Ps0r ++ Qs ++ Ps1r end,
@@ -305,11 +305,10 @@ split_alt(Bound, I, {'case', Pats, Body}) ->
     {SPat, {'case', Pats0 ++ InnerPats ++ Pats1, Body}}.
 
 -spec split_pat(var_name(), fpat()) -> {fsplit_pat(), [fpat()]}.
-split_pat(Bound, P = {var, X}) -> {{var, freshen(Bound, X)}, [P]};
+split_pat(_Bound, P = {var, _}) -> {{var, fresh_name()}, [P]};
 split_pat(_Bound, {bool, B})    -> {{bool, B}, []};
-split_pat(Bound, {tuple, Pats}) ->
-    Var = fun({var, X}) -> freshen(Bound, X); (_) -> fresh_name() end,
-    Xs = [Var(P) || P <- Pats],
+split_pat(_Bound, {tuple, Pats}) ->
+    Xs = [fresh_name() || _ <- Pats],
     {{tuple, Xs}, Pats}.
 
 -spec split_vars(fsplit_pat(), ftype()) -> [{var_name(), ftype()}].
@@ -490,12 +489,6 @@ fresh_name() ->
     N = get('%fresh'),
     put('%fresh', N + 1),
     lists:concat(["%", N]).
-
-freshen(Bound, X) ->
-    case lists:member(X, ["_" | Bound]) of
-        true  -> fresh_name();
-        false -> X
-    end.
 
 %% -- Attributes --
 
