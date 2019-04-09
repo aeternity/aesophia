@@ -40,10 +40,12 @@
 
 -type fcase() :: {'case', fsplit_pat(), fsplit()}.
 
--type fsplit_pat()  :: {bool, false | true}
+-type fsplit_pat()  :: {var, var_name()}
+                     | {bool, false | true}
                      | {int, integer()}
-                     | {tuple, [var_name()]}
-                     | {var, var_name()}.
+                     | nil
+                     | {'::', var_name(), var_name()}
+                     | {tuple, [var_name()]}.
 
 -type ftype() :: integer
                | boolean
@@ -261,6 +263,7 @@ alts_to_fcode(Env, Type, X, Alts) ->
 -type fpat() :: {var, var_name()}
               | {bool, false | true}
               | {int, integer()}
+              | nil | {'::', fpat(), fpat()}
               | {tuple, [fpat()]}.
 
 %% %% Invariant: the number of variables matches the number of patterns in each falt.
@@ -295,13 +298,15 @@ merge_alts(I, X, Alts, Alts1) ->
         when Alts :: [{fsplit_pat(), [falt()]}].
 merge_alt(_, _, {P, A}, []) -> [{P, [A]}];
 merge_alt(I, X, {P, A}, [{Q, As} | Rest]) ->
-    Match = fun({var, _}, {var, _})     -> match;
-               ({tuple, _}, {tuple, _}) -> match;
-               ({bool, B}, {bool, B})   -> match;
-               ({int, N},  {int, N})    -> match;
-               ({var, _}, _)            -> expand;
-               (_, {var, _})            -> insert;
-               (_, _)                   -> mismatch
+    Match = fun({var, _}, {var, _})         -> match;
+               ({tuple, _}, {tuple, _})     -> match;
+               ({bool, B}, {bool, B})       -> match;
+               ({int, N},  {int, N})        -> match;
+               (nil,       nil)             -> match;
+               ({'::', _, _}, {'::', _, _}) -> match;
+               ({var, _}, _)                -> expand;
+               (_, {var, _})                -> insert;
+               (_, _)                       -> mismatch
             end,
     case Match(P, Q) of
         match    -> [{Q, [A | As]} | Rest];
@@ -317,11 +322,18 @@ expand(I, X, P, Q, Case = {'case', Ps, E}) ->
     {Ps0r, Ren1} = rename_pats([{Y, X} || Y /= X], Ps0),
     {Ps1r, Ren2} = rename_pats(Ren1, Ps1),
     E1 = rename(Ren2, E),
-    Splice = fun(Qs) -> Ps0r ++ Qs ++ Ps1r end,
-    case Q of
-        {tuple, Xs} -> {[{Q,         {'case', Splice([{var, "_"} || _ <- Xs]), E1}}], []};
-        {bool, _}   -> {[{{bool, B}, {'case', Splice([]), E1}} || B <- [false, true]], []};
-        {int, _}    -> {[{Q,         {'case', Splice([]), E1}}], [{P, Case}]}
+    Splice = fun(N) -> Ps0r ++ lists:duplicate(N, {var, "_"}) ++ Ps1r end,
+    Type = fun({tuple, Xs})  -> {tuple, length(Xs)};
+              ({bool, _})    -> bool;
+              ({int, _})     -> int;
+              (nil)          -> list;
+              ({'::', _, _}) -> list end,
+    MkCase = fun(Pat, Vars) -> {Pat, {'case', Splice(Vars), E1}} end,
+    case Type(Q) of
+        {tuple, N} -> {[MkCase(Q, N)], []};
+        bool       -> {[MkCase({bool, B}, 0) || B <- [false, true]], []};
+        int        -> {[MkCase(Q, 0)], [{P, Case}]};
+        list       -> {[MkCase(nil, 0), MkCase({'::', fresh_name(), fresh_name()}, 2)], []}
     end.
 
 -spec split_alt(integer(), falt()) -> {fsplit_pat(), falt()}.
@@ -334,13 +346,17 @@ split_alt(I, {'case', Pats, Body}) ->
 split_pat(P = {var, _})  -> {{var, fresh_name()}, [P]};
 split_pat({bool, B})     -> {{bool, B}, []};
 split_pat({int, N})      -> {{int, N}, []};
+split_pat(nil) -> {nil, []};
+split_pat({'::', P, Q}) -> {{'::', fresh_name(), fresh_name()}, [P, Q]};
 split_pat({tuple, Pats}) ->
     Xs = [fresh_name() || _ <- Pats],
     {{tuple, Xs}, Pats}.
 
 -spec split_vars(fsplit_pat(), ftype()) -> [{var_name(), ftype()}].
-split_vars({bool, _}, boolean) -> [];
-split_vars({int, _},  integer) -> [];
+split_vars({bool, _}, boolean)       -> [];
+split_vars({int, _},  integer)       -> [];
+split_vars(nil,       {list, _})     -> [];
+split_vars({'::', X, Xs}, {list, T}) -> [{X, T}, {Xs, {list, T}}];
 split_vars({tuple, Xs}, {tuple, Ts}) ->
     lists:zip(Xs, Ts);
 split_vars({var, X}, T) -> [{X, T}].
@@ -384,6 +400,11 @@ rename_pats(Ren, [P | Ps]) ->
 
 rename_pat(Ren, P = {bool, _}) -> {P, Ren};
 rename_pat(Ren, P = {int, _})  -> {P, Ren};
+rename_pat(Ren, P = nil)       -> {P, Ren};
+rename_pat(Ren, {'::', P, Q}) ->
+    {P1, Ren1} = rename_pat(Ren, P),
+    {Q1, Ren2} = rename_pat(Ren1, Q),
+    {{'::', P1, Q1}, Ren2};
 rename_pat(Ren, {var, X}) ->
     {Z, Ren1} = rename_binding(Ren, X),
     {{var, Z}, Ren1};
@@ -425,6 +446,12 @@ pat_to_fcode(_Env, _Type, {bool, _, B}) ->
     {bool, B};
 pat_to_fcode(_Env, _Type, {int, _, N}) ->
     {int, N};
+pat_to_fcode(Env, _Type, {list, _, Ps}) ->
+    lists:foldr(fun(P, Qs) ->
+                    {'::', pat_to_fcode(Env, P), Qs}
+                end, nil, Ps);
+pat_to_fcode(Env, _Type, {app, _, {'::', _}, [P, Q]}) ->
+    {'::', pat_to_fcode(Env, P), pat_to_fcode(Env, Q)};
 pat_to_fcode(_Env, Type, Pat) -> {todo, Pat, ':', Type}.
 
 -spec stmts_to_fcode(env(), [aeso_syntax:stmt()]) -> fexpr().
@@ -588,6 +615,7 @@ pp_case({'case', Pat, Split}) ->
     pp_above(pp_beside(pp_pat(Pat), pp_text(" =>")),
              prettypr:nest(2, pp_split(Split))).
 
-pp_pat({tuple, Xs}) -> pp_fexpr({tuple, [{var, X} || X <- Xs]});
-pp_pat(Pat) -> pp_fexpr(Pat).
+pp_pat({tuple, Xs})   -> pp_fexpr({tuple, [{var, X} || X <- Xs]});
+pp_pat({'::', X, Xs}) -> pp_fexpr({binop, list, '::', {var, X}, {var, Xs}});
+pp_pat(Pat)           -> pp_fexpr(Pat).
 

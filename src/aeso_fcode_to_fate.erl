@@ -56,6 +56,10 @@
      Op =:= 'ELEMENT' orelse
      Op =:= 'CONS')).
 
+-define(IsUnOp(Op),
+    (Op =:= 'HD' orelse
+     Op =:= 'TL')).
+
 -record(env, { vars = [], locals = [], tailpos = true }).
 
 %% -- Debugging --------------------------------------------------------------
@@ -191,6 +195,24 @@ split_to_scode(Env, {split, boolean, X, Alts}) ->
              end,
     SAlts = [GetAlt(false), GetAlt(true)],
     [aeb_fate_code:push(lookup_var(Env, X)),
+     {switch, boolean, SAlts, Def}];
+split_to_scode(Env, {split, {list, _}, X, Alts}) ->
+    {Def, Alts1} = catchall_to_scode(Env, X, Alts),
+    Arg = lookup_var(Env, X),
+    GetAlt = fun(P) ->
+                 case [C || C = {'case', Pat, _} <- Alts1, Pat == P orelse is_tuple(Pat) andalso element(1, Pat) == P] of
+                     []      -> missing;
+                     [{'case', nil, S} | _]           -> split_to_scode(Env, S);
+                     [{'case', {'::', Y, Z}, S} | _] ->
+                         {I, Env1} = bind_local(Y, Env),
+                         {J, Env2} = bind_local(Z, Env1),
+                         [aeb_fate_code:hd({var, I}, Arg),
+                          aeb_fate_code:tl({var, J}, Arg),
+                          split_to_scode(Env2, S)]
+                 end
+             end,
+    SAlts = [GetAlt('::'), GetAlt(nil)],
+    [aeb_fate_code:is_nil(?a, Arg),
      {switch, boolean, SAlts, Def}];
 split_to_scode(Env, {split, integer, X, Alts}) ->
     {Def, Alts1} = catchall_to_scode(Env, X, Alts),
@@ -572,6 +594,8 @@ rules() ->
     ].
 
 %% Removing pushes that are immediately consumed.
+r_push_consume({i, Ann1, {'PUSH', A}}, [{i, Ann2, {Op, R, ?a}} | Code]) when ?IsUnOp(Op) ->
+    {[{i, merge_ann(Ann1, Ann2), {Op, R, A}}], Code};
 r_push_consume({i, Ann1, {'PUSH', A}}, [{i, Ann2, {Op, R, ?a, B}} | Code]) when ?IsBinOp(Op) ->
     {[{i, merge_ann(Ann1, Ann2), {Op, R, A, B}}], Code};
 r_push_consume({i, Ann1, {'PUSH', B}}, [{i, Ann2, {Op, R, A, ?a}} | Code]) when A /= ?a, ?IsBinOp(Op) ->
@@ -584,6 +608,8 @@ r_push_consume({i, Ann1, {'PUSH', A}}, [{i, Ann2, {'POP', B}} | Code]) ->
         false -> {[], Code}
     end;
 %% Writing directly to memory instead of going through the accumulator.
+r_push_consume({i, Ann1, {Op, ?a, A}}, [{i, Ann2, {'STORE', R, ?a}} | Code]) when ?IsUnOp(Op) ->
+    {[{i, merge_ann(Ann1, Ann2), {Op, R, A}}], Code};
 r_push_consume({i, Ann1, {Op, ?a, A, B}}, [{i, Ann2, {'STORE', R, ?a}} | Code]) when ?IsBinOp(Op) ->
     {[{i, merge_ann(Ann1, Ann2), {Op, R, A, B}}], Code};
 
@@ -654,49 +680,63 @@ r_inline_store(Acc, R, A, [{i, Ann, I} | Code]) ->
                         false -> {lists:reverse(Acc1), Code};
                         {New, Rest} -> {New, Rest}
                     end;
+                {Op, S, B} when ?IsUnOp(Op), B == R ->
+                    Acc1 = [{i, Ann, {Op, S, Inl(B)}} | Acc],
+                    case r_inline_store(Acc1, R, A, Code) of
+                        false -> {lists:reverse(Acc1), Code};
+                        {New, Rest} -> {New, Rest}
+                    end;
                 _ -> r_inline_store([{i, Ann, I} | Acc], R, A, Code)
             end
     end;
 r_inline_store(_Acc, _, _, _) -> false.
 
 %% Shortcut write followed by final read
-r_one_shot_var({i, Ann1, {Op, R = {var, _}, A, B}}, [{i, Ann2, J} | Code]) when ?IsBinOp(Op) ->
-    Copy = case J of
-               {'PUSH', R}     -> {write_to, ?a};
-               {'STORE', S, R} -> {write_to, S};
-               _               -> false
-           end,
-    case {live_out(R, Ann2), Copy} of
-        {false, {write_to, X}} ->
-            {[{i, merge_ann(Ann1, Ann2), {Op, X, A, B}}], Code};
+r_one_shot_var({i, Ann1, I}, [{i, Ann2, J} | Code]) ->
+    case op_view(I) of
+        {Op, R, As} ->
+            Copy = case J of
+                       {'PUSH', R}     -> {write_to, ?a};
+                       {'STORE', S, R} -> {write_to, S};
+                       _               -> false
+                   end,
+            case {live_out(R, Ann2), Copy} of
+                {false, {write_to, X}} ->
+                    {[{i, merge_ann(Ann1, Ann2), from_op_view({Op, X, As})}], Code};
+                _ -> false
+            end;
         _ -> false
     end;
 r_one_shot_var(_, _) -> false.
 
 %% Remove writes to dead variables
-r_write_to_dead_var({i, Ann, {Op, R = {var, _}, A, B}}, Code) when ?IsBinOp(Op) ->
-    case live_out(R, Ann) of
-        false ->
-            %% Subtle: we still have to pop the stack if any of the arguments
-            %% came from there. In this case we pop to R, which we know is
-            %% unused.
-            {[{i, Ann, {'POP', R}} || X <- [A, B], X == ?a], Code};
-        true -> false
-    end;
-r_write_to_dead_var({i, Ann, {'STORE', R = {var, _}, A}}, Code) when A /= ?a ->
-    case live_out(R, Ann) of
-        false ->
-            case Code of
-                []                  -> {[], []};
-                [switch_body, {Ann1, I} | Code1] ->
-                    {[], [switch_body, {i, merge_ann(Ann, Ann1), I} | Code1]};
-                [{i, Ann1, I} | Code1] ->
-                    {[], [{merge_ann(Ann, Ann1), I} | Code1]}
+r_write_to_dead_var({i, Ann, I}, Code) ->
+    case op_view(I) of
+        {_Op, R = {var, _}, As} ->
+            case live_out(R, Ann) of
+                false ->
+                    %% Subtle: we still have to pop the stack if any of the arguments
+                    %% came from there. In this case we pop to R, which we know is
+                    %% unused.
+                    {[{i, Ann, {'POP', R}} || X <- As, X == ?a], Code};
+                true -> false
             end;
-        true  -> false
+        _ -> false
     end;
 r_write_to_dead_var(_, _) -> false.
 
+op_view({Op, R, A, B}) when ?IsBinOp(Op) ->
+    {Op, R, [A, B]};
+op_view({Op, R, A}) when ?IsUnOp(Op) ->
+    {Op, R, [A]};
+op_view({'STORE', R, A}) ->
+    {'STORE', R, [A]};
+op_view({'NIL', R}) ->
+    {'NIL', R, []};
+op_view(_) ->
+    false.
+
+from_op_view({Op, R, As}) -> list_to_tuple([Op, R | As]).
 
 %% Desugar and specialize and remove annotations
 -spec unannotate(scode_a())  -> scode();
