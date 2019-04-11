@@ -10,7 +10,6 @@
 -module(aeso_fcode_to_fate).
 
 -export([compile/2]).
--compile([export_all, no_warn_export_all]).
 
 %% -- Preamble ---------------------------------------------------------------
 
@@ -594,24 +593,27 @@ rules() ->
     ].
 
 %% Removing pushes that are immediately consumed.
-r_push_consume({i, Ann1, {'PUSH', A}}, [{i, Ann2, {Op, R, ?a}} | Code]) when ?IsUnOp(Op) ->
-    {[{i, merge_ann(Ann1, Ann2), {Op, R, A}}], Code};
-r_push_consume({i, Ann1, {'PUSH', A}}, [{i, Ann2, {Op, R, ?a, B}} | Code]) when ?IsBinOp(Op) ->
-    {[{i, merge_ann(Ann1, Ann2), {Op, R, A, B}}], Code};
-r_push_consume({i, Ann1, {'PUSH', B}}, [{i, Ann2, {Op, R, A, ?a}} | Code]) when A /= ?a, ?IsBinOp(Op) ->
-    {[{i, merge_ann(Ann1, Ann2), {Op, R, A, B}}], Code};
-r_push_consume({i, Ann1, {'PUSH', A}}, [{Ann2, {'STORE', R, ?a}} | Code]) ->
-    {[{i, merge_ann(Ann1, Ann2), {'STORE', R, A}}], Code};
 r_push_consume({i, Ann1, {'PUSH', A}}, [{i, Ann2, {'POP', B}} | Code]) ->
     case live_out(B, Ann2) of
         true  -> {[{i, merge_ann(Ann1, Ann2), {'STORE', B, A}}], Code};
         false -> {[], Code}
     end;
+r_push_consume({i, Ann1, {'PUSH', A}}, [{i, Ann2, I} | Code]) ->
+    case op_view(I) of
+        {Op, R, As} ->
+            case lists:splitwith(fun(X) -> X /= ?a end, As) of
+                {_, []} -> false;
+                {As1, [?a | As2]} ->
+                    {[{i, merge_ann(Ann1, Ann2), from_op_view(Op, R, As1 ++ [A] ++ As2)}], Code}
+            end;
+        _ -> false
+    end;
 %% Writing directly to memory instead of going through the accumulator.
-r_push_consume({i, Ann1, {Op, ?a, A}}, [{i, Ann2, {'STORE', R, ?a}} | Code]) when ?IsUnOp(Op) ->
-    {[{i, merge_ann(Ann1, Ann2), {Op, R, A}}], Code};
-r_push_consume({i, Ann1, {Op, ?a, A, B}}, [{i, Ann2, {'STORE', R, ?a}} | Code]) when ?IsBinOp(Op) ->
-    {[{i, merge_ann(Ann1, Ann2), {Op, R, A, B}}], Code};
+r_push_consume({i, Ann1, I}, [{i, Ann2, {'STORE', R, ?a}} | Code]) ->
+    case op_view(I) of
+        {Op, ?a, As} -> {[{i, merge_ann(Ann1, Ann2), from_op_view(Op, R, As)}], Code};
+        _            -> false
+    end;
 
 r_push_consume(_, _) -> false.
 
@@ -673,18 +675,17 @@ r_inline_store(Acc, R, A, [{i, Ann, I} | Code]) ->
     case not live_in(R, Ann) orelse not Pure orelse lists:member(W, [R, A]) of
         true  -> false;
         false ->
-            case I of
-                {Op, S, B, C} when ?IsBinOp(Op), B == R orelse C == R ->
-                    Acc1 = [{i, Ann, {Op, S, Inl(B), Inl(C)}} | Acc],
-                    case r_inline_store(Acc1, R, A, Code) of
-                        false -> {lists:reverse(Acc1), Code};
-                        {New, Rest} -> {New, Rest}
-                    end;
-                {Op, S, B} when ?IsUnOp(Op), B == R ->
-                    Acc1 = [{i, Ann, {Op, S, Inl(B)}} | Acc],
-                    case r_inline_store(Acc1, R, A, Code) of
-                        false -> {lists:reverse(Acc1), Code};
-                        {New, Rest} -> {New, Rest}
+            case op_view(I) of
+                {Op, S, As} ->
+                    case lists:member(R, As) of
+                        true ->
+                            Acc1 = [{i, Ann, from_op_view(Op, S, lists:map(Inl, As))} | Acc],
+                            case r_inline_store(Acc1, R, A, Code) of
+                                false        -> {lists:reverse(Acc1), Code};
+                                {_, _} = Res -> Res
+                            end;
+                        false ->
+                            r_inline_store([{i, Ann, I} | Acc], R, A, Code)
                     end;
                 _ -> r_inline_store([{i, Ann, I} | Acc], R, A, Code)
             end
@@ -702,7 +703,7 @@ r_one_shot_var({i, Ann1, I}, [{i, Ann2, J} | Code]) ->
                    end,
             case {live_out(R, Ann2), Copy} of
                 {false, {write_to, X}} ->
-                    {[{i, merge_ann(Ann1, Ann2), from_op_view({Op, X, As})}], Code};
+                    {[{i, merge_ann(Ann1, Ann2), from_op_view(Op, X, As)}], Code};
                 _ -> false
             end;
         _ -> false
@@ -736,7 +737,7 @@ op_view({'NIL', R}) ->
 op_view(_) ->
     false.
 
-from_op_view({Op, R, As}) -> list_to_tuple([Op, R | As]).
+from_op_view(Op, R, As) -> list_to_tuple([Op, R | As]).
 
 %% Desugar and specialize and remove annotations
 -spec unannotate(scode_a())  -> scode();
@@ -923,16 +924,4 @@ set_labels(_, I) -> I.
 
 with_ixs(Xs) ->
     lists:zip(lists:seq(0, length(Xs) - 1), Xs).
-
-keyfind_index(X, J, Xs) ->
-    case [ I || {I, E} <- with_ixs(Xs), X == element(J, E) ] of
-        [I | _] -> I;
-        []      -> false
-    end.
-
-find_index(X, Xs) ->
-    case lists:keyfind(X, 2, with_ixs(Xs)) of
-        {I, _} -> I;
-        false  -> false
-    end.
 
