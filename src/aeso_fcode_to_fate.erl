@@ -150,7 +150,11 @@ to_scode(Env, {tuple, As}) ->
     [[ to_scode(Env, A) || A <- As ],
      aeb_fate_code:tuple(N)];
 
-to_scode(Env, {binop, _Type, Op, A, B}) ->
+to_scode(Env, {proj, E, I}) ->
+    [to_scode(Env, E),
+     aeb_fate_code:element_op(?a, ?i(I), ?a)];
+
+to_scode(Env, {binop, Op, A, B}) ->
     [ to_scode(notail(Env), B),
       to_scode(Env, A),
       binop_to_scode(Op) ];

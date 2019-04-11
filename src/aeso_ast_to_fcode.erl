@@ -31,7 +31,8 @@
                | nil
                | {var, var_name()}
                | {tuple, [fexpr()]}
-               | {binop, ftype(), binop(), fexpr(), fexpr()}
+               | {proj, fexpr(), integer()}
+               | {binop, binop(), fexpr(), fexpr()}
                | {'let', var_name(), fexpr(), fexpr()}
                | {switch, fsplit()}.
 
@@ -73,7 +74,9 @@
                     event_type    := ftype() | none,
                     functions     := #{ fun_name() => fun_def() } }.
 
--type type_env() :: #{ sophia_name() => fun(([ftype()]) -> ftype()) }.
+-type type_def() :: fun(([ftype()]) -> ftype()).
+
+-type type_env() :: #{ sophia_name() => type_def() }.
 -type fun_env()  :: #{ sophia_name() => fun_name() }.
 
 -type context() :: {main_contract, string()}
@@ -158,9 +161,8 @@ decls_to_fcode(Env, Decls) ->
 -spec decl_to_fcode(env(), aeso_syntax:decl()) -> env().
 decl_to_fcode(Env, {type_decl, _, _, _}) -> Env;
 decl_to_fcode(Env, {fun_decl, _, _, _})  -> Env;
-decl_to_fcode(Env, Decl = {type_def, _Ann, {id, _, _Name}, _Args, _Def}) ->
-    error({todo, Decl}),
-    Env;
+decl_to_fcode(Env, {type_def, _Ann, Name, Args, Def}) ->
+    typedef_to_fcode(Env, Name, Args, Def);
 decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, {id, _, Name}, Args, Ret, Body}) ->
     Attrs = get_attributes(Ann),
     FName = lookup_fun(Env, qname(Env, Name)),
@@ -174,6 +176,17 @@ decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, {id, _, Name}, Args, R
     NewFuns = Funs#{ FName => Def },
     Env#{ functions := NewFuns }.
 
+-spec typedef_to_fcode(env(), aeso_syntax:id(), [aeso_syntax:tvar()], aeso_syntax:type_def()) -> env().
+typedef_to_fcode(Env, {id, _, Name}, Xs, Def) ->
+    Q = qname(Env, Name),
+    FDef = fun(Args) ->
+                case Def of
+                    {record_t, Fields} -> {todo, Xs, Args, record_t, Fields};
+                    {variant_t, Cons} -> {todo, Xs, Args, variant_t, Cons};
+                    {alias_t, Type} -> {todo, Xs, Args, alias_t, Type}
+                end end,
+    bind_type(Env, Q, FDef).
+
 -spec type_to_fcode(env(), aeso_syntax:type()) -> ftype().
 type_to_fcode(Env, {app_t, _, T = {Id, _, _}, Types}) when Id == id; Id == qid ->
     lookup_type(Env, T, [type_to_fcode(Env, Type) || Type <- Types]);
@@ -181,6 +194,9 @@ type_to_fcode(Env, T = {Id, _, _}) when Id == id; Id == qid ->
     lookup_type(Env, T, []);
 type_to_fcode(Env, {tuple_t, _, Types}) ->
     {tuple, [type_to_fcode(Env, T) || T <- Types]};
+type_to_fcode(Env, {record_t, Fields}) ->
+    FieldType = fun({field_t, _, _, Ty}) -> Ty end,
+    type_to_fcode(Env, {tuple_t, [], lists:map(FieldType, Fields)});
 type_to_fcode(_Env, Type) ->
     error({todo, Type}).
 
@@ -190,11 +206,11 @@ args_to_fcode(Env, Args) ->
 
 -spec expr_to_fcode(env(), aeso_syntax:expr()) -> fexpr().
 expr_to_fcode(Env, {typed, _, Expr, Type}) ->
-    expr_to_fcode(Env, type_to_fcode(Env, Type), Expr);
+    expr_to_fcode(Env, Type, Expr);
 expr_to_fcode(Env, Expr) ->
     expr_to_fcode(Env, no_type, Expr).
 
--spec expr_to_fcode(env(), ftype() | no_type, aeso_syntax:expr()) -> fexpr().
+-spec expr_to_fcode(env(), aeso_syntax:type() | no_type, aeso_syntax:expr()) -> fexpr().
 
 %% Literals
 expr_to_fcode(_Env, _Type, {int, _, N})  -> {int, N};
@@ -207,9 +223,16 @@ expr_to_fcode(_Env, _Type, {id, _, X}) -> {var, X};
 expr_to_fcode(Env, _Type, {tuple, _, Es}) ->
     {tuple, [expr_to_fcode(Env, E) || E <- Es]};
 
+%% Records
+expr_to_fcode(Env, _Type, {proj, _Ann, Rec, X}) ->
+    {proj, expr_to_fcode(Env, Rec), field_index(Rec, X)};
+
+expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Fields}) ->
+    {tuple, [expr_to_fcode(Env, field_value(F, Fields)) || F <- FieldTypes]};
+
 %% Lists
-expr_to_fcode(Env, Type, {list, _, Es}) ->
-    lists:foldr(fun(E, L) -> {binop, Type, '::', expr_to_fcode(Env, E), L} end,
+expr_to_fcode(Env, _Type, {list, _, Es}) ->
+    lists:foldr(fun(E, L) -> {binop, '::', expr_to_fcode(Env, E), L} end,
                 nil, Es);
 
 %% Conditionals
@@ -244,12 +267,12 @@ expr_to_fcode(Env, _Type, {block, _, Stmts}) ->
     stmts_to_fcode(Env, Stmts);
 
 %% Binary operator
-expr_to_fcode(Env, Type, {app, _Ann, {Op, _}, [A, B]}) when is_atom(Op) ->
+expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A, B]}) when is_atom(Op) ->
     FOp = binop_to_fcode(Op),
-    {binop, Type, FOp, expr_to_fcode(Env, A), expr_to_fcode(Env, B)};
+    {binop, FOp, expr_to_fcode(Env, A), expr_to_fcode(Env, B)};
 
 expr_to_fcode(_Env, Type, Expr) ->
-    {todo, {Expr, ':', Type}}.
+    error({todo, {Expr, ':', Type}}).
 
 binop_to_fcode(Op) when Op == '+'; Op == '-'; Op == '==' -> Op.
 
@@ -364,13 +387,14 @@ split_vars({var, X}, T) -> [{X, T}].
 -spec rename([{var_name(), var_name()}], fexpr()) -> fexpr().
 rename(Ren, Expr) ->
     case Expr of
-        {int, _}               -> Expr;
-        {bool, _}              -> Expr;
-        nil                    -> nil;
-        {var, X}               -> {var, rename_var(Ren, X)};
-        {tuple, Es}            -> {tuple, [rename(Ren, E) || E <- Es]};
-        {binop, T, Op, E1, E2} -> {binop, T, Op, rename(Ren, E1), rename(Ren, E2)};
-        {'let', X, E, Body}    ->
+        {int, _}            -> Expr;
+        {bool, _}           -> Expr;
+        nil                 -> nil;
+        {var, X}            -> {var, rename_var(Ren, X)};
+        {tuple, Es}         -> {tuple, [rename(Ren, E) || E <- Es]};
+        {proj, E, I}        -> {proj, rename(Ren, E), I};
+        {binop, Op, E1, E2} -> {binop, Op, rename(Ren, E1), rename(Ren, E2)};
+        {'let', X, E, Body} ->
             {Z, Ren1} = rename_binding(Ren, X),
             {'let', Z, rename(Ren, E), rename(Ren1, Body)};
         {switch, Split} -> {switch, rename_split(Ren, Split)}
@@ -434,11 +458,11 @@ alt_to_fcode(Env, {'case', _, Pat, Expr}) ->
 
 -spec pat_to_fcode(env(), aeso_syntax:pat()) -> fpat().
 pat_to_fcode(Env, {typed, _, Pat, Type}) ->
-    pat_to_fcode(Env, type_to_fcode(Env, Type), Pat);
+    pat_to_fcode(Env, Type, Pat);
 pat_to_fcode(Env, Pat) ->
     pat_to_fcode(Env, no_type, Pat).
 
--spec pat_to_fcode(env(), ftype() | no_type, aeso_syntax:pat()) -> fpat().
+-spec pat_to_fcode(env(), aeso_syntax:type() | no_type, aeso_syntax:pat()) -> fpat().
 pat_to_fcode(_Env, _Type, {id, _, X}) -> {var, X};
 pat_to_fcode(Env, _Type, {tuple, _, Pats}) ->
     {tuple, [ pat_to_fcode(Env, Pat) || Pat <- Pats ]};
@@ -452,7 +476,17 @@ pat_to_fcode(Env, _Type, {list, _, Ps}) ->
                 end, nil, Ps);
 pat_to_fcode(Env, _Type, {app, _, {'::', _}, [P, Q]}) ->
     {'::', pat_to_fcode(Env, P), pat_to_fcode(Env, Q)};
-pat_to_fcode(_Env, Type, Pat) -> {todo, Pat, ':', Type}.
+pat_to_fcode(Env, {record_t, Fields}, {record, _, FieldPats}) ->
+    FieldPat = fun(F) ->
+                    case field_value(F, FieldPats) of
+                        false -> {id, [], "_"};
+                        Pat   -> Pat
+                    end end,
+    {tuple, [pat_to_fcode(Env, FieldPat(Field))
+             || Field <- Fields]};
+
+pat_to_fcode(_Env, Type, Pat) ->
+    error({todo, Pat, ':', Type}).
 
 -spec stmts_to_fcode(env(), [aeso_syntax:stmt()]) -> fexpr().
 stmts_to_fcode(Env, [{letval, _, {typed, _, {id, _, X}, _}, _, Expr} | Stmts]) ->
@@ -491,6 +525,10 @@ lookup_type(#{ type_env := TypeEnv }, Name, Args, Default) ->
         false -> Default;
         Fun   -> Fun(Args)
     end.
+
+-spec bind_type(env(), sophia_name(), type_def()) -> env().
+bind_type(Env = #{type_env := TEnv}, Q, FDef) ->
+    Env#{ type_env := TEnv#{ Q => FDef } }.
 
 %% -- Names --
 
@@ -547,6 +585,22 @@ fresh_name() ->
     put('%fresh', N + 1),
     lists:concat(["%", N]).
 
+%% -- Records --
+
+field_index({typed, _, _, RecTy}, X) ->
+    field_index(RecTy, X);
+field_index({record_t, Fields}, {id, _, X}) ->
+    IsX = fun({field_t, _, {id, _, Y}, _}) -> X == Y end,
+    [I] = [ I || {I, Field} <- indexed(Fields), IsX(Field) ],
+    I - 1.  %% Tuples are 0-indexed
+
+field_value({field_t, _, {id, _, X}, _}, Fields) ->
+    IsX = fun({field, _, [{proj, _, {id, _, Y}}], _}) -> X == Y end,
+    case [E || {field, _, _, E} = F <- Fields, IsX(F)] of
+        [E] -> E;
+        []  -> false
+    end.
+
 %% -- Attributes --
 
 get_attributes(Ann) ->
@@ -593,7 +647,9 @@ pp_fexpr({var, X}) ->
     pp_text(X);
 pp_fexpr({tuple, Es}) ->
     pp_parens(prettypr:par(pp_punctuate(pp_text(","), [pp_fexpr(E) || E <- Es])));
-pp_fexpr({binop, _Type, Op, A, B}) ->
+pp_fexpr({proj, E, I}) ->
+    pp_beside([pp_fexpr(E), pp_text("."), pp_text(I)]);
+pp_fexpr({binop, Op, A, B}) ->
     pp_parens(prettypr:par([pp_fexpr(A), pp_text(Op), pp_fexpr(B)]));
 pp_fexpr({'let', X, A, B}) ->
     prettypr:par([pp_beside([pp_text("let "), pp_text(X), pp_text(" = "), pp_fexpr(A), pp_text(" in")]),
@@ -612,10 +668,10 @@ pp_split({split, Type, X, Alts}) ->
              [prettypr:nest(2, pp_case(Alt)) || Alt <- Alts]).
 
 pp_case({'case', Pat, Split}) ->
-    pp_above(pp_beside(pp_pat(Pat), pp_text(" =>")),
-             prettypr:nest(2, pp_split(Split))).
+    prettypr:sep([pp_beside(pp_pat(Pat), pp_text(" =>")),
+                  prettypr:nest(2, pp_split(Split))]).
 
 pp_pat({tuple, Xs})   -> pp_fexpr({tuple, [{var, X} || X <- Xs]});
-pp_pat({'::', X, Xs}) -> pp_fexpr({binop, list, '::', {var, X}, {var, Xs}});
+pp_pat({'::', X, Xs}) -> pp_fexpr({binop, '::', {var, X}, {var, Xs}});
 pp_pat(Pat)           -> pp_fexpr(Pat).
 
