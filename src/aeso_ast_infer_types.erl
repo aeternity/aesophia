@@ -98,11 +98,12 @@
 -type scope() :: #scope{}.
 
 -record(env,
-    { scopes    = #{ [] => #scope{}} :: #{ qname() => scope() }
-    , vars      = []                 :: [{name(), var_info()}]
-    , typevars  = unrestricted       :: unrestricted | [name()]
-    , fields    = #{}                :: #{ name() => [field_info()] }    %% fields are global
-    , namespace = []                 :: qname()
+    { scopes     = #{ [] => #scope{}} :: #{ qname() => scope() }
+    , vars       = []                 :: [{name(), var_info()}]
+    , typevars   = unrestricted       :: unrestricted | [name()]
+    , fields     = #{}                :: #{ name() => [field_info()] }    %% fields are global
+    , namespace  = []                 :: qname()
+    , in_pattern = false              :: boolean()
     }).
 
 -type env() :: #env{}.
@@ -990,7 +991,7 @@ infer_expr(Env, {record, Attrs, Fields}) ->
     constrain([ #record_create_constraint{
                     record_t = RecordType1,
                     fields   = [ FieldName || {field, _, [{proj, _, FieldName}], _} <- Fields ],
-                    context  = Attrs } ] ++
+                    context  = Attrs } || not Env#env.in_pattern ] ++
               [begin
                 [{proj, _, FieldName}] = LV,
                 #field_constraint{
@@ -1119,7 +1120,7 @@ infer_case(Env, Attrs, Pattern, ExprType, Branch, SwitchType) ->
         [] -> ok;
         Nonlinear -> type_error({non_linear_pattern, Pattern, lists:usort(Nonlinear)})
     end,
-    NewEnv = bind_vars([{Var, fresh_uvar(Ann)} || Var = {id, Ann, _} <- Vars], Env),
+    NewEnv = bind_vars([{Var, fresh_uvar(Ann)} || Var = {id, Ann, _} <- Vars], Env#env{ in_pattern = true }),
     NewPattern = {typed, _, _, PatType} = infer_expr(NewEnv, Pattern),
     NewBranch  = check_expr(NewEnv, Branch, SwitchType),
     unify(Env, PatType, ExprType, {case_pat, Pattern, PatType, ExprType}),
