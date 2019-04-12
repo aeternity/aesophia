@@ -228,7 +228,25 @@ expr_to_fcode(Env, _Type, {proj, _Ann, Rec, X}) ->
     {proj, expr_to_fcode(Env, Rec), field_index(Rec, X)};
 
 expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Fields}) ->
-    {tuple, [expr_to_fcode(Env, field_value(F, Fields)) || F <- FieldTypes]};
+    FVal = fun(F) ->
+             %% All fields are present and no updates
+             {set, E} = field_value(F, Fields),
+             expr_to_fcode(Env, E)
+           end,
+    {tuple, lists:map(FVal, FieldTypes)};
+
+expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Rec, Fields}) ->
+    %% TODO: update once we have a SETELEMENT instruction
+    X    = fresh_name(),
+    Proj = fun(I) -> {proj, {var, X}, I - 1} end,
+    Comp = fun(I, FT) ->
+                case field_value(FT, Fields) of
+                    false       -> Proj(I);
+                    {set, E}    -> expr_to_fcode(Env, E);
+                    {upd, Z, E} -> {'let', Z, Proj(I), expr_to_fcode(Env, E)}
+                end end,
+    {'let', X, expr_to_fcode(Env, Rec),
+     {tuple, [Comp(I, FT) || {I, FT} <- indexed(FieldTypes)]}};
 
 %% Lists
 expr_to_fcode(Env, _Type, {list, _, Es}) ->
@@ -479,8 +497,9 @@ pat_to_fcode(Env, _Type, {app, _, {'::', _}, [P, Q]}) ->
 pat_to_fcode(Env, {record_t, Fields}, {record, _, FieldPats}) ->
     FieldPat = fun(F) ->
                     case field_value(F, FieldPats) of
-                        false -> {id, [], "_"};
-                        Pat   -> Pat
+                        false      -> {id, [], "_"};
+                        {set, Pat} -> Pat
+                        %% {upd, _, _} is impossible in patterns
                     end end,
     {tuple, [pat_to_fcode(Env, FieldPat(Field))
              || Field <- Fields]};
@@ -595,10 +614,12 @@ field_index({record_t, Fields}, {id, _, X}) ->
     I - 1.  %% Tuples are 0-indexed
 
 field_value({field_t, _, {id, _, X}, _}, Fields) ->
-    IsX = fun({field, _, [{proj, _, {id, _, Y}}], _}) -> X == Y end,
-    case [E || {field, _, _, E} = F <- Fields, IsX(F)] of
-        [E] -> E;
-        []  -> false
+    View = fun({field, _, [{proj, _, {id, _, Y}}], E})    -> {Y, {set, E}};
+              ({field_upd, _, [{proj, _, {id, _, Y}}],
+                {typed, _, {lam, _, [{arg, _, {id, _, Z}, _}], E}, _}}) -> {Y, {upd, Z, E}} end,
+    case [Upd || {Y, Upd} <- lists:map(View, Fields), X == Y] of
+        [Upd] -> Upd;
+        []    -> false
     end.
 
 %% -- Attributes --
