@@ -24,6 +24,7 @@
 %% Types
 -record(app_t, {ann,id,fields}).
 -record(tuple_t, {ann,args}).
+-record(bytes_t, {ann,len}).
 -record(record_t, {fields}).
 -record(field_t, {ann,id,type}).
 -record(alias_t, {type}).
@@ -43,7 +44,7 @@
 -record(bool, {ann,bool}).
 -record(int, {ann,value}).
 -record(string, {ann,bin}).
--record(hash, {ann,hash}).
+-record(bytes, {ann,bin}).
 -record(tuple, {ann,args}).
 -record(list, {ann,args}).
 -record(app, {ann,func,args}).
@@ -133,6 +134,8 @@ encode_type(#qcon{names=Ns}) ->
 encode_type(#tuple_t{args=As}) ->
     Eas = encode_types(As),
     [{<<"tuple">>,Eas}];
+encode_type(#bytes_t{len=Len}) ->
+    list_to_binary(lists:concat(["bytes(", Len, ")"]));
 encode_type(#record_t{fields=Fs}) ->
     Efs = encode_fields(Fs),
     [{<<"record">>,Efs}];
@@ -208,7 +211,7 @@ encode_expr(#typed{expr=E}) ->
 encode_expr(#bool{bool=B}) -> B;
 encode_expr(#int{value=V}) -> V;
 encode_expr(#string{bin=B}) -> B;
-encode_expr(#hash{hash=H}) -> H;
+encode_expr(#bytes{bin=B}) -> B;
 encode_expr(#tuple{args=As}) ->
     Eas = encode_exprs(As),
     [{<<"tuple">>,Eas}];

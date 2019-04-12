@@ -104,13 +104,12 @@ from_string(ContractString, Options) ->
         %% General programming errors in the compiler just signal error.
     end.
 
--spec string_to_icode(string(), [option() | permissive_address_literals]) -> map().
-string_to_icode(ContractString, Options0) ->
-    {InferOptions, Options} = lists:partition(fun(Opt) -> Opt == permissive_address_literals end, Options0),
+-spec string_to_icode(string(), [option()]) -> map().
+string_to_icode(ContractString, Options) ->
     Ast = parse(ContractString, Options),
     pp_sophia_code(Ast, Options),
     pp_ast(Ast, Options),
-    {TypeEnv, TypedAst} = aeso_ast_infer_types:infer(Ast, [return_env | InferOptions]),
+    {TypeEnv, TypedAst} = aeso_ast_infer_types:infer(Ast, [return_env]),
     pp_typed_ast(TypedAst, Options),
     Icode = ast_to_icode(TypedAst, Options),
     pp_icode(Icode, Options),
@@ -151,11 +150,11 @@ check_call(Source, FunName, Args, Options) ->
 
 check_call(ContractString0, FunName, Args, Options, PatchFun) ->
     try
-        %% First check the contract without the __call function and no permissive literals
+        %% First check the contract without the __call function
         #{} = string_to_icode(ContractString0, Options),
         ContractString = insert_call_function(ContractString0, FunName, Args, Options),
         #{typed_ast := TypedAst,
-          icode     := Icode} = string_to_icode(ContractString, [permissive_address_literals | Options]),
+          icode     := Icode} = string_to_icode(ContractString, Options),
         {ok, {FunName, {fun_t, _, _, ArgTypes, RetType}}} = get_call_type(TypedAst),
         ArgVMTypes = [ aeso_ast_to_icode:ast_typerep(T, Icode) || T <- ArgTypes ],
         RetVMType  = case RetType of
@@ -257,19 +256,21 @@ to_sophia_value(ContractString, FunName, ok, Data, Options) ->
                                 fun (E) -> io_lib:format("~p", [E]) end)}
     end.
 
-address_literal(N) -> {hash, [], <<N:256>>}.  % TODO
+address_literal(Type, N) -> {Type, [], <<N:256>>}.
 
 %% TODO: somewhere else
 -spec translate_vm_value(aeb_aevm_data:type(), aeso_syntax:type(), aeb_aevm_data:data()) -> aeso_syntax:expr().
-translate_vm_value(word,   {id, _, "address"},                     N) -> address_literal(N);
-translate_vm_value(word,   {app_t, _, {id, _, "oracle"}, _},       N) -> address_literal(N);
-translate_vm_value(word,   {app_t, _, {id, _, "oracle_query"}, _}, N) -> address_literal(N);
-translate_vm_value(word,   {id, _, "hash"},    N) -> {hash, [], <<N:256>>};
-translate_vm_value(word,   {id, _, "int"},     N) -> {int, [], N};
-translate_vm_value(word,   {id, _, "bits"},    N) -> error({todo, bits, N});
-translate_vm_value(word,   {id, _, "bool"},    N) -> {bool, [], N /= 0};
-translate_vm_value({tuple, [word, word]}, {id, _, "signature"}, {tuple, [Hi, Lo]}) ->
-    {hash, [], <<Hi:256, Lo:256>>};
+translate_vm_value(word, {id, _, "address"},                     N) -> address_literal(account_pubkey, N);
+translate_vm_value(word, {app_t, _, {id, _, "oracle"}, _},       N) -> address_literal(oracle_pubkey, N);
+translate_vm_value(word, {app_t, _, {id, _, "oracle_query"}, _}, N) -> address_literal(oracle_query_id, N);
+translate_vm_value(word, {con, _, _Name},                        N) -> address_literal(contract_pubkey, N);
+translate_vm_value(word, {id, _, "int"},     N) -> {int, [], N};
+translate_vm_value(word, {id, _, "bits"},    N) -> error({todo, bits, N});
+translate_vm_value(word, {id, _, "bool"},    N) -> {bool, [], N /= 0};
+translate_vm_value({bytes, Len}, {bytes_t, _, Len}, Val) when Len =< 32 ->
+    {bytes, [], <<Val:Len/unit:8>>};
+translate_vm_value({bytes, Len}, {bytes_t, _, Len}, Val) ->
+    {bytes, [], binary:part(<< <<W:32/unit:8>> || W <- tuple_to_list(Val) >>, 0, Len)};
 translate_vm_value(string, {id, _, "string"}, S) -> {string, [], S};
 translate_vm_value({list, VmType}, {app_t, _, {id, _, "list"}, [Type]}, List) ->
     {list, [], [translate_vm_value(VmType, Type, X) || X <- List]};
@@ -402,6 +403,10 @@ icode_to_term(word, {integer, N}) -> N;
 icode_to_term(string, {tuple, [{integer, Len} | Words]}) ->
     <<Str:Len/binary, _/binary>> = << <<W:256>> || {integer, W} <- Words >>,
     Str;
+icode_to_term({bytes, Len}, {integer, Value}) when Len =< 32 ->
+    Value;
+icode_to_term({bytes, Len}, {tuple, Words}) when Len > 32->
+    list_to_tuple([W || {integer, W} <- Words]);
 icode_to_term({list, T}, {list, Vs}) ->
     [ icode_to_term(T, V) || V <- Vs ];
 icode_to_term({tuple, Ts}, {tuple, Vs}) ->

@@ -346,6 +346,11 @@ ast_body(?qid_app(["Crypto", "ecverify"], [Msg, PK, Sig], _, _), Icode) ->
               [ast_body(Msg, Icode), ast_body(PK, Icode), ast_body(Sig, Icode)],
               [word, word, sign_t()], word);
 
+ast_body(?qid_app(["Crypto", "ecverify_secp256k1"], [Msg, PK, Sig], _, _), Icode) ->
+    prim_call(?PRIM_CALL_CRYPTO_ECVERIFY_SECP256K1, #integer{value = 0},
+              [ast_body(Msg, Icode), ast_body(PK, Icode), ast_body(Sig, Icode)],
+              [bytes_t(32), bytes_t(64), bytes_t(64)], word);
+
 ast_body(?qid_app(["Crypto", "sha3"], [Term], [Type], _), Icode) ->
     generic_hash_primop(?PRIM_CALL_CRYPTO_SHA3, Term, Type, Icode);
 ast_body(?qid_app(["Crypto", "sha256"], [Term], [Type], _), Icode) ->
@@ -416,14 +421,17 @@ ast_body({bool, _, Bool}, _Icode) ->        %BOOL as ints
     #integer{value = Value};
 ast_body({int, _, Value}, _Icode) ->
     #integer{value = Value};
-ast_body({hash, _, Hash}, _Icode) ->
-    case Hash of
-        <<Value:32/unit:8>> ->              %% address
-            #integer{value = Value};
-        <<Hi:32/unit:8, Lo:32/unit:8>> ->   %% signature
-            #tuple{cpts = [#integer{value = Hi},
-                           #integer{value = Lo}]}
+ast_body({bytes, _, Bin}, _Icode) ->
+    case aeb_memory:binary_to_words(Bin) of
+        [Word] -> #integer{value = Word};
+        Words  -> #tuple{cpts = [#integer{value = W} || W <- Words]}
     end;
+ast_body({Key, _, Bin}, _Icode) when Key == account_pubkey;
+                                     Key == contract_pubkey;
+                                     Key == oracle_pubkey;
+                                     Key == oracle_query_id ->
+    <<Value:32/unit:8>> = Bin,
+    #integer{value = Value};
 ast_body({string,_,Bin}, _Icode) ->
     Cpts = [size(Bin) | aeb_memory:binary_to_words(Bin)],
     #tuple{cpts = [#integer{value=X} || X <- Cpts]};
@@ -688,6 +696,8 @@ ast_typerep({qid, _, Name}, Icode) ->
     lookup_type_id(Name, [], Icode);
 ast_typerep({con, _, _}, _) ->
     word;   %% Contract type
+ast_typerep({bytes_t, _, Len}, _) ->
+    {bytes, Len};
 ast_typerep({app_t, _, {id, _, Name}, Args}, Icode) ->
     ArgReps = [ ast_typerep(Arg, Icode) || Arg <- Args ],
     lookup_type_id(Name, ArgReps, Icode);
@@ -715,8 +725,9 @@ ast_typerep({variant_t, Cons}, Icode) ->
 ttl_t(Icode) ->
     ast_typerep({qid, [], ["Chain", "ttl"]}, Icode).
 
-sign_t() ->
-    {tuple, [word, word]}.
+sign_t() -> bytes_t(64).
+bytes_t(Len) when Len =< 32 -> word;
+bytes_t(Len)                -> {tuple, lists:duplicate((31 + Len) div 32, word)}.
 
 get_signature_arg(Args0) ->
     NamedArgs = [Arg || Arg = {named_arg, _, _, _} <- Args0],
@@ -750,6 +761,8 @@ type_value({list, A}) ->
 type_value({tuple, As}) ->
     #tuple{ cpts = [#integer{ value = ?TYPEREP_TUPLE_TAG },
                     #list{ elems = [ type_value(A) || A <- As ] }] };
+type_value({bytes, Len}) ->
+    #tuple{ cpts = [#integer{ value = ?TYPEREP_BYTES_TAG }, #integer{ value = Len }] };
 type_value({variant, Cs}) ->
     #tuple{ cpts = [#integer{ value = ?TYPEREP_VARIANT_TAG },
                     #list{ elems = [ #list{ elems = [ type_value(A) || A <- As ] } || As <- Cs ] }] };

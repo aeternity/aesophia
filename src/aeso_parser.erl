@@ -136,11 +136,15 @@ type200() ->
 type300() -> type400().
 
 type400() ->
-    ?RULE(typeAtom(), optional(type_args()),
+    choice(
+    [?RULE(typeAtom(), optional(type_args()),
           case _2 of
             none       -> _1;
             {ok, Args} -> {app_t, get_ann(_1), _1, Args}
-          end).
+          end),
+     ?RULE(id("bytes"), parens(token(int)),
+           {bytes_t, get_ann(_1), element(3, _2)})
+    ]).
 
 typeAtom() ->
     ?LAZY_P(choice(
@@ -203,8 +207,8 @@ exprAtom() ->
     ?LAZY_P(begin
         Expr = ?LAZY_P(expr()),
         choice(
-        [ id(), con(), token(qid), token(qcon)
-        , token(hash), token(string), token(char)
+        [ id_or_addr(), con(), token(qid), token(qcon)
+        , token(bytes), token(string), token(char)
         , token(int)
         , ?RULE(token(hex), set_ann(format, hex, setelement(1, _1, int)))
         , {bool, keyword(true), true}
@@ -325,6 +329,26 @@ token(Tag) ->
         {Tok, {Line, Col}}      -> {Tok, pos_ann(Line, Col)};
         {Tok, {Line, Col}, Val} -> {Tok, pos_ann(Line, Col), Val}
     end).
+
+id(Id) ->
+    ?LET_P({id, A, X} = Y, id(),
+           if X == Id -> Y;
+              true    -> fail({A, "expected 'bytes'"})
+           end).
+
+id_or_addr() ->
+    ?RULE(id(), parse_addr_literal(_1)).
+
+parse_addr_literal(Id = {id, Ann, Name}) ->
+    case lists:member(lists:sublist(Name, 3), ["ak_", "ok_", "oq_", "ct_"]) of
+        false -> Id;
+        true  ->
+            try aeser_api_encoder:decode(list_to_binary(Name)) of
+                {Type, Bin} -> {Type, Ann, Bin}
+            catch _:_ ->
+                Id
+            end
+    end.
 
 %% -- Helpers ----------------------------------------------------------------
 
@@ -457,7 +481,7 @@ parse_pattern(E = {id, _, _})     -> E;
 parse_pattern(E = {unit, _})      -> E;
 parse_pattern(E = {int, _, _})    -> E;
 parse_pattern(E = {bool, _, _})   -> E;
-parse_pattern(E = {hash, _, _})   -> E;
+parse_pattern(E = {bytes, _, _})  -> E;
 parse_pattern(E = {string, _, _}) -> E;
 parse_pattern(E = {char, _, _})   -> E;
 parse_pattern(E) -> bad_expr_err("Not a valid pattern", E).

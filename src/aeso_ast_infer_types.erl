@@ -56,7 +56,12 @@
     , fields   :: [aeso_syntax:id()]
     , context  :: why_record() }).
 
--type field_constraint() :: #field_constraint{} | #record_create_constraint{}.
+-record(is_contract_constraint,
+    { contract_t :: utype(),
+      context    :: aeso_syntax:expr()  %% The address literal
+    }).
+
+-type field_constraint() :: #field_constraint{} | #record_create_constraint{} | #is_contract_constraint{}.
 
 -record(field_info,
     { ann      :: aeso_syntax:ann()
@@ -341,6 +346,7 @@ global_env() ->
     Address = {id, Ann, "address"},
     Hash    = {id, Ann, "hash"},
     Bits    = {id, Ann, "bits"},
+    Bytes   = fun(Len) -> {bytes_t, Ann, Len} end,
     Oracle  = fun(Q, R) -> {app_t, Ann, {id, Ann, "oracle"}, [Q, R]} end,
     Query   = fun(Q, R) -> {app_t, Ann, {id, Ann, "oracle_query"}, [Q, R]} end,
     Unit    = {tuple_t, Ann, []},
@@ -373,7 +379,9 @@ global_env() ->
                      {"abort", Fun1(String, A)}])
         , types = MkDefs(
                     [{"int", 0}, {"bool", 0}, {"string", 0}, {"address", 0},
-                     {"hash", 0}, {"signature", 0}, {"bits", 0},
+                     {"hash", {[], {alias_t, Bytes(32)}}},
+                     {"signature", {[], {alias_t, Bytes(64)}}},
+                     {"bits", 0},
                      {"option", 1}, {"list", 1}, {"map", 2},
                      {"oracle", 2}, {"oracle_query", 2}
                      ]) },
@@ -439,6 +447,7 @@ global_env() ->
     CryptoScope = #scope
         { funs = MkDefs(
                      [{"ecverify", Fun([Hash, Address, SignId], Bool)},
+                      {"ecverify_secp256k1", Fun([Hash, Bytes(64), Bytes(64)], Bool)},
                       {"sha3",     Fun1(A, Hash)},
                       {"sha256",   Fun1(A, Hash)},
                       {"blake2b",  Fun1(A, Hash)}]) },
@@ -497,7 +506,7 @@ map_t(As, K, V) -> {app_t, As, {id, As, "map"}, [K, V]}.
 infer(Contracts) ->
     infer(Contracts, []).
 
--type option() :: permissive_address_literals | return_env.
+-type option() :: return_env.
 
 -spec init_env(list(option())) -> env().
 init_env(_Options) -> global_env().
@@ -675,6 +684,9 @@ check_type(Env, X = {Tag, _, _}, Arity) when Tag == con; Tag == qcon; Tag == id;
 check_type(Env, Type = {tuple_t, Ann, Types}, Arity) ->
     ensure_base_type(Type, Arity),
     {tuple_t, Ann, [ check_type(Env, T, 0) || T <- Types ]};
+check_type(_Env, Type = {bytes_t, _Ann, _Len}, Arity) ->
+    ensure_base_type(Type, Arity),
+    Type;
 check_type(Env, {app_t, Ann, Type, Types}, Arity) ->
     Types1 = [ check_type(Env, T, 0) || T <- Types ],
     Type1  = check_type(Env, Type, Arity + length(Types)),
@@ -898,20 +910,29 @@ infer_expr(_Env, Body={int, As, _}) ->
     {typed, As, Body, {id, As, "int"}};
 infer_expr(_Env, Body={string, As, _}) ->
     {typed, As, Body, {id, As, "string"}};
-infer_expr(_Env, Body={hash, As, Hash}) ->
-    case byte_size(Hash) of
-        32 -> {typed, As, Body, {id, As, "address"}};
-        64 -> {typed, As, Body, {id, As, "signature"}}
-    end;
+infer_expr(_Env, Body={bytes, As, Bin}) ->
+    {typed, As, Body, {bytes_t, As, byte_size(Bin)}};
+infer_expr(_Env, Body={account_pubkey, As, _}) ->
+    {typed, As, Body, {id, As, "address"}};
+infer_expr(_Env, Body={oracle_pubkey, As, _}) ->
+    Q = fresh_uvar(As),
+    R = fresh_uvar(As),
+    {typed, As, Body, {app_t, As, {id, As, "oracle"}, [Q, R]}};
+infer_expr(_Env, Body={oracle_query_id, As, _}) ->
+    Q = fresh_uvar(As),
+    R = fresh_uvar(As),
+    {typed, As, Body, {app_t, As, {id, As, "oracle_query"}, [Q, R]}};
+infer_expr(_Env, Body={contract_pubkey, As, _}) ->
+    Con = fresh_uvar(As),
+    constrain([#is_contract_constraint{ contract_t = Con,
+                                        context    = Body }]),
+    {typed, As, Body, Con};
 infer_expr(_Env, Body={id, As, "_"}) ->
     {typed, As, Body, fresh_uvar(As)};
-infer_expr(Env, Id = {id, As, _}) ->
+infer_expr(Env, Id = {Tag, As, _}) when Tag == id; Tag == qid ->
     {QName, Type} = lookup_name(Env, As, Id),
     {typed, As, QName, Type};
-infer_expr(Env, Id = {qid, As, _}) ->
-    {QName, Type} = lookup_name(Env, As, Id),
-    {typed, As, QName, Type};
-infer_expr(Env, Id = {con, As, _}) ->
+infer_expr(Env, Id = {Tag, As, _}) when Tag == con; Tag == qcon ->
     {QName, Type} = lookup_name(Env, As, Id, [freshen]),
     {typed, As, QName, Type};
 infer_expr(Env, {unit, As}) ->
@@ -1348,6 +1369,16 @@ check_record_create_constraints(Env, [C | Cs]) ->
     end,
     check_record_create_constraints(Env, Cs).
 
+check_is_contract_constraints(_Env, []) -> ok;
+check_is_contract_constraints(Env, [C | Cs]) ->
+    #is_contract_constraint{ contract_t = Type, context = Lit } = C,
+    Type1 = unfold_types_in_type(Env, instantiate(Type)),
+    case lookup_type(Env, record_type_name(Type1)) of
+        {_, {_Ann, {[], {contract_t, _}}}} -> ok;
+        _ -> type_error({not_a_contract_type, Type1, Lit})
+    end,
+    check_is_contract_constraints(Env, Cs).
+
 -spec solve_field_constraints(env(), [field_constraint()]) -> ok.
 solve_field_constraints(Env, Constraints) ->
     %% First look for record fields that appear in only one type definition
@@ -1446,9 +1477,12 @@ solve_known_record_types(Env, Constraints) ->
     DerefConstraints--SolvedConstraints.
 
 destroy_and_report_unsolved_field_constraints(Env) ->
-    {FieldCs, CreateCs} =
+    {FieldCs, OtherCs} =
         lists:partition(fun(#field_constraint{}) -> true; (_) -> false end,
                         get_field_constraints()),
+    {CreateCs, ContractCs} =
+        lists:partition(fun(#record_create_constraint{}) -> true; (_) -> false end,
+                        OtherCs),
     Unknown  = solve_known_record_types(Env, FieldCs),
     if Unknown == [] -> ok;
        true ->
@@ -1458,6 +1492,7 @@ destroy_and_report_unsolved_field_constraints(Env) ->
             end
     end,
     check_record_create_constraints(Env, CreateCs),
+    check_is_contract_constraints(Env, ContractCs),
     destroy_field_constraints(),
     ok.
 
@@ -1583,6 +1618,8 @@ unfold_types_in_type(Env, {field_t, Attr, Name, Type}, Options) ->
     {field_t, Attr, Name, unfold_types_in_type(Env, Type, Options)};
 unfold_types_in_type(Env, {constr_t, Ann, Con, Types}, Options) ->
     {constr_t, Ann, Con, unfold_types_in_type(Env, Types, Options)};
+unfold_types_in_type(Env, {named_arg_t, Ann, Con, Types, Default}, Options) ->
+    {named_arg_t, Ann, Con, unfold_types_in_type(Env, Types, Options), Default};
 unfold_types_in_type(Env, T, Options) when is_tuple(T) ->
     list_to_tuple(unfold_types_in_type(Env, tuple_to_list(T), Options));
 unfold_types_in_type(Env, [H|T], Options) ->
@@ -1638,6 +1675,8 @@ unify1(_Env, {qid, _, Name}, {qid, _, Name}, _When) ->
     true;
 unify1(_Env, {qcon, _, Name}, {qcon, _, Name}, _When) ->
     true;
+unify1(_Env, {bytes_t, _, Len}, {bytes_t, _, Len}, _When) ->
+    true;
 unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, When) ->
     unify(Env, Named1, Named2, When) andalso
     unify(Env, Args1, Args2, When) andalso unify(Env, Result1, Result2, When);
@@ -1655,26 +1694,8 @@ unify1(Env, {app_t, _, T, []}, B, When) ->
 unify1(Env, A, {app_t, _, T, []}, When) ->
     unify(Env, A, T, When);
 unify1(_Env, A, B, When) ->
-    Ok =
-        case get_option(permissive_address_literals, false) of
-            true ->
-                Kind = fun({qcon, _, _})       -> con;
-                          ({con, _, _})        -> con;
-                          ({id, _, "address"}) -> addr;
-                          ({id, _, "hash"})    -> hash;
-                          ({app_t, _, {id, _, "oracle"}, _})       -> oracle;
-                          ({app_t, _, {id, _, "oracle_query"}, _}) -> query;
-                          (_)                  -> other end,
-                %% If permissive_address_literals we allow unifying adresses
-                %% with contract types or oracles/oracle queries
-                case lists:usort([Kind(A), Kind(B)]) of
-                    [addr, K] -> K /= other;
-                    _ -> false
-                end;
-            false -> false
-        end,
-    [ cannot_unify(A, B, When) || not Ok ],
-    Ok.
+    cannot_unify(A, B, When),
+    false.
 
 dereference(T = {uvar, _, R}) ->
     case ets_lookup(type_vars, R) of
@@ -1703,6 +1724,7 @@ occurs_check1(_, {con, _, _}) -> false;
 occurs_check1(_, {qid, _, _}) -> false;
 occurs_check1(_, {qcon, _, _}) -> false;
 occurs_check1(_, {tvar, _, _}) -> false;
+occurs_check1(_, {bytes_t, _, _}) -> false;
 occurs_check1(R, {fun_t, _, Named, Args, Res}) ->
     occurs_check(R, [Res, Named | Args]);
 occurs_check1(R, {app_t, _, T, Ts}) ->
@@ -1819,6 +1841,11 @@ pp_error({undefined_field, Id}) ->
     io_lib:format("Unbound field ~s at ~s\n", [pp(Id), pp_loc(Id)]);
 pp_error({not_a_record_type, Type, Why}) ->
     io_lib:format("~s\n~s\n", [pp_type("Not a record type: ", Type), pp_why_record(Why)]);
+pp_error({not_a_contract_type, Type, Lit}) ->
+    io_lib:format("The type ~s is not a contract type\n"
+                  "when checking that the contract literal at ~s\n~s\n"
+                  "has the type\n~s\n",
+                  [pp_type("", Type), pp_loc(Lit), pp_expr("  ", Lit), pp_type("  ", Type)]);
 pp_error({non_linear_pattern, Pattern, Nonlinear}) ->
     Plural = [ $s || length(Nonlinear) > 1 ],
     io_lib:format("Repeated name~s ~s in pattern\n~s (at ~s)\n",
@@ -2043,6 +2070,8 @@ pp({qid, _, Name}) ->
     string:join(Name, ".");
 pp({con, _, Name}) ->
     Name;
+pp({qcon, _, Name}) ->
+    string:join(Name, ".");
 pp({uvar, _, Ref}) ->
     %% Show some unique representation
     ["?u" | integer_to_list(erlang:phash2(Ref, 16384)) ];
@@ -2050,6 +2079,8 @@ pp({tvar, _, Name}) ->
     Name;
 pp({tuple_t, _, Cpts}) ->
     ["(", pp(Cpts), ")"];
+pp({bytes_t, _, Len}) ->
+    ["bytes(", integer_to_list(Len), ")"];
 pp({app_t, _, T, []}) ->
     pp(T);
 pp({app_t, _, Type, Args}) ->

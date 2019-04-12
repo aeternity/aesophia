@@ -8,6 +8,8 @@
 
 -module(aeso_compiler_tests).
 
+-compile([export_all, nowarn_export_all]).
+
 -include_lib("eunit/include/eunit.hrl").
 
 %%  Very simply test compile the given contracts. Only basic checks
@@ -16,10 +18,14 @@
 simple_compile_test_() ->
      [ {"Testing the " ++ ContractName ++ " contract",
         fun() ->
-            #{byte_code := ByteCode,
-              contract_source := _,
-              type_info := _} = compile(ContractName),
-            ?assertMatch(Code when is_binary(Code), ByteCode)
+            case compile(ContractName) of
+                #{byte_code := ByteCode,
+                  contract_source := _,
+                  type_info := _} -> ?assertMatch(Code when is_binary(Code), ByteCode);
+                ErrBin ->
+                    io:format("\n~s", [ErrBin]),
+                    error(ErrBin)
+            end
         end} || ContractName <- compilable_contracts() ] ++
      [ {"Testing error messages of " ++ ContractName,
         fun() ->
@@ -98,7 +104,9 @@ compilable_contracts() ->
      "state_handling",
      "events",
      "include",
-     "basic_auth"
+     "basic_auth",
+     "bitcoin_auth",
+     "address_literals"
     ].
 
 %% Contracts that should produce type errors
@@ -218,4 +226,80 @@ failing_contracts() ->
     , {"bad_include_and_ns",
         [<<"Include of 'included.aes' at line 2, column 11\nnot allowed, include only allowed at top level.">>,
          <<"Nested namespace not allowed\nNamespace 'Foo' at line 3, column 13 not defined at top level.">>]}
+    , {"bad_address_literals",
+        [<<"The type bytes(32) is not a contract type\n"
+           "when checking that the contract literal at line 32, column 5\n"
+           "  ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ\n"
+           "has the type\n"
+           "  bytes(32)">>,
+         <<"The type oracle(int, bool) is not a contract type\n"
+           "when checking that the contract literal at line 30, column 5\n"
+           "  ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ\n"
+           "has the type\n"
+           "  oracle(int, bool)">>,
+         <<"The type address is not a contract type\n"
+           "when checking that the contract literal at line 28, column 5\n"
+           "  ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ\n"
+           "has the type\n"
+           "  address">>,
+         <<"Cannot unify oracle_query('1, '2)\n"
+           "         and Remote\n"
+           "when checking the type of the expression at line 25, column 5\n"
+           "  oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY :\n"
+           "    oracle_query('1, '2)\n"
+           "against the expected type\n"
+           "  Remote">>,
+         <<"Cannot unify oracle_query('3, '4)\n"
+           "         and bytes(32)\n"
+           "when checking the type of the expression at line 23, column 5\n"
+           "  oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY :\n"
+           "    oracle_query('3, '4)\n"
+           "against the expected type\n"
+           "  bytes(32)">>,
+         <<"Cannot unify oracle_query('5, '6)\n"
+           "         and oracle(int, bool)\n"
+           "when checking the type of the expression at line 21, column 5\n"
+           "  oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY :\n"
+           "    oracle_query('5, '6)\n"
+           "against the expected type\n"
+           "  oracle(int, bool)">>,
+         <<"Cannot unify oracle('7, '8)\n"
+           "         and Remote\n"
+           "when checking the type of the expression at line 18, column 5\n"
+           "  ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5 :\n"
+           "    oracle('7, '8)\n"
+           "against the expected type\n"
+           "  Remote">>,
+         <<"Cannot unify oracle('9, '10)\n"
+           "         and bytes(32)\n"
+           "when checking the type of the expression at line 16, column 5\n"
+           "  ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5 :\n"
+           "    oracle('9, '10)\n"
+           "against the expected type\n"
+           "  bytes(32)">>,
+         <<"Cannot unify oracle('11, '12)\n"
+           "         and oracle_query(int, bool)\n"
+           "when checking the type of the expression at line 14, column 5\n"
+           "  ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5 :\n"
+           "    oracle('11, '12)\n"
+           "against the expected type\n"
+           "  oracle_query(int, bool)">>,
+         <<"Cannot unify address\n"
+           "         and oracle(int, bool)\n"
+           "when checking the type of the expression at line 11, column 5\n"
+           "  ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt : address\n"
+           "against the expected type\n"
+           "  oracle(int, bool)">>,
+         <<"Cannot unify address\n"
+           "         and Remote\n"
+           "when checking the type of the expression at line 9, column 5\n"
+           "  ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt : address\n"
+           "against the expected type\n"
+           "  Remote">>,
+         <<"Cannot unify address\n"
+           "         and bytes(32)\n"
+           "when checking the type of the expression at line 7, column 5\n"
+           "  ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt : address\n"
+           "against the expected type\n"
+           "  bytes(32)">>]}
     ].

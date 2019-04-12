@@ -48,7 +48,7 @@ all_tokens() ->
     %% Literals
     [ Lit(true), Lit(false)
     , Tok(id, "foo"), Tok(id, "_"), Tok(con, "Foo")
-    , Tok(hash, Hash)
+    , Tok(bytes, Hash)
     , Tok(int, 1234567890), Tok(hex, 9876543210)
     , Tok(string, <<"bla\"\\\b\e\f\n\r\t\vbla">>)
     ].
@@ -78,7 +78,7 @@ show_token({param, _, P}) -> "@" ++ P;
 show_token({string, _, S}) -> fmt(binary_to_list(S));
 show_token({int, _, N}) -> fmt(N);
 show_token({hex, _, N}) -> fmt("0x~.16b", N);
-show_token({hash, _, <<N:256>>}) -> fmt("#~.16b", N);
+show_token({bytes, _, <<N:256>>}) -> fmt("#~64.16.0b", N);
 show_token({comment, _, S}) -> S;
 show_token({_, _, _}) -> "TODO".
 
