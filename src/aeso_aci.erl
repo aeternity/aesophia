@@ -10,7 +10,8 @@
 -module(aeso_aci).
 
 -export([encode/1,encode/2,decode/1]).
--export([encode_type/1,encode_stmt/1,encode_expr/1]).
+-export([encode_type/1,encode_types/1,
+	 encode_stmt/1,encode_expr/1,encode_exprs/1]).
 
 %% Define records for the various typed syntactic forms. These make
 %% the code easier but don't seem to exist elsewhere.
@@ -47,6 +48,9 @@
 -record(bytes, {ann,bin}).
 -record(tuple, {ann,args}).
 -record(list, {ann,args}).
+-record(record, {ann,fields}).
+-record(field, {ann,name,value}).		%A record field
+-record(proj, {ann,value}).			%?
 -record(app, {ann,func,args}).
 -record(typed, {ann,expr,type}).
 
@@ -62,10 +66,10 @@ encode(ContractString, Options) when is_binary(ContractString) ->
 encode(ContractString, Options) ->
     try
         Ast = parse(ContractString, Options),
-        %% io:format("~p\n", [Ast]),
+        io:format("Ast\n~p\n", [Ast]),
         %% aeso_ast:pp(Ast),
         TypedAst = aeso_ast_infer_types:infer(Ast, Options),
-        %% io:format("~p\n", [TypedAst]),
+        io:format("Typed ast\n~p\n", [TypedAst]),
         %% aeso_ast:pp_typed(TypedAst),
         %% We find and look at the last contract.
         Contract = lists:last(TypedAst),
@@ -137,7 +141,7 @@ encode_type(#tuple_t{args=As}) ->
 encode_type(#bytes_t{len=Len}) ->
     {<<"bytes">>, Len};
 encode_type(#record_t{fields=Fs}) ->
-    Efs = encode_fields(Fs),
+    Efs = encode_field_types(Fs),
     [{<<"record">>,Efs}];
 encode_type(#app_t{id=Id,fields=Fs}) ->
     Name = encode_type(Id),
@@ -158,14 +162,14 @@ encode_type(#fun_t{args=As,type=T}) ->
 encode_name(Name) ->
     list_to_binary(Name).
 
-%% encode_fields(Fields) -> [JSON].
-%% encode_field(Field) -> JSON.
-%%  Encode a record field.
+%% encode_field_types(Fields) -> [JSON].
+%% encode_field_type(Field) -> JSON.
+%%  Encode a record field type.
 
-encode_fields(Fs) ->
-    [ encode_field(F) || F <- Fs ].
+encode_field_types(Fs) ->
+    [ encode_field_type(F) || F <- Fs ].
 
-encode_field(#field_t{id=Id,type=T}) ->
+encode_field_type(#field_t{id=Id,type=T}) ->
     [{<<"name">>,encode_type(Id)},
      {<<"type">>,[encode_type(T)]}].
 
@@ -218,6 +222,11 @@ encode_expr(#tuple{args=As}) ->
 encode_expr(#list{args=As}) ->
     Eas = encode_exprs(As),
     [{<<"list">>,Eas}];
+encode_expr(#record{fields=Fs}) ->
+    Efs = encode_field_exprs(Fs),
+    [{<<"record">>,Efs}];
+encode_expr(#proj{value=V}) ->
+    encode_expr(V);
 encode_expr(#app{func=F,args=As}) ->
     Ef = encode_expr(F),
     Eas = encode_exprs(As),
@@ -225,6 +234,17 @@ encode_expr(#app{func=F,args=As}) ->
 		   {<<"arguments">>,Eas}]}];
 encode_expr({Op,_Ann}) ->
     list_to_binary(atom_to_list(Op)).
+
+%% encode_field_exprs(Fields) -> [JSON].
+%% encode_field_expr(Field) -> JSON.
+%%  Encode a record field expression.
+
+encode_field_exprs(Fs) ->
+    [ encode_field_expr(F) || F <- Fs ].
+
+encode_field_expr(#field{name=[N],value=V}) ->
+    [{<<"name">>,encode_expr(N)},
+     {<<"value">>,[encode_expr(V)]}].
 
 %% decode(JSON) -> ContractString.
 %%  Decode a JSON string and generate a suitable contract string which
