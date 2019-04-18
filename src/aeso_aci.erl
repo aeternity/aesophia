@@ -10,6 +10,7 @@
 -module(aeso_aci).
 
 -export([encode/1,encode/2,decode/1]).
+-export([encode_contract/1,encode_contract/2,decode_contract/1]).
 -export([encode_type/1,encode_types/1,
          encode_stmt/1,encode_expr/1,encode_exprs/1]).
 
@@ -41,6 +42,9 @@
 -record(qcon, {ann,names}).
 -record(tvar, {ann,name}).
 
+%% Statements
+-record('if', {ann,test,true,false}).
+
 %% Expressions
 -record(bool, {ann,bool}).
 -record(int, {ann,value}).
@@ -55,16 +59,20 @@
 -record(app, {ann,func,args}).
 -record(typed, {ann,expr,type}).
 
-%% encode(ContractString) -> {ok,JSON} | {error,String}.
-%% encode(ContractString, Options) -> {ok,JSON} | {error,String}.
+%% encode_contract(ContractString) -> {ok,JSON} | {error,String}.
+%% encode_contract(ContractString, Options) -> {ok,JSON} | {error,String}.
 %%  Build a JSON structure with lists and tuples, not maps, as this
 %%  allows us to order the fields in the contructed JSON string.
 
-encode(ContractString) -> encode(ContractString, []).
+encode(C) -> encode_contract(C).
+encode(C, Os) -> encode_contract(C, Os).
 
-encode(ContractString, Options) when is_binary(ContractString) ->
-    encode(binary_to_list(ContractString), Options);
-encode(ContractString, Options) ->
+encode_contract(ContractString) -> 
+    encode_contract(ContractString, []).
+
+encode_contract(ContractString, Options) when is_binary(ContractString) ->
+    encode_contract(binary_to_list(ContractString), Options);
+encode_contract(ContractString, Options) ->
     try
         Ast = parse(ContractString, Options),
         %% io:format("Ast\n~p\n", [Ast]),
@@ -144,6 +152,14 @@ encode_type(#bytes_t{len=Len}) ->
 encode_type(#record_t{fields=Fs}) ->
     Efs = encode_rec_field_types(Fs),
     [{<<"record">>,Efs}];
+%% Special case lists and maps as they are built-in types.
+encode_type(#app_t{id=#id{name="list"},fields=[F]}) ->
+    Ef = encode_type(F),
+    [{<<"list">>,Ef}];
+encode_type(#app_t{id=#id{name="map"},fields=Fs}) ->
+    Ef = encode_map_field_type(Fs),
+    [{<<"map">>,Ef}];
+%% Other applications.
 encode_type(#app_t{id=Id,fields=Fs}) ->
     Name = encode_type(Id),
     Efs = encode_types(Fs),
@@ -172,7 +188,14 @@ encode_rec_field_types(Fs) ->
 
 encode_rec_field_type(#field_t{id=Id,type=T}) ->
     [{<<"name">>,encode_type(Id)},
-     {<<"type">>,[encode_type(T)]}].
+     {<<"type">>,encode_type(T)}].
+
+%% encode_map_field_type(Field) -> JSON.
+%%  Two fields for one map type.
+
+encode_map_field_type([K,V]) ->
+    [{<<"key">>,encode_type(K)},
+     {<<"value">>,encode_type(V)}].
 
 %% encode_typedef(TypeDef) -> JSON.
 
@@ -196,6 +219,13 @@ encode_alias(A) -> encode_type(A).
 
 %% encode_stmt(Stmt) -> JSON.
 
+encode_stmt(#typed{expr=E}) ->                  %Ignore the type
+    encode_stmt(E);
+encode_stmt(#'if'{test=Test,true=True,false=False}) ->
+    Etest = encode_expr(Test),
+    Etrue = encode_stmt(True),
+    Efalse = encode_stmt(False),
+    [{<<"if">>,[{<<"test">>,Etest},{<<"true">>,Etrue},{<<"false">>,Efalse}]}];
 encode_stmt(E) ->
     encode_expr(E).
 
@@ -205,14 +235,14 @@ encode_stmt(E) ->
 encode_exprs(Es) ->
     [ encode_expr(E) || E <- Es ].
 
+encode_expr(#typed{expr=E}) ->                  %Ignore the type
+    encode_expr(E);
 encode_expr(#id{name=N}) -> encode_name(N);
 encode_expr(#con{name=N}) -> encode_name(N);
 encode_expr(#qid{names=Ns}) ->
     encode_name(lists:join(".", Ns));
 encode_expr(#qcon{names=Ns}) ->
     encode_name(lists:join(".", Ns));           %?
-encode_expr(#typed{expr=E}) ->                  %Ignore the type
-    encode_expr(E);
 encode_expr(#bool{bool=B}) -> B;
 encode_expr(#int{value=V}) -> V;
 encode_expr(#string{bin=B}) -> B;
@@ -248,7 +278,7 @@ encode_rec_field_exprs(Fs) ->
 
 encode_rec_field_expr(#field{name=[N],value=V}) ->
     [{<<"name">>,encode_expr(N)},
-     {<<"value">>,[encode_expr(V)]}].
+     {<<"value">>,encode_expr(V)}].
 
 %% encode_map_field_exprs(Fields) -> [JSON].
 %% encode_map_field_expr(Field) -> JSON.
@@ -261,23 +291,22 @@ encode_map_field_expr({K,V}) ->
     [{<<"key">>,encode_expr(K)},
      {<<"value">>,encode_expr(V)}].
 
-%% decode(JSON) -> ContractString.
+%% decode_contract(JSON) -> ContractString.
 %%  Decode a JSON string and generate a suitable contract string which
 %%  can be included in a contract definition. We decode into a map
 %%  here as this is easier to work with and order is not important.
 
-decode(Json) ->
+decode(J) -> decode_contract(J).
+
+decode_contract(Json) ->
     Map = jsx:decode(Json, [return_maps]),
     %% io:format("~p\n", [Map]),
     #{<<"contract">> := C} = Map,
-    list_to_binary(decode_contract(C)).
-
-decode_contract(#{<<"name">> := Name,
-                  <<"type_defs">> := Ts,
-                  <<"functions">> := Fs}) ->
-    ["contract"," ",io_lib:format("~s", [Name])," =\n",
-     decode_tdefs(Ts),
-     decode_funcs(Fs)].
+    #{<<"name">> := Name, <<"type_defs">> := Ts, <<"functions">> := Fs} = C,
+    CS = ["contract"," ",io_lib:format("~s", [Name])," =\n",
+	  decode_tdefs(Ts),
+	  decode_funcs(Fs)],
+    list_to_binary(CS).
 
 decode_funcs(Fs) -> [ decode_func(F) || F <- Fs ].
 
@@ -297,37 +326,43 @@ decode_types(Ets) ->
 
 decode_type(#{<<"tuple">> := Ets}) ->
     Ts = decode_types(Ets),
-    [$(,lists:join(",", Ts),$)];
+    [$(,lists:join(", ", Ts),$)];
 decode_type(#{<<"record">> := Efs}) ->
-    Fs = decode_fields(Efs),
-    [${,lists:join(",", Fs),$}];
-decode_type(#{<<"list">> := [Et]}) ->
+    Fs = decode_rec_field_types(Efs),
+    [${,lists:join(", ", Fs),$}];
+decode_type(#{<<"list">> := Et}) ->
     T = decode_type(Et),
     ["list",$(,T,$)];
-decode_type(#{<<"map">> := Ets}) ->
-    Ts = decode_types(Ets),
-    ["map",$(,lists:join(",", Ts),$)];
+decode_type(#{<<"map">> := Et}) ->
+    T = decode_map_type(Et),
+    ["map",$(,T,$)];
 decode_type(#{<<"variant">> := Ets}) ->
     Ts = decode_types(Ets),
     lists:join(" | ", Ts);
 decode_type(Econs) when is_map(Econs) ->        %General constructor
+    %% io:format("~p\n", [Econs]),
     [{Ec,Ets}] = maps:to_list(Econs),
     C = decode_name(Ec),
     Ts = decode_types(Ets),
-    [C,$(,lists:join(",", Ts),$)];
+    [C,$(,lists:join(", ", Ts),$)];
 decode_type(T) ->                               %Just raw names.
     decode_name(T).
 
 decode_name(En) ->
     binary_to_list(En).
 
-decode_fields(Efs) ->
-    [ decode_field(Ef) || Ef <- Efs ].
+decode_rec_field_types(Efs) ->
+    [ decode_rec_field_type(Ef) || Ef <- Efs ].
 
-decode_field(#{<<"name">> := En,<<"type">> := [Et]}) ->
+decode_rec_field_type(#{<<"name">> := En,<<"type">> := Et}) ->
     Name = decode_name(En),
     Type = decode_type(Et),
     [Name," : ",Type].
+
+decode_map_type(#{<<"key">> := Ek,<<"value">> := Ev}) ->
+    Key = decode_type(Ek),
+    Value = decode_type(Ev),
+    [Key,", ",Value].
 
 %% decode_tdefs(Json) -> [TypeString].
 %%  Here we are only interested in the type definitions and ignore the
