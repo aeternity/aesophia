@@ -1109,10 +1109,13 @@ infer_block(_Env, Attrs, [], BlockType) ->
     error({impossible, empty_block, Attrs, BlockType});
 infer_block(Env, Attrs, [Def={letfun, _, _, _, _, _}|Rest], BlockType) ->
     NewDef = infer_letfun(Env, Def),
-    [NewDef|infer_block(Env, Attrs, Rest, BlockType)];
+    {{Name, TypeSig}, _} = NewDef,
+    NewE = bind_fun(Name, TypeSig, Env),
+    [NewDef|infer_block(NewE, Attrs, Rest, BlockType)];
 infer_block(Env, Attrs, [Def={letrec, _, _}|Rest], BlockType) ->
-    NewDef = infer_letrec(Env, Def),
-    [NewDef|infer_block(Env, Attrs, Rest, BlockType)];
+    NewDefs = {DefList, _} = infer_letrec(Env, Def),
+    NewE = bind_funs(DefList, Env),
+    [NewDefs|infer_block(NewE, Attrs, Rest, BlockType)];
 infer_block(Env, _, [{letval, Attrs, Pattern, Type, E}|Rest], BlockType) ->
     NewE = {typed, _, _, PatType} = infer_expr(Env, {typed, Attrs, E, arg_type(Type)}),
     {'case', _, NewPattern, {typed, _, {block, _, NewRest}, _}} =
