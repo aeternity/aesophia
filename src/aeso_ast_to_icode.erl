@@ -726,8 +726,7 @@ ttl_t(Icode) ->
     ast_typerep({qid, [], ["Chain", "ttl"]}, Icode).
 
 sign_t() -> bytes_t(64).
-bytes_t(Len) when Len =< 32 -> word;
-bytes_t(Len)                -> {tuple, lists:duplicate((31 + Len) div 32, word)}.
+bytes_t(Len) -> {bytes, Len}.
 
 get_signature_arg(Args0) ->
     NamedArgs = [Arg || Arg = {named_arg, _, _, _} <- Args0],

@@ -135,7 +135,7 @@ encode_type(#tuple_t{args=As}) ->
     Eas = encode_types(As),
     [{<<"tuple">>,Eas}];
 encode_type(#bytes_t{len=Len}) ->
-    list_to_binary(lists:concat(["bytes(", Len, ")"]));
+    {<<"bytes">>, Len};
 encode_type(#record_t{fields=Fs}) ->
     Efs = encode_fields(Fs),
     [{<<"record">>,Efs}];
