@@ -28,7 +28,7 @@
 -type var() :: {var, integer()}.
 -type vars() :: ordsets:ordset(var()).
 
--type stype()         :: tuple | boolean.
+-type stype()         :: tuple | boolean | {variant, [non_neg_integer()]}.
 -type maybe_scode()   :: missing | scode().
 -type maybe_scode_a() :: missing | scode_a().
 
@@ -53,6 +53,7 @@
      Op =:= 'AND' orelse
      Op =:= 'OR'  orelse
      Op =:= 'ELEMENT' orelse
+     Op =:= 'VARIANT_ELEMENT' orelse
      Op =:= 'CONS')).
 
 -define(IsUnOp(Op),
@@ -100,10 +101,16 @@ functions_to_scode(Functions, Options) ->
 
 function_to_scode(Name, Args, Body, ResType, Options) ->
     debug(scode, Options, "Compiling ~p ~p : ~p ->\n  ~p\n", [Name, Args, ResType, Body]),
-    ArgTypes = [ T || {_, T} <- Args ],
+    ArgTypes = [ type_to_scode(T) || {_, T} <- Args ],
     SCode    = to_scode(init_env(Args), Body),
     debug(scode, Options, "  scode: ~p\n", [SCode]),
-    {{ArgTypes, ResType}, SCode}.
+    {{ArgTypes, type_to_scode(ResType)}, SCode}.
+
+type_to_scode({variant, Cons}) -> {variant, lists:map(fun length/1, Cons)};
+type_to_scode({list, Type})    -> {list, type_to_scode(Type)};
+type_to_scode({tuple, Types})  -> {tuple, lists:map(fun type_to_scode/1, Types)};
+type_to_scode({map, Key, Val}) -> {map, type_to_scode(Key), type_to_scode(Val)};
+type_to_scode(T)               -> T.
 
 %% -- Phase I ----------------------------------------------------------------
 %%  Icode to structured assembly
@@ -145,6 +152,11 @@ to_scode(_Env, nil) -> aeb_fate_code:nil(?a);
 to_scode(Env, {var, X}) ->
     [aeb_fate_code:push(lookup_var(Env, X))];
 
+to_scode(Env, {con, Ar, I, As}) ->
+    N = length(As),
+    [[to_scode(Env, A) || A <- As],
+     aeb_fate_code:variant(?a, ?i(Ar), ?i(I), ?i(N))];
+
 to_scode(Env, {tuple, As}) ->
     N = length(As),
     [[ to_scode(Env, A) || A <- As ],
@@ -182,13 +194,14 @@ split_to_scode(Env, {nosplit, Expr}) ->
     [switch_body, to_scode(Env, Expr)];
 split_to_scode(Env, {split, {tuple, _}, X, Alts}) ->
     {Def, Alts1} = catchall_to_scode(Env, X, Alts),
+    Arg = lookup_var(Env, X),
     Alt = case [ {Xs, Split} || {'case', {tuple, Xs}, Split} <- Alts1 ] of
             []            -> missing;
             [{Xs, S} | _] ->
-                {Code, Env1} = match_tuple(Env, Xs),
+                {Code, Env1} = match_tuple(Env, Arg, Xs),
                 [Code, split_to_scode(Env1, S)]
           end,
-    [aeb_fate_code:push(lookup_var(Env, X)),
+    [aeb_fate_code:push(Arg),
      case Def == missing andalso Alt /= missing of
         true  -> Alt;   % skip the switch if single tuple pattern
         false -> {switch, tuple, [Alt], Def}
@@ -225,6 +238,20 @@ split_to_scode(Env, {split, {list, _}, X, Alts}) ->
 split_to_scode(Env, {split, integer, X, Alts}) ->
     {Def, Alts1} = catchall_to_scode(Env, X, Alts),
     literal_split_to_scode(Env, integer, X, Alts1, Def);
+split_to_scode(Env, {split, {variant, Cons}, X, Alts}) ->
+    {Def, Alts1} = catchall_to_scode(Env, X, Alts),
+    Arg = lookup_var(Env, X),
+    GetAlt = fun(I) ->
+                case [{Xs, S} || {'case', {con, _, J, Xs}, S} <- Alts1, I == J] of
+                    [] -> missing;
+                    [{Xs, S} | _] ->
+                        {Code, Env1} = match_variant(Env, Arg, Xs),
+                        [Code, split_to_scode(Env1, S)]
+                end
+             end,
+    SType = {variant, [length(Args) || Args <- Cons]},
+    [aeb_fate_code:push(Arg),
+     {switch, SType, [GetAlt(I) || I <- lists:seq(0, length(Cons) - 1)], Def}];
 split_to_scode(_, Split = {split, _, _, _}) ->
     ?TODO({'case', Split}).
 
@@ -250,18 +277,20 @@ catchall_to_scode(Env, X, [Alt | Alts], Acc) ->
 catchall_to_scode(_, _, [], Acc) -> {missing, lists:reverse(Acc)}.
 
 %% Tuple is in the accumulator. Arguments are the variable names.
-match_tuple(Env, Xs) ->
-    match_tuple(Env, 0, Xs).
+match_tuple(Env, Arg, Xs) ->
+    match_tuple(Env, 0, fun aeb_fate_code:element_op/3, Arg, Xs).
 
-match_tuple(Env, I, ["_" | Xs]) ->
-    match_tuple(Env, I + 1, Xs);
-match_tuple(Env, I, [X | Xs]) ->
+match_variant(Env, Arg, Xs) ->
+    Elem = fun(Dst, I, Val) -> aeb_fate_code:variant_element(Dst, Val, I) end,
+    match_tuple(Env, 0, Elem, Arg, Xs).
+
+match_tuple(Env, I, Elem, Arg, ["_" | Xs]) ->
+    match_tuple(Env, I + 1, Elem, Arg, Xs);
+match_tuple(Env, I, Elem, Arg, [X | Xs]) ->
     {J,    Env1} = bind_local(X, Env),
-    {Code, Env2} = match_tuple(Env1, I + 1, Xs),
-    {[ [aeb_fate_code:dup() || [] /= [Y || Y <- Xs, Y /= "_"]],  %% Don't DUP the last one
-       aeb_fate_code:element_op({var, J}, ?i(I), ?a),
-       Code], Env2};
-match_tuple(Env, _, []) ->
+    {Code, Env2} = match_tuple(Env1, I + 1, Elem, Arg, Xs),
+    {[Elem({var, J}, ?i(I), Arg), Code], Env2};
+match_tuple(Env, _, _, _, []) ->
     {[], Env}.
 
 %% -- Operators --
@@ -315,8 +344,9 @@ simpl_loop(N, Code, Options) ->
 pp_ann(Ind, [{switch, Type, Alts, Def} | Code]) ->
     Tags =
         case Type of
-            boolean -> ["FALSE", "TRUE"];
-            tuple   -> ["(_)"]
+            boolean       -> ["FALSE", "TRUE"];
+            tuple         -> ["(_)"];
+            {variant, Ar} -> ["C" ++ integer_to_list(I) || I <- lists:seq(0, length(Ar) - 1)]
         end,
     [[[Ind, Tag, " =>\n", pp_ann("  " ++ Ind, Alt)]
       || {Tag, Alt} <- lists:zip(Tags, Alts), Alt /= missing],
@@ -851,7 +881,13 @@ block(Blk = #blk{code     = [{switch, Type, Alts, Default} | Code],
                 {Blk#blk{code = ElseCode}, [{jumpif, ThenRef}], ThenBlk};
             tuple ->
                 [TCode] = Alts,
-                {Blk#blk{code = TCode ++ [{jump, RestRef}]}, [], []}
+                {Blk#blk{code = TCode ++ [{jump, RestRef}]}, [], []};
+            {variant, _Ar} ->
+                MkBlk = fun(missing) -> {DefRef, []};
+                           (ACode)   -> FreshBlk(ACode ++ [{jump, RestRef}], DefRef)
+                        end,
+                {AltRefs, AltBs} = lists:unzip(lists:map(MkBlk, Alts)),
+                {Blk#blk{code = []}, [{switch, AltRefs}], lists:append(AltBs)}
         end,
     Blk2 = Blk1#blk{catchall = DefRef}, %% Update catchall ref
     block(Blk2, Code1 ++ Acc, DefBlk ++ RestBlk ++ AltBlks ++ Blocks, BlockAcc);
@@ -883,7 +919,8 @@ reorder_blocks(Ref, Code, Blocks, Acc) ->
         ['RETURN'|_]        -> reorder_blocks(Blocks, Acc1);
         [{'RETURNR', _}|_]  -> reorder_blocks(Blocks, Acc1);
         [{'ABORT', _}|_]    -> reorder_blocks(Blocks, Acc1);
-        [{jump, L}|_]     ->
+        [{switch, _}|_]     -> reorder_blocks(Blocks, Acc1);
+        [{jump, L}|_]       ->
             NotL = fun({L1, _}) -> L1 /= L end,
             case lists:splitwith(NotL, Blocks) of
                 {Blocks1, [{L, Code1} | Blocks2]} ->
@@ -911,9 +948,10 @@ remove_dead_blocks(Blocks = [{Top, _} | _]) ->
 chase_labels([], _, Live) -> Live;
 chase_labels([L | Ls], Map, Live) ->
     Code = maps:get(L, Map),
-    Jump = fun({jump, A})   -> [A || not maps:is_key(A, Live)];
-              ({jumpif, A}) -> [A || not maps:is_key(A, Live)];
-              (_)                 -> [] end,
+    Jump = fun({jump, A})    -> [A || not maps:is_key(A, Live)];
+              ({jumpif, A})  -> [A || not maps:is_key(A, Live)];
+              ({switch, As}) -> [A || A <- As, not maps:is_key(A, Live)];
+              (_)            -> [] end,
     New  = lists:flatmap(Jump, Code),
     chase_labels(New ++ Ls, Map, Live#{ L => true }).
 
@@ -928,6 +966,12 @@ set_labels(Labels, {Ref, Code}) when is_reference(Ref) ->
     {maps:get(Ref, Labels), [ set_labels(Labels, I) || I <- Code ]};
 set_labels(Labels, {jump, Ref})   -> aeb_fate_code:jump(maps:get(Ref, Labels));
 set_labels(Labels, {jumpif, Ref}) -> aeb_fate_code:jumpif(?a, maps:get(Ref, Labels));
+set_labels(Labels, {switch, Refs}) ->
+    case [ maps:get(Ref, Labels) || Ref <- Refs ] of
+        [R1, R2]     -> aeb_fate_code:switch(?a, R1, R2);
+        [R1, R2, R3] -> aeb_fate_code:switch(?a, R1, R2, R3);
+        Rs           -> aeb_fate_code:switch(?a, Rs)
+    end;
 set_labels(_, I) -> I.
 
 %% -- Helpers ----------------------------------------------------------------

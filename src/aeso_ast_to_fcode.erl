@@ -30,6 +30,7 @@
                | {bool, false | true}
                | nil
                | {var, var_name()}
+               | {con, arities(), tag(), [fexpr()]}
                | {tuple, [fexpr()]}
                | {proj, fexpr(), integer()}
                | {set_proj, fexpr(), integer(), fexpr()}    %% tuple, field, new_value
@@ -47,6 +48,7 @@
                      | {int, integer()}
                      | nil
                      | {'::', var_name(), var_name()}
+                     | {con, arities(), tag(), [var_name()]}
                      | {tuple, [var_name()]}.
 
 -type ftype() :: integer
@@ -77,8 +79,15 @@
 
 -type type_def() :: fun(([ftype()]) -> ftype()).
 
+-type tag()     :: non_neg_integer().
+-type arities() :: [non_neg_integer()].
+
+-record(con_tag, { tag :: tag(), arities :: arities() }).
+-type con_tag() :: #con_tag{}.
+
 -type type_env() :: #{ sophia_name() => type_def() }.
 -type fun_env()  :: #{ sophia_name() => fun_name() }.
+-type con_env()  :: #{ sophia_name() => con_tag() }.
 
 -type context() :: {main_contract, string()}
                  | {namespace, string()}
@@ -86,6 +95,7 @@
 
 -type env() :: #{ type_env  := type_env(),
                   fun_env   := fun_env(),
+                  con_env   := con_env(),
                   options   := [option()],
                   context   => context(),
                   functions := #{ fun_name() => fun_def() } }.
@@ -104,6 +114,9 @@ ast_to_fcode(Code, Options) ->
 init_env(Options) ->
     #{ type_env  => init_type_env(),
        fun_env   => #{},    %% TODO: builtin functions here?
+       con_env   => #{["None"] => #con_tag{ tag = 0, arities = [0, 1] },
+                      ["Some"] => #con_tag{ tag = 1, arities = [0, 1] }
+                     },
        options   => Options,
        functions => #{} }.
 
@@ -181,24 +194,53 @@ decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, {id, _, Name}, Args, R
 typedef_to_fcode(Env, {id, _, Name}, Xs, Def) ->
     Q = qname(Env, Name),
     FDef = fun(Args) ->
+                Sub = maps:from_list(lists:zip([X || {tvar, _, X} <- Xs], Args)),
                 case Def of
                     {record_t, Fields} -> {todo, Xs, Args, record_t, Fields};
-                    {variant_t, Cons} -> {todo, Xs, Args, variant_t, Cons};
-                    {alias_t, Type} -> {todo, Xs, Args, alias_t, Type}
+                    {variant_t, Cons}  ->
+                        FCons = [ begin
+                                      {constr_t, _, _, Ts} = Con,
+                                      [type_to_fcode(Env, Sub, T) || T <- Ts]
+                                  end || Con <- Cons ],
+                        {variant, FCons};
+                    {alias_t, Type}    -> {todo, Xs, Args, alias_t, Type}
                 end end,
-    bind_type(Env, Q, FDef).
+    Constructors =
+        case Def of
+            {variant_t, Cons} ->
+                Arities = [ begin
+                                {constr_t, _, _, Args} = Con,
+                                length(Args)
+                            end || Con <- Cons ],
+                Tags    = [ #con_tag{ tag = I, arities = Arities } || I <- lists:seq(0, length(Cons) - 1) ],
+                GetName = fun({constr_t, _, {con, _, C}, _}) -> C end,
+                QName   = fun(Con) -> qname(Env, GetName(Con)) end,
+                maps:from_list([ {QName(Con), Tag} || {Tag, Con} <- lists:zip(Tags, Cons) ]);
+            _ -> #{}
+        end,
+    Env1 = bind_constructors(Env, Constructors),
+    bind_type(Env1, Q, FDef).
 
 -spec type_to_fcode(env(), aeso_syntax:type()) -> ftype().
-type_to_fcode(Env, {app_t, _, T = {Id, _, _}, Types}) when Id == id; Id == qid ->
-    lookup_type(Env, T, [type_to_fcode(Env, Type) || Type <- Types]);
-type_to_fcode(Env, T = {Id, _, _}) when Id == id; Id == qid ->
+type_to_fcode(Env, Type) ->
+    type_to_fcode(Env, #{}, Type).
+
+-spec type_to_fcode(env(), #{var_name() => ftype()}, aeso_syntax:type()) -> ftype().
+type_to_fcode(Env, Sub, {app_t, _, T = {Id, _, _}, Types}) when Id == id; Id == qid ->
+    lookup_type(Env, T, [type_to_fcode(Env, Sub, Type) || Type <- Types]);
+type_to_fcode(Env, _Sub, T = {Id, _, _}) when Id == id; Id == qid ->
     lookup_type(Env, T, []);
-type_to_fcode(Env, {tuple_t, _, Types}) ->
-    {tuple, [type_to_fcode(Env, T) || T <- Types]};
-type_to_fcode(Env, {record_t, Fields}) ->
+type_to_fcode(Env, Sub, {tuple_t, _, Types}) ->
+    {tuple, [type_to_fcode(Env, Sub, T) || T <- Types]};
+type_to_fcode(Env, Sub, {record_t, Fields}) ->
     FieldType = fun({field_t, _, _, Ty}) -> Ty end,
-    type_to_fcode(Env, {tuple_t, [], lists:map(FieldType, Fields)});
-type_to_fcode(_Env, Type) ->
+    type_to_fcode(Env, Sub, {tuple_t, [], lists:map(FieldType, Fields)});
+type_to_fcode(_Env, Sub, {tvar, _, X} = Type) ->
+    case maps:get(X, Sub, not_found) of
+        not_found -> {todo, polymorphism, Type};
+        FType     -> FType
+    end;
+type_to_fcode(_Env, _Sub, Type) ->
     error({todo, Type}).
 
 -spec args_to_fcode(env(), [aeso_syntax:arg()]) -> [{var_name(), ftype()}].
@@ -219,6 +261,17 @@ expr_to_fcode(_Env, _Type, {bool, _, B}) -> {bool, B};
 
 %% Variables
 expr_to_fcode(_Env, _Type, {id, _, X}) -> {var, X};
+
+%% Constructors
+expr_to_fcode(Env, Type, {C, _, _} = Con) when C == con; C == qcon ->
+    expr_to_fcode(Env, Type, {app, [], {typed, [], Con, Type}, []});
+expr_to_fcode(Env, _Type, {app, _, {typed, _, {C, _, _} = Con, _}, Args}) when C == con; C == qcon ->
+    #con_tag{ tag = I, arities = Arities } = lookup_con(Env, Con),
+    Arity = lists:nth(I + 1, Arities),
+    case length(Args) == Arity of
+        true  -> {con, Arities, I, [expr_to_fcode(Env, Arg) || Arg <- Args]};
+        false -> fcode_error({constructor_arity_mismatch, Con, length(Args), Arity})
+    end;
 
 %% Tuples
 expr_to_fcode(Env, _Type, {tuple, _, Es}) ->
@@ -312,7 +365,8 @@ alts_to_fcode(Env, Type, X, Alts) ->
               | {bool, false | true}
               | {int, integer()}
               | nil | {'::', fpat(), fpat()}
-              | {tuple, [fpat()]}.
+              | {tuple, [fpat()]}
+              | {con, arities(), tag(), [fpat()]}.
 
 %% %% Invariant: the number of variables matches the number of patterns in each falt.
 -spec split_tree(env(), [{var_name(), ftype()}], [falt()]) -> fsplit().
@@ -346,15 +400,17 @@ merge_alts(I, X, Alts, Alts1) ->
         when Alts :: [{fsplit_pat(), [falt()]}].
 merge_alt(_, _, {P, A}, []) -> [{P, [A]}];
 merge_alt(I, X, {P, A}, [{Q, As} | Rest]) ->
-    Match = fun({var, _}, {var, _})         -> match;
-               ({tuple, _}, {tuple, _})     -> match;
-               ({bool, B}, {bool, B})       -> match;
-               ({int, N},  {int, N})        -> match;
-               (nil,       nil)             -> match;
-               ({'::', _, _}, {'::', _, _}) -> match;
-               ({var, _}, _)                -> expand;
-               (_, {var, _})                -> insert;
-               (_, _)                       -> mismatch
+    Match = fun({var, _}, {var, _})             -> match;
+               ({tuple, _}, {tuple, _})         -> match;
+               ({bool, B}, {bool, B})           -> match;
+               ({int, N},  {int, N})            -> match;
+               (nil,       nil)                 -> match;
+               ({'::', _, _}, {'::', _, _})     -> match;
+               ({con, _, C, _}, {con, _, C, _}) -> match;
+               ({con, _, _, _}, {con, _, _, _}) -> mismatch;
+               ({var, _}, _)                    -> expand;
+               (_, {var, _})                    -> insert;
+               (_, _)                           -> mismatch
             end,
     case Match(P, Q) of
         match    -> [{Q, [A | As]} | Rest];
@@ -367,21 +423,25 @@ merge_alt(I, X, {P, A}, [{Q, As} | Rest]) ->
 
 expand(I, X, P, Q, Case = {'case', Ps, E}) ->
     {Ps0, [{var, Y} | Ps1]} = lists:split(I - 1, Ps),
-    {Ps0r, Ren1} = rename_pats([{Y, X} || Y /= X], Ps0),
-    {Ps1r, Ren2} = rename_pats(Ren1, Ps1),
+    {Ps0r, Ren1} = rename_fpats([{Y, X} || Y /= X], Ps0),
+    {Ps1r, Ren2} = rename_fpats(Ren1, Ps1),
     E1 = rename(Ren2, E),
     Splice = fun(N) -> Ps0r ++ lists:duplicate(N, {var, "_"}) ++ Ps1r end,
-    Type = fun({tuple, Xs})  -> {tuple, length(Xs)};
-              ({bool, _})    -> bool;
-              ({int, _})     -> int;
-              (nil)          -> list;
-              ({'::', _, _}) -> list end,
+    Type = fun({tuple, Xs})     -> {tuple, length(Xs)};
+              ({bool, _})       -> bool;
+              ({int, _})        -> int;
+              (nil)             -> list;
+              ({'::', _, _})    -> list;
+              ({con, As, _, _}) -> {variant, As}
+           end,
     MkCase = fun(Pat, Vars) -> {Pat, {'case', Splice(Vars), E1}} end,
     case Type(Q) of
-        {tuple, N} -> {[MkCase(Q, N)], []};
-        bool       -> {[MkCase({bool, B}, 0) || B <- [false, true]], []};
-        int        -> {[MkCase(Q, 0)], [{P, Case}]};
-        list       -> {[MkCase(nil, 0), MkCase({'::', fresh_name(), fresh_name()}, 2)], []}
+        {tuple, N}    -> {[MkCase(Q, N)], []};
+        bool          -> {[MkCase({bool, B}, 0) || B <- [false, true]], []};
+        int           -> {[MkCase(Q, 0)], [{P, Case}]};
+        list          -> {[MkCase(nil, 0), MkCase({'::', fresh_name(), fresh_name()}, 2)], []};
+        {variant, As} -> {[MkCase({con, As, C - 1, [fresh_name() || _ <- lists:seq(1, Ar)]}, Ar)
+                           || {C, Ar} <- indexed(As)], []}
     end.
 
 -spec split_alt(integer(), falt()) -> {fsplit_pat(), falt()}.
@@ -396,6 +456,9 @@ split_pat({bool, B})     -> {{bool, B}, []};
 split_pat({int, N})      -> {{int, N}, []};
 split_pat(nil) -> {nil, []};
 split_pat({'::', P, Q}) -> {{'::', fresh_name(), fresh_name()}, [P, Q]};
+split_pat({con, As, I, Pats}) ->
+    Xs = [fresh_name() || _ <- Pats],
+    {{con, As, I, Xs}, Pats};
 split_pat({tuple, Pats}) ->
     Xs = [fresh_name() || _ <- Pats],
     {{tuple, Xs}, Pats}.
@@ -405,6 +468,8 @@ split_vars({bool, _}, boolean)       -> [];
 split_vars({int, _},  integer)       -> [];
 split_vars(nil,       {list, _})     -> [];
 split_vars({'::', X, Xs}, {list, T}) -> [{X, T}, {Xs, {list, T}}];
+split_vars({con, _, I, Xs}, {variant, Cons}) ->
+    lists:zip(Xs, lists:nth(I + 1, Cons));
 split_vars({tuple, Xs}, {tuple, Ts}) ->
     lists:zip(Xs, Ts);
 split_vars({var, X}, T) -> [{X, T}].
@@ -416,6 +481,7 @@ rename(Ren, Expr) ->
         {bool, _}           -> Expr;
         nil                 -> nil;
         {var, X}            -> {var, rename_var(Ren, X)};
+        {con, Ar, I, Es}    -> {con, Ar, I, [rename(Ren, E) || E <- Es]};
         {tuple, Es}         -> {tuple, [rename(Ren, E) || E <- Es]};
         {proj, E, I}        -> {proj, rename(Ren, E), I};
         {set_proj, R, I, E} -> {set_proj, rename(Ren, R), I, rename(Ren, E)};
@@ -442,23 +508,43 @@ rename_bindings(Ren, [X | Xs]) ->
     {Zs, Ren2} = rename_bindings(Ren1, Xs),
     {[Z | Zs], Ren2}.
 
-rename_pats(Ren, []) -> {[], Ren};
-rename_pats(Ren, [P | Ps]) ->
-    {Q, Ren1}  = rename_pat(Ren, P),
-    {Qs, Ren2} = rename_pats(Ren1, Ps),
+rename_fpats(Ren, []) -> {[], Ren};
+rename_fpats(Ren, [P | Ps]) ->
+    {Q, Ren1}  = rename_fpat(Ren, P),
+    {Qs, Ren2} = rename_fpats(Ren1, Ps),
     {[Q | Qs], Ren2}.
 
-rename_pat(Ren, P = {bool, _}) -> {P, Ren};
-rename_pat(Ren, P = {int, _})  -> {P, Ren};
-rename_pat(Ren, P = nil)       -> {P, Ren};
-rename_pat(Ren, {'::', P, Q}) ->
-    {P1, Ren1} = rename_pat(Ren, P),
-    {Q1, Ren2} = rename_pat(Ren1, Q),
+rename_fpat(Ren, P = {bool, _}) -> {P, Ren};
+rename_fpat(Ren, P = {int, _})  -> {P, Ren};
+rename_fpat(Ren, P = nil)       -> {P, Ren};
+rename_fpat(Ren, {'::', P, Q}) ->
+    {P1, Ren1} = rename_fpat(Ren, P),
+    {Q1, Ren2} = rename_fpat(Ren1, Q),
     {{'::', P1, Q1}, Ren2};
-rename_pat(Ren, {var, X}) ->
+rename_fpat(Ren, {var, X}) ->
     {Z, Ren1} = rename_binding(Ren, X),
     {{var, Z}, Ren1};
-rename_pat(Ren, {tuple, Xs}) ->
+rename_fpat(Ren, {con, Ar, C, Ps}) ->
+    {Ps1, Ren1} = rename_fpats(Ren, Ps),
+    {{con, Ar, C, Ps1}, Ren1};
+rename_fpat(Ren, {tuple, Ps}) ->
+    {Ps1, Ren1} = rename_fpats(Ren, Ps),
+    {{tuple, Ps1}, Ren1}.
+
+rename_spat(Ren, P = {bool, _}) -> {P, Ren};
+rename_spat(Ren, P = {int, _})  -> {P, Ren};
+rename_spat(Ren, P = nil)       -> {P, Ren};
+rename_spat(Ren, {'::', X, Y}) ->
+    {X1, Ren1} = rename_binding(Ren, X),
+    {Y1, Ren2} = rename_binding(Ren1, Y),
+    {{'::', X1, Y1}, Ren2};
+rename_spat(Ren, {var, X}) ->
+    {Z, Ren1} = rename_binding(Ren, X),
+    {{var, Z}, Ren1};
+rename_spat(Ren, {con, Ar, C, Xs}) ->
+    {Zs, Ren1} = rename_bindings(Ren, Xs),
+    {{con, Ar, C, Zs}, Ren1};
+rename_spat(Ren, {tuple, Xs}) ->
     {Zs, Ren1} = rename_bindings(Ren, Xs),
     {{tuple, Zs}, Ren1}.
 
@@ -467,7 +553,7 @@ rename_split(Ren, {split, Type, X, Cases}) ->
 rename_split(Ren, {nosplit, E}) -> {nosplit, rename(Ren, E)}.
 
 rename_case(Ren, {'case', Pat, Split}) ->
-    {Pat1, Ren1} = rename_pat(Ren, Pat),
+    {Pat1, Ren1} = rename_spat(Ren, Pat),
     {'case', Pat1, rename_split(Ren1, Split)}.
 
 -spec next_split([fpat()]) -> integer() | false.
@@ -490,6 +576,11 @@ pat_to_fcode(Env, Pat) ->
 
 -spec pat_to_fcode(env(), aeso_syntax:type() | no_type, aeso_syntax:pat()) -> fpat().
 pat_to_fcode(_Env, _Type, {id, _, X}) -> {var, X};
+pat_to_fcode(Env, Type, {C, _, _} = Con) when C == con; C == qcon ->
+    pat_to_fcode(Env, Type, {app, [], {typed, [], Con, Type}, []});
+pat_to_fcode(Env, _Type, {app, _, {typed, _, {C, _, _} = Con, _}, Pats}) when C == con; C == qcon ->
+    #con_tag{tag = I, arities = As} = lookup_con(Env, Con),
+    {con, As, I, [pat_to_fcode(Env, Pat) || Pat <- Pats]};
 pat_to_fcode(Env, _Type, {tuple, _, Pats}) ->
     {tuple, [ pat_to_fcode(Env, Pat) || Pat <- Pats ]};
 pat_to_fcode(_Env, _Type, {bool, _, B}) ->
@@ -557,6 +648,10 @@ lookup_type(#{ type_env := TypeEnv }, Name, Args, Default) ->
 bind_type(Env = #{type_env := TEnv}, Q, FDef) ->
     Env#{ type_env := TEnv#{ Q => FDef } }.
 
+-spec bind_constructors(env(), con_env()) -> env().
+bind_constructors(Env = #{ con_env := ConEnv }, NewCons) ->
+    Env#{ con_env := maps:merge(ConEnv, NewCons) }.
+
 %% -- Names --
 
 -spec add_fun_env(env(), [aeso_syntax:decl()]) -> env().
@@ -600,6 +695,15 @@ lookup_fun(#{ fun_env := FunEnv }, Name) ->
         FName -> FName
     end.
 
+-spec lookup_con(env(), aeso_syntax:con() | aeso_syntax:qcon() | sophia_name()) -> con_tag().
+lookup_con(Env, {con, _, Con})  -> lookup_con(Env, [Con]);
+lookup_con(Env, {qcon, _, Con}) -> lookup_con(Env, Con);
+lookup_con(#{ con_env := ConEnv }, Con) ->
+    case maps:get(Con, ConEnv, false) of
+        false -> error({unbound_constructor, Con});
+        Tag   -> Tag
+    end.
+
 init_fresh_names() ->
     put('%fresh', 0).
 
@@ -640,6 +744,9 @@ get_attributes(Ann) ->
 indexed(Xs) ->
     lists:zip(lists:seq(1, length(Xs)), Xs).
 
+fcode_error(Err) ->
+    error(Err).
+
 %% -- Pretty printing --------------------------------------------------------
 
 format_fexpr(E) ->
@@ -659,8 +766,8 @@ pp_above([X | Xs]) -> pp_above(X, pp_above(Xs)).
 
 pp_above(A, B) -> prettypr:above(A, B).
 
-pp_parens(Doc) ->
-    pp_beside([pp_text("("), Doc, pp_text(")")]).
+pp_parens(Doc) -> pp_beside([pp_text("("), Doc, pp_text(")")]).
+pp_braces(Doc) -> pp_beside([pp_text("{"), Doc, pp_text("}")]).
 
 pp_punctuate(_Sep, [])      -> [];
 pp_punctuate(_Sep, [X])     -> [X];
@@ -674,10 +781,17 @@ pp_fexpr(nil) ->
     pp_text("[]");
 pp_fexpr({var, X}) ->
     pp_text(X);
+pp_fexpr({con, _, I, []}) ->
+    pp_beside(pp_text("C"), pp_text(I));
+pp_fexpr({con, _, I, Es}) ->
+    pp_beside(pp_fexpr({con, [], I, []}),
+              pp_fexpr({tuple, Es}));
 pp_fexpr({tuple, Es}) ->
     pp_parens(prettypr:par(pp_punctuate(pp_text(","), [pp_fexpr(E) || E <- Es])));
 pp_fexpr({proj, E, I}) ->
     pp_beside([pp_fexpr(E), pp_text("."), pp_text(I)]);
+pp_fexpr({set_proj, E, I, A}) ->
+    pp_beside(pp_fexpr(E), pp_braces(pp_beside([pp_text(I), pp_text(" = "), pp_fexpr(A)])));
 pp_fexpr({binop, Op, A, B}) ->
     pp_parens(prettypr:par([pp_fexpr(A), pp_text(Op), pp_fexpr(B)]));
 pp_fexpr({'let', X, A, B}) ->
@@ -689,7 +803,14 @@ pp_ftype(T) when is_atom(T) -> pp_text(T);
 pp_ftype({tuple, Ts}) ->
     pp_parens(prettypr:par(pp_punctuate(pp_text(","), [pp_ftype(T) || T <- Ts])));
 pp_ftype({list, T}) ->
-    pp_beside([pp_text("list("), pp_ftype(T), pp_text(")")]).
+    pp_beside([pp_text("list("), pp_ftype(T), pp_text(")")]);
+pp_ftype({variant, Cons}) ->
+    prettypr:par(
+    pp_punctuate(pp_text(" |"),
+                 [ case Args of
+                     [] -> pp_fexpr({con, [], I - 1, []});
+                     _  -> pp_beside(pp_fexpr({con, [], I - 1, []}), pp_ftype({tuple, Args}))
+                   end || {I, Args} <- indexed(Cons)])).
 
 pp_split({nosplit, E}) -> pp_fexpr(E);
 pp_split({split, Type, X, Alts}) ->
@@ -700,7 +821,8 @@ pp_case({'case', Pat, Split}) ->
     prettypr:sep([pp_beside(pp_pat(Pat), pp_text(" =>")),
                   prettypr:nest(2, pp_split(Split))]).
 
-pp_pat({tuple, Xs})   -> pp_fexpr({tuple, [{var, X} || X <- Xs]});
-pp_pat({'::', X, Xs}) -> pp_fexpr({binop, '::', {var, X}, {var, Xs}});
-pp_pat(Pat)           -> pp_fexpr(Pat).
+pp_pat({tuple, Xs})      -> pp_fexpr({tuple, [{var, X} || X <- Xs]});
+pp_pat({'::', X, Xs})    -> pp_fexpr({binop, '::', {var, X}, {var, Xs}});
+pp_pat({con, As, I, Xs}) -> pp_fexpr({con, As, I, [{var, X} || X <- Xs]});
+pp_pat(Pat)              -> pp_fexpr(Pat).
 
