@@ -35,19 +35,48 @@ generates the following JSON structure representing the contract interface:
       {
         "name": "state",
         "vars": [],
-        "typedef": "{a : map(string,int)}"
+        "typedef": {
+          "record": [
+            {
+              "name": "a",
+              "type": {
+                "map": {
+                  "key": "string",
+                  "value": "int"
+                }
+              }
+            }
+          ]
+        }
       },
       {
         "name": "answers",
         "vars": [],
-        "typedef": "map(string,int)"
+        "typedef": {
+          "map": {
+            "key": "string",
+            "value": "int"
+          }
+        }
       }
     ],
     "functions": [
       {
         "name": "init",
         "arguments": [],
-        "type": "{a : map(string,int)}",
+        "returns": {
+          "record": [
+            {
+              "name": "a",
+              "type": {
+                "map": {
+                  "key": "string",
+                  "value": "int"
+                }
+              }
+            }
+          ]
+        },
         "stateful": true
       },
       {
@@ -55,14 +84,23 @@ generates the following JSON structure representing the contract interface:
         "arguments": [
           {
             "name": "q",
-            "type": "string"
+            "type": [
+              "string"
+            ]
           },
           {
             "name": "a",
-            "type": "int"
+            "type": [
+              "int"
+            ]
           }
         ],
-        "type": "map(string,int)",
+        "returns": {
+          "map": {
+            "key": "string",
+            "value": "int"
+          }
+        },
         "stateful": false
       }
     ]
@@ -74,7 +112,7 @@ When that encoding is decoded the following include definition is generated:
 
 ```
 contract Answers =
-  function new_answer : (string, int) => map(string,int)
+  function new_answer : (string, int) => map(string, int)
 ```
 
 ### Types
@@ -85,7 +123,7 @@ json_string() = binary()
 
 ### Exports
 
-#### encode(ContractString) -> {ok,JSONstring} | {error,ErrorString}
+#### encode_contract(ContractString) -> {ok,JSONstring} | {error,ErrorString}
 
 Types
 
@@ -96,7 +134,7 @@ JSONstring = json_string()
 
 Generate the JSON encoding of the interface to a contract. The type definitions and non-private functions are included in the JSON string.
 
-#### decode(JSONstring) -> ConstractString.
+#### decode_contract(JSONstring) -> ConstractString.
 
 Types
 
@@ -107,6 +145,12 @@ JSONstring = json_string()
 
 Take a JSON encoding of a contract interface and generate and generate a contract definition which can be included in another contract.
 
+#### encode_type(TypeAST) -> JSONstring.
+
+#### encode_stmt(StmtAST) -> JSONstring.
+
+#### encode_expr(ExprAST) -> JSONstring.
+
 ### Example run
 
 This is an example of using the ACI generator from an Erlang shell. The file called `aci_test.aes` contains the contract in the description from which we want to generate files `aci_test.json` which is the JSON encoding of the contract interface and `aci_test.include` which is the contract definition to be included inside another contract.
@@ -114,12 +158,12 @@ This is an example of using the ACI generator from an Erlang shell. The file cal
 ``` erlang
 1> {ok,Contract} = file:read_file("aci_test.aes").
 {ok,<<"contract Answers =\n  record state = { a : answers }\n  type answers() = map(string, int)\n\n  stateful function"...>>}
-2> {ok,Encoding} = aeso_aci:encode(Contract).
+2> {ok,Encoding} = aeso_aci:encode_contract(Contract).
 <<"{\"contract\":{\"name\":\"Answers\",\"type_defs\":[{\"name\":\"state\",\"vars\":[],\"typedef\":\"{a : map(string,int)}\"},{\"name\":\"ans"...>>
 3> file:write_file("aci_test.aci", Encoding).
 ok
-4> Decoded = aeso_aci:decode(Encoding).
-<<"contract Answers =\n  function new_answer : (string, int) => map(string,int)\n">>
+4> Decoded = aeso_aci:decode_contract(Encoding).
+<<"contract Answers =\n  function new_answer : (string, int) => map(string, int)\n">>
 5> file:write_file("aci_test.include", Decoded).
 ok
 6> jsx:prettify(Encoding).
