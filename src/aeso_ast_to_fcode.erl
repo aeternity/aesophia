@@ -32,6 +32,7 @@
                | {var, var_name()}
                | {tuple, [fexpr()]}
                | {proj, fexpr(), integer()}
+               | {set_proj, fexpr(), integer(), fexpr()}    %% tuple, field, new_value
                | {binop, binop(), fexpr(), fexpr()}
                | {'let', var_name(), fexpr(), fexpr()}
                | {switch, fsplit()}.
@@ -236,17 +237,23 @@ expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Fields}) ->
     {tuple, lists:map(FVal, FieldTypes)};
 
 expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Rec, Fields}) ->
-    %% TODO: update once we have a SETELEMENT instruction
     X    = fresh_name(),
     Proj = fun(I) -> {proj, {var, X}, I - 1} end,
-    Comp = fun(I, FT) ->
-                case field_value(FT, Fields) of
-                    false       -> Proj(I);
-                    {set, E}    -> expr_to_fcode(Env, E);
-                    {upd, Z, E} -> {'let', Z, Proj(I), expr_to_fcode(Env, E)}
-                end end,
-    {'let', X, expr_to_fcode(Env, Rec),
-     {tuple, [Comp(I, FT) || {I, FT} <- indexed(FieldTypes)]}};
+    Comp = fun({I, false})       -> Proj(I);
+              ({_, {set, E}})    -> expr_to_fcode(Env, E);
+              ({I, {upd, Z, E}}) -> {'let', Z, Proj(I), expr_to_fcode(Env, E)}
+           end,
+    Set  = fun({_, false}, R)       -> R;
+              ({I, {set, E}}, R)    -> {set_proj, R, I - 1, expr_to_fcode(Env, E)};
+              ({I, {upd, Z, E}}, R) -> {set_proj, R, I - 1, {'let', Z, Proj(I), expr_to_fcode(Env, E)}}
+           end,
+    Expand  = length(Fields) == length(FieldTypes),
+    Updates = [ {I, field_value(FT, Fields)} || {I, FT} <- indexed(FieldTypes) ],
+    Body = case Expand of
+             true  -> {tuple, lists:map(Comp, Updates)};
+             false -> lists:foldr(Set, {var, X}, Updates)
+           end,
+    {'let', X, expr_to_fcode(Env, Rec), Body};
 
 %% Lists
 expr_to_fcode(Env, _Type, {list, _, Es}) ->
@@ -411,6 +418,7 @@ rename(Ren, Expr) ->
         {var, X}            -> {var, rename_var(Ren, X)};
         {tuple, Es}         -> {tuple, [rename(Ren, E) || E <- Es]};
         {proj, E, I}        -> {proj, rename(Ren, E), I};
+        {set_proj, R, I, E} -> {set_proj, rename(Ren, R), I, rename(Ren, E)};
         {binop, Op, E1, E2} -> {binop, Op, rename(Ren, E1), rename(Ren, E2)};
         {'let', X, E, Body} ->
             {Z, Ren1} = rename_binding(Ren, X),

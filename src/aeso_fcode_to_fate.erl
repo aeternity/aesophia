@@ -154,6 +154,11 @@ to_scode(Env, {proj, E, I}) ->
     [to_scode(Env, E),
      aeb_fate_code:element_op(?a, ?i(I), ?a)];
 
+to_scode(Env, {set_proj, R, I, E}) ->
+    [to_scode(Env, E),
+     to_scode(Env, R),
+     aeb_fate_code:setelement(?a, ?i(I), ?a, ?a)];
+
 to_scode(Env, {binop, Op, A, B}) ->
     [ to_scode(notail(Env), B),
       to_scode(Env, A),
@@ -425,6 +430,7 @@ attributes(I) ->
         {'NOT', A, B}                         -> Pure(A, B);
         {'TUPLE', _}                          -> Pure(?a, []);
         {'ELEMENT', A, B, C}                  -> Pure(A, [B, C]);
+        {'SETELEMENT', A, B, C, D}            -> Pure(A, [B, C, D]);
         {'MAP_EMPTY', A}                      -> Pure(A, []);
         {'MAP_LOOKUP', A, B, C}               -> Pure(A, [B, C]);
         {'MAP_LOOKUPD', A, B, C, D}           -> Pure(A, [B, C, D]);
@@ -732,12 +738,12 @@ r_write_to_dead_var(_, _) -> false.
 
 op_view({Op, R, A, B}) when ?IsBinOp(Op) ->
     {Op, R, [A, B]};
-op_view({Op, R, A}) when ?IsUnOp(Op) ->
+op_view({Op, R, A}) when ?IsUnOp(Op); Op == 'STORE' ->
     {Op, R, [A]};
-op_view({'STORE', R, A}) ->
-    {'STORE', R, [A]};
-op_view({'NIL', R}) ->
-    {'NIL', R, []};
+op_view({Op, R, A, B, C}) when Op == 'SETELEMENT' ->
+    {Op, R, [A, B, C]};
+op_view({Op, R}) when Op == 'NIL' ->
+    {Op, R, []};
 op_view(_) ->
     false.
 
