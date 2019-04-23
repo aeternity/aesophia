@@ -20,7 +20,7 @@ lexer() ->
     CON      = [UPPER, "[a-zA-Z0-9_]*"],
     INT      = [DIGIT, "+"],
     HEX      = ["0x", HEXDIGIT, "+"],
-    HASH     = ["#", HEXDIGIT, "+"],
+    BYTES    = ["#", HEXDIGIT, "+"],
     WS       = "[\\000-\\ ]+",
     ID       = [LOWER, "[a-zA-Z0-9_']*"],
     TVAR     = ["'", ID],
@@ -54,7 +54,7 @@ lexer() ->
         , {STRING, token(string, fun parse_string/1)}
         , {HEX,    token(hex,    fun parse_hex/1)}
         , {INT,    token(int,    fun list_to_integer/1)}
-        , {HASH,   token(hash,   fun parse_hash/1)}
+        , {BYTES,  token(bytes,  fun parse_bytes/1)}
 
           %% Identifiers (qualified first!)
         , {QID,   token(qid,  fun(S) -> string:tokens(S, ".") end)}
@@ -117,10 +117,8 @@ unescape([C | Chars], Acc) ->
 
 parse_hex("0x" ++ Chars) -> list_to_integer(Chars, 16).
 
-parse_hash("#" ++ Chars) ->
-    N = list_to_integer(Chars, 16),
-    case length(Chars) > 64 of  %% 64 hex digits = 32 bytes
-        true  -> <<N:64/unit:8>>;   %% signature
-        false -> <<N:32/unit:8>>    %% address
-    end.
+parse_bytes("#" ++ Chars) ->
+    N      = list_to_integer(Chars, 16),
+    Digits = (length(Chars) + 1) div 2,
+    <<N:Digits/unit:8>>.
 

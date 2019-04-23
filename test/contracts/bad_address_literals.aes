@@ -1,0 +1,33 @@
+
+contract Remote =
+  function foo : () => ()
+
+contract AddressLiterals =
+  function addr1() : bytes(32) =
+    ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt
+  function addr2() : Remote =
+    ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt
+  function addr3() : oracle(int, bool) =
+    ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt
+
+  function oracle1() : oracle_query(int, bool) =
+    ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5
+  function oracle2() : bytes(32) =
+    ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5
+  function oracle3() : Remote =
+    ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5
+
+  function query1() : oracle(int, bool) =
+    oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY
+  function query2() : bytes(32) =
+    oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY
+  function query3() : Remote =
+    oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY
+
+  function contr1() : address =
+    ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ
+  function contr2() : oracle(int, bool) =
+    ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ
+  function contr3() : bytes(32) =
+    ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ
+

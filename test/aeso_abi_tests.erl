@@ -4,6 +4,9 @@
 -compile(export_all).
 
 -define(SANDBOX(Code), sandbox(fun() -> Code end)).
+-define(DUMMY_HASH_WORD, 16#123).
+-define(DUMMY_HASH, <<0:30/unit:8, 127, 119>>). %% 16#123
+-define(DUMMY_HASH_LIT, "#0000000000000000000000000000000000000000000000000000000000000123").
 
 sandbox(Code) ->
     Parent = self(),
@@ -97,7 +100,15 @@ calldata_test() ->
     Map = #{ <<"a">> => 4 },
     [{variant, 1, [Map]}, {{<<"b">>, 5}, {variant, 0, []}}] =
         encode_decode_calldata("foo", ["variant", "r"], ["Blue({[\"a\"] = 4})", "{x = (\"b\", 5), y = Red}"]),
-    [16#123, 16#456] = encode_decode_calldata("foo", ["hash", "address"], ["#123", "#456"]),
+    [?DUMMY_HASH_WORD, 16#456] = encode_decode_calldata("foo", ["bytes(32)", "address"],
+                                                        [?DUMMY_HASH_LIT, "ak_1111111111111111111111111111113AFEFpt5"]),
+    [?DUMMY_HASH_WORD, ?DUMMY_HASH_WORD] =
+        encode_decode_calldata("foo", ["bytes(32)", "hash"], [?DUMMY_HASH_LIT, ?DUMMY_HASH_LIT]),
+
+    [119, {0, 0}] = encode_decode_calldata("foo", ["int", "signature"], ["119", [$# | lists:duplicate(128, $0)]]),
+
+    [16#456] = encode_decode_calldata("foo", ["Remote"], ["ct_1111111111111111111111111111113AFEFpt5"]),
+
     ok.
 
 calldata_init_test() ->
@@ -126,7 +137,9 @@ parameterized_contract(FunName, Types) ->
 
 parameterized_contract(ExtraCode, FunName, Types) ->
     lists:flatten(
-        ["contract Dummy =\n",
+        ["contract Remote =\n"
+         "  function bla : () => ()\n\n"
+         "contract Dummy =\n",
          ExtraCode, "\n",
          "  type an_alias('a) = (string, 'a)\n"
          "  record r = {x : an_alias(int), y : variant}\n"
@@ -139,7 +152,9 @@ oracle_test() ->
         "  function question(o, q : oracle_query(list(string), option(int))) =\n"
         "    Oracle.get_question(o, q)\n",
     {ok, _, {[word, word], {list, string}}, [16#123, 16#456]} =
-        aeso_compiler:check_call(Contract, "question", ["#123", "#456"], []),
+        aeso_compiler:check_call(Contract, "question", ["ok_111111111111111111111111111111ZrdqRz9",
+                                                        "oq_1111111111111111111111111111113AFEFpt5"], []),
+
     ok.
 
 permissive_literals_fail_test() ->

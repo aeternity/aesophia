@@ -60,6 +60,7 @@
 -type type() :: {fun_t, ann(), [named_arg_t()], [type()], type()}
               | {app_t, ann(), type(), [type()]}
               | {tuple_t, ann(), [type()]}
+              | {bytes_t, ann(), integer()}
               | id()  | qid()
               | con() | qcon()  %% contracts
               | tvar().
@@ -70,6 +71,10 @@
     :: {int, ann(), integer()}
      | {bool, ann(), true | false}
      | {hash, ann(), binary()}
+     | {account_pubkey, binary()}
+     | {contract_pubkey, binary()}
+     | {oracle_pubkey, binary()}
+     | {oracle_query_id, binary()}
      | {unit, ann()}
      | {string, ann(), binary()}
      | {char, ann(), integer()}.

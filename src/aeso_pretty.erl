@@ -236,6 +236,8 @@ type({app_t, _, Type, Args}) ->
     beside(type(Type), tuple_type(Args));
 type({tuple_t, _, Args}) ->
     tuple_type(Args);
+type({bytes_t, _, Len}) ->
+    text(lists:concat(["bytes(", Len, ")"]));
 type({named_arg_t, _, Name, Type, _Default}) ->
     %% Drop the default value
     %% follow(hsep(typed(name(Name), Type), text("=")), expr(Default));
@@ -319,8 +321,17 @@ expr_p(_, E = {int, _, N}) ->
            end,
     text(S);
 expr_p(_, {bool, _, B}) -> text(atom_to_list(B));
-expr_p(_, {hash, _, <<N:256>>}) -> text("#" ++ integer_to_list(N, 16));
+expr_p(_, {bytes, _, Bin}) ->
+    Digits = byte_size(Bin),
+    <<N:Digits/unit:8>> = Bin,
+    text(lists:flatten(io_lib:format("#~*.16.0b", [Digits*2, N])));
 expr_p(_, {hash, _, <<N:512>>}) -> text("#" ++ integer_to_list(N, 16));
+expr_p(_, {Type, _, Bin})
+    when Type == account_pubkey;
+         Type == contract_pubkey;
+         Type == oracle_pubkey;
+         Type == oracle_query_id ->
+    text(binary_to_list(aeser_api_encoder:encode(Type, Bin)));
 expr_p(_, {unit, _}) -> text("()");
 expr_p(_, {string, _, S}) -> term(binary_to_list(S));
 expr_p(_, {char, _, C}) ->
