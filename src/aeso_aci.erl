@@ -121,8 +121,8 @@ encode_func(Fdef) ->
      {<<"returns">>, encode_type(Type)},
      {<<"stateful">>, is_stateful_func(Fdef)}].
 
-%% encode_args(Args) -> [JSON].
-%% encode_arg(Args) -> JSON.
+%% encode_args(ArgASTs) -> [JSON].
+%% encode_arg(ArgAST) -> JSON.
 
 encode_args(Args) ->
     [ encode_arg(A) || A <- Args ].
@@ -131,8 +131,8 @@ encode_arg(#arg{id=Id,type=T}) ->
     [{<<"name">>,encode_type(Id)},
      {<<"type">>,[encode_type(T)]}].
 
-%% encode_types(Types) -> [JSON].
-%% encode_type(Type) -> JSON.
+%% encode_types(TypeASTs) -> [JSON].
+%% encode_type(TypeAST) -> JSON.
 
 encode_types(Types) ->
     [ encode_type(T) || T <- Types ].
@@ -148,7 +148,7 @@ encode_type(#tuple_t{args=As}) ->
     Eas = encode_types(As),
     [{<<"tuple">>,Eas}];
 encode_type(#bytes_t{len=Len}) ->
-    {<<"bytes">>, Len};
+    {<<"bytes">>,Len};
 encode_type(#record_t{fields=Fs}) ->
     Efs = encode_rec_field_types(Fs),
     [{<<"record">>,Efs}];
@@ -197,7 +197,7 @@ encode_map_field_type([K,V]) ->
     [{<<"key">>,encode_type(K)},
      {<<"value">>,encode_type(V)}].
 
-%% encode_typedef(TypeDef) -> JSON.
+%% encode_typedef(TypeDefAST) -> JSON.
 
 encode_typedef(Type) ->
     Name = typedef_name(Type),
@@ -217,7 +217,7 @@ encode_alias(#alias_t{type=T}) ->
     encode_type(T);
 encode_alias(A) -> encode_type(A).
 
-%% encode_stmt(Stmt) -> JSON.
+%% encode_stmt(StmtAST) -> JSON.
 
 encode_stmt(#typed{expr=E}) ->                  %Ignore the type
     encode_stmt(E);
@@ -229,8 +229,8 @@ encode_stmt(#'if'{test=Test,true=True,false=False}) ->
 encode_stmt(E) ->
     encode_expr(E).
 
-%% encode_exprs(Exprs) -> [JSON].
-%% encode_expr(Expr) -> JSON.
+%% encode_exprs(ExprASTs) -> [JSON].
+%% encode_expr(ExprAST) -> JSON.
 
 encode_exprs(Es) ->
     [ encode_expr(E) || E <- Es ].
