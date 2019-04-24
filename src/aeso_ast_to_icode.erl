@@ -696,11 +696,8 @@ ast_typerep({qid, _, Name}, Icode) ->
     lookup_type_id(Name, [], Icode);
 ast_typerep({con, _, _}, _) ->
     word;   %% Contract type
-ast_typerep({bytes_t, _, Len}, _) when Len =< 32 ->
-    word;
 ast_typerep({bytes_t, _, Len}, _) ->
-    Words = (31 + Len) div 32,
-    {tuple, lists:duplicate(Words, word)};
+    bytes_t(Len);
 ast_typerep({app_t, _, {id, _, Name}, Args}, Icode) ->
     ArgReps = [ ast_typerep(Arg, Icode) || Arg <- Args ],
     lookup_type_id(Name, ArgReps, Icode);
