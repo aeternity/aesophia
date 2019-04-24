@@ -697,7 +697,7 @@ ast_typerep({qid, _, Name}, Icode) ->
 ast_typerep({con, _, _}, _) ->
     word;   %% Contract type
 ast_typerep({bytes_t, _, Len}, _) ->
-    {bytes, Len};
+    bytes_t(Len);
 ast_typerep({app_t, _, {id, _, Name}, Args}, Icode) ->
     ArgReps = [ ast_typerep(Arg, Icode) || Arg <- Args ],
     lookup_type_id(Name, ArgReps, Icode);
@@ -726,7 +726,8 @@ ttl_t(Icode) ->
     ast_typerep({qid, [], ["Chain", "ttl"]}, Icode).
 
 sign_t() -> bytes_t(64).
-bytes_t(Len) -> {bytes, Len}.
+bytes_t(Len) when Len =< 32 -> word;
+bytes_t(Len)                -> {tuple, lists:duplicate((31 + Len) div 32, word)}.
 
 get_signature_arg(Args0) ->
     NamedArgs = [Arg || Arg = {named_arg, _, _, _} <- Args0],
@@ -760,8 +761,6 @@ type_value({list, A}) ->
 type_value({tuple, As}) ->
     #tuple{ cpts = [#integer{ value = ?TYPEREP_TUPLE_TAG },
                     #list{ elems = [ type_value(A) || A <- As ] }] };
-type_value({bytes, Len}) ->
-    #tuple{ cpts = [#integer{ value = ?TYPEREP_BYTES_TAG }, #integer{ value = Len }] };
 type_value({variant, Cs}) ->
     #tuple{ cpts = [#integer{ value = ?TYPEREP_VARIANT_TAG },
                     #list{ elems = [ #list{ elems = [ type_value(A) || A <- As ] } || As <- Cs ] }] };
