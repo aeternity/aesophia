@@ -579,15 +579,29 @@ ast_binop(Op, Ann, {typed, _, A, Type}, B, Icode)
         _ when not Monomorphic ->
             gen_error({cant_compare_polymorphic_type, Ann, Op, Type});
         word   -> #binop{op = Op, left = ast_body(A, Icode), right = ast_body(B, Icode)};
-        string ->
+        OtherType ->
             Neg = case Op of
                     '==' -> fun(X) -> X end;
                     '!=' -> fun(X) -> #unop{ op = '!', rand = X } end;
                     _    -> gen_error({cant_compare, Ann, Op, Type})
                   end,
-            Neg(#funcall{ function = #var_ref{name = {builtin, str_equal}},
-                          args     = [ast_body(A, Icode), ast_body(B, Icode)] });
-        _ -> gen_error({cant_compare, Ann, Op, Type})
+            Args = [ast_body(A, Icode), ast_body(B, Icode)],
+            Builtin =
+                case OtherType of
+                    string ->
+                        #funcall{ function = #var_ref{name = {builtin, str_equal}},
+                                  args     = Args };
+                    {tuple, Types} ->
+                        case lists:usort(Types) of
+                            [word] ->
+                                #funcall{ function = #var_ref{name = {builtin, str_equal_p}},
+                                          args = [ #integer{value = 32 * length(Types)} | Args] };
+                            _ -> gen_error({cant_compare, Ann, Op, Type})
+                        end;
+                    _ ->
+                        gen_error({cant_compare, Ann, Op, Type})
+                end,
+            Neg(Builtin)
     end;
 ast_binop('++', _, A, B, Icode) ->
     #funcall{ function = #var_ref{ name = {builtin, list_concat} },
