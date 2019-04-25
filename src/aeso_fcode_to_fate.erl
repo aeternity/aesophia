@@ -201,11 +201,10 @@ split_to_scode(Env, {split, {tuple, _}, X, Alts}) ->
                 {Code, Env1} = match_tuple(Env, Arg, Xs),
                 [Code, split_to_scode(Env1, S)]
           end,
-    [aeb_fate_code:push(Arg),
-     case Def == missing andalso Alt /= missing of
-        true  -> Alt;   % skip the switch if single tuple pattern
-        false -> {switch, tuple, [Alt], Def}
-     end];
+    case Def == missing andalso Alt /= missing of
+       true  -> Alt;   % skip the switch if single tuple pattern
+       false -> [{switch, tuple, [Alt], Def}]
+    end;
 split_to_scode(Env, {split, boolean, X, Alts}) ->
     {Def, Alts1} = catchall_to_scode(Env, X, Alts),
     GetAlt = fun(B) ->
