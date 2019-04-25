@@ -147,9 +147,43 @@ Take a JSON encoding of a contract interface and generate and generate a contrac
 
 #### encode_type(TypeAST) -> JSONstring.
 
+Types
+
+``` erlang
+JSONstring = json_string()
+```
+
+Generate the JSON encoding of a type from the AST of the type.
+
+#### encode_arg(ArgAST) -> JSONstring.
+
+Types
+
+``` erlang
+JSONstring = json_string()
+```
+
+Generate the JSON encoding of a function argument from the AST of the argument.
+
 #### encode_stmt(StmtAST) -> JSONstring.
 
+Types
+
+``` erlang
+JSONstring = json_string()
+```
+
+Generate the JSON encoding of a statement from the AST of the statement.
+
 #### encode_expr(ExprAST) -> JSONstring.
+
+Types
+
+``` erlang
+JSONstring = json_string()
+```
+
+Generate the JSON encoding of an expression from the AST of the expression.
 
 ### Example run
 
