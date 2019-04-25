@@ -248,9 +248,19 @@ split_to_scode(Env, {split, {variant, Cons}, X, Alts}) ->
                         [Code, split_to_scode(Env1, S)]
                 end
              end,
-    SType = {variant, [length(Args) || Args <- Cons]},
-    [aeb_fate_code:push(Arg),
-     {switch, SType, [GetAlt(I) || I <- lists:seq(0, length(Cons) - 1)], Def}];
+    SType  = {variant, [length(Args) || Args <- Cons]},
+    case {[GetAlt(I) || I <- lists:seq(0, length(Cons) - 1)], Def} of
+        %% Skip the switch for single constructor datatypes (with no catchall)
+        {[SAlt], missing} when SAlt /= missing -> SAlt;
+        {[SAlt], _} ->
+            %% Single-case switches are not compiled to a SWITCH instruction, so
+            %% we don't need to push the argument. See [SINGLE_CON_SWITCH]
+            %% below. We need the scode switch to keep track of the default
+            %% case though.
+            [{switch, SType, [SAlt], Def}];
+        {SAlts, _}  ->
+            [aeb_fate_code:push(Arg), {switch, SType, SAlts, Def}]
+    end;
 split_to_scode(_, Split = {split, _, _, _}) ->
     ?TODO({'case', Split}).
 
@@ -881,6 +891,11 @@ block(Blk = #blk{code     = [{switch, Type, Alts, Default} | Code],
             tuple ->
                 [TCode] = Alts,
                 {Blk#blk{code = TCode ++ [{jump, RestRef}]}, [], []};
+            {variant, [_]} ->
+                %% [SINGLE_CON_SWITCH] Single constructor switches don't need a
+                %% switch instruction.
+                [AltCode] = Alts,
+                {Blk#blk{code = AltCode ++ [{jump, RestRef}]}, [], []};
             {variant, _Ar} ->
                 MkBlk = fun(missing) -> {DefRef, []};
                            (ACode)   -> FreshBlk(ACode ++ [{jump, RestRef}], DefRef)
