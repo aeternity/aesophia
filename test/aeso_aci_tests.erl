@@ -24,7 +24,7 @@ test_cases(1) ->
 			 [#{<<"name">> => <<"a">>,
 			    <<"arguments">> => 
 				[#{<<"name">> => <<"i">>,
-				   <<"type">> => [<<"int">>]}],
+				   <<"type">> => <<"int">>}],
 			    <<"returns">> => <<"int">>,
 			    <<"stateful">> => false}]}},
     DecACI = <<"contract C =\n"
@@ -44,7 +44,7 @@ test_cases(2) ->
 			 <<"functions">> =>
                              [#{<<"arguments">> =>
                                     [#{<<"name">> => <<"i">>,
-                                       <<"type">> => [<<"int">>]}],
+                                       <<"type">> => <<"int">>}],
                                 <<"name">> => <<"a">>,
                                 <<"returns">> => <<"int">>,
                                 <<"stateful">> => false}]}},
@@ -60,7 +60,7 @@ test_cases(3) ->
 			 [#{<<"arguments">> =>
 				[#{<<"name">> => <<"i">>,
 				   <<"type">> =>
-				       [#{<<"C.bert">> => [<<"string">>]}]}],
+				       #{<<"C.bert">> => [<<"string">>]}}],
 			    <<"name">> => <<"a">>,<<"returns">> => <<"int">>,
 			    <<"stateful">> => false}],
 		     <<"name">> => <<"C">>,

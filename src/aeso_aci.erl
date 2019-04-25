@@ -383,7 +383,7 @@ do_decode_args(As) ->
     Das = [ do_decode_arg(A) || A <- As ],
     [$(,lists:join(", ", Das),$)].
 
-do_decode_arg(#{<<"type">> := [T]}) -> do_decode_type(T).
+do_decode_arg(#{<<"type">> := T}) -> do_decode_type(T).
 
 do_decode_types(Ets) ->
     [ do_decode_type(Et) || Et <- Ets ].
