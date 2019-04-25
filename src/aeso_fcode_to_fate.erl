@@ -14,13 +14,15 @@
 %% -- Preamble ---------------------------------------------------------------
 
 -type scode()  :: [sinstr()].
--type sinstr() :: {switch, stype(), [maybe_scode()], maybe_scode()}  %% last arg is catch-all
+-type sinstr() :: {switch, arg(), stype(), [maybe_scode()], maybe_scode()}  %% last arg is catch-all
                 | switch_body
                 | tuple().    %% FATE instruction
 
+-type arg() :: aeb_fate_code:fate_arg().
+
 %% Annotated scode
 -type scode_a()  :: [sinstr_a()].
--type sinstr_a() :: {switch, stype(), [maybe_scode_a()], maybe_scode_a()}  %% last arg is catch-all
+-type sinstr_a() :: {switch, arg(), stype(), [maybe_scode_a()], maybe_scode_a()}  %% last arg is catch-all
                   | switch_body
                   | {i, ann(), tuple()}.    %% FATE instruction
 
@@ -203,7 +205,7 @@ split_to_scode(Env, {split, {tuple, _}, X, Alts}) ->
           end,
     case Def == missing andalso Alt /= missing of
        true  -> Alt;   % skip the switch if single tuple pattern
-       false -> [{switch, tuple, [Alt], Def}]
+       false -> [{switch, Arg, tuple, [Alt], Def}]
     end;
 split_to_scode(Env, {split, boolean, X, Alts}) ->
     {Def, Alts1} = catchall_to_scode(Env, X, Alts),
@@ -214,8 +216,8 @@ split_to_scode(Env, {split, boolean, X, Alts}) ->
                  end
              end,
     SAlts = [GetAlt(false), GetAlt(true)],
-    [aeb_fate_code:push(lookup_var(Env, X)),
-     {switch, boolean, SAlts, Def}];
+    Arg   = lookup_var(Env, X),
+    [{switch, Arg, boolean, SAlts, Def}];
 split_to_scode(Env, {split, {list, _}, X, Alts}) ->
     {Def, Alts1} = catchall_to_scode(Env, X, Alts),
     Arg = lookup_var(Env, X),
@@ -233,10 +235,10 @@ split_to_scode(Env, {split, {list, _}, X, Alts}) ->
              end,
     SAlts = [GetAlt('::'), GetAlt(nil)],
     [aeb_fate_code:is_nil(?a, Arg),
-     {switch, boolean, SAlts, Def}];
+     {switch, ?a, boolean, SAlts, Def}];
 split_to_scode(Env, {split, integer, X, Alts}) ->
     {Def, Alts1} = catchall_to_scode(Env, X, Alts),
-    literal_split_to_scode(Env, integer, X, Alts1, Def);
+    literal_split_to_scode(Env, integer, lookup_var(Env, X), Alts1, Def);
 split_to_scode(Env, {split, {variant, Cons}, X, Alts}) ->
     {Def, Alts1} = catchall_to_scode(Env, X, Alts),
     Arg = lookup_var(Env, X),
@@ -252,29 +254,22 @@ split_to_scode(Env, {split, {variant, Cons}, X, Alts}) ->
     case {[GetAlt(I) || I <- lists:seq(0, length(Cons) - 1)], Def} of
         %% Skip the switch for single constructor datatypes (with no catchall)
         {[SAlt], missing} when SAlt /= missing -> SAlt;
-        {[SAlt], _} ->
-            %% Single-case switches are not compiled to a SWITCH instruction, so
-            %% we don't need to push the argument. See [SINGLE_CON_SWITCH]
-            %% below. We need the scode switch to keep track of the default
-            %% case though.
-            [{switch, SType, [SAlt], Def}];
-        {SAlts, _}  ->
-            [aeb_fate_code:push(Arg), {switch, SType, SAlts, Def}]
+        {SAlts, _} -> [{switch, Arg, SType, SAlts, Def}]
     end;
 split_to_scode(_, Split = {split, _, _, _}) ->
     ?TODO({'case', Split}).
 
-literal_split_to_scode(_Env, _Type, _X, [], Def) ->
-    {switch, boolean, [missing, missing], Def};
-literal_split_to_scode(Env, integer, X, [{'case', {int, N}, Body} | Alts], Def) ->
+literal_split_to_scode(_Env, _Type, Arg, [], Def) ->
+    {switch, Arg, boolean, [missing, missing], Def};
+literal_split_to_scode(Env, integer, Arg, [{'case', {int, N}, Body} | Alts], Def) ->
     True = split_to_scode(Env, Body),
     False =
         case Alts of
             [] -> missing;
-            _  -> literal_split_to_scode(Env, integer, X, Alts, missing)
+            _  -> literal_split_to_scode(Env, integer, Arg, Alts, missing)
         end,
-    [aeb_fate_code:eq(?a, lookup_var(Env, X), ?i(N)),
-     {switch, boolean, [False, True], Def}].
+    [aeb_fate_code:eq(?a, Arg, ?i(N)),
+     {switch, ?a, boolean, [False, True], Def}].
 
 catchall_to_scode(Env, X, Alts) -> catchall_to_scode(Env, X, Alts, []).
 
@@ -320,8 +315,8 @@ optimize_scode(Funs, Options) ->
 flatten(missing) -> missing;
 flatten(Code)    -> lists:map(fun flatten_s/1, lists:flatten(Code)).
 
-flatten_s({switch, Type, Alts, Catch}) ->
-    {switch, Type, [flatten(Alt) || Alt <- Alts], flatten(Catch)};
+flatten_s({switch, Arg, Type, Alts, Catch}) ->
+    {switch, Arg, Type, [flatten(Alt) || Alt <- Alts], flatten(Catch)};
 flatten_s(I) -> I.
 
 -define(MAX_SIMPL_ITERATIONS, 10).
@@ -350,16 +345,19 @@ simpl_loop(N, Code, Options) ->
         false -> simpl_loop(N + 1, Code2, Options)
     end.
 
-pp_ann(Ind, [{switch, Type, Alts, Def} | Code]) ->
+pp_ann(Ind, [{switch, Arg, Type, Alts, Def} | Code]) ->
     Tags =
         case Type of
             boolean       -> ["FALSE", "TRUE"];
             tuple         -> ["(_)"];
             {variant, Ar} -> ["C" ++ integer_to_list(I) || I <- lists:seq(0, length(Ar) - 1)]
         end,
-    [[[Ind, Tag, " =>\n", pp_ann("  " ++ Ind, Alt)]
+    Ind1 = "  " ++ Ind,
+    Ind2 = "  " ++ Ind1,
+    [Ind, "SWITCH ", pp_arg(Arg), "\n",
+     [[Ind1, Tag, " =>\n", pp_ann(Ind2, Alt)]
       || {Tag, Alt} <- lists:zip(Tags, Alts), Alt /= missing],
-     [[Ind, "_ =>\n", pp_ann("  " ++ Ind, Def)] || Def /= missing],
+     [[Ind1, "_ =>\n", pp_ann("  " ++ Ind, Def)] || Def /= missing],
      pp_ann(Ind, Code)];
 pp_ann(Ind, [switch_body | Code]) ->
     [Ind, "SWITCH-BODY\n", pp_ann(Ind, Code)];
@@ -373,6 +371,12 @@ pp_ann(Ind, [{i, #{ live_in := In, live_out := Out }, I} | Code]) ->
      pp_ann(Ind, Code)];
 pp_ann(_, []) -> [].
 
+
+pp_arg(?i(I))    -> io_lib:format("~w", [I]);
+pp_arg({arg, N}) -> io_lib:format("arg~p", [N]);
+pp_arg({var, N}) -> io_lib:format("var~p", [N]);
+pp_arg(?a)       -> "a".
+
 %% -- Analysis --
 
 annotate_code(Code) ->
@@ -384,11 +388,11 @@ annotate_code(Code) ->
 ann_writes(missing, Writes, []) -> {missing, Writes};
 ann_writes([switch_body | Code], Writes, Acc) ->
     ann_writes(Code, Writes, [switch_body | Acc]);
-ann_writes([{switch, Type, Alts, Def} | Code], Writes, Acc) ->
+ann_writes([{switch, Arg, Type, Alts, Def} | Code], Writes, Acc) ->
     {Alts1, WritesAlts} = lists:unzip([ ann_writes(Alt, Writes, []) || Alt <- Alts ]),
     {Def1, WritesDef}   = ann_writes(Def, Writes, []),
     Writes1 = ordsets:union(Writes, ordsets:intersection([WritesDef | WritesAlts])),
-    ann_writes(Code, Writes1, [{switch, Type, Alts1, Def1} | Acc]);
+    ann_writes(Code, Writes1, [{switch, Arg, Type, Alts1, Def1} | Acc]);
 ann_writes([I | Code], Writes, Acc) ->
     Ws = var_writes(I),
     Writes1 = ordsets:union(Writes, Ws),
@@ -401,11 +405,11 @@ ann_writes([], Writes, Acc) ->
 ann_reads(missing, Reads, []) -> {missing, Reads};
 ann_reads([switch_body | Code], Reads, Acc) ->
     ann_reads(Code, Reads, [switch_body | Acc]);
-ann_reads([{switch, Type, Alts, Def} | Code], Reads, Acc) ->
+ann_reads([{switch, Arg, Type, Alts, Def} | Code], Reads, Acc) ->
     {Alts1, ReadsAlts} = lists:unzip([ ann_reads(Alt, Reads, []) || Alt <- Alts ]),
     {Def1, ReadsDef}   = ann_reads(Def, Reads, []),
-    Reads1 = ordsets:union([Reads, ReadsDef | ReadsAlts]),
-    ann_reads(Code, Reads1, [{switch, Type, Alts1, Def1} | Acc]);
+    Reads1 = ordsets:union([[Arg], Reads, ReadsDef | ReadsAlts]),
+    ann_reads(Code, Reads1, [{switch, Arg, Type, Alts1, Def1} | Acc]);
 ann_reads([{i, Ann, I} | Code], Reads, Acc) ->
     #{ writes_in := WritesIn, writes_out := WritesOut } = Ann,
     #{ read := Rs, write := W, pure := Pure } = attributes(I),
@@ -554,8 +558,8 @@ var_writes(I) ->
         _        -> []
     end.
 
-independent({switch, _, _, _}, _) -> false;
-independent(_, {switch, _, _, _}) -> false;
+independent({switch, _, _, _, _}, _) -> false;
+independent(_, {switch, _, _, _, _}) -> false;
 independent(switch_body, _) -> true;
 independent(_, switch_body) -> true;
 independent({i, _, I}, {i, _, J}) ->
@@ -601,8 +605,8 @@ simplify(missing, _) -> missing;
 simplify([I | Code], Options) ->
     simpl_top(simpl_s(I, Options), simplify(Code, Options), Options).
 
-simpl_s({switch, Type, Alts, Def}, Options) ->
-    {switch, Type, [simplify(A, Options) || A <- Alts], simplify(Def, Options)};
+simpl_s({switch, Arg, Type, Alts, Def}, Options) ->
+    {switch, Arg, Type, [simplify(A, Options) || A <- Alts], simplify(Def, Options)};
 simpl_s(I, _) -> I.
 
 simpl_top(I, Code, Options) ->
@@ -793,8 +797,8 @@ from_op_view(Op, R, As) -> list_to_tuple([Op, R | As]).
                 (sinstr_a()) -> sinstr();
                 (missing)    -> missing.
 unannotate(switch_body) -> [switch_body];
-unannotate({switch, Type, Alts, Def}) ->
-    [{switch, Type, [unannotate(A) || A <- Alts], unannotate(Def)}];
+unannotate({switch, Arg, Type, Alts, Def}) ->
+    [{switch, Arg, Type, [unannotate(A) || A <- Alts], unannotate(Def)}];
 unannotate(missing) -> missing;
 unannotate(Code) when is_list(Code) ->
     lists:flatmap(fun unannotate/1, Code);
@@ -803,8 +807,8 @@ unannotate({i, _Ann, I}) -> [I].
 %% Desugar and specialize
 desugar({'ADD', ?a, ?i(1), ?a})     -> [aeb_fate_code:inc()];
 desugar({'SUB', ?a, ?a, ?i(1)})     -> [aeb_fate_code:dec()];
-desugar({switch, Type, Alts, Def}) ->
-    [{switch, Type, [desugar(A) || A <- Alts], desugar(Def)}];
+desugar({switch, Arg, Type, Alts, Def}) ->
+    [{switch, Arg, Type, [desugar(A) || A <- Alts], desugar(Def)}];
 desugar(missing) -> missing;
 desugar(Code) when is_list(Code) ->
     lists:flatmap(fun desugar/1, Code);
@@ -858,7 +862,7 @@ block(#blk{ref = Ref, code = []}, CodeAcc, Blocks, BlockAcc) ->
 block(Blk = #blk{code = [switch_body | Code]}, Acc, Blocks, BlockAcc) ->
     %% Reached the body of a switch. Clear catchall ref.
     block(Blk#blk{code = Code, catchall = none}, Acc, Blocks, BlockAcc);
-block(Blk = #blk{code     = [{switch, Type, Alts, Default} | Code],
+block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
                  catchall = Catchall}, Acc, Blocks, BlockAcc) ->
     FreshBlk = fun(C, Ca) ->
                    R = make_ref(),
@@ -887,7 +891,7 @@ block(Blk = #blk{code     = [{switch, Type, Alts, Default} | Code],
                         missing -> [{jump, DefRef}];
                         _       -> FalseCode ++ [{jump, RestRef}]
                     end,
-                {Blk#blk{code = ElseCode}, [{jumpif, ThenRef}], ThenBlk};
+                {Blk#blk{code = ElseCode}, [{jumpif, Arg, ThenRef}], ThenBlk};
             tuple ->
                 [TCode] = Alts,
                 {Blk#blk{code = TCode ++ [{jump, RestRef}]}, [], []};
@@ -901,7 +905,7 @@ block(Blk = #blk{code     = [{switch, Type, Alts, Default} | Code],
                            (ACode)   -> FreshBlk(ACode ++ [{jump, RestRef}], DefRef)
                         end,
                 {AltRefs, AltBs} = lists:unzip(lists:map(MkBlk, Alts)),
-                {Blk#blk{code = []}, [{switch, AltRefs}], lists:append(AltBs)}
+                {Blk#blk{code = []}, [{switch, Arg, AltRefs}], lists:append(AltBs)}
         end,
     Blk2 = Blk1#blk{catchall = DefRef}, %% Update catchall ref
     block(Blk2, Code1 ++ Acc, DefBlk ++ RestBlk ++ AltBlks ++ Blocks, BlockAcc);
@@ -933,7 +937,7 @@ reorder_blocks(Ref, Code, Blocks, Acc) ->
         ['RETURN'|_]        -> reorder_blocks(Blocks, Acc1);
         [{'RETURNR', _}|_]  -> reorder_blocks(Blocks, Acc1);
         [{'ABORT', _}|_]    -> reorder_blocks(Blocks, Acc1);
-        [{switch, _}|_]     -> reorder_blocks(Blocks, Acc1);
+        [{switch, _, _}|_]  -> reorder_blocks(Blocks, Acc1);
         [{jump, L}|_]       ->
             NotL = fun({L1, _}) -> L1 /= L end,
             case lists:splitwith(NotL, Blocks) of
@@ -962,10 +966,10 @@ remove_dead_blocks(Blocks = [{Top, _} | _]) ->
 chase_labels([], _, Live) -> Live;
 chase_labels([L | Ls], Map, Live) ->
     Code = maps:get(L, Map),
-    Jump = fun({jump, A})    -> [A || not maps:is_key(A, Live)];
-              ({jumpif, A})  -> [A || not maps:is_key(A, Live)];
-              ({switch, As}) -> [A || A <- As, not maps:is_key(A, Live)];
-              (_)            -> [] end,
+    Jump = fun({jump, A})       -> [A || not maps:is_key(A, Live)];
+              ({jumpif, _, A})  -> [A || not maps:is_key(A, Live)];
+              ({switch, _, As}) -> [A || A <- As, not maps:is_key(A, Live)];
+              (_)               -> [] end,
     New  = lists:flatmap(Jump, Code),
     chase_labels(New ++ Ls, Map, Live#{ L => true }).
 
@@ -979,12 +983,12 @@ use_returnr(Code) -> Code.
 set_labels(Labels, {Ref, Code}) when is_reference(Ref) ->
     {maps:get(Ref, Labels), [ set_labels(Labels, I) || I <- Code ]};
 set_labels(Labels, {jump, Ref})   -> aeb_fate_code:jump(maps:get(Ref, Labels));
-set_labels(Labels, {jumpif, Ref}) -> aeb_fate_code:jumpif(?a, maps:get(Ref, Labels));
-set_labels(Labels, {switch, Refs}) ->
+set_labels(Labels, {jumpif, Arg, Ref}) -> aeb_fate_code:jumpif(Arg, maps:get(Ref, Labels));
+set_labels(Labels, {switch, Arg, Refs}) ->
     case [ maps:get(Ref, Labels) || Ref <- Refs ] of
-        [R1, R2]     -> aeb_fate_code:switch(?a, R1, R2);
-        [R1, R2, R3] -> aeb_fate_code:switch(?a, R1, R2, R3);
-        Rs           -> aeb_fate_code:switch(?a, Rs)
+        [R1, R2]     -> aeb_fate_code:switch(Arg, R1, R2);
+        [R1, R2, R3] -> aeb_fate_code:switch(Arg, R1, R2, R3);
+        Rs           -> aeb_fate_code:switch(Arg, Rs)
     end;
 set_labels(_, I) -> I.
 
