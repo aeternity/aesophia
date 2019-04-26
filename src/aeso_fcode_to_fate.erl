@@ -144,7 +144,10 @@ lookup_var(Env = #env{ vars = Vars }, X) ->
 %% -- The compiler --
 
 to_scode(_Env, {int, N}) ->
-    [aeb_fate_code:push(?i(N))];    %% Doesn't exist (yet), translated by desugaring
+    [aeb_fate_code:push(?i(N))];
+
+to_scode(_Env, {string, S}) ->
+    [aeb_fate_code:push(?i(aeb_fate_data:make_string(S)))];
 
 to_scode(_Env, {bool, B}) ->
     [aeb_fate_code:push(?i(B))];
@@ -236,9 +239,9 @@ split_to_scode(Env, {split, {list, _}, X, Alts}) ->
     SAlts = [GetAlt('::'), GetAlt(nil)],
     [aeb_fate_code:is_nil(?a, Arg),
      {switch, ?a, boolean, SAlts, Def}];
-split_to_scode(Env, {split, integer, X, Alts}) ->
+split_to_scode(Env, {split, Type, X, Alts}) when Type == integer; Type == string ->
     {Def, Alts1} = catchall_to_scode(Env, X, Alts),
-    literal_split_to_scode(Env, integer, lookup_var(Env, X), Alts1, Def);
+    literal_split_to_scode(Env, Type, lookup_var(Env, X), Alts1, Def);
 split_to_scode(Env, {split, {variant, Cons}, X, Alts}) ->
     {Def, Alts1} = catchall_to_scode(Env, X, Alts),
     Arg = lookup_var(Env, X),
@@ -261,14 +264,18 @@ split_to_scode(_, Split = {split, _, _, _}) ->
 
 literal_split_to_scode(_Env, _Type, Arg, [], Def) ->
     {switch, Arg, boolean, [missing, missing], Def};
-literal_split_to_scode(Env, integer, Arg, [{'case', {int, N}, Body} | Alts], Def) ->
+literal_split_to_scode(Env, Type, Arg, [{'case', Lit, Body} | Alts], Def) when Type == integer; Type == string ->
     True = split_to_scode(Env, Body),
     False =
         case Alts of
             [] -> missing;
-            _  -> literal_split_to_scode(Env, integer, Arg, Alts, missing)
+            _  -> literal_split_to_scode(Env, Type, Arg, Alts, missing)
         end,
-    [aeb_fate_code:eq(?a, Arg, ?i(N)),
+    SLit = case Lit of
+               {int, N} -> N;
+               {string, S} -> aeb_fate_data:make_string(S)
+           end,
+    [aeb_fate_code:eq(?a, Arg, ?i(SLit)),
      {switch, ?a, boolean, [False, True], Def}].
 
 catchall_to_scode(Env, X, Alts) -> catchall_to_scode(Env, X, Alts, []).

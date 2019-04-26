@@ -27,6 +27,7 @@
 -type binop() :: '+' | '-' | '==' | '::'.
 
 -type fexpr() :: {int, integer()}
+               | {string, binary()}
                | {bool, false | true}
                | nil
                | {var, var_name()}
@@ -46,6 +47,7 @@
 -type fsplit_pat()  :: {var, var_name()}
                      | {bool, false | true}
                      | {int, integer()}
+                     | {string, binary()}
                      | nil
                      | {'::', var_name(), var_name()}
                      | {con, arities(), tag(), [var_name()]}
@@ -256,8 +258,9 @@ expr_to_fcode(Env, Expr) ->
 -spec expr_to_fcode(env(), aeso_syntax:type() | no_type, aeso_syntax:expr()) -> fexpr().
 
 %% Literals
-expr_to_fcode(_Env, _Type, {int, _, N})  -> {int, N};
-expr_to_fcode(_Env, _Type, {bool, _, B}) -> {bool, B};
+expr_to_fcode(_Env, _Type, {int, _, N})    -> {int, N};
+expr_to_fcode(_Env, _Type, {bool, _, B})   -> {bool, B};
+expr_to_fcode(_Env, _Type, {string, _, S}) -> {string, S};
 
 %% Variables
 expr_to_fcode(_Env, _Type, {id, _, X}) -> {var, X};
@@ -364,6 +367,7 @@ alts_to_fcode(Env, Type, X, Alts) ->
 -type fpat() :: {var, var_name()}
               | {bool, false | true}
               | {int, integer()}
+              | {string, binary()}
               | nil | {'::', fpat(), fpat()}
               | {tuple, [fpat()]}
               | {con, arities(), tag(), [fpat()]}.
@@ -404,6 +408,7 @@ merge_alt(I, X, {P, A}, [{Q, As} | Rest]) ->
                ({tuple, _}, {tuple, _})         -> match;
                ({bool, B}, {bool, B})           -> match;
                ({int, N},  {int, N})            -> match;
+               ({string, S}, {string, S})       -> match;
                (nil,       nil)                 -> match;
                ({'::', _, _}, {'::', _, _})     -> match;
                ({con, _, C, _}, {con, _, C, _}) -> match;
@@ -430,6 +435,7 @@ expand(I, X, P, Q, Case = {'case', Ps, E}) ->
     Type = fun({tuple, Xs})     -> {tuple, length(Xs)};
               ({bool, _})       -> bool;
               ({int, _})        -> int;
+              ({string, _})     -> string;
               (nil)             -> list;
               ({'::', _, _})    -> list;
               ({con, As, _, _}) -> {variant, As}
@@ -439,6 +445,7 @@ expand(I, X, P, Q, Case = {'case', Ps, E}) ->
         {tuple, N}    -> {[MkCase(Q, N)], []};
         bool          -> {[MkCase({bool, B}, 0) || B <- [false, true]], []};
         int           -> {[MkCase(Q, 0)], [{P, Case}]};
+        string        -> {[MkCase(Q, 0)], [{P, Case}]};
         list          -> {[MkCase(nil, 0), MkCase({'::', fresh_name(), fresh_name()}, 2)], []};
         {variant, As} -> {[MkCase({con, As, C - 1, [fresh_name() || _ <- lists:seq(1, Ar)]}, Ar)
                            || {C, Ar} <- indexed(As)], []}
@@ -454,6 +461,7 @@ split_alt(I, {'case', Pats, Body}) ->
 split_pat(P = {var, _})  -> {{var, fresh_name()}, [P]};
 split_pat({bool, B})     -> {{bool, B}, []};
 split_pat({int, N})      -> {{int, N}, []};
+split_pat({string, N})   -> {{string, N}, []};
 split_pat(nil) -> {nil, []};
 split_pat({'::', P, Q}) -> {{'::', fresh_name(), fresh_name()}, [P, Q]};
 split_pat({con, As, I, Pats}) ->
@@ -464,9 +472,10 @@ split_pat({tuple, Pats}) ->
     {{tuple, Xs}, Pats}.
 
 -spec split_vars(fsplit_pat(), ftype()) -> [{var_name(), ftype()}].
-split_vars({bool, _}, boolean)       -> [];
-split_vars({int, _},  integer)       -> [];
-split_vars(nil,       {list, _})     -> [];
+split_vars({bool, _},   boolean)     -> [];
+split_vars({int, _},    integer)     -> [];
+split_vars({string, _}, string)      -> [];
+split_vars(nil,         {list, _})   -> [];
 split_vars({'::', X, Xs}, {list, T}) -> [{X, T}, {Xs, {list, T}}];
 split_vars({con, _, I, Xs}, {variant, Cons}) ->
     lists:zip(Xs, lists:nth(I + 1, Cons));
@@ -478,6 +487,7 @@ split_vars({var, X}, T) -> [{X, T}].
 rename(Ren, Expr) ->
     case Expr of
         {int, _}            -> Expr;
+        {string, _}         -> Expr;
         {bool, _}           -> Expr;
         nil                 -> nil;
         {var, X}            -> {var, rename_var(Ren, X)};
@@ -514,10 +524,11 @@ rename_fpats(Ren, [P | Ps]) ->
     {Qs, Ren2} = rename_fpats(Ren1, Ps),
     {[Q | Qs], Ren2}.
 
-rename_fpat(Ren, P = {bool, _}) -> {P, Ren};
-rename_fpat(Ren, P = {int, _})  -> {P, Ren};
-rename_fpat(Ren, P = nil)       -> {P, Ren};
-rename_fpat(Ren, {'::', P, Q}) ->
+rename_fpat(Ren, P = {bool, _})   -> {P, Ren};
+rename_fpat(Ren, P = {int, _})    -> {P, Ren};
+rename_fpat(Ren, P = {string, _}) -> {P, Ren};
+rename_fpat(Ren, P = nil)         -> {P, Ren};
+rename_fpat(Ren, {'::', P, Q})    ->
     {P1, Ren1} = rename_fpat(Ren, P),
     {Q1, Ren2} = rename_fpat(Ren1, Q),
     {{'::', P1, Q1}, Ren2};
@@ -531,9 +542,10 @@ rename_fpat(Ren, {tuple, Ps}) ->
     {Ps1, Ren1} = rename_fpats(Ren, Ps),
     {{tuple, Ps1}, Ren1}.
 
-rename_spat(Ren, P = {bool, _}) -> {P, Ren};
-rename_spat(Ren, P = {int, _})  -> {P, Ren};
-rename_spat(Ren, P = nil)       -> {P, Ren};
+rename_spat(Ren, P = {bool, _})   -> {P, Ren};
+rename_spat(Ren, P = {int, _})    -> {P, Ren};
+rename_spat(Ren, P = {string, _}) -> {P, Ren};
+rename_spat(Ren, P = nil)         -> {P, Ren};
 rename_spat(Ren, {'::', X, Y}) ->
     {X1, Ren1} = rename_binding(Ren, X),
     {Y1, Ren2} = rename_binding(Ren1, Y),
@@ -587,6 +599,8 @@ pat_to_fcode(_Env, _Type, {bool, _, B}) ->
     {bool, B};
 pat_to_fcode(_Env, _Type, {int, _, N}) ->
     {int, N};
+pat_to_fcode(_Env, _Type, {string, _, N}) ->
+    {string, N};
 pat_to_fcode(Env, _Type, {list, _, Ps}) ->
     lists:foldr(fun(P, Qs) ->
                     {'::', pat_to_fcode(Env, P), Qs}
@@ -752,6 +766,8 @@ fcode_error(Err) ->
 format_fexpr(E) ->
     prettypr:format(pp_fexpr(E)).
 
+pp_text(<<>>) -> prettypr:text("\"\"");
+pp_text(Bin) when is_binary(Bin) -> prettypr:text(lists:flatten(io_lib:format("~p", [binary_to_list(Bin)])));
 pp_text(S) -> prettypr:text(lists:concat([S])).
 
 pp_beside([])       -> prettypr:empty();
@@ -773,8 +789,13 @@ pp_punctuate(_Sep, [])      -> [];
 pp_punctuate(_Sep, [X])     -> [X];
 pp_punctuate(Sep, [X | Xs]) -> [pp_beside(X, Sep) | pp_punctuate(Sep, Xs)].
 
+pp_par([]) -> prettypr:empty();
+pp_par(Xs) -> prettypr:par(Xs).
+
 pp_fexpr({int, N}) ->
     pp_text(N);
+pp_fexpr({string, S}) ->
+    pp_text(S);
 pp_fexpr({bool, B}) ->
     pp_text(B);
 pp_fexpr(nil) ->
@@ -787,25 +808,25 @@ pp_fexpr({con, _, I, Es}) ->
     pp_beside(pp_fexpr({con, [], I, []}),
               pp_fexpr({tuple, Es}));
 pp_fexpr({tuple, Es}) ->
-    pp_parens(prettypr:par(pp_punctuate(pp_text(","), [pp_fexpr(E) || E <- Es])));
+    pp_parens(pp_par(pp_punctuate(pp_text(","), [pp_fexpr(E) || E <- Es])));
 pp_fexpr({proj, E, I}) ->
     pp_beside([pp_fexpr(E), pp_text("."), pp_text(I)]);
 pp_fexpr({set_proj, E, I, A}) ->
     pp_beside(pp_fexpr(E), pp_braces(pp_beside([pp_text(I), pp_text(" = "), pp_fexpr(A)])));
 pp_fexpr({binop, Op, A, B}) ->
-    pp_parens(prettypr:par([pp_fexpr(A), pp_text(Op), pp_fexpr(B)]));
+    pp_parens(pp_par([pp_fexpr(A), pp_text(Op), pp_fexpr(B)]));
 pp_fexpr({'let', X, A, B}) ->
-    prettypr:par([pp_beside([pp_text("let "), pp_text(X), pp_text(" = "), pp_fexpr(A), pp_text(" in")]),
-                  pp_fexpr(B)]);
+    pp_par([pp_beside([pp_text("let "), pp_text(X), pp_text(" = "), pp_fexpr(A), pp_text(" in")]),
+            pp_fexpr(B)]);
 pp_fexpr({switch, Split}) -> pp_split(Split).
 
 pp_ftype(T) when is_atom(T) -> pp_text(T);
 pp_ftype({tuple, Ts}) ->
-    pp_parens(prettypr:par(pp_punctuate(pp_text(","), [pp_ftype(T) || T <- Ts])));
+    pp_parens(pp_par(pp_punctuate(pp_text(","), [pp_ftype(T) || T <- Ts])));
 pp_ftype({list, T}) ->
     pp_beside([pp_text("list("), pp_ftype(T), pp_text(")")]);
 pp_ftype({variant, Cons}) ->
-    prettypr:par(
+    pp_par(
     pp_punctuate(pp_text(" |"),
                  [ case Args of
                      [] -> pp_fexpr({con, [], I - 1, []});
