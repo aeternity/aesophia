@@ -39,28 +39,56 @@
 -define(i(X), {immediate, X}).
 -define(a, {stack, 0}).
 
--define(IsBinOp(Op),
-    (Op =:= 'ADD' orelse
-     Op =:= 'SUB' orelse
-     Op =:= 'MUL' orelse
-     Op =:= 'DIV' orelse
-     Op =:= 'MOD' orelse
-     Op =:= 'POW' orelse
-     Op =:= 'LT'  orelse
-     Op =:= 'GT'  orelse
-     Op =:= 'EQ'  orelse
-     Op =:= 'ELT' orelse
-     Op =:= 'EGT' orelse
-     Op =:= 'NEQ' orelse
-     Op =:= 'AND' orelse
-     Op =:= 'OR'  orelse
-     Op =:= 'ELEMENT' orelse
+-define(IsOp(Op), (
+     Op =:= 'STORE'           orelse
+     Op =:= 'ADD'             orelse
+     Op =:= 'SUB'             orelse
+     Op =:= 'MUL'             orelse
+     Op =:= 'DIV'             orelse
+     Op =:= 'MOD'             orelse
+     Op =:= 'POW'             orelse
+     Op =:= 'LT'              orelse
+     Op =:= 'GT'              orelse
+     Op =:= 'EQ'              orelse
+     Op =:= 'ELT'             orelse
+     Op =:= 'EGT'             orelse
+     Op =:= 'NEQ'             orelse
+     Op =:= 'AND'             orelse
+     Op =:= 'OR'              orelse
+     Op =:= 'NOT'             orelse
+     Op =:= 'ELEMENT'         orelse
+     Op =:= 'MAP_EMPTY'       orelse
+     Op =:= 'MAP_LOOKUP'      orelse
+     Op =:= 'MAP_LOOKUPD'     orelse
+     Op =:= 'MAP_UPDATE'      orelse
+     Op =:= 'MAP_DELETE'      orelse
+     Op =:= 'MAP_MEMBER'      orelse
+     Op =:= 'MAP_FROM_LIST'   orelse
+     Op =:= 'NIL'             orelse
+     Op =:= 'IS_NIL'          orelse
+     Op =:= 'CONS'            orelse
+     Op =:= 'HD'              orelse
+     Op =:= 'TL'              orelse
+     Op =:= 'LENGTH'          orelse
+     Op =:= 'STR_EQ'          orelse
+     Op =:= 'STR_JOIN'        orelse
+     Op =:= 'INT_TO_STR'      orelse
+     Op =:= 'ADDR_TO_STR'     orelse
+     Op =:= 'STR_REVERSE'     orelse
+     Op =:= 'INT_TO_ADDR'     orelse
+     Op =:= 'VARIANT_TEST'    orelse
      Op =:= 'VARIANT_ELEMENT' orelse
-     Op =:= 'CONS')).
-
--define(IsUnOp(Op),
-    (Op =:= 'HD' orelse
-     Op =:= 'TL')).
+     Op =:= 'BITS_NONE'       orelse
+     Op =:= 'BITS_ALL'        orelse
+     Op =:= 'BITS_ALL_N'      orelse
+     Op =:= 'BITS_SET'        orelse
+     Op =:= 'BITS_CLEAR'      orelse
+     Op =:= 'BITS_TEST'       orelse
+     Op =:= 'BITS_SUM'        orelse
+     Op =:= 'BITS_OR'         orelse
+     Op =:= 'BITS_AND'        orelse
+     Op =:= 'BITS_DIFF'       orelse
+     false)).
 
 -record(env, { vars = [], locals = [], tailpos = true }).
 
@@ -786,16 +814,13 @@ r_write_to_dead_var({i, Ann, I}, Code) ->
     end;
 r_write_to_dead_var(_, _) -> false.
 
-op_view({Op, R, A, B}) when ?IsBinOp(Op) ->
-    {Op, R, [A, B]};
-op_view({Op, R, A}) when ?IsUnOp(Op); Op == 'STORE' ->
-    {Op, R, [A]};
-op_view({Op, R, A, B, C}) when Op == 'SETELEMENT' ->
-    {Op, R, [A, B, C]};
-op_view({Op, R}) when Op == 'NIL' ->
-    {Op, R, []};
-op_view(_) ->
-    false.
+op_view(T) when is_tuple(T) ->
+    case tuple_to_list(T) of
+        [Op, R | As] when ?IsOp(Op) ->
+            {Op, R, As};
+        _ -> false
+    end;
+op_view(_) -> false.
 
 from_op_view(Op, R, As) -> list_to_tuple([Op, R | As]).
 
