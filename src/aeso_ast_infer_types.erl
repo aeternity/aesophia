@@ -938,8 +938,6 @@ infer_expr(Env, Id = {Tag, As, _}) when Tag == id; Tag == qid ->
 infer_expr(Env, Id = {Tag, As, _}) when Tag == con; Tag == qcon ->
     {QName, Type} = lookup_name(Env, As, Id, [freshen]),
     {typed, As, QName, Type};
-infer_expr(Env, {unit, As}) ->
-    infer_expr(Env, {tuple, As, []});
 infer_expr(Env, {tuple, As, Cpts}) ->
     NewCpts = [infer_expr(Env, C) || C <- Cpts],
     CptTypes = [T || {typed, _, _, T} <- NewCpts],
