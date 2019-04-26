@@ -131,6 +131,7 @@ init_type_env() ->
     #{ ["int"]          => ?type(integer),
        ["bool"]         => ?type(boolean),
        ["bits"]         => ?type(bits),
+       ["char"]         => ?type(integer),
        ["string"]       => ?type(string),
        ["address"]      => ?type(address),
        ["hash"]         => ?type(hash),
@@ -259,6 +260,7 @@ expr_to_fcode(Env, Expr) ->
 
 %% Literals
 expr_to_fcode(_Env, _Type, {int, _, N})    -> {int, N};
+expr_to_fcode(_Env, _Type, {char, _, N})   -> {int, N};
 expr_to_fcode(_Env, _Type, {bool, _, B})   -> {bool, B};
 expr_to_fcode(_Env, _Type, {string, _, S}) -> {string, S};
 
@@ -595,12 +597,10 @@ pat_to_fcode(Env, _Type, {app, _, {typed, _, {C, _, _} = Con, _}, Pats}) when C 
     {con, As, I, [pat_to_fcode(Env, Pat) || Pat <- Pats]};
 pat_to_fcode(Env, _Type, {tuple, _, Pats}) ->
     {tuple, [ pat_to_fcode(Env, Pat) || Pat <- Pats ]};
-pat_to_fcode(_Env, _Type, {bool, _, B}) ->
-    {bool, B};
-pat_to_fcode(_Env, _Type, {int, _, N}) ->
-    {int, N};
-pat_to_fcode(_Env, _Type, {string, _, N}) ->
-    {string, N};
+pat_to_fcode(_Env, _Type, {bool, _, B})   -> {bool, B};
+pat_to_fcode(_Env, _Type, {int, _, N})    -> {int, N};
+pat_to_fcode(_Env, _Type, {char, _, N})   -> {int, N};
+pat_to_fcode(_Env, _Type, {string, _, N}) -> {string, N};
 pat_to_fcode(Env, _Type, {list, _, Ps}) ->
     lists:foldr(fun(P, Qs) ->
                     {'::', pat_to_fcode(Env, P), Qs}

@@ -379,7 +379,7 @@ global_env() ->
                      %% Abort
                      {"abort", Fun1(String, A)}])
         , types = MkDefs(
-                    [{"int", 0}, {"bool", 0}, {"string", 0}, {"address", 0},
+                    [{"int", 0}, {"bool", 0}, {"char", 0}, {"string", 0}, {"address", 0},
                      {"hash", {[], {alias_t, Bytes(32)}}},
                      {"signature", {[], {alias_t, Bytes(64)}}},
                      {"bits", 0},
@@ -909,6 +909,8 @@ infer_expr(_Env, Body={bool, As, _}) ->
     {typed, As, Body, {id, As, "bool"}};
 infer_expr(_Env, Body={int, As, _}) ->
     {typed, As, Body, {id, As, "int"}};
+infer_expr(_Env, Body={char, As, _}) ->
+    {typed, As, Body, {id, As, "char"}};
 infer_expr(_Env, Body={string, As, _}) ->
     {typed, As, Body, {id, As, "string"}};
 infer_expr(_Env, Body={bytes, As, Bin}) ->
@@ -1178,6 +1180,8 @@ infer_prefix({IntOp,As}) when IntOp =:= '-' ->
     {fun_t, As, [], [Int], Int}.
 
 free_vars({int, _, _}) ->
+    [];
+free_vars({char, _, _}) ->
     [];
 free_vars({string, _, _}) ->
     [];
