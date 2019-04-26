@@ -35,7 +35,7 @@
                | {oracle_query_id, binary()}
                | {bool, false | true}
                | nil
-               | {var, var_name()}
+               | {var, sophia_name()}
                | {con, arities(), tag(), [fexpr()]}
                | {tuple, [fexpr()]}
                | {proj, fexpr(), integer()}
@@ -43,6 +43,7 @@
                | {op, binop(), fexpr(), fexpr()}
                | {op, unop(), fexpr()}
                | {'let', var_name(), fexpr(), fexpr()}
+               | {funcall, fexpr(), [fexpr()]}
                | {switch, fsplit()}.
 
 -type fsplit() :: {split, ftype(), var_name(), [fcase()]}
@@ -73,7 +74,8 @@
                | name
                | channel
                | bits
-               | {variant, [[ftype()]]}.
+               | {variant, [[ftype()]]}
+               | any.
 
 -type fun_def() :: #{ attrs  := [attribute()],
                       args   := [{var_name(), ftype()}],
@@ -244,11 +246,8 @@ type_to_fcode(Env, Sub, {tuple_t, _, Types}) ->
 type_to_fcode(Env, Sub, {record_t, Fields}) ->
     FieldType = fun({field_t, _, _, Ty}) -> Ty end,
     type_to_fcode(Env, Sub, {tuple_t, [], lists:map(FieldType, Fields)});
-type_to_fcode(_Env, Sub, {tvar, _, X} = Type) ->
-    case maps:get(X, Sub, not_found) of
-        not_found -> {todo, polymorphism, Type};
-        FType     -> FType
-    end;
+type_to_fcode(_Env, Sub, {tvar, _, X}) ->
+    maps:get(X, Sub, any);
 type_to_fcode(_Env, _Sub, Type) ->
     error({todo, Type}).
 
@@ -275,7 +274,8 @@ expr_to_fcode(_Env, _Type, {oracle_pubkey,   _, K}) -> {oracle_pubkey, K};
 expr_to_fcode(_Env, _Type, {oracle_query_id, _, K}) -> {oracle_query_id, K};
 
 %% Variables
-expr_to_fcode(_Env, _Type, {id, _, X}) -> {var, X};
+expr_to_fcode(_Env, _Type, {id, _, X})  -> {var, [X]};
+expr_to_fcode(_Env, _Type, {qid, _, X}) -> {var, X};
 
 %% Constructors
 expr_to_fcode(Env, Type, {C, _, _} = Con) when C == con; C == qcon ->
@@ -368,6 +368,10 @@ expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
         '-' -> {op, '-', {int, 0}, expr_to_fcode(Env, A)};
         '!' -> {op, '!', expr_to_fcode(Env, A)}
     end;
+
+%% Function calls
+expr_to_fcode(Env, _Type, {app, _Ann, Fun, Args}) ->
+    {funcall, expr_to_fcode(Env, Fun), [expr_to_fcode(Env, Arg) || Arg <- Args]};
 
 expr_to_fcode(_Env, Type, Expr) ->
     error({todo, {Expr, ':', Type}}).

@@ -90,7 +90,7 @@
      Op =:= 'BITS_DIFF'       orelse
      false)).
 
--record(env, { vars = [], locals = [], tailpos = true }).
+-record(env, { contract, vars = [], locals = [], tailpos = true }).
 
 %% -- Debugging --------------------------------------------------------------
 
@@ -104,11 +104,11 @@ debug(Tag, Options, Fmt, Args) ->
 %% -- Main -------------------------------------------------------------------
 
 %% @doc Main entry point.
-compile(ICode, Options) ->
-    #{ contract_name := _ContractName,
+compile(FCode, Options) ->
+    #{ contract_name := ContractName,
        state_type    := _StateType,
-       functions     := Functions } = ICode,
-    SFuns  = functions_to_scode(Functions, Options),
+       functions     := Functions } = FCode,
+    SFuns  = functions_to_scode(ContractName, Functions, Options),
     SFuns1 = optimize_scode(SFuns, Options),
     BBFuns = to_basic_blocks(SFuns1, Options),
     FateCode = #{ functions   => BBFuns,
@@ -121,18 +121,19 @@ make_function_name(init)               -> <<"init">>;
 make_function_name({entrypoint, Name}) -> Name;
 make_function_name({local_fun, Xs})    -> list_to_binary("." ++ string:join(Xs, ".")).
 
-functions_to_scode(Functions, Options) ->
+functions_to_scode(ContractName, Functions, Options) ->
+    FunNames = maps:keys(Functions),
     maps:from_list(
-        [ {make_function_name(Name), function_to_scode(Name, Args, Body, Type, Options)}
+        [ {make_function_name(Name), function_to_scode(ContractName, FunNames, Name, Args, Body, Type, Options)}
         || {Name, #{args   := Args,
                     body   := Body,
                     return := Type}} <- maps:to_list(Functions),
            Name /= init ]).  %% TODO: skip init for now
 
-function_to_scode(Name, Args, Body, ResType, Options) ->
+function_to_scode(ContractName, Functions, Name, Args, Body, ResType, Options) ->
     debug(scode, Options, "Compiling ~p ~p : ~p ->\n  ~p\n", [Name, Args, ResType, Body]),
     ArgTypes = [ type_to_scode(T) || {_, T} <- Args ],
-    SCode    = to_scode(init_env(Args), Body),
+    SCode    = to_scode(init_env(ContractName, Functions, Args), Body),
     debug(scode, Options, "  scode: ~p\n", [SCode]),
     {{ArgTypes, type_to_scode(ResType)}, SCode}.
 
@@ -147,15 +148,17 @@ type_to_scode(T)               -> T.
 
 %% -- Environment functions --
 
-init_env(Args) ->
-    #env{ vars    = [ {X, {arg, I}} || {I, {X, _}} <- with_ixs(Args) ],
-          tailpos = true }.
+init_env(ContractName, FunNames, Args) ->
+    #env{ vars      = [ {[X], {arg, I}} || {I, {X, _}} <- with_ixs(Args) ],
+          contract  = ContractName,
+          locals    = FunNames,
+          tailpos   = true }.
 
 next_var(#env{ vars = Vars }) ->
     1 + lists:max([-1 | [J || {_, {var, J}} <- Vars]]).
 
 bind_var(Name, Var, Env = #env{ vars = Vars }) ->
-    Env#env{ vars = [{Name, Var} | Vars] }.
+    Env#env{ vars = [{[Name], Var} | Vars] }.
 
 bind_local(Name, Env) ->
     I = next_var(Env),
@@ -163,10 +166,30 @@ bind_local(Name, Env) ->
 
 notail(Env) -> Env#env{ tailpos = false }.
 
-lookup_var(Env = #env{ vars = Vars }, X) ->
+code_error(Err) -> error(Err).
+
+lookup_var(Env, X = [N | _]) when is_integer(N) ->
+    lookup_var(Env, [X]);
+lookup_var(Env, X) ->
+    case resolve_name(Env, X) of
+        {var, Var} -> Var;
+        _          -> code_error({unbound_variable, X, Env})
+    end.
+
+resolve_name(#env{ vars = Vars, contract = Contract, locals = Funs }, X) ->
     case lists:keyfind(X, 1, Vars) of
-        false    -> error({unbound_variable, X, Env});
-        {_, Var} -> Var
+        {_, Var} -> {var, Var};
+        false    ->
+            case X of
+                [Lib, Fun] ->
+                    EntryPoint = Lib == Contract andalso lists:member({entrypoint, Fun}, Funs),
+                    LocalFun   = lists:member({local_fun, X}, Funs),
+                    if EntryPoint -> {def, make_function_name({entrypoint, Fun})};
+                       LocalFun   -> {def, make_function_name({local_fun, X})};
+                       true       -> not_found end;
+                _ ->
+                    not_found
+            end
     end.
 
 %% -- The compiler --
@@ -200,21 +223,21 @@ to_scode(Env, {var, X}) ->
 
 to_scode(Env, {con, Ar, I, As}) ->
     N = length(As),
-    [[to_scode(Env, A) || A <- As],
+    [[to_scode(notail(Env), A) || A <- As],
      aeb_fate_code:variant(?a, ?i(Ar), ?i(I), ?i(N))];
 
 to_scode(Env, {tuple, As}) ->
     N = length(As),
-    [[ to_scode(Env, A) || A <- As ],
+    [[ to_scode(notail(Env), A) || A <- As ],
      aeb_fate_code:tuple(N)];
 
 to_scode(Env, {proj, E, I}) ->
-    [to_scode(Env, E),
+    [to_scode(notail(Env), E),
      aeb_fate_code:element_op(?a, ?i(I), ?a)];
 
 to_scode(Env, {set_proj, R, I, E}) ->
-    [to_scode(Env, E),
-     to_scode(Env, R),
+    [to_scode(notail(Env), E),
+     to_scode(notail(Env), R),
      aeb_fate_code:setelement(?a, ?i(I), ?a, ?a)];
 
 to_scode(Env, {op, Op, A, B}) ->
@@ -230,9 +253,28 @@ to_scode(Env, {'let', X, {var, Y}, Body}) ->
     to_scode(Env1, Body);
 to_scode(Env, {'let', X, Expr, Body}) ->
     {I, Env1} = bind_local(X, Env),
-    [ to_scode(Env, Expr),
+    [ to_scode(notail(Env), Expr),
       aeb_fate_code:store({var, I}, {stack, 0}),
       to_scode(Env1, Body) ];
+
+to_scode(Env, {funcall, Fun, Args}) ->
+    case Fun of
+        {var, X} ->
+            case resolve_name(Env, X) of
+                {def, F} ->
+                    Lbl  = aeb_fate_data:make_string(F),
+                    Call = if Env#env.tailpos -> aeb_fate_code:call_t(Lbl);
+                              true            -> aeb_fate_code:call(Lbl) end,
+                    [ [to_scode(notail(Env), Arg) || Arg <- lists:reverse(Args)],
+                      Call ];
+                {var, Y} ->
+                    ?TODO({call_to_unknown_function, Y});
+                not_found ->
+                    code_error({unbound_variable, X, Env})
+            end;
+        _ ->
+            ?TODO({funcall, Fun})
+    end;
 
 to_scode(Env, {switch, Case}) ->
     split_to_scode(Env, Case);
@@ -873,7 +915,8 @@ to_basic_blocks(Funs, Options) ->
 
 bb(_Name, Code, _Options) ->
     Blocks0 = blocks(Code),
-    Blocks  = optimize_blocks(Blocks0),
+    Blocks1 = optimize_blocks(Blocks0),
+    Blocks  = lists:flatmap(fun split_calls/1, Blocks1),
     Labels  = maps:from_list([ {Ref, I} || {I, {Ref, _}} <- with_ixs(Blocks) ]),
     BBs     = [ set_labels(Labels, B) || B <- Blocks ],
     maps:from_list(BBs).
@@ -1026,6 +1069,19 @@ chase_labels([L | Ls], Map, Live) ->
 use_returnr(['RETURN', {'PUSH', A} | Code]) ->
     [{'RETURNR', A} | Code];
 use_returnr(Code) -> Code.
+
+%% -- Split basic blocks at CALL instructions --
+%%  Calls can only return to a new basic block.
+
+split_calls({Ref, Code}) ->
+    split_calls(Ref, Code, [], []).
+
+split_calls(Ref, [], Acc, Blocks) ->
+    lists:reverse([{Ref, lists:reverse(Acc)} | Blocks]);
+split_calls(Ref, [I = {CALL, _} | Code], Acc, Blocks) when CALL == 'CALL'; CALL == 'CALL_R' ->
+    split_calls(make_ref(), Code, [], [{Ref, lists:reverse([I | Acc])} | Blocks]);
+split_calls(Ref, [I | Code], Acc, Blocks) ->
+    split_calls(Ref, Code, [I | Acc], Blocks).
 
 %% -- Translate label refs to indices --
 
