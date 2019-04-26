@@ -217,10 +217,13 @@ to_scode(Env, {set_proj, R, I, E}) ->
      to_scode(Env, R),
      aeb_fate_code:setelement(?a, ?i(I), ?a, ?a)];
 
-to_scode(Env, {binop, Op, A, B}) ->
+to_scode(Env, {op, Op, A, B}) ->
     [ to_scode(notail(Env), B),
-      to_scode(Env, A),
+      to_scode(notail(Env), A),
       binop_to_scode(Op) ];
+to_scode(Env, {op, Op, A}) ->
+    [ to_scode(notail(Env), A),
+      unop_to_scode(Op) ];
 
 to_scode(Env, {'let', X, {var, Y}, Body}) ->
     Env1 = bind_var(X, lookup_var(Env, Y), Env),
@@ -351,7 +354,8 @@ binop_to_scode('+') -> aeb_fate_code:add(?a, ?a, ?a);
 binop_to_scode('-') -> aeb_fate_code:sub(?a, ?a, ?a);
 binop_to_scode('==') -> aeb_fate_code:eq(?a, ?a, ?a);
 binop_to_scode('::') -> aeb_fate_code:cons(?a, ?a, ?a).
-% binop_to_scode(Op) -> ?TODO(Op).
+
+unop_to_scode('!') -> aeb_fate_code:not_op(?a, ?a).
 
 %% -- Phase II ---------------------------------------------------------------
 %%  Optimize

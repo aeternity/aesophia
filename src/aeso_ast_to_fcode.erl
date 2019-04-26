@@ -25,6 +25,7 @@
 -type sophia_name() :: [string()].
 
 -type binop() :: '+' | '-' | '==' | '::'.
+-type unop() :: '!'.
 
 -type fexpr() :: {int, integer()}
                | {string, binary()}
@@ -39,7 +40,8 @@
                | {tuple, [fexpr()]}
                | {proj, fexpr(), integer()}
                | {set_proj, fexpr(), integer(), fexpr()}    %% tuple, field, new_value
-               | {binop, binop(), fexpr(), fexpr()}
+               | {op, binop(), fexpr(), fexpr()}
+               | {op, unop(), fexpr()}
                | {'let', var_name(), fexpr(), fexpr()}
                | {switch, fsplit()}.
 
@@ -360,7 +362,12 @@ expr_to_fcode(Env, _Type, {block, _, Stmts}) ->
 %% Binary operator
 expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A, B]}) when is_atom(Op) ->
     FOp = binop_to_fcode(Op),
-    {binop, FOp, expr_to_fcode(Env, A), expr_to_fcode(Env, B)};
+    {op, FOp, expr_to_fcode(Env, A), expr_to_fcode(Env, B)};
+expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
+    case Op of
+        '-' -> {op, '-', {int, 0}, expr_to_fcode(Env, A)};
+        '!' -> {op, '!', expr_to_fcode(Env, A)}
+    end;
 
 expr_to_fcode(_Env, Type, Expr) ->
     error({todo, {Expr, ':', Type}}).
