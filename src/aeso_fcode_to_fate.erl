@@ -180,6 +180,19 @@ to_scode(_Env, {string, S}) ->
 to_scode(_Env, {bool, B}) ->
     [aeb_fate_code:push(?i(B))];
 
+to_scode(_Env, {account_pubkey, K}) ->
+    [aeb_fate_code:push(?i(aeb_fate_data:make_address(K)))];
+
+to_scode(_Env, {contract_pubkey, K}) ->
+    [aeb_fate_code:push(?i(aeb_fate_data:make_contract(K)))];
+
+to_scode(_Env, {oracle_pubkey, K}) ->
+    [aeb_fate_code:push(?i(aeb_fate_data:make_oracle(K)))];
+
+to_scode(_Env, {oracle_query_id, K}) ->
+    %% Not actually in FATE yet
+    [aeb_fate_code:push(?i(aeb_fate_data:make_oracle_query(K)))];
+
 to_scode(_Env, nil) -> aeb_fate_code:nil(?a);
 
 to_scode(Env, {var, X}) ->

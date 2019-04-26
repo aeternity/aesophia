@@ -28,6 +28,10 @@
 
 -type fexpr() :: {int, integer()}
                | {string, binary()}
+               | {account_pubkey, binary()}
+               | {contract_pubkey, binary()}
+               | {oracle_pubkey, binary()}
+               | {oracle_query_id, binary()}
                | {bool, false | true}
                | nil
                | {var, var_name()}
@@ -259,10 +263,14 @@ expr_to_fcode(Env, Expr) ->
 -spec expr_to_fcode(env(), aeso_syntax:type() | no_type, aeso_syntax:expr()) -> fexpr().
 
 %% Literals
-expr_to_fcode(_Env, _Type, {int, _, N})    -> {int, N};
-expr_to_fcode(_Env, _Type, {char, _, N})   -> {int, N};
-expr_to_fcode(_Env, _Type, {bool, _, B})   -> {bool, B};
-expr_to_fcode(_Env, _Type, {string, _, S}) -> {string, S};
+expr_to_fcode(_Env, _Type, {int,             _, N}) -> {int, N};
+expr_to_fcode(_Env, _Type, {char,            _, N}) -> {int, N};
+expr_to_fcode(_Env, _Type, {bool,            _, B}) -> {bool, B};
+expr_to_fcode(_Env, _Type, {string,          _, S}) -> {string, S};
+expr_to_fcode(_Env, _Type, {account_pubkey,  _, K}) -> {account_pubkey, K};
+expr_to_fcode(_Env, _Type, {contract_pubkey, _, K}) -> {contract_pubkey, K};
+expr_to_fcode(_Env, _Type, {oracle_pubkey,   _, K}) -> {oracle_pubkey, K};
+expr_to_fcode(_Env, _Type, {oracle_query_id, _, K}) -> {oracle_query_id, K};
 
 %% Variables
 expr_to_fcode(_Env, _Type, {id, _, X}) -> {var, X};
@@ -488,9 +496,13 @@ split_vars({var, X}, T) -> [{X, T}].
 -spec rename([{var_name(), var_name()}], fexpr()) -> fexpr().
 rename(Ren, Expr) ->
     case Expr of
-        {int, _}            -> Expr;
-        {string, _}         -> Expr;
-        {bool, _}           -> Expr;
+        {int, _}             -> Expr;
+        {string, _}          -> Expr;
+        {bool, _}            -> Expr;
+        {account_pubkey, _}  -> Expr;
+        {contract_pubkey, _} -> Expr;
+        {oracle_pubkey, _}   -> Expr;
+        {oracle_query_id, _} -> Expr;
         nil                 -> nil;
         {var, X}            -> {var, rename_var(Ren, X)};
         {con, Ar, I, Es}    -> {con, Ar, I, [rename(Ren, E) || E <- Es]};
@@ -791,13 +803,14 @@ pp_punctuate(Sep, [X | Xs]) -> [pp_beside(X, Sep) | pp_punctuate(Sep, Xs)].
 
 pp_par([]) -> prettypr:empty();
 pp_par(Xs) -> prettypr:par(Xs).
-
-pp_fexpr({int, N}) ->
-    pp_text(N);
-pp_fexpr({string, S}) ->
-    pp_text(S);
-pp_fexpr({bool, B}) ->
-    pp_text(B);
+pp_fexpr({Tag, Lit}) when Tag == int;
+                          Tag == string;
+                          Tag == bool;
+                          Tag == account_pubkey;
+                          Tag == contract_pubkey;
+                          Tag == oracle_pubkey;
+                          Tag == oracle_query_id ->
+    aeso_pretty:expr({Tag, [], Lit});
 pp_fexpr(nil) ->
     pp_text("[]");
 pp_fexpr({var, X}) ->
