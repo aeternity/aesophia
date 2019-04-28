@@ -16,7 +16,8 @@
          encode_stmt/1,encode_expr/1]).
 
 %% Define records for the various typed syntactic forms. These make
-%% the code easier but don't seem to exist elsewhere.
+%% the code easier but don't seem to exist elsewhere. Unfortunately
+%% sometimes the same typename is used with different fields.
 
 %% Top-level
 -record(contract, {ann,con,decls}).
@@ -57,10 +58,11 @@
 -record(bytes, {ann,bin}).
 -record(tuple, {ann,args}).
 -record(list, {ann,args}).
--record(record, {ann,fields}).
+-record(record, {ann,fields}).                  %Create a record
 -record(field, {ann,name,value}).               %A record field
 -record(proj, {ann,value}).                     %?
--record(map, {ann,fields}).
+-record(map, {ann,fields}).                     %Create a map
+-record(map_get, {ann,field}).
 -record(lam, {ann,args,body}).
 -record(app, {ann,func,args}).
 -record(typed, {ann,expr,type}).
@@ -309,16 +311,26 @@ do_encode_expr(#tuple{args=As}) ->
 do_encode_expr(#list{args=As}) ->
     Eas = do_encode_exprs(As),
     [{<<"list">>,Eas}];
-do_encode_expr(#record{fields=Fs}) ->
+do_encode_expr(#record{fields=Fs}) ->           %Create a record
     Efs = do_encode_expr_rec_fields(Fs),
-    [{<<"record">>,Efs}];
+    [{<<"create_record">>,Efs}];
+do_encode_expr({record,_Ann,Rec,Fs}) ->         %Update a record
+    Erec = do_encode_expr(Rec),
+    Efs = do_encode_expr_rec_fields(Fs),
+    [{<<"update_record">>,[Erec,Efs]}];
 do_encode_expr(#lam{args=As,body=B}) ->
     Eas = do_encode_args(As),
     Eb = do_encode_stmt(B),
     [{<<"function">>,[{<<"arguments">>,Eas},{<<"body">>,Eb}]}];
-do_encode_expr(#map{fields=Fs}) ->
+do_encode_expr(#map{fields=Fs}) ->              %Create a map
     Efs = do_encode_expr_map_fields(Fs),
-    [{<<"map">>,Efs}];
+    [{<<"create_map">>,Efs}];
+do_encode_expr({map,_Ann,Map,Fs}) ->            %Update a map
+    Emap = do_encode_expr(Map),
+    Efs = do_encode_expr_map_fields(Fs),
+    [{<<"update_map">>,[Emap,Efs]}];
+do_encode_expr(#map_get{field=F}) ->
+    do_encode_expr(F);
 do_encode_expr(#proj{value=V}) ->
     do_encode_expr(V);
 do_encode_expr(#app{func=F,args=As}) ->
@@ -354,6 +366,9 @@ do_encode_expr_map_fields(Fs) ->
     [ do_encode_expr_map_field(F) || F <- Fs ].
 
 do_encode_expr_map_field({K,V}) ->
+    [{<<"key">>,do_encode_expr(K)},
+     {<<"value">>,do_encode_expr(V)}];
+do_encode_expr_map_field(#field{name=[K],value=V}) ->
     [{<<"key">>,do_encode_expr(K)},
      {<<"value">>,do_encode_expr(V)}].
 
