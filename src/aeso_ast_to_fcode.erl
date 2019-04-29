@@ -116,7 +116,7 @@
 %% and produces Fate intermediate code.
 -spec ast_to_fcode(aeso_syntax:ast(), [option()]) -> fcode().
 ast_to_fcode(Code, Options) ->
-    to_fcode(init_env(Options), Code).
+    optimize_fcode(to_fcode(init_env(Options), Code)).
 
 %% -- Environment ------------------------------------------------------------
 
@@ -657,9 +657,17 @@ stmts_to_fcode(Env, [Expr]) ->
 %% - Translate && and || to ifte
 %% - Deadcode elimination
 %% - Unused variable analysis (replace by _)
-%% - Simplified case trees (FATE has special instructions for shallow matching)
 %% - Case specialization
 %% - Constant propagation
+
+-spec optimize_fcode(fcode()) -> fcode().
+optimize_fcode(Code = #{ functions := Funs }) ->
+    Code#{ functions := maps:map(fun(Name, Def) -> optimize_fun(Code, Name, Def) end, Funs) }.
+
+-spec optimize_fun(fcode(), fun_name(), fun_def()) -> fun_def().
+optimize_fun(_Fcode, _Fun, Def = #{ body := _Body }) ->
+    %% io:format("Optimizing ~p =\n~s\n", [Fun, prettypr:format(pp_fexpr(Body))]),
+    Def.
 
 %% -- Helper functions -------------------------------------------------------
 
