@@ -195,31 +195,31 @@ resolve_name(#env{ vars = Vars, contract = Contract, locals = Funs }, X) ->
 %% -- The compiler --
 
 to_scode(_Env, {int, N}) ->
-    [aeb_fate_code:push(?i(N))];
+    [push(?i(N))];
 
 to_scode(_Env, {string, S}) ->
-    [aeb_fate_code:push(?i(aeb_fate_data:make_string(S)))];
+    [push(?i(aeb_fate_data:make_string(S)))];
 
 to_scode(_Env, {bool, B}) ->
-    [aeb_fate_code:push(?i(B))];
+    [push(?i(B))];
 
 to_scode(_Env, {account_pubkey, K}) ->
-    [aeb_fate_code:push(?i(aeb_fate_data:make_address(K)))];
+    [push(?i(aeb_fate_data:make_address(K)))];
 
 to_scode(_Env, {contract_pubkey, K}) ->
-    [aeb_fate_code:push(?i(aeb_fate_data:make_contract(K)))];
+    [push(?i(aeb_fate_data:make_contract(K)))];
 
 to_scode(_Env, {oracle_pubkey, K}) ->
-    [aeb_fate_code:push(?i(aeb_fate_data:make_oracle(K)))];
+    [push(?i(aeb_fate_data:make_oracle(K)))];
 
 to_scode(_Env, {oracle_query_id, K}) ->
     %% Not actually in FATE yet
-    [aeb_fate_code:push(?i(aeb_fate_data:make_oracle_query(K)))];
+    [push(?i(aeb_fate_data:make_oracle_query(K)))];
 
 to_scode(_Env, nil) -> aeb_fate_code:nil(?a);
 
 to_scode(Env, {var, X}) ->
-    [aeb_fate_code:push(lookup_var(Env, X))];
+    [push(lookup_var(Env, X))];
 
 to_scode(Env, {con, Ar, I, As}) ->
     N = length(As),
@@ -398,6 +398,10 @@ binop_to_scode('==') -> aeb_fate_code:eq(?a, ?a, ?a);
 binop_to_scode('::') -> aeb_fate_code:cons(?a, ?a, ?a).
 
 unop_to_scode('!') -> aeb_fate_code:not_op(?a, ?a).
+
+%% PUSH and STORE ?a are the same, so we use STORE to make optimizations
+%% easier, and specialize to PUSH (which is cheaper) at the end.
+push(A) -> aeb_fate_code:store(?a, A).
 
 %% -- Phase II ---------------------------------------------------------------
 %%  Optimize
@@ -740,12 +744,12 @@ rules() ->
     ].
 
 %% Removing pushes that are immediately consumed.
-r_push_consume({i, Ann1, {'PUSH', A}}, [{i, Ann2, {'POP', B}} | Code]) ->
+r_push_consume({i, Ann1, {'STORE', ?a, A}}, [{i, Ann2, {'POP', B}} | Code]) ->
     case live_out(B, Ann2) of
         true  -> {[{i, merge_ann(Ann1, Ann2), {'STORE', B, A}}], Code};
         false -> {[], Code}
     end;
-r_push_consume({i, Ann1, {'PUSH', A}}, [{i, Ann2, I} | Code]) ->
+r_push_consume({i, Ann1, {'STORE', ?a, A}}, [{i, Ann2, I} | Code]) ->
     case op_view(I) of
         {Op, R, As} ->
             case lists:splitwith(fun(X) -> X /= ?a end, As) of
@@ -765,7 +769,7 @@ r_push_consume({i, Ann1, I}, [{i, Ann2, {'STORE', R, ?a}} | Code]) ->
 r_push_consume(_, _) -> false.
 
 %% Changing PUSH A, DUPA to PUSH A, PUSH A enables further optimisations
-r_dup_to_push({i, Ann1, Push={'PUSH', _}}, [{i, Ann2, 'DUPA'} | Code]) ->
+r_dup_to_push({i, Ann1, Push={'STORE', ?a, _}}, [{i, Ann2, 'DUPA'} | Code]) ->
     #{ live_in  := LiveIn  } = Ann1,
     Ann1_ = Ann1#{ live_out => LiveIn },
     Ann2_ = Ann2#{ live_in  => LiveIn },
@@ -773,7 +777,7 @@ r_dup_to_push({i, Ann1, Push={'PUSH', _}}, [{i, Ann2, 'DUPA'} | Code]) ->
 r_dup_to_push(_, _) -> false.
 
 %% Move PUSH A past non-stack instructions.
-r_swap_push(Push = {i, _, {'PUSH', _}}, [I | Code]) ->
+r_swap_push(Push = {i, _, {'STORE', ?a, _}}, [I | Code]) ->
     case independent(Push, I) of
         true ->
             {I1, Push1} = swap_instrs(Push, I),
@@ -844,7 +848,6 @@ r_one_shot_var({i, Ann1, I}, [{i, Ann2, J} | Code]) ->
     case op_view(I) of
         {Op, R, As} ->
             Copy = case J of
-                       {'PUSH', R}     -> {write_to, ?a};
                        {'STORE', S, R} -> {write_to, S};
                        _               -> false
                    end,
@@ -898,6 +901,7 @@ unannotate({i, _Ann, I}) -> [I].
 %% Desugar and specialize
 desugar({'ADD', ?a, ?i(1), ?a})     -> [aeb_fate_code:inc()];
 desugar({'SUB', ?a, ?a, ?i(1)})     -> [aeb_fate_code:dec()];
+desugar({'STORE', ?a, A})           -> [aeb_fate_code:push(A)];
 desugar({switch, Arg, Type, Alts, Def}) ->
     [{switch, Arg, Type, [desugar(A) || A <- Alts], desugar(Def)}];
 desugar(missing) -> missing;
