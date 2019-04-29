@@ -325,7 +325,7 @@ expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Rec, Fields}) ->
 
 %% Lists
 expr_to_fcode(Env, _Type, {list, _, Es}) ->
-    lists:foldr(fun(E, L) -> {binop, '::', expr_to_fcode(Env, E), L} end,
+    lists:foldr(fun(E, L) -> {op, '::', expr_to_fcode(Env, E), L} end,
                 nil, Es);
 
 %% Conditionals
@@ -520,7 +520,8 @@ rename(Ren, Expr) ->
         {tuple, Es}         -> {tuple, [rename(Ren, E) || E <- Es]};
         {proj, E, I}        -> {proj, rename(Ren, E), I};
         {set_proj, R, I, E} -> {set_proj, rename(Ren, R), I, rename(Ren, E)};
-        {binop, Op, E1, E2} -> {binop, Op, rename(Ren, E1), rename(Ren, E2)};
+        {op, Op, E1, E2}    -> {op, Op, rename(Ren, E1), rename(Ren, E2)};
+        {op, Op, E}         -> {op, Op, rename(Ren, E)};
         {'let', X, E, Body} ->
             {Z, Ren1} = rename_binding(Ren, X),
             {'let', Z, rename(Ren, E), rename(Ren1, Body)};
@@ -837,8 +838,10 @@ pp_fexpr({proj, E, I}) ->
     pp_beside([pp_fexpr(E), pp_text("."), pp_text(I)]);
 pp_fexpr({set_proj, E, I, A}) ->
     pp_beside(pp_fexpr(E), pp_braces(pp_beside([pp_text(I), pp_text(" = "), pp_fexpr(A)])));
-pp_fexpr({binop, Op, A, B}) ->
+pp_fexpr({op, Op, A, B}) ->
     pp_parens(pp_par([pp_fexpr(A), pp_text(Op), pp_fexpr(B)]));
+pp_fexpr({op, Op, A}) ->
+    pp_parens(pp_par([pp_text(Op), pp_fexpr(A)]));
 pp_fexpr({'let', X, A, B}) ->
     pp_par([pp_beside([pp_text("let "), pp_text(X), pp_text(" = "), pp_fexpr(A), pp_text(" in")]),
             pp_fexpr(B)]);
@@ -866,8 +869,8 @@ pp_case({'case', Pat, Split}) ->
     prettypr:sep([pp_beside(pp_pat(Pat), pp_text(" =>")),
                   prettypr:nest(2, pp_split(Split))]).
 
-pp_pat({tuple, Xs})      -> pp_fexpr({tuple, [{var, X} || X <- Xs]});
-pp_pat({'::', X, Xs})    -> pp_fexpr({binop, '::', {var, X}, {var, Xs}});
-pp_pat({con, As, I, Xs}) -> pp_fexpr({con, As, I, [{var, X} || X <- Xs]});
+pp_pat({tuple, Xs})      -> pp_fexpr({tuple, [{var, [X]} || X <- Xs]});
+pp_pat({'::', X, Xs})    -> pp_fexpr({op, '::', {var, [X]}, {var, [Xs]}});
+pp_pat({con, As, I, Xs}) -> pp_fexpr({con, As, I, [{var, [X]} || X <- Xs]});
 pp_pat(Pat)              -> pp_fexpr(Pat).
 
