@@ -306,7 +306,7 @@ expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Fields}) ->
 
 expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Rec, Fields}) ->
     X    = fresh_name(),
-    Proj = fun(I) -> {proj, {var, X}, I - 1} end,
+    Proj = fun(I) -> {proj, {var, [X]}, I - 1} end,
     Comp = fun({I, false})       -> Proj(I);
               ({_, {set, E}})    -> expr_to_fcode(Env, E);
               ({I, {upd, Z, E}}) -> {'let', Z, Proj(I), expr_to_fcode(Env, E)}
@@ -319,7 +319,7 @@ expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Rec, Fields}) ->
     Updates = [ {I, field_value(FT, Fields)} || {I, FT} <- indexed(FieldTypes) ],
     Body = case Expand of
              true  -> {tuple, lists:map(Comp, Updates)};
-             false -> lists:foldr(Set, {var, X}, Updates)
+             false -> lists:foldr(Set, {var, [X]}, Updates)
            end,
     {'let', X, expr_to_fcode(Env, Rec), Body};
 
@@ -336,8 +336,8 @@ expr_to_fcode(Env, _Type, {'if', _, Cond, Then, Else}) ->
                      {'case', {bool, true},  {nosplit, expr_to_fcode(Env, Then)}}]}}
              end,
     case Cond of
-        {var, X} -> Switch(X);
-        _        ->
+        {var, [X]} -> Switch(X);
+        _          ->
             X = fresh_name(),
             {'let', X, expr_to_fcode(Env, Cond), Switch(X)}
     end;
@@ -515,7 +515,8 @@ rename(Ren, Expr) ->
         {oracle_pubkey, _}   -> Expr;
         {oracle_query_id, _} -> Expr;
         nil                 -> nil;
-        {var, X}            -> {var, rename_var(Ren, X)};
+        {var, [X]}          -> {var, [rename_var(Ren, X)]};
+        {var, _}            -> Expr;
         {con, Ar, I, Es}    -> {con, Ar, I, [rename(Ren, E) || E <- Es]};
         {tuple, Es}         -> {tuple, [rename(Ren, E) || E <- Es]};
         {proj, E, I}        -> {proj, rename(Ren, E), I};
@@ -872,5 +873,6 @@ pp_case({'case', Pat, Split}) ->
 pp_pat({tuple, Xs})      -> pp_fexpr({tuple, [{var, [X]} || X <- Xs]});
 pp_pat({'::', X, Xs})    -> pp_fexpr({op, '::', {var, [X]}, {var, [Xs]}});
 pp_pat({con, As, I, Xs}) -> pp_fexpr({con, As, I, [{var, [X]} || X <- Xs]});
+pp_pat({var, X})         -> pp_fexpr({var, [X]});
 pp_pat(Pat)              -> pp_fexpr(Pat).
 
