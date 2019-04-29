@@ -846,6 +846,8 @@ pp_fexpr({op, Op, A}) ->
 pp_fexpr({'let', X, A, B}) ->
     pp_par([pp_beside([pp_text("let "), pp_text(X), pp_text(" = "), pp_fexpr(A), pp_text(" in")]),
             pp_fexpr(B)]);
+pp_fexpr({funcall, Fun, As}) ->
+    pp_beside(pp_fexpr(Fun), pp_fexpr({tuple, As}));
 pp_fexpr({switch, Split}) -> pp_split(Split).
 
 pp_ftype(T) when is_atom(T) -> pp_text(T);
