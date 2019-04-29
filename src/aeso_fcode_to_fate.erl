@@ -455,7 +455,7 @@ pp_ann(Ind, [{switch, Arg, Type, Alts, Def} | Code]) ->
     [Ind, "SWITCH ", pp_arg(Arg), "\n",
      [[Ind1, Tag, " =>\n", pp_ann(Ind2, Alt)]
       || {Tag, Alt} <- lists:zip(Tags, Alts), Alt /= missing],
-     [[Ind1, "_ =>\n", pp_ann("  " ++ Ind, Def)] || Def /= missing],
+     [[Ind1, "_ =>\n", pp_ann(Ind2, Def)] || Def /= missing],
      pp_ann(Ind, Code)];
 pp_ann(Ind, [switch_body | Code]) ->
     [Ind, "SWITCH-BODY\n", pp_ann(Ind, Code)];
@@ -591,7 +591,7 @@ attributes(I) ->
         {'ADDR_TO_STR', A, B}                 -> Pure(A, B);
         {'STR_REVERSE', A, B}                 -> Pure(A, B);
         {'INT_TO_ADDR', A, B}                 -> Pure(A, B);
-        {'VARIANT', A, B, C, D}               -> Pure(A, [B, C, D]);
+        {'VARIANT', A, B, C, D}               -> Pure(A, [?a, B, C, D]);
         {'VARIANT_TEST', A, B, C}             -> Pure(A, [B, C]);
         {'VARIANT_ELEMENT', A, B, C}          -> Pure(A, [B, C]);
         'BITS_NONEA'                          -> Pure(?a, []);
@@ -751,7 +751,8 @@ rules() ->
      ?RULE(r_swap_write),
      ?RULE(r_constant_propagation),
      ?RULE(r_prune_impossible_branches),
-     ?RULE(r_inline_store)
+     ?RULE(r_inline_store),
+     ?RULE(r_float_switch_body)
     ].
 
 %% Removing pushes that are immediately consumed.
@@ -772,11 +773,17 @@ r_push_consume({i, Ann1, {'STORE', ?a, A}}, [{i, Ann2, I} | Code]) ->
     end;
 %% Writing directly to memory instead of going through the accumulator.
 r_push_consume({i, Ann1, I}, [{i, Ann2, {'STORE', R, ?a}} | Code]) ->
-    case op_view(I) of
-        {Op, ?a, As} -> {[{i, merge_ann(Ann1, Ann2), from_op_view(Op, R, As)}], Code};
-        _            -> false
-    end;
-
+    IsPush =
+        case op_view(I) of
+            {_, ?a, _} -> true;
+            _          -> false
+        end orelse
+        case I of
+            {'VARIANT', ?a, _, _, _} -> true;
+            _                        -> false
+        end,
+    if IsPush -> {[{i, merge_ann(Ann1, Ann2), setelement(2, I, R)}], Code};
+       true   -> false end;
 r_push_consume(_, _) -> false.
 
 %% Changing PUSH A, DUPA to PUSH A, PUSH A enables further optimisations
@@ -824,6 +831,18 @@ r_swap_write(Pre, I, Code0 = [J | Code]) ->
 r_swap_write(_, _, _) -> false.
 
 %% Precompute instructions with known values
+r_constant_propagation(Cons = {i, _, {'CONS', R, _, _}}, [{i, Ann, {'IS_NIL', S, R}} | Code]) ->
+    Store = {i, Ann, {'STORE', S, ?i(false)}},
+    case R of
+        ?a -> {[Store], Code};
+        _  -> {[Cons, Store], Code}
+    end;
+r_constant_propagation(Cons = {i, _, {'NIL', R}}, [{i, Ann, {'IS_NIL', S, R}} | Code]) ->
+    Store = {i, Ann, {'STORE', S, ?i(true)}},
+    case R of
+        ?a -> {[Store], Code};
+        _  -> {[Cons, Store], Code}
+    end;
 r_constant_propagation({i, Ann, I}, Code) ->
     case op_view(I) of
         false -> false;
@@ -855,7 +874,21 @@ r_prune_impossible_branches({switch, ?i(V), boolean, [False, True] = Alts, Def},
     case Alts == Alts1 of
         true  -> false;
         false ->
-            {[{switch, ?i(V), boolean, Alts1, Def}], Code}
+            case Alts1 of
+                [missing, missing] -> {Def, Code};
+                _                  -> {[{switch, ?i(V), boolean, Alts1, Def}], Code}
+            end
+    end;
+r_prune_impossible_branches(Variant = {i, _, {'VARIANT', R, ?i(_), ?i(Tag), ?i(_)}},
+                            [{switch, R, Type, Alts, missing} | Code]) ->
+    case {R, lists:nth(Tag + 1, Alts)} of
+        {_, missing} -> {[Variant, {switch, R, Type, [missing || _ <- Alts], missing}]};
+        {?a, Alt} -> {Alt, Code};
+        {_,  Alt} ->
+            case live_in(R, Alt) of
+                true  -> {[Variant | Alt], Code};
+                false -> {Alt, Code}
+            end
     end;
 r_prune_impossible_branches(_, _) -> false.
 
@@ -875,12 +908,18 @@ r_inline_switch_target(Store = {i, _, {'STORE', R, A}}, [{switch, R, Type, Alts,
         ?a       -> {[Switch], Code};
         {var, _} ->
             case lists:any(fun(Alt) -> live_in(R, Alt) end, [Def | Alts]) of
-                false -> {[Switch], Code};
-                true  -> {[Store, Switch], Code}
+                false             -> {[Switch], Code};
+                true when A /= ?a -> {[Store, Switch], Code};
+                true              -> false
             end;
         _        -> false %% impossible
     end;
 r_inline_switch_target(_, _) -> false.
+
+%% Float switch-body to closest switch
+r_float_switch_body(I = {i, _, _}, [switch_body | Code]) ->
+    {[], [switch_body, I | Code]};
+r_float_switch_body(_, _) -> false.
 
 %% Inline stores
 r_inline_store(I = {i, _, {'STORE', R = {var, _}, A}}, Code) ->
