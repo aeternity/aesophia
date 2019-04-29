@@ -693,7 +693,15 @@ swap_instrs({i, #{ live_in := Live1 }, I}, {i, #{ live_in := Live2, live_out := 
     {{i, #{ live_in => Live1,  live_out => Live2_ }, J},
      {i, #{ live_in => Live2_, live_out => Live3  }, I}}.
 
-live_in(R,  #{ live_in  := LiveIn  }) -> ordsets:is_element(R, LiveIn).
+live_in(R, #{ live_in  := LiveIn  }) -> ordsets:is_element(R, LiveIn);
+live_in(R, {i, Ann, _}) -> live_in(R, Ann);
+live_in(R, [I = {i, _, _} | _]) -> live_in(R, I);
+live_in(R, [switch_body | Code]) -> live_in(R, Code);
+live_in(R, [{switch, A, _, Alts, Def} | _]) ->
+    R == A orelse lists:any(fun(Code) -> live_in(R, Code) end, [Def | Alts]);
+live_in(_, missing) -> false;
+live_in(_, []) -> false.
+
 live_out(R, #{ live_out := LiveOut }) -> ordsets:is_element(R, LiveOut).
 
 %% -- Optimizations --
@@ -732,7 +740,8 @@ apply_rules_once([{RName, Rule} | Rules], I, Code) ->
 merge_rules() ->
     [?RULE(r_push_consume),
      ?RULE(r_one_shot_var),
-     ?RULE(r_write_to_dead_var)
+     ?RULE(r_write_to_dead_var),
+     ?RULE(r_inline_switch_target)
     ].
 
 rules() ->
@@ -740,6 +749,8 @@ rules() ->
     [?RULE(r_dup_to_push),
      ?RULE(r_swap_push),
      ?RULE(r_swap_write),
+     ?RULE(r_constant_propagation),
+     ?RULE(r_prune_impossible_branches),
      ?RULE(r_inline_store)
     ].
 
@@ -812,10 +823,75 @@ r_swap_write(Pre, I, Code0 = [J | Code]) ->
     end;
 r_swap_write(_, _, _) -> false.
 
+%% Precompute instructions with known values
+r_constant_propagation({i, Ann, I}, Code) ->
+    case op_view(I) of
+        false -> false;
+        {Op, R, As} ->
+            Vs = [V || ?i(V) <- As],
+            case length(Vs) == length(As) of
+                false -> false;
+                true  ->
+                    case eval_op(Op, Vs) of
+                        no_eval -> false;
+                        V       -> {[{i, Ann, {'STORE', R, ?i(V)}}], Code}
+                    end
+            end
+    end;
+r_constant_propagation(_, _) -> false.
+
+eval_op('EQ', [X, Y]) -> X =:= Y;   %% TODO: more
+eval_op(_, _) -> no_eval.
+
+%% Prune impossible branches from switches
+r_prune_impossible_branches({switch, ?i(V), Type, Alts, missing}, Code) ->
+    case pick_branch(Type, V, Alts) of
+        false -> false;
+        Alt   -> {Alt, Code}
+    end;
+r_prune_impossible_branches({switch, ?i(V), boolean, [False, True] = Alts, Def}, Code) ->
+    Alts1 = [if V -> missing; true -> False   end,
+             if V -> True;    true -> missing end],
+    case Alts == Alts1 of
+        true  -> false;
+        false ->
+            {[{switch, ?i(V), boolean, Alts1, Def}], Code}
+    end;
+r_prune_impossible_branches(_, _) -> false.
+
+pick_branch(boolean, V, [False, True]) ->
+    Alt = if V -> True; true -> False end,
+    case Alt of
+        missing -> false;
+        _       -> Alt
+    end;
+pick_branch(_Type, _V, _Alts) ->
+    false.
+
+%% STORE R A, SWITCH R --> SWITCH A
+r_inline_switch_target(Store = {i, _, {'STORE', R, A}}, [{switch, R, Type, Alts, Def} | Code]) ->
+    Switch = {switch, A, Type, Alts, Def},
+    case R of
+        ?a       -> {[Switch], Code};
+        {var, _} ->
+            case lists:any(fun(Alt) -> live_in(R, Alt) end, [Def | Alts]) of
+                false -> {[Switch], Code};
+                true  -> {[Store, Switch], Code}
+            end;
+        _        -> false %% impossible
+    end;
+r_inline_switch_target(_, _) -> false.
+
 %% Inline stores
-r_inline_store(I = {i, _, {'STORE', R = {var, _}, A = {arg, _}}}, Code) ->
+r_inline_store(I = {i, _, {'STORE', R = {var, _}, A}}, Code) ->
     %% Not when A is var unless updating the annotations properly.
-    r_inline_store([I], R, A, Code);
+    Inline = case A of
+                 {arg, _} -> true;
+                 ?i(_)    -> true;
+                 _        -> false
+             end,
+    if Inline -> r_inline_store([I], R, A, Code);
+       true   -> false end;
 r_inline_store(_, _) -> false.
 
 r_inline_store(Acc, R, A, [switch_body | Code]) ->
@@ -987,7 +1063,12 @@ block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
                         missing -> [{jump, DefRef}];
                         _       -> FalseCode ++ [{jump, RestRef}]
                     end,
-                {Blk#blk{code = ElseCode}, [{jumpif, Arg, ThenRef}], ThenBlk};
+                case lists:usort(Alts) == [missing] of
+                    true ->
+                        {Blk#blk{code = [{jump, DefRef}]}, [], []};
+                    false ->
+                        {Blk#blk{code = ElseCode}, [{jumpif, Arg, ThenRef}], ThenBlk}
+                end;
             tuple ->
                 [TCode] = Alts,
                 {Blk#blk{code = TCode ++ [{jump, RestRef}]}, [], []};
@@ -1018,7 +1099,7 @@ optimize_blocks(Blocks) ->
     RBlocks1  = reorder_blocks(RBlocks, []),
     RBlocks2  = [ {Ref, inline_block(RBlockMap, Ref, Code)} || {Ref, Code} <- RBlocks1 ],
     RBlocks3  = remove_dead_blocks(RBlocks2),
-    RBlocks4  = [ {Ref, use_returnr(Code)} || {Ref, Code} <- RBlocks3 ],
+    RBlocks4  = [ {Ref, tweak_returns(Code)} || {Ref, Code} <- RBlocks3 ],
     Rev(RBlocks4).
 
 %% Choose the next block based on the final jump.
@@ -1030,11 +1111,13 @@ reorder_blocks([{Ref, Code} | Blocks], Acc) ->
 reorder_blocks(Ref, Code, Blocks, Acc) ->
     Acc1 = [{Ref, Code} | Acc],
     case Code of
-        ['RETURN'|_]        -> reorder_blocks(Blocks, Acc1);
-        [{'RETURNR', _}|_]  -> reorder_blocks(Blocks, Acc1);
-        [{'ABORT', _}|_]    -> reorder_blocks(Blocks, Acc1);
-        [{switch, _, _}|_]  -> reorder_blocks(Blocks, Acc1);
-        [{jump, L}|_]       ->
+        ['RETURN'|_]          -> reorder_blocks(Blocks, Acc1);
+        [{'RETURNR', _}|_]    -> reorder_blocks(Blocks, Acc1);
+        [{'CALL_T', _}|_]     -> reorder_blocks(Blocks, Acc1);
+        [{'CALL_TR', _, _}|_] -> reorder_blocks(Blocks, Acc1);
+        [{'ABORT', _}|_]      -> reorder_blocks(Blocks, Acc1);
+        [{switch, _, _}|_]    -> reorder_blocks(Blocks, Acc1);
+        [{jump, L}|_]         ->
             NotL = fun({L1, _}) -> L1 /= L end,
             case lists:splitwith(NotL, Blocks) of
                 {Blocks1, [{L, Code1} | Blocks2]} ->
@@ -1069,10 +1152,16 @@ chase_labels([L | Ls], Map, Live) ->
     New  = lists:flatmap(Jump, Code),
     chase_labels(New ++ Ls, Map, Live#{ L => true }).
 
-%% Replace PUSH, RETURN by RETURNR
-use_returnr(['RETURN', {'PUSH', A} | Code]) ->
+%% Replace PUSH, RETURN by RETURNR, drop returns after tail calls.
+tweak_returns(['RETURN', {'PUSH', A} | Code]) ->
     [{'RETURNR', A} | Code];
-use_returnr(Code) -> Code.
+%% tweak_returns(['RETURN', {'PUSH', A} | Code]) ->
+%%     [{'RETURNR', A} | Code];
+tweak_returns(['RETURN' | Code = [{'CALL_T', _} | _]]) ->
+    Code;
+tweak_returns(['RETURN' | Code = [{'CALL_TR', _, _} | _]]) ->
+    Code;
+tweak_returns(Code) -> Code.
 
 %% -- Split basic blocks at CALL instructions --
 %%  Calls can only return to a new basic block.
