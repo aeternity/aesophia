@@ -41,6 +41,10 @@
                | {tuple, [fexpr()]}
                | {proj, fexpr(), integer()}
                | {set_proj, fexpr(), integer(), fexpr()}    %% tuple, field, new_value
+               | map_empty
+               | {map_set, fexpr(), fexpr(), fexpr()}   % map, key, val
+               | {map_get, fexpr(), fexpr()}            % map, key
+               | {map_get, fexpr(), fexpr(), fexpr()}   % map, key, default
                | {op, binop(), fexpr(), fexpr()}
                | {op, unop(), fexpr()}
                | {'let', var_name(), fexpr(), fexpr()}
@@ -375,6 +379,33 @@ expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
 %% Function calls
 expr_to_fcode(Env, _Type, {app, _Ann, Fun, Args}) ->
     {funcall, expr_to_fcode(Env, Fun), [expr_to_fcode(Env, Arg) || Arg <- Args]};
+
+%% Maps
+expr_to_fcode(_Env, _Type, {map, _, []}) ->
+    map_empty;
+expr_to_fcode(Env, Type, {map, Ann, KVs}) ->
+    %% Cheaper to do incremental map_update than building the list and doing
+    %% map_from_list (I think).
+    Fields = [{field, Ann, [{map_get, Ann, K}], V} || {K, V} <- KVs],
+    expr_to_fcode(Env, Type, {map, Ann, {map, Ann, []}, Fields});
+expr_to_fcode(Env, _Type, {map, _, Map, KVs}) ->
+    X    = fresh_name(),
+    Map1 = {var, [X]},
+    {'let', X, expr_to_fcode(Env, Map),
+        lists:foldr(fun(Fld, M) ->
+                        case Fld of
+                            {field, _, [{map_get, _, K}], V} ->
+                                {map_set, M, expr_to_fcode(Env, K), expr_to_fcode(Env, V)};
+                            {field_upd, _, [{map_get, _, K}], {typed, _, {lam, _, [{arg, _, {id, _, Z}, _}], V}, _}} ->
+                                Y = fresh_name(),
+                                {'let', Y, expr_to_fcode(Env, K),
+                                {'let', Z, {map_get, Map1, {var, [Y]}},
+                                {map_set, M, {var, [Y]}, expr_to_fcode(Env, V)}}}
+                        end end, Map1, KVs)};
+expr_to_fcode(Env, _Type, {map_get, _, Map, Key}) ->
+    {map_get, expr_to_fcode(Env, Map), expr_to_fcode(Env, Key)};
+expr_to_fcode(Env, _Type, {map_get, _, Map, Key, Def}) ->
+    {map_get, expr_to_fcode(Env, Map), expr_to_fcode(Env, Key), expr_to_fcode(Env, Def)};
 
 expr_to_fcode(_Env, Type, Expr) ->
     error({todo, {Expr, ':', Type}}).

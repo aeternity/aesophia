@@ -249,6 +249,24 @@ to_scode(Env, {op, Op, A}) ->
     [ to_scode(notail(Env), A),
       unop_to_scode(Op) ];
 
+%% Maps
+to_scode(_Env, map_empty) ->
+    [aeb_fate_code:map_empty(?a)];
+to_scode(Env, {map_set, Map, Key, Val}) ->
+    [to_scode(notail(Env), Val),
+     to_scode(notail(Env), Key),
+     to_scode(notail(Env), Map),
+     aeb_fate_code:map_update(?a, ?a, ?a, ?a)];
+to_scode(Env, {map_get, Map, Key}) ->
+    [to_scode(notail(Env), Key),
+     to_scode(notail(Env), Map),
+     aeb_fate_code:map_lookup(?a, ?a, ?a)];
+to_scode(Env, {map_get, Map, Key, Default}) ->
+    [to_scode(notail(Env), Default),
+     to_scode(notail(Env), Key),
+     to_scode(notail(Env), Map),
+     aeb_fate_code:map_lookup(?a, ?a, ?a, ?a)];
+
 to_scode(Env, {'let', X, {var, Y}, Body}) ->
     Env1 = bind_var(X, lookup_var(Env, Y), Env),
     to_scode(Env1, Body);
