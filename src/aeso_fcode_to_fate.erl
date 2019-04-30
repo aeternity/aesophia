@@ -216,7 +216,8 @@ to_scode(_Env, {oracle_query_id, K}) ->
     %% Not actually in FATE yet
     [push(?i(aeb_fate_data:make_oracle_query(K)))];
 
-to_scode(_Env, nil) -> aeb_fate_code:nil(?a);
+to_scode(_Env, nil) ->
+    [aeb_fate_code:nil(?a)];
 
 to_scode(Env, {var, X}) ->
     [push(lookup_var(Env, X))];
@@ -882,7 +883,12 @@ r_prune_impossible_branches({switch, ?i(V), boolean, [False, True] = Alts, Def},
 r_prune_impossible_branches(Variant = {i, _, {'VARIANT', R, ?i(_), ?i(Tag), ?i(_)}},
                             [{switch, R, Type, Alts, missing} | Code]) ->
     case {R, lists:nth(Tag + 1, Alts)} of
-        {_, missing} -> {[Variant, {switch, R, Type, [missing || _ <- Alts], missing}]};
+        {_, missing} ->
+            Alts1 = [missing || _ <- Alts],
+            case Alts == Alts1 of
+                true -> false;
+                false -> {[Variant, {switch, R, Type, Alts1, missing}], Code}
+            end;
         {?a, Alt} -> {Alt, Code};
         {_,  Alt} ->
             case live_in(R, Alt) of

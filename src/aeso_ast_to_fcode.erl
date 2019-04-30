@@ -376,7 +376,8 @@ expr_to_fcode(Env, _Type, {app, _Ann, Fun, Args}) ->
 expr_to_fcode(_Env, Type, Expr) ->
     error({todo, {Expr, ':', Type}}).
 
-binop_to_fcode(Op) when Op == '+'; Op == '-'; Op == '==' -> Op.
+binop_to_fcode(Op) when Op == '+'; Op == '-'; Op == '==';
+                        Op == '::' -> Op.
 
 -spec alts_to_fcode(env(), ftype(), var_name(), [aeso_syntax:alt()]) -> fsplit().
 alts_to_fcode(Env, Type, X, Alts) ->
