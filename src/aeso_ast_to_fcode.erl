@@ -24,7 +24,8 @@
 -type var_name() :: string().
 -type sophia_name() :: [string()].
 
--type binop() :: '+' | '-' | '==' | '::'.
+-type binop() :: '+' | '-' | '*' | '/' | mod | '^' | '++' | '::' |
+                 '<' | '>' | '=<' | '>=' | '==' | '!='.
 -type unop() :: '!'.
 
 -type fexpr() :: {int, integer()}
@@ -360,9 +361,11 @@ expr_to_fcode(Env, _Type, {block, _, Stmts}) ->
     stmts_to_fcode(Env, Stmts);
 
 %% Binary operator
+expr_to_fcode(Env, _Type, Expr = {app, _, {Op, _}, [_, _]}) when Op == '&&'; Op == '||' ->
+    Tree = expr_to_decision_tree(Env, Expr),
+    decision_tree_to_fcode(Tree);
 expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A, B]}) when is_atom(Op) ->
-    FOp = binop_to_fcode(Op),
-    {op, FOp, expr_to_fcode(Env, A), expr_to_fcode(Env, B)};
+    {op, Op, expr_to_fcode(Env, A), expr_to_fcode(Env, B)};
 expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
     case Op of
         '-' -> {op, '-', {int, 0}, expr_to_fcode(Env, A)};
@@ -376,8 +379,7 @@ expr_to_fcode(Env, _Type, {app, _Ann, Fun, Args}) ->
 expr_to_fcode(_Env, Type, Expr) ->
     error({todo, {Expr, ':', Type}}).
 
-binop_to_fcode(Op) when Op == '+'; Op == '-'; Op == '==';
-                        Op == '::' -> Op.
+%% -- Pattern matching --
 
 -spec alts_to_fcode(env(), ftype(), var_name(), [aeso_syntax:alt()]) -> fsplit().
 alts_to_fcode(Env, Type, X, Alts) ->
@@ -505,97 +507,6 @@ split_vars({tuple, Xs}, {tuple, Ts}) ->
     lists:zip(Xs, Ts);
 split_vars({var, X}, T) -> [{X, T}].
 
--spec rename([{var_name(), var_name()}], fexpr()) -> fexpr().
-rename(Ren, Expr) ->
-    case Expr of
-        {int, _}             -> Expr;
-        {string, _}          -> Expr;
-        {bool, _}            -> Expr;
-        {account_pubkey, _}  -> Expr;
-        {contract_pubkey, _} -> Expr;
-        {oracle_pubkey, _}   -> Expr;
-        {oracle_query_id, _} -> Expr;
-        nil                 -> nil;
-        {var, [X]}          -> {var, [rename_var(Ren, X)]};
-        {var, _}            -> Expr;
-        {con, Ar, I, Es}    -> {con, Ar, I, [rename(Ren, E) || E <- Es]};
-        {tuple, Es}         -> {tuple, [rename(Ren, E) || E <- Es]};
-        {proj, E, I}        -> {proj, rename(Ren, E), I};
-        {set_proj, R, I, E} -> {set_proj, rename(Ren, R), I, rename(Ren, E)};
-        {op, Op, E1, E2}    -> {op, Op, rename(Ren, E1), rename(Ren, E2)};
-        {op, Op, E}         -> {op, Op, rename(Ren, E)};
-        {'let', X, E, Body} ->
-            {Z, Ren1} = rename_binding(Ren, X),
-            {'let', Z, rename(Ren, E), rename(Ren1, Body)};
-        {switch, Split} -> {switch, rename_split(Ren, Split)}
-    end.
-
-rename_var(Ren, X) -> proplists:get_value(X, Ren, X).
-rename_binding(Ren, X) ->
-    Ren1 = lists:keydelete(X, 1, Ren),
-    case lists:keymember(X, 2, Ren) of
-        false -> {X, Ren1};
-        true  ->
-            Z = fresh_name(),
-            {Z, [{X, Z} | Ren1]}
-    end.
-
-rename_bindings(Ren, []) -> {[], Ren};
-rename_bindings(Ren, [X | Xs]) ->
-    {Z, Ren1}  = rename_binding(Ren, X),
-    {Zs, Ren2} = rename_bindings(Ren1, Xs),
-    {[Z | Zs], Ren2}.
-
-rename_fpats(Ren, []) -> {[], Ren};
-rename_fpats(Ren, [P | Ps]) ->
-    {Q, Ren1}  = rename_fpat(Ren, P),
-    {Qs, Ren2} = rename_fpats(Ren1, Ps),
-    {[Q | Qs], Ren2}.
-
-rename_fpat(Ren, P = {bool, _})   -> {P, Ren};
-rename_fpat(Ren, P = {int, _})    -> {P, Ren};
-rename_fpat(Ren, P = {string, _}) -> {P, Ren};
-rename_fpat(Ren, P = nil)         -> {P, Ren};
-rename_fpat(Ren, {'::', P, Q})    ->
-    {P1, Ren1} = rename_fpat(Ren, P),
-    {Q1, Ren2} = rename_fpat(Ren1, Q),
-    {{'::', P1, Q1}, Ren2};
-rename_fpat(Ren, {var, X}) ->
-    {Z, Ren1} = rename_binding(Ren, X),
-    {{var, Z}, Ren1};
-rename_fpat(Ren, {con, Ar, C, Ps}) ->
-    {Ps1, Ren1} = rename_fpats(Ren, Ps),
-    {{con, Ar, C, Ps1}, Ren1};
-rename_fpat(Ren, {tuple, Ps}) ->
-    {Ps1, Ren1} = rename_fpats(Ren, Ps),
-    {{tuple, Ps1}, Ren1}.
-
-rename_spat(Ren, P = {bool, _})   -> {P, Ren};
-rename_spat(Ren, P = {int, _})    -> {P, Ren};
-rename_spat(Ren, P = {string, _}) -> {P, Ren};
-rename_spat(Ren, P = nil)         -> {P, Ren};
-rename_spat(Ren, {'::', X, Y}) ->
-    {X1, Ren1} = rename_binding(Ren, X),
-    {Y1, Ren2} = rename_binding(Ren1, Y),
-    {{'::', X1, Y1}, Ren2};
-rename_spat(Ren, {var, X}) ->
-    {Z, Ren1} = rename_binding(Ren, X),
-    {{var, Z}, Ren1};
-rename_spat(Ren, {con, Ar, C, Xs}) ->
-    {Zs, Ren1} = rename_bindings(Ren, Xs),
-    {{con, Ar, C, Zs}, Ren1};
-rename_spat(Ren, {tuple, Xs}) ->
-    {Zs, Ren1} = rename_bindings(Ren, Xs),
-    {{tuple, Zs}, Ren1}.
-
-rename_split(Ren, {split, Type, X, Cases}) ->
-    {split, Type, rename_var(Ren, X), [rename_case(Ren, C) || C <- Cases]};
-rename_split(Ren, {nosplit, E}) -> {nosplit, rename(Ren, E)}.
-
-rename_case(Ren, {'case', Pat, Split}) ->
-    {Pat1, Ren1} = rename_spat(Ren, Pat),
-    {'case', Pat1, rename_split(Ren1, Split)}.
-
 -spec next_split([fpat()]) -> integer() | false.
 next_split(Pats) ->
     IsVar = fun({var, _}) -> true; (_) -> false end,
@@ -646,6 +557,34 @@ pat_to_fcode(Env, {record_t, Fields}, {record, _, FieldPats}) ->
 pat_to_fcode(_Env, Type, Pat) ->
     error({todo, Pat, ':', Type}).
 
+%% -- Decision trees for boolean operators --
+
+decision_op('&&', {atom, A}, B) -> {'if', A, B, false};
+decision_op('&&', false, _)     -> false;
+decision_op('&&', true,  B)     -> B;
+decision_op('||', {atom, A}, B) -> {'if', A, true, B};
+decision_op('||', false, B)     -> B;
+decision_op('||', true,  _)     -> true;
+decision_op(Op, {'if', A, Then, Else}, B) ->
+    {'if', A, decision_op(Op, Then, B), decision_op(Op, Else, B)}.
+
+expr_to_decision_tree(Env, {app, _Ann, {Op, _}, [A, B]}) when Op == '&&'; Op == '||' ->
+    decision_op(Op, expr_to_decision_tree(Env, A), expr_to_decision_tree(Env, B));
+expr_to_decision_tree(Env, {typed, _, Expr, _}) -> expr_to_decision_tree(Env, Expr);
+expr_to_decision_tree(Env, Expr) ->
+    {atom, expr_to_fcode(Env, Expr)}.
+
+decision_tree_to_fcode(false)     -> {bool, false};
+decision_tree_to_fcode(true)      -> {bool, true};
+decision_tree_to_fcode({atom, B}) -> B;
+decision_tree_to_fcode({'if', A, Then, Else}) ->
+    X = fresh_name(),
+    {'let', X, A,
+        {switch, {split, boolean, X, [{'case', {bool, false}, {nosplit, decision_tree_to_fcode(Else)}},
+                                      {'case', {bool, true},  {nosplit, decision_tree_to_fcode(Then)}}]}}}.
+
+%% -- Statements --
+
 -spec stmts_to_fcode(env(), [aeso_syntax:stmt()]) -> fexpr().
 stmts_to_fcode(Env, [{letval, _, {typed, _, {id, _, X}, _}, _, Expr} | Stmts]) ->
     {'let', X, expr_to_fcode(Env, Expr), stmts_to_fcode(Env, Stmts)};
@@ -667,7 +606,7 @@ optimize_fcode(Code = #{ functions := Funs }) ->
 
 -spec optimize_fun(fcode(), fun_name(), fun_def()) -> fun_def().
 optimize_fun(_Fcode, _Fun, Def = #{ body := _Body }) ->
-    %% io:format("Optimizing ~p =\n~s\n", [Fun, prettypr:format(pp_fexpr(Body))]),
+    %% io:format("Optimizing ~p =\n~s\n", [_Fun, prettypr:format(pp_fexpr(_Body))]),
     Def.
 
 %% -- Helper functions -------------------------------------------------------
@@ -763,6 +702,100 @@ fresh_name() ->
     N = get('%fresh'),
     put('%fresh', N + 1),
     lists:concat(["%", N]).
+
+%% -- Renaming --
+
+-spec rename([{var_name(), var_name()}], fexpr()) -> fexpr().
+rename(Ren, Expr) ->
+    case Expr of
+        {int, _}             -> Expr;
+        {string, _}          -> Expr;
+        {bool, _}            -> Expr;
+        {account_pubkey, _}  -> Expr;
+        {contract_pubkey, _} -> Expr;
+        {oracle_pubkey, _}   -> Expr;
+        {oracle_query_id, _} -> Expr;
+        nil                 -> nil;
+        {var, [X]}          -> {var, [rename_var(Ren, X)]};
+        {var, _}            -> Expr;
+        {con, Ar, I, Es}    -> {con, Ar, I, [rename(Ren, E) || E <- Es]};
+        {tuple, Es}         -> {tuple, [rename(Ren, E) || E <- Es]};
+        {proj, E, I}        -> {proj, rename(Ren, E), I};
+        {set_proj, R, I, E} -> {set_proj, rename(Ren, R), I, rename(Ren, E)};
+        {op, Op, E1, E2}    -> {op, Op, rename(Ren, E1), rename(Ren, E2)};
+        {op, Op, E}         -> {op, Op, rename(Ren, E)};
+        {funcall, Fun, Es}  -> {funcall, Fun, [rename(Ren, E) || E <- Es]};
+        {'let', X, E, Body} ->
+            {Z, Ren1} = rename_binding(Ren, X),
+            {'let', Z, rename(Ren, E), rename(Ren1, Body)};
+        {switch, Split} -> {switch, rename_split(Ren, Split)}
+    end.
+
+rename_var(Ren, X) -> proplists:get_value(X, Ren, X).
+rename_binding(Ren, X) ->
+    Ren1 = lists:keydelete(X, 1, Ren),
+    case lists:keymember(X, 2, Ren) of
+        false -> {X, Ren1};
+        true  ->
+            Z = fresh_name(),
+            {Z, [{X, Z} | Ren1]}
+    end.
+
+rename_bindings(Ren, []) -> {[], Ren};
+rename_bindings(Ren, [X | Xs]) ->
+    {Z, Ren1}  = rename_binding(Ren, X),
+    {Zs, Ren2} = rename_bindings(Ren1, Xs),
+    {[Z | Zs], Ren2}.
+
+rename_fpats(Ren, []) -> {[], Ren};
+rename_fpats(Ren, [P | Ps]) ->
+    {Q, Ren1}  = rename_fpat(Ren, P),
+    {Qs, Ren2} = rename_fpats(Ren1, Ps),
+    {[Q | Qs], Ren2}.
+
+rename_fpat(Ren, P = {bool, _})   -> {P, Ren};
+rename_fpat(Ren, P = {int, _})    -> {P, Ren};
+rename_fpat(Ren, P = {string, _}) -> {P, Ren};
+rename_fpat(Ren, P = nil)         -> {P, Ren};
+rename_fpat(Ren, {'::', P, Q})    ->
+    {P1, Ren1} = rename_fpat(Ren, P),
+    {Q1, Ren2} = rename_fpat(Ren1, Q),
+    {{'::', P1, Q1}, Ren2};
+rename_fpat(Ren, {var, X}) ->
+    {Z, Ren1} = rename_binding(Ren, X),
+    {{var, Z}, Ren1};
+rename_fpat(Ren, {con, Ar, C, Ps}) ->
+    {Ps1, Ren1} = rename_fpats(Ren, Ps),
+    {{con, Ar, C, Ps1}, Ren1};
+rename_fpat(Ren, {tuple, Ps}) ->
+    {Ps1, Ren1} = rename_fpats(Ren, Ps),
+    {{tuple, Ps1}, Ren1}.
+
+rename_spat(Ren, P = {bool, _})   -> {P, Ren};
+rename_spat(Ren, P = {int, _})    -> {P, Ren};
+rename_spat(Ren, P = {string, _}) -> {P, Ren};
+rename_spat(Ren, P = nil)         -> {P, Ren};
+rename_spat(Ren, {'::', X, Y}) ->
+    {X1, Ren1} = rename_binding(Ren, X),
+    {Y1, Ren2} = rename_binding(Ren1, Y),
+    {{'::', X1, Y1}, Ren2};
+rename_spat(Ren, {var, X}) ->
+    {Z, Ren1} = rename_binding(Ren, X),
+    {{var, Z}, Ren1};
+rename_spat(Ren, {con, Ar, C, Xs}) ->
+    {Zs, Ren1} = rename_bindings(Ren, Xs),
+    {{con, Ar, C, Zs}, Ren1};
+rename_spat(Ren, {tuple, Xs}) ->
+    {Zs, Ren1} = rename_bindings(Ren, Xs),
+    {{tuple, Zs}, Ren1}.
+
+rename_split(Ren, {split, Type, X, Cases}) ->
+    {split, Type, rename_var(Ren, X), [rename_case(Ren, C) || C <- Cases]};
+rename_split(Ren, {nosplit, E}) -> {nosplit, rename(Ren, E)}.
+
+rename_case(Ren, {'case', Pat, Split}) ->
+    {Pat1, Ren1} = rename_spat(Ren, Pat),
+    {'case', Pat1, rename_split(Ren1, Split)}.
 
 %% -- Records --
 

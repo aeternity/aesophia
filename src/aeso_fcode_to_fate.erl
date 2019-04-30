@@ -395,8 +395,18 @@ match_tuple(Env, _, _, _, []) ->
 
 binop_to_scode('+') -> aeb_fate_code:add(?a, ?a, ?a);
 binop_to_scode('-') -> aeb_fate_code:sub(?a, ?a, ?a);
+binop_to_scode('*') -> aeb_fate_code:mul(?a, ?a, ?a);
+binop_to_scode('/') -> aeb_fate_code:divide(?a, ?a, ?a);
+binop_to_scode(mod) -> aeb_fate_code:modulo(?a, ?a, ?a);
+binop_to_scode('^') -> aeb_fate_code:pow(?a, ?a, ?a);
+binop_to_scode('++') -> aeb_fate_code:append(?a, ?a, ?a);
+binop_to_scode('::') -> aeb_fate_code:cons(?a, ?a, ?a);
+binop_to_scode('<') -> aeb_fate_code:lt(?a, ?a, ?a);
+binop_to_scode('>') -> aeb_fate_code:gt(?a, ?a, ?a);
+binop_to_scode('=<') -> aeb_fate_code:elt(?a, ?a, ?a);
+binop_to_scode('>=') -> aeb_fate_code:egt(?a, ?a, ?a);
 binop_to_scode('==') -> aeb_fate_code:eq(?a, ?a, ?a);
-binop_to_scode('::') -> aeb_fate_code:cons(?a, ?a, ?a).
+binop_to_scode('!=') -> aeb_fate_code:neq(?a, ?a, ?a).
 
 unop_to_scode('!') -> aeb_fate_code:not_op(?a, ?a).
 
@@ -586,7 +596,7 @@ attributes(I) ->
         {'HD', A, B}                          -> Pure(A, B);
         {'TL', A, B}                          -> Pure(A, B);
         {'LENGTH', A, B}                      -> Pure(A, B);
-        {'STR_EQ', A, B, C}                   -> Pure(A, [B, C]);
+        {'APPEND', A, B, C}                   -> Pure(A, [B, C]);
         {'STR_JOIN', A, B, C}                 -> Pure(A, [B, C]);
         {'INT_TO_STR', A, B}                  -> Pure(A, B);
         {'ADDR_TO_STR', A, B}                 -> Pure(A, B);
