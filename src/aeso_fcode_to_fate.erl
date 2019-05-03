@@ -223,31 +223,20 @@ to_scode(Env, {set_proj, R, I, E}) ->
      to_scode(notail(Env), R),
      aeb_fate_code:setelement(?a, ?i(I), ?a, ?a)];
 
-to_scode(Env, {op, Op, A, B}) ->
-    [ to_scode(notail(Env), B),
-      to_scode(notail(Env), A),
-      binop_to_scode(Op) ];
-to_scode(Env, {op, Op, A}) ->
-    [ to_scode(notail(Env), A),
-      unop_to_scode(Op) ];
+to_scode(Env, {op, Op, Args}) ->
+    call_to_scode(Env, op_to_scode(Op), Args);
 
 %% Maps
 to_scode(_Env, map_empty) ->
     [aeb_fate_code:map_empty(?a)];
 to_scode(Env, {map_set, Map, Key, Val}) ->
-    [to_scode(notail(Env), Val),
-     to_scode(notail(Env), Key),
-     to_scode(notail(Env), Map),
-     aeb_fate_code:map_update(?a, ?a, ?a, ?a)];
+    call_to_scode(Env, aeb_fate_code:map_update(?a, ?a, ?a, ?a),
+                  [Map, Key, Val]);
 to_scode(Env, {map_get, Map, Key}) ->
-    [to_scode(notail(Env), Key),
-     to_scode(notail(Env), Map),
-     aeb_fate_code:map_lookup(?a, ?a, ?a)];
+    call_to_scode(Env, aeb_fate_code:map_lookup(?a, ?a, ?a), [Map, Key]);
 to_scode(Env, {map_get, Map, Key, Default}) ->
-    [to_scode(notail(Env), Default),
-     to_scode(notail(Env), Key),
-     to_scode(notail(Env), Map),
-     aeb_fate_code:map_lookup(?a, ?a, ?a, ?a)];
+    call_to_scode(Env, aeb_fate_code:map_lookup(?a, ?a, ?a, ?a),
+                  [Map, Key, Default]);
 
 to_scode(Env, {'let', X, {var, Y}, Body}) ->
     Env1 = bind_var(X, lookup_var(Env, Y), Env),
@@ -275,6 +264,9 @@ to_scode(Env, {funcall, Fun, Args}) ->
 
 to_scode(Env, {switch, Case}) ->
     split_to_scode(Env, Case);
+
+to_scode(Env, {builtin, B, Args}) ->
+    builtin_to_scode(Env, B, Args);
 
 to_scode(_Env, Icode) -> ?TODO(Icode).
 
@@ -387,24 +379,123 @@ match_tuple(Env, I, Elem, Arg, [X | Xs]) ->
 match_tuple(Env, _, _, _, []) ->
     {[], Env}.
 
+%% -- Builtins --
+
+call_to_scode(Env, CallCode, Args) ->
+    [[to_scode(notail(Env), A) || A <- lists:reverse(Args)],
+     CallCode].
+
+builtin_to_scode(_Env, bits_none, none) ->
+    [aeb_fate_code:bits_none(?a)];
+builtin_to_scode(_Env, bits_all, none) ->
+    [aeb_fate_code:bits_all(?a)];
+builtin_to_scode(Env, abort, [_] = Args) ->
+    call_to_scode(Env, aeb_fate_code:abort(?a), Args);
+builtin_to_scode(Env, chain_spend, [_, _] = Args) ->
+    call_to_scode(Env, [aeb_fate_code:spend(?a, ?a),
+                        aeb_fate_code:tuple(0)], Args);
+builtin_to_scode(Env, chain_balance, [_] = Args) ->
+    call_to_scode(Env, aeb_fate_code:balance_other(?a, ?a), Args);
+builtin_to_scode(_Env, chain_block_hash, [{builtin, chain_block_height, none}]) ->
+    [aeb_fate_code:blockhash(?a)];
+builtin_to_scode(_Env, chain_block_hash, [_]) ->
+    ?TODO(fate_block_hash_at_height_instruction);
+builtin_to_scode(_Env, chain_coinbase, none) ->
+    [aeb_fate_code:beneficiary(?a)];
+builtin_to_scode(_Env, chain_timestamp, none) ->
+    [aeb_fate_code:timestamp(?a)];
+builtin_to_scode(_Env, chain_block_height, none) ->
+    [aeb_fate_code:generation(?a)];
+builtin_to_scode(_Env, chain_difficulty, none) ->
+    [aeb_fate_code:difficulty(?a)];
+builtin_to_scode(_Env, chain_gas_limit, none) ->
+    [aeb_fate_code:gaslimit(?a)];
+builtin_to_scode(_Env, contract_balance, none) ->
+    [aeb_fate_code:balance(?a)];
+builtin_to_scode(_Env, contract_address, none) ->
+    [aeb_fate_code:address(?a)];
+builtin_to_scode(_Env, call_origin, none) ->
+    [aeb_fate_code:origin(?a)];
+builtin_to_scode(_Env, call_caller, none) ->
+    [aeb_fate_code:caller(?a)];
+builtin_to_scode(_Env, call_value, none) ->
+    ?TODO(fate_call_value_instruction);
+builtin_to_scode(_Env, call_gas_price, none) ->
+    [aeb_fate_code:gasprice(?a)];
+builtin_to_scode(_Env, call_gas_left, []) ->
+    [aeb_fate_code:gas(?a)];
+builtin_to_scode(_Env, oracle_register, [_, _, _, _] = _Args) ->
+    ?TODO(fate_oracle_register_instruction);
+builtin_to_scode(_Env, oracle_query_fee, [_] = _Args) ->
+    ?TODO(fate_oracle_query_fee_instruction);
+builtin_to_scode(_Env, oracle_query, [_, _, _, _, _] = _Args) ->
+    ?TODO(fate_oracle_query_instruction);
+builtin_to_scode(_Env, oracle_get_question, [_, _] = _Args) ->
+    ?TODO(fate_oracle_get_question_instruction);
+builtin_to_scode(_Env, oracle_respond, [_, _, _, _] = _Args) ->
+    ?TODO(fate_oracle_respond_instruction);
+builtin_to_scode(_Env, oracle_extend, [_, _, _] = _Args) ->
+    ?TODO(fate_oracle_extend_instruction);
+builtin_to_scode(_Env, oracle_get_answer, [_, _] = _Args) ->
+    ?TODO(fate_oracle_get_answer_instruction);
+builtin_to_scode(_Env, aens_resolve, [_, _] = _Args) ->
+    ?TODO(fate_aens_resolve_instruction);
+builtin_to_scode(_Env, aens_preclaim, [_, _, _] = _Args) ->
+    ?TODO(fate_aens_preclaim_instruction);
+builtin_to_scode(_Env, aens_claim, [_, _, _, _] = _Args) ->
+    ?TODO(fate_aens_claim_instruction);
+builtin_to_scode(_Env, aens_transfer, [_, _, _, _] = _Args) ->
+    ?TODO(fate_aens_transfer_instruction);
+builtin_to_scode(_Env, aens_revoke, [_, _, _] = _Args) ->
+    ?TODO(fate_aens_revoke_instruction);
+builtin_to_scode(_Env, crypto_ecverify, [_, _, _] = _Args) ->
+    ?TODO(fate_crypto_ecverify_instruction);
+builtin_to_scode(_Env, crypto_ecverify_secp256k1, [_, _, _] = _Args) ->
+    ?TODO(fate_crypto_ecverify_secp256k1_instruction);
+builtin_to_scode(_Env, crypto_sha3, [_] = _Args) ->
+    ?TODO(fate_crypto_sha3_instruction);
+builtin_to_scode(_Env, crypto_sha256, [_] = _Args) ->
+    ?TODO(fate_crypto_sha256_instruction);
+builtin_to_scode(_Env, crypto_blake2b, [_] = _Args) ->
+    ?TODO(fate_crypto_blake2b_instruction);
+builtin_to_scode(_Env, auth_tx_hash, none) ->
+    ?TODO(fate_auth_tx_hash_instruction);
+builtin_to_scode(_, B, Args) ->
+    ?TODO({builtin, B, Args}).
+
 %% -- Operators --
 
-binop_to_scode('+') -> aeb_fate_code:add(?a, ?a, ?a);
-binop_to_scode('-') -> aeb_fate_code:sub(?a, ?a, ?a);
-binop_to_scode('*') -> aeb_fate_code:mul(?a, ?a, ?a);
-binop_to_scode('/') -> aeb_fate_code:divide(?a, ?a, ?a);
-binop_to_scode(mod) -> aeb_fate_code:modulo(?a, ?a, ?a);
-binop_to_scode('^') -> aeb_fate_code:pow(?a, ?a, ?a);
-binop_to_scode('++') -> aeb_fate_code:append(?a, ?a, ?a);
-binop_to_scode('::') -> aeb_fate_code:cons(?a, ?a, ?a);
-binop_to_scode('<') -> aeb_fate_code:lt(?a, ?a, ?a);
-binop_to_scode('>') -> aeb_fate_code:gt(?a, ?a, ?a);
-binop_to_scode('=<') -> aeb_fate_code:elt(?a, ?a, ?a);
-binop_to_scode('>=') -> aeb_fate_code:egt(?a, ?a, ?a);
-binop_to_scode('==') -> aeb_fate_code:eq(?a, ?a, ?a);
-binop_to_scode('!=') -> aeb_fate_code:neq(?a, ?a, ?a).
-
-unop_to_scode('!') -> aeb_fate_code:not_op(?a, ?a).
+op_to_scode('+')               -> aeb_fate_code:add(?a, ?a, ?a);
+op_to_scode('-')               -> aeb_fate_code:sub(?a, ?a, ?a);
+op_to_scode('*')               -> aeb_fate_code:mul(?a, ?a, ?a);
+op_to_scode('/')               -> aeb_fate_code:divide(?a, ?a, ?a);
+op_to_scode(mod)               -> aeb_fate_code:modulo(?a, ?a, ?a);
+op_to_scode('^')               -> aeb_fate_code:pow(?a, ?a, ?a);
+op_to_scode('++')              -> aeb_fate_code:append(?a, ?a, ?a);
+op_to_scode('::')              -> aeb_fate_code:cons(?a, ?a, ?a);
+op_to_scode('<')               -> aeb_fate_code:lt(?a, ?a, ?a);
+op_to_scode('>')               -> aeb_fate_code:gt(?a, ?a, ?a);
+op_to_scode('=<')              -> aeb_fate_code:elt(?a, ?a, ?a);
+op_to_scode('>=')              -> aeb_fate_code:egt(?a, ?a, ?a);
+op_to_scode('==')              -> aeb_fate_code:eq(?a, ?a, ?a);
+op_to_scode('!=')              -> aeb_fate_code:neq(?a, ?a, ?a);
+op_to_scode('!')               -> aeb_fate_code:not_op(?a, ?a);
+op_to_scode(map_from_list)     -> aeb_fate_code:map_from_list(?a, ?a);
+op_to_scode(map_to_list)       -> ?TODO(fate_map_to_list_instruction);
+op_to_scode(map_delete)        -> aeb_fate_code:map_delete(?a, ?a, ?a);
+op_to_scode(map_member)        -> aeb_fate_code:map_member(?a, ?a, ?a);
+op_to_scode(map_size)          -> ?TODO(fate_map_size_instruction);
+op_to_scode(string_length)     -> ?TODO(fate_string_length_instruction);
+op_to_scode(string_concat)     -> aeb_fate_code:str_join(?a, ?a, ?a);
+op_to_scode(bits_set)          -> aeb_fate_code:bits_set(?a, ?a, ?a);
+op_to_scode(bits_clear)        -> aeb_fate_code:bits_clear(?a, ?a, ?a);
+op_to_scode(bits_test)         -> aeb_fate_code:bits_test(?a, ?a, ?a);
+op_to_scode(bits_sum)          -> aeb_fate_code:bits_sum(?a, ?a);
+op_to_scode(bits_intersection) -> aeb_fate_code:bits_and(?a, ?a, ?a);
+op_to_scode(bits_union)        -> aeb_fate_code:bits_or(?a, ?a, ?a);
+op_to_scode(bits_difference)   -> aeb_fate_code:bits_diff(?a, ?a, ?a);
+op_to_scode(address_to_str)    -> aeb_fate_code:addr_to_str(?a, ?a);
+op_to_scode(int_to_str)        -> aeb_fate_code:int_to_str(?a, ?a).
 
 %% PUSH and STORE ?a are the same, so we use STORE to make optimizations
 %% easier, and specialize to PUSH (which is cheaper) at the end.
@@ -614,7 +705,8 @@ attributes(I) ->
         {'BITS_AND', A, B, C}                 -> Pure(A, [B, C]);
         {'BITS_DIFF', A, B, C}                -> Pure(A, [B, C]);
         {'ADDRESS', A}                        -> Pure(A, []);
-        {'BALANCE', A}                        -> Pure(A, []);
+        {'BALANCE', A}                        -> Impure(A, []);
+        {'BALANCE_OTHER', A, B}               -> Impure(A, [B]);
         {'ORIGIN', A}                         -> Pure(A, []);
         {'CALLER', A}                         -> Pure(A, []);
         {'GASPRICE', A}                       -> Pure(A, []);
@@ -633,6 +725,7 @@ attributes(I) ->
         {'LOG4', A, B, C, D, E, F}            -> Impure(none, [A, B, C, D, E, F]);
         'DEACTIVATE'                          -> Impure(none, []);
         {'SPEND', A, B}                       -> Impure(none, [A, B]);
+
         {'ORACLE_REGISTER', A, B, C, D, E, F} -> Impure(A, [B, C, D, E, F]);
         'ORACLE_QUERY'                        -> Impure(?a, []);  %% TODO
         'ORACLE_RESPOND'                      -> Impure(?a, []);  %% TODO
@@ -1219,14 +1312,10 @@ chase_labels([L | Ls], Map, Live) ->
     chase_labels(New ++ Ls, Map, Live#{ L => true }).
 
 %% Replace PUSH, RETURN by RETURNR, drop returns after tail calls.
-tweak_returns(['RETURN', {'PUSH', A} | Code]) ->
-    [{'RETURNR', A} | Code];
-%% tweak_returns(['RETURN', {'PUSH', A} | Code]) ->
-%%     [{'RETURNR', A} | Code];
-tweak_returns(['RETURN' | Code = [{'CALL_T', _} | _]]) ->
-    Code;
-tweak_returns(['RETURN' | Code = [{'CALL_TR', _, _} | _]]) ->
-    Code;
+tweak_returns(['RETURN', {'PUSH', A} | Code])              -> [{'RETURNR', A} | Code];
+tweak_returns(['RETURN' | Code = [{'CALL_T', _} | _]])     -> Code;
+tweak_returns(['RETURN' | Code = [{'CALL_TR', _, _} | _]]) -> Code;
+tweak_returns(['RETURN' | Code = [{'ABORT', _} | _]])      -> Code;
 tweak_returns(Code) -> Code.
 
 %% -- Split basic blocks at CALL instructions --

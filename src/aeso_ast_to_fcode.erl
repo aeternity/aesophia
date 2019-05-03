@@ -24,9 +24,13 @@
 -type var_name() :: string().
 -type sophia_name() :: [string()].
 
--type binop() :: '+' | '-' | '*' | '/' | mod | '^' | '++' | '::' |
-                 '<' | '>' | '=<' | '>=' | '==' | '!='.
--type unop() :: '!'.
+-type builtin() :: atom().
+
+-type op() :: '+' | '-' | '*' | '/' | mod | '^' | '++' | '::' |
+              '<' | '>' | '=<' | '>=' | '==' | '!=' | '!' |
+              map_from_list | map_to_list | map_delete | map_member | map_size |
+              string_length | string_concat | bits_set | bits_clear | bits_test |
+              bits_sum | bits_intersection | bits_union | bits_difference.
 
 -type fexpr() :: {int, integer()}
                | {string, binary()}
@@ -38,6 +42,8 @@
                | nil
                | {var, var_name()}
                | {def, fun_name()}
+               | {builtin, builtin(), non_neg_integer() | none} %% Unapplied builtin
+               | {builtin, builtin(), [fexpr()]}
                | {con, arities(), tag(), [fexpr()]}
                | {tuple, [fexpr()]}
                | {proj, fexpr(), integer()}
@@ -46,8 +52,7 @@
                | {map_set, fexpr(), fexpr(), fexpr()}   % map, key, val
                | {map_get, fexpr(), fexpr()}            % map, key
                | {map_get, fexpr(), fexpr(), fexpr()}   % map, key, default
-               | {op, binop(), fexpr(), fexpr()}
-               | {op, unop(), fexpr()}
+               | {op, op(), [fexpr()]}
                | {'let', var_name(), fexpr(), fexpr()}
                | {funcall, fexpr(), [fexpr()]}
                | {switch, fsplit()}.
@@ -104,6 +109,7 @@
 -type type_env() :: #{ sophia_name() => type_def() }.
 -type fun_env()  :: #{ sophia_name() => fun_name() }.
 -type con_env()  :: #{ sophia_name() => con_tag() }.
+-type builtins() :: #{ sophia_name() => {builtin(), non_neg_integer() | none} }.
 
 -type context() :: {main_contract, string()}
                  | {namespace, string()}
@@ -112,6 +118,7 @@
 -type env() :: #{ type_env  := type_env(),
                   fun_env   := fun_env(),
                   con_env   := con_env(),
+                  builtins  := builtins(),
                   options   := [option()],
                   context   => context(),
                   vars      => [var_name()],
@@ -130,12 +137,46 @@ ast_to_fcode(Code, Options) ->
 -spec init_env([option()]) -> env().
 init_env(Options) ->
     #{ type_env  => init_type_env(),
-       fun_env   => #{},    %% TODO: builtin functions here?
-       con_env   => #{["None"] => #con_tag{ tag = 0, arities = [0, 1] },
-                      ["Some"] => #con_tag{ tag = 1, arities = [0, 1] }
+       fun_env   => #{},
+       builtins  => builtins(),
+       con_env   => #{["None"]        => #con_tag{ tag = 0, arities = [0, 1] },
+                      ["Some"]        => #con_tag{ tag = 1, arities = [0, 1] },
+                      ["RelativeTTL"] => #con_tag{ tag = 0, arities = [1, 1] },
+                      ["FixedTTL"]    => #con_tag{ tag = 1, arities = [1, 1] }
                      },
        options   => Options,
        functions => #{} }.
+
+-spec builtins() -> builtins().
+builtins() ->
+    MkName = fun(NS, Fun) ->
+                list_to_atom(string:to_lower(string:join(NS ++ [Fun], "_")))
+             end,
+    Scopes = [{[],           [{"abort", 1}]},
+              {["Chain"],    [{"spend", 2}, {"balance", 1}, {"block_hash", 1}, {"coinbase", none},
+                              {"timestamp", none}, {"block_height", none}, {"difficulty", none},
+                              {"gas_limit", none}]},
+              {["Contract"], [{"address", none}, {"balance", none}]},
+              {["Call"],     [{"origin", none}, {"caller", none}, {"value", none}, {"gas_price", none},
+                              {"gas_left", 0}]},
+              {["Oracle"],   [{"register", 4}, {"query_fee", 1}, {"query", 5}, {"get_question", 2},
+                              {"respond", 4}, {"extend", 3}, {"get_answer", 2}]},
+              {["AENS"],     [{"resolve", 2}, {"preclaim", 3}, {"claim", 4}, {"transfer", 4},
+                              {"revoke", 3}]},
+              {["Map"],      [{"from_list", 1}, {"to_list", 1}, {"lookup", 2},
+                              {"lookup_default", 3}, {"delete", 2}, {"member", 2}, {"size", 1}]},
+              {["Crypto"],   [{"ecverify", 3}, {"ecverify_secp256k1", 3}, {"sha3", 1},
+                              {"sha256", 1}, {"blake2b", 1}]},
+              {["Auth"],     [{"tx_hash", none}]},
+              {["String"],   [{"length", 1}, {"concat", 2}, {"sha3", 1}, {"sha256", 1}, {"blake2b", 1}]},
+              {["Bits"],     [{"set", 2}, {"clear", 2}, {"test", 2}, {"sum", 1}, {"intersection", 2},
+                              {"union", 2}, {"difference", 2}, {"none", none}, {"all", none}]},
+              {["Int"],      [{"to_str", 1}]},
+              {["Address"],  [{"to_str", 1}]}
+             ],
+    maps:from_list([ {NS ++ [Fun], {MkName(NS, Fun), Arity}}
+                     || {NS, Funs} <- Scopes,
+                        {Fun, Arity} <- Funs ]).
 
 -define(type(T),       fun([])     -> T end).
 -define(type(X, T),    fun([X])    -> T end).
@@ -333,7 +374,7 @@ expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Rec, Fields}) ->
 
 %% Lists
 expr_to_fcode(Env, _Type, {list, _, Es}) ->
-    lists:foldr(fun(E, L) -> {op, '::', expr_to_fcode(Env, E), L} end,
+    lists:foldr(fun(E, L) -> {op, '::', [expr_to_fcode(Env, E), L]} end,
                 nil, Es);
 
 %% Conditionals
@@ -372,16 +413,25 @@ expr_to_fcode(Env, _Type, Expr = {app, _, {Op, _}, [_, _]}) when Op == '&&'; Op 
     Tree = expr_to_decision_tree(Env, Expr),
     decision_tree_to_fcode(Tree);
 expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A, B]}) when is_atom(Op) ->
-    {op, Op, expr_to_fcode(Env, A), expr_to_fcode(Env, B)};
+    {op, Op, [expr_to_fcode(Env, A), expr_to_fcode(Env, B)]};
 expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
     case Op of
-        '-' -> {op, '-', {int, 0}, expr_to_fcode(Env, A)};
-        '!' -> {op, '!', expr_to_fcode(Env, A)}
+        '-' -> {op, '-', [{int, 0}, expr_to_fcode(Env, A)]};
+        '!' -> {op, '!', [expr_to_fcode(Env, A)]}
     end;
 
 %% Function calls
-expr_to_fcode(Env, _Type, {app, _Ann, Fun, Args}) ->
-    {funcall, expr_to_fcode(Env, Fun), [expr_to_fcode(Env, Arg) || Arg <- Args]};
+expr_to_fcode(Env, _Type, {app, _Ann, Fun = {typed, _, _, {fun_t, _, NamedArgsT, _, _}}, Args}) ->
+    Args1 = get_named_args(NamedArgsT, Args),
+    FArgs = [expr_to_fcode(Env, Arg) || Arg <- Args1],
+    case expr_to_fcode(Env, Fun) of
+        {builtin, B, Ar} when is_integer(Ar) ->
+            case length(FArgs) of
+                N when N == Ar -> builtin_to_fcode(B, FArgs);
+                N when N < Ar  -> error({todo, eta_expand, B, FArgs})
+            end;
+        FFun -> {funcall, FFun, FArgs}
+    end;
 
 %% Maps
 expr_to_fcode(_Env, _Type, {map, _, []}) ->
@@ -628,6 +678,24 @@ stmts_to_fcode(Env, [{letval, _, {typed, _, {id, _, X}, _}, _, Expr} | Stmts]) -
 stmts_to_fcode(Env, [Expr]) ->
     expr_to_fcode(Env, Expr).
 
+%% -- Builtins --
+
+op_builtins() ->
+    [map_from_list, map_to_list, map_delete, map_member, map_size,
+     string_length, string_concat, string_sha3, string_sha256, string_blake2b,
+     bits_set, bits_clear, bits_test, bits_sum, bits_intersection, bits_union,
+     bits_difference, int_to_str, address_to_str].
+
+builtin_to_fcode(map_lookup, [Key, Map]) ->
+    {map_get, Map, Key};
+builtin_to_fcode(map_lookup_default, [Key, Map, Def]) ->
+    {map_get, Map, Key, Def};
+builtin_to_fcode(Builtin, Args) ->
+    case lists:member(Builtin, op_builtins()) of
+        true  -> {op, Builtin, Args};
+        false -> {builtin, Builtin, Args}
+    end.
+
 %% -- Optimisations ----------------------------------------------------------
 
 %% - Deadcode elimination
@@ -739,9 +807,10 @@ resolve_var(#{ vars := Vars } = Env, [X]) ->
     end;
 resolve_var(Env, Q) -> resolve_fun(Env, Q).
 
-resolve_fun(#{ fun_env := Funs }, Q) ->
-    case maps:get(Q, Funs, not_found) of
+resolve_fun(#{ fun_env := Funs, builtins := Builtin }, Q) ->
+    case maps:get(Q, maps:merge(Funs, Builtin), not_found) of
         not_found -> fcode_error({unbound_variable, Q});
+        {B, Ar}   -> {builtin, B, Ar};
         Fun       -> {def, Fun}
     end.
 
@@ -768,6 +837,19 @@ pat_vars({tuple, Ps})         -> pat_vars(Ps);
 pat_vars({con, _, _, Ps})     -> pat_vars(Ps);
 pat_vars(Ps) when is_list(Ps) -> [X || P <- Ps, X <- pat_vars(P)].
 
+get_named_args(NamedArgsT, Args) ->
+    IsNamed = fun({named_arg, _, _, _}) -> true;
+                 (_) -> false end,
+    {Named, NotNamed} = lists:partition(IsNamed, Args),
+    NamedArgs = [get_named_arg(NamedArg, Named) || NamedArg <- NamedArgsT],
+    NamedArgs ++ NotNamed.
+
+get_named_arg({named_arg_t, _, {id, _, Name}, _, Default}, Args) ->
+    case [ Val || {named_arg, _, {id, _, X}, Val} <- Args, X == Name ] of
+        [Val] -> Val;
+        []    -> Default
+    end.
+
 %% -- Renaming --
 
 -spec rename([{var_name(), var_name()}], fexpr()) -> fexpr().
@@ -787,8 +869,7 @@ rename(Ren, Expr) ->
         {tuple, Es}         -> {tuple, [rename(Ren, E) || E <- Es]};
         {proj, E, I}        -> {proj, rename(Ren, E), I};
         {set_proj, R, I, E} -> {set_proj, rename(Ren, R), I, rename(Ren, E)};
-        {op, Op, E1, E2}    -> {op, Op, rename(Ren, E1), rename(Ren, E2)};
-        {op, Op, E}         -> {op, Op, rename(Ren, E)};
+        {op, Op, Es}        -> {op, Op, [rename(Ren, E) || E <- Es]};
         {funcall, Fun, Es}  -> {funcall, Fun, [rename(Ren, E) || E <- Es]};
         {'let', X, E, Body} ->
             {Z, Ren1} = rename_binding(Ren, X),
@@ -936,7 +1017,6 @@ pp_fexpr(nil) ->
 pp_fexpr({var, X})               -> pp_text(X);
 pp_fexpr({def, {entrypoint, E}}) -> pp_text(E);
 pp_fexpr({def, {local_fun, Q}})  -> pp_text(string:join(Q, "."));
-pp_fexpr({def, {builtin, B}})    -> pp_text(B);
 pp_fexpr({con, _, I, []}) ->
     pp_beside(pp_text("C"), pp_text(I));
 pp_fexpr({con, _, I, Es}) ->
@@ -948,16 +1028,32 @@ pp_fexpr({proj, E, I}) ->
     pp_beside([pp_fexpr(E), pp_text("."), pp_text(I)]);
 pp_fexpr({set_proj, E, I, A}) ->
     pp_beside(pp_fexpr(E), pp_braces(pp_beside([pp_text(I), pp_text(" = "), pp_fexpr(A)])));
-pp_fexpr({op, Op, A, B}) ->
-    pp_parens(pp_par([pp_fexpr(A), pp_text(Op), pp_fexpr(B)]));
-pp_fexpr({op, Op, A}) ->
-    pp_parens(pp_par([pp_text(Op), pp_fexpr(A)]));
+pp_fexpr({op, Op, [A, B] = Args}) ->
+    case is_infix(Op) of
+        false -> pp_call(pp_text(Op), Args);
+        true  -> pp_parens(pp_par([pp_fexpr(A), pp_text(Op), pp_fexpr(B)]))
+    end;
+pp_fexpr({op, Op, [A] = Args}) ->
+    case is_infix(Op) of
+        false -> pp_call(pp_text(Op), Args);
+        true  -> pp_parens(pp_par([pp_text(Op), pp_fexpr(A)]))
+    end;
+pp_fexpr({op, Op, As}) ->
+    pp_beside(pp_text(Op), pp_fexpr({tuple, As}));
 pp_fexpr({'let', X, A, B}) ->
     pp_par([pp_beside([pp_text("let "), pp_text(X), pp_text(" = "), pp_fexpr(A), pp_text(" in")]),
             pp_fexpr(B)]);
+pp_fexpr({builtin, B, none}) -> pp_text(B);
+pp_fexpr({builtin, B, N}) when is_integer(N) ->
+    pp_beside([pp_text(B), pp_text("/"), pp_text(N)]);
+pp_fexpr({builtin, B, As}) when is_list(As) ->
+    pp_call(pp_text(B), As);
 pp_fexpr({funcall, Fun, As}) ->
-    pp_beside(pp_fexpr(Fun), pp_fexpr({tuple, As}));
+    pp_call(pp_fexpr(Fun), As);
 pp_fexpr({switch, Split}) -> pp_split(Split).
+
+pp_call(Fun, Args) ->
+    pp_beside(Fun, pp_fexpr({tuple, Args})).
 
 pp_ftype(T) when is_atom(T) -> pp_text(T);
 pp_ftype({tuple, Ts}) ->
@@ -982,8 +1078,12 @@ pp_case({'case', Pat, Split}) ->
                   prettypr:nest(2, pp_split(Split))]).
 
 pp_pat({tuple, Xs})      -> pp_fexpr({tuple, [{var, X} || X <- Xs]});
-pp_pat({'::', X, Xs})    -> pp_fexpr({op, '::', {var, X}, {var, Xs}});
+pp_pat({'::', X, Xs})    -> pp_fexpr({op, '::', [{var, X}, {var, Xs}]});
 pp_pat({con, As, I, Xs}) -> pp_fexpr({con, As, I, [{var, X} || X <- Xs]});
 pp_pat({var, X})         -> pp_fexpr({var, X});
 pp_pat(Pat)              -> pp_fexpr(Pat).
+
+is_infix(Op) ->
+    C = hd(atom_to_list(Op)),
+    C < $a orelse C > $z.
 
