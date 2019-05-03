@@ -1137,10 +1137,13 @@ block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
                         _       -> FalseCode ++ [{jump, RestRef}]
                     end,
                 case lists:usort(Alts) == [missing] of
-                    true ->
-                        {Blk#blk{code = [{jump, DefRef}]}, [], []};
+                    true  -> {Blk#blk{code = [{jump, DefRef}]}, [], []};
                     false ->
-                        {Blk#blk{code = ElseCode}, [{jumpif, Arg, ThenRef}], ThenBlk}
+                        case Arg of
+                            ?i(false) -> {Blk#blk{code = ElseCode}, [], ThenBlk};
+                            ?i(true)  -> {Blk#blk{code = []}, [{jump, ThenRef}], ThenBlk};
+                            _         -> {Blk#blk{code = ElseCode}, [{jumpif, Arg, ThenRef}], ThenBlk}
+                        end
                 end;
             tuple ->
                 [TCode] = Alts,
