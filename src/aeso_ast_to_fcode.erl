@@ -36,7 +36,8 @@
                | {oracle_query_id, binary()}
                | {bool, false | true}
                | nil
-               | {var, sophia_name()}
+               | {var, var_name()}
+               | {def, fun_name()}
                | {con, arities(), tag(), [fexpr()]}
                | {tuple, [fexpr()]}
                | {proj, fexpr(), integer()}
@@ -113,6 +114,7 @@
                   con_env   := con_env(),
                   options   := [option()],
                   context   => context(),
+                  vars      => [var_name()],
                   functions := #{ fun_name() => fun_def() } }.
 
 %% -- Entrypoint -------------------------------------------------------------
@@ -197,7 +199,7 @@ decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, {id, _, Name}, Args, R
     Attrs = get_attributes(Ann),
     FName = lookup_fun(Env, qname(Env, Name)),
     FArgs = args_to_fcode(Env, Args),
-    FBody = expr_to_fcode(Env, Body),
+    FBody = expr_to_fcode(Env#{ vars => [X || {X, _} <- FArgs] }, Body),
     %% io:format("Body of ~s:\n~s\n", [Name, format_fexpr(FBody)]),
     Def   = #{ attrs  => Attrs,
                args   => FArgs,
@@ -279,8 +281,8 @@ expr_to_fcode(_Env, _Type, {oracle_pubkey,   _, K}) -> {oracle_pubkey, K};
 expr_to_fcode(_Env, _Type, {oracle_query_id, _, K}) -> {oracle_query_id, K};
 
 %% Variables
-expr_to_fcode(_Env, _Type, {id, _, X})  -> {var, [X]};
-expr_to_fcode(_Env, _Type, {qid, _, X}) -> {var, X};
+expr_to_fcode(Env, _Type, {id, _, X})  -> resolve_var(Env, [X]);
+expr_to_fcode(Env, _Type, {qid, _, X}) -> resolve_var(Env, X);
 
 %% Constructors
 expr_to_fcode(Env, Type, {C, _, _} = Con) when C == con; C == qcon ->
@@ -311,20 +313,21 @@ expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Fields}) ->
 
 expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Rec, Fields}) ->
     X    = fresh_name(),
-    Proj = fun(I) -> {proj, {var, [X]}, I - 1} end,
+    Proj = fun(I) -> {proj, {var, X}, I - 1} end,
     Comp = fun({I, false})       -> Proj(I);
               ({_, {set, E}})    -> expr_to_fcode(Env, E);
               ({I, {upd, Z, E}}) -> {'let', Z, Proj(I), expr_to_fcode(Env, E)}
            end,
     Set  = fun({_, false}, R)       -> R;
               ({I, {set, E}}, R)    -> {set_proj, R, I - 1, expr_to_fcode(Env, E)};
-              ({I, {upd, Z, E}}, R) -> {set_proj, R, I - 1, {'let', Z, Proj(I), expr_to_fcode(Env, E)}}
+              ({I, {upd, Z, E}}, R) -> {set_proj, R, I - 1,
+                                        {'let', Z, Proj(I), expr_to_fcode(bind_var(Env, Z), E)}}
            end,
     Expand  = length(Fields) == length(FieldTypes),
     Updates = [ {I, field_value(FT, Fields)} || {I, FT} <- indexed(FieldTypes) ],
     Body = case Expand of
              true  -> {tuple, lists:map(Comp, Updates)};
-             false -> lists:foldr(Set, {var, [X]}, Updates)
+             false -> lists:foldr(Set, {var, X}, Updates)
            end,
     {'let', X, expr_to_fcode(Env, Rec), Body};
 
@@ -341,7 +344,7 @@ expr_to_fcode(Env, _Type, {'if', _, Cond, Then, Else}) ->
                      {'case', {bool, true},  {nosplit, expr_to_fcode(Env, Then)}}]}}
              end,
     case Cond of
-        {var, [X]} -> Switch(X);
+        {var, X} -> Switch(X);
         _          ->
             X = fresh_name(),
             {'let', X, expr_to_fcode(Env, Cond), Switch(X)}
@@ -390,7 +393,7 @@ expr_to_fcode(Env, Type, {map, Ann, KVs}) ->
     expr_to_fcode(Env, Type, {map, Ann, {map, Ann, []}, Fields});
 expr_to_fcode(Env, _Type, {map, _, Map, KVs}) ->
     X    = fresh_name(),
-    Map1 = {var, [X]},
+    Map1 = {var, X},
     {'let', X, expr_to_fcode(Env, Map),
         lists:foldr(fun(Fld, M) ->
                         case Fld of
@@ -399,8 +402,8 @@ expr_to_fcode(Env, _Type, {map, _, Map, KVs}) ->
                             {field_upd, _, [{map_get, _, K}], {typed, _, {lam, _, [{arg, _, {id, _, Z}, _}], V}, _}} ->
                                 Y = fresh_name(),
                                 {'let', Y, expr_to_fcode(Env, K),
-                                {'let', Z, {map_get, Map1, {var, [Y]}},
-                                {map_set, M, {var, [Y]}, expr_to_fcode(Env, V)}}}
+                                {'let', Z, {map_get, Map1, {var, Y}},
+                                {map_set, M, {var, Y}, expr_to_fcode(bind_var(Env, Z), V)}}}
                         end end, Map1, KVs)};
 expr_to_fcode(Env, _Type, {map_get, _, Map, Key}) ->
     {map_get, expr_to_fcode(Env, Map), expr_to_fcode(Env, Key)};
@@ -548,7 +551,9 @@ next_split(Pats) ->
 
 -spec alt_to_fcode(env(), aeso_syntax:alt()) -> falt().
 alt_to_fcode(Env, {'case', _, Pat, Expr}) ->
-    {'case', [pat_to_fcode(Env, Pat)], expr_to_fcode(Env, Expr)}.
+    FPat  = pat_to_fcode(Env, Pat),
+    FExpr = expr_to_fcode(bind_vars(Env, pat_vars(FPat)), Expr),
+    {'case', [FPat], FExpr}.
 
 -spec pat_to_fcode(env(), aeso_syntax:pat()) -> fpat().
 pat_to_fcode(Env, {typed, _, Pat, Type}) ->
@@ -618,18 +623,18 @@ decision_tree_to_fcode({'if', A, Then, Else}) ->
 
 -spec stmts_to_fcode(env(), [aeso_syntax:stmt()]) -> fexpr().
 stmts_to_fcode(Env, [{letval, _, {typed, _, {id, _, X}, _}, _, Expr} | Stmts]) ->
-    {'let', X, expr_to_fcode(Env, Expr), stmts_to_fcode(Env, Stmts)};
+    {'let', X, expr_to_fcode(Env, Expr), stmts_to_fcode(bind_var(Env, X), Stmts)};
 
 stmts_to_fcode(Env, [Expr]) ->
     expr_to_fcode(Env, Expr).
 
 %% -- Optimisations ----------------------------------------------------------
 
-%% - Translate && and || to ifte
 %% - Deadcode elimination
 %% - Unused variable analysis (replace by _)
 %% - Case specialization
 %% - Constant propagation
+%% - Inlining
 
 -spec optimize_fcode(fcode()) -> fcode().
 optimize_fcode(Code = #{ functions := Funs }) ->
@@ -722,6 +727,24 @@ lookup_con(#{ con_env := ConEnv }, Con) ->
         Tag   -> Tag
     end.
 
+bind_vars(Env, Xs) ->
+    lists:foldl(fun(X, E) -> bind_var(E, X) end, Env, Xs).
+
+bind_var(Env = #{ vars := Vars }, X) -> Env#{ vars := [X | Vars] }.
+
+resolve_var(#{ vars := Vars } = Env, [X]) ->
+    case lists:member(X, Vars) of
+        true  -> {var, X};
+        false -> resolve_fun(Env, [X])
+    end;
+resolve_var(Env, Q) -> resolve_fun(Env, Q).
+
+resolve_fun(#{ fun_env := Funs }, Q) ->
+    case maps:get(Q, Funs, not_found) of
+        not_found -> fcode_error({unbound_variable, Q});
+        Fun       -> {def, Fun}
+    end.
+
 init_fresh_names() ->
     put('%fresh', 0).
 
@@ -733,6 +756,17 @@ fresh_name() ->
     N = get('%fresh'),
     put('%fresh', N + 1),
     lists:concat(["%", N]).
+
+-spec pat_vars(fpat()) -> [var_name()].
+pat_vars({var, X})            -> [X || X /= "_"];
+pat_vars({bool, _})           -> [];
+pat_vars({int, _})            -> [];
+pat_vars({string, _})         -> [];
+pat_vars(nil)                 -> [];
+pat_vars({'::', P, Q})        -> pat_vars(P) ++ pat_vars(Q);
+pat_vars({tuple, Ps})         -> pat_vars(Ps);
+pat_vars({con, _, _, Ps})     -> pat_vars(Ps);
+pat_vars(Ps) when is_list(Ps) -> [X || P <- Ps, X <- pat_vars(P)].
 
 %% -- Renaming --
 
@@ -747,8 +781,8 @@ rename(Ren, Expr) ->
         {oracle_pubkey, _}   -> Expr;
         {oracle_query_id, _} -> Expr;
         nil                 -> nil;
-        {var, [X]}          -> {var, [rename_var(Ren, X)]};
-        {var, _}            -> Expr;
+        {var, X}            -> {var, rename_var(Ren, X)};
+        {def, _}            -> Expr;
         {con, Ar, I, Es}    -> {con, Ar, I, [rename(Ren, E) || E <- Es]};
         {tuple, Es}         -> {tuple, [rename(Ren, E) || E <- Es]};
         {proj, E, I}        -> {proj, rename(Ren, E), I};
@@ -899,8 +933,10 @@ pp_fexpr({Tag, Lit}) when Tag == int;
     aeso_pretty:expr({Tag, [], Lit});
 pp_fexpr(nil) ->
     pp_text("[]");
-pp_fexpr({var, X}) ->
-    pp_text(X);
+pp_fexpr({var, X})               -> pp_text(X);
+pp_fexpr({def, {entrypoint, E}}) -> pp_text(E);
+pp_fexpr({def, {local_fun, Q}})  -> pp_text(string:join(Q, "."));
+pp_fexpr({def, {builtin, B}})    -> pp_text(B);
 pp_fexpr({con, _, I, []}) ->
     pp_beside(pp_text("C"), pp_text(I));
 pp_fexpr({con, _, I, Es}) ->
@@ -945,9 +981,9 @@ pp_case({'case', Pat, Split}) ->
     prettypr:sep([pp_beside(pp_pat(Pat), pp_text(" =>")),
                   prettypr:nest(2, pp_split(Split))]).
 
-pp_pat({tuple, Xs})      -> pp_fexpr({tuple, [{var, [X]} || X <- Xs]});
-pp_pat({'::', X, Xs})    -> pp_fexpr({op, '::', {var, [X]}, {var, [Xs]}});
-pp_pat({con, As, I, Xs}) -> pp_fexpr({con, As, I, [{var, [X]} || X <- Xs]});
-pp_pat({var, X})         -> pp_fexpr({var, [X]});
+pp_pat({tuple, Xs})      -> pp_fexpr({tuple, [{var, X} || X <- Xs]});
+pp_pat({'::', X, Xs})    -> pp_fexpr({op, '::', {var, X}, {var, Xs}});
+pp_pat({con, As, I, Xs}) -> pp_fexpr({con, As, I, [{var, X} || X <- Xs]});
+pp_pat({var, X})         -> pp_fexpr({var, X});
 pp_pat(Pat)              -> pp_fexpr(Pat).
 

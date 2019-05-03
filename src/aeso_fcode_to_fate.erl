@@ -149,7 +149,7 @@ type_to_scode(T)               -> T.
 %% -- Environment functions --
 
 init_env(ContractName, FunNames, Args) ->
-    #env{ vars      = [ {[X], {arg, I}} || {I, {X, _}} <- with_ixs(Args) ],
+    #env{ vars      = [ {X, {arg, I}} || {I, {X, _}} <- with_ixs(Args) ],
           contract  = ContractName,
           locals    = FunNames,
           tailpos   = true }.
@@ -158,7 +158,7 @@ next_var(#env{ vars = Vars }) ->
     1 + lists:max([-1 | [J || {_, {var, J}} <- Vars]]).
 
 bind_var(Name, Var, Env = #env{ vars = Vars }) ->
-    Env#env{ vars = [{[Name], Var} | Vars] }.
+    Env#env{ vars = [{Name, Var} | Vars] }.
 
 bind_local(Name, Env) ->
     I = next_var(Env),
@@ -168,28 +168,10 @@ notail(Env) -> Env#env{ tailpos = false }.
 
 code_error(Err) -> error(Err).
 
-lookup_var(Env, X = [N | _]) when is_integer(N) ->
-    lookup_var(Env, [X]);
-lookup_var(Env, X) ->
-    case resolve_name(Env, X) of
-        {var, Var} -> Var;
-        _          -> code_error({unbound_variable, X, Env})
-    end.
-
-resolve_name(#env{ vars = Vars, contract = Contract, locals = Funs }, X) ->
+lookup_var(#env{vars = Vars}, X) ->
     case lists:keyfind(X, 1, Vars) of
-        {_, Var} -> {var, Var};
-        false    ->
-            case X of
-                [Lib, Fun] ->
-                    EntryPoint = Lib == Contract andalso lists:member({entrypoint, Fun}, Funs),
-                    LocalFun   = lists:member({local_fun, X}, Funs),
-                    if EntryPoint -> {def, make_function_name({entrypoint, Fun})};
-                       LocalFun   -> {def, make_function_name({local_fun, X})};
-                       true       -> not_found end;
-                _ ->
-                    not_found
-            end
+        {_, Var} -> Var;
+        false    -> code_error({unbound_variable, X, Vars})
     end.
 
 %% -- The compiler --
@@ -278,21 +260,17 @@ to_scode(Env, {'let', X, Expr, Body}) ->
 
 to_scode(Env, {funcall, Fun, Args}) ->
     case Fun of
-        {var, X} ->
-            case resolve_name(Env, X) of
-                {def, F} ->
-                    Lbl  = aeb_fate_data:make_string(F),
-                    Call = if Env#env.tailpos -> aeb_fate_code:call_t(Lbl);
-                              true            -> aeb_fate_code:call(Lbl) end,
-                    [ [to_scode(notail(Env), Arg) || Arg <- lists:reverse(Args)],
-                      Call ];
-                {var, Y} ->
-                    ?TODO({call_to_unknown_function, Y});
-                not_found ->
-                    code_error({unbound_variable, X, Env})
-            end;
-        _ ->
-            ?TODO({funcall, Fun})
+        {var, _} ->
+            ?TODO({funcall, Fun});
+        {def, {builtin, _}} ->
+            ?TODO({funcall, Fun});
+        {def, Def} ->
+            FName = make_function_name(Def),
+            Lbl   = aeb_fate_data:make_string(FName),
+            Call = if Env#env.tailpos -> aeb_fate_code:call_t(Lbl);
+                      true            -> aeb_fate_code:call(Lbl) end,
+            [ [to_scode(notail(Env), Arg) || Arg <- lists:reverse(Args)],
+              Call ]
     end;
 
 to_scode(Env, {switch, Case}) ->
