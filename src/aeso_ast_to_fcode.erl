@@ -294,6 +294,8 @@ type_to_fcode(Env, Sub, {tuple_t, _, Types}) ->
 type_to_fcode(Env, Sub, {record_t, Fields}) ->
     FieldType = fun({field_t, _, _, Ty}) -> Ty end,
     type_to_fcode(Env, Sub, {tuple_t, [], lists:map(FieldType, Fields)});
+type_to_fcode(_Env, _Sub, {bytes_t, _, _N}) ->
+    string; %% TODO: add bytes type to FATE?
 type_to_fcode(_Env, Sub, {tvar, _, X}) ->
     maps:get(X, Sub, any);
 type_to_fcode(_Env, _Sub, Type) ->
@@ -320,6 +322,8 @@ expr_to_fcode(_Env, _Type, {account_pubkey,  _, K}) -> {account_pubkey, K};
 expr_to_fcode(_Env, _Type, {contract_pubkey, _, K}) -> {contract_pubkey, K};
 expr_to_fcode(_Env, _Type, {oracle_pubkey,   _, K}) -> {oracle_pubkey, K};
 expr_to_fcode(_Env, _Type, {oracle_query_id, _, K}) -> {oracle_query_id, K};
+
+expr_to_fcode(_Env, _Type, {bytes, _, Bin}) -> {string, Bin};
 
 %% Variables
 expr_to_fcode(Env, _Type, {id, _, X})  -> resolve_var(Env, [X]);

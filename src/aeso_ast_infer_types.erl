@@ -359,7 +359,7 @@ global_env() ->
     Fun1    = fun(S, T) -> Fun([S], T) end,
     TVar    = fun(X) -> {tvar, Ann, "'" ++ X} end,
     SignId    = {id, Ann, "signature"},
-    SignDef   = {tuple, Ann, [{int, Ann, 0}, {int, Ann, 0}]},
+    SignDef   = {bytes, Ann, <<0:64/unit:8>>},
     Signature = {named_arg_t, Ann, SignId, SignId, {typed, Ann, SignDef, SignId}},
     SignFun   = fun(Ts, T) -> {type_sig, Ann, [Signature], Ts, T} end,
     TTL       = {qid, Ann, ["Chain", "ttl"]},
