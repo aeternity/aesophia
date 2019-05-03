@@ -812,10 +812,10 @@ resolve_var(#{ vars := Vars } = Env, [X]) ->
 resolve_var(Env, Q) -> resolve_fun(Env, Q).
 
 resolve_fun(#{ fun_env := Funs, builtins := Builtin }, Q) ->
-    case maps:get(Q, maps:merge(Funs, Builtin), not_found) of
-        not_found -> fcode_error({unbound_variable, Q});
-        {B, Ar}   -> {builtin, B, Ar};
-        Fun       -> {def, Fun}
+    case {maps:get(Q, Funs, not_found), maps:get(Q, Builtin, not_found)} of
+        {not_found, not_found} -> fcode_error({unbound_variable, Q});
+        {_, {B, Ar}}           -> {builtin, B, Ar};
+        {Fun, _}               -> {def, Fun}
     end.
 
 init_fresh_names() ->
