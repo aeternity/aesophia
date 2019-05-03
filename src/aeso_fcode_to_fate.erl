@@ -70,7 +70,7 @@
      Op =:= 'HD'              orelse
      Op =:= 'TL'              orelse
      Op =:= 'LENGTH'          orelse
-     Op =:= 'STR_EQ'          orelse
+     Op =:= 'APPEND'          orelse
      Op =:= 'STR_JOIN'        orelse
      Op =:= 'INT_TO_STR'      orelse
      Op =:= 'ADDR_TO_STR'     orelse
