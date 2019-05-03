@@ -861,16 +861,8 @@ r_push_consume({i, Ann1, {'STORE', ?a, A}}, [{i, Ann2, {'POP', B}} | Code]) ->
         true  -> {[{i, merge_ann(Ann1, Ann2), {'STORE', B, A}}], Code};
         false -> {[], Code}
     end;
-r_push_consume({i, Ann1, {'STORE', ?a, A}}, [{i, Ann2, I} | Code]) ->
-    case op_view(I) of
-        {Op, R, As} ->
-            case lists:splitwith(fun(X) -> X /= ?a end, As) of
-                {_, []} -> false;
-                {As1, [?a | As2]} ->
-                    {[{i, merge_ann(Ann1, Ann2), from_op_view(Op, R, As1 ++ [A] ++ As2)}], Code}
-            end;
-        _ -> false
-    end;
+r_push_consume({i, Ann1, {'STORE', ?a, A}}, Code) ->
+    inline_push(Ann1, A, 0, Code, []);
 %% Writing directly to memory instead of going through the accumulator.
 r_push_consume({i, Ann1, I}, [{i, Ann2, {'STORE', R, ?a}} | Code]) ->
     IsPush =
@@ -885,6 +877,34 @@ r_push_consume({i, Ann1, I}, [{i, Ann2, {'STORE', R, ?a}} | Code]) ->
     if IsPush -> {[{i, merge_ann(Ann1, Ann2), setelement(2, I, R)}], Code};
        true   -> false end;
 r_push_consume(_, _) -> false.
+
+inline_push(Ann, Arg, Stack, [switch_body | Code], Acc) ->
+    inline_push(Ann, Arg, Stack, Code, [switch_body | Acc]);
+inline_push(Ann1, Arg, Stack, [{i, Ann2, I} = AI | Code], Acc) ->
+    case op_view(I) of
+        {Op, R, As} ->
+            Consumes = length([ ?a || ?a <- As ]),
+            Produces = length([ ?a || ?a == R  ]),
+            case Consumes > Stack of
+                true ->
+                    {As0, As1} = split_stack_arg(Stack, As),
+                    Acc1 = [{i, merge_ann(Ann1, Ann2), from_op_view(Op, R, As0 ++ [Arg] ++ As1)} | Acc],
+                    {lists:reverse(Acc1), Code};
+                false ->
+                    {AI1, {i, Ann1b, _}} = swap_instrs({i, Ann1, {'STORE', ?a, Arg}}, AI),
+                    inline_push(Ann1b, Arg, Stack + Produces - Consumes, Code, [AI1 | Acc])
+            end;
+        false -> false
+    end;
+inline_push(_, _, _, _, _) -> false.
+
+split_stack_arg(N, As) -> split_stack_arg(N, As, []).
+split_stack_arg(0, [?a | As], Acc) ->
+    {lists:reverse(Acc), As};
+split_stack_arg(N, [A | As], Acc) ->
+    N1 = if A == ?a -> N - 1;
+            true    -> N end,
+    split_stack_arg(N1, As, [A | Acc]).
 
 %% Changing PUSH A, DUPA to PUSH A, PUSH A enables further optimisations
 r_dup_to_push({i, Ann1, Push={'STORE', ?a, _}}, [{i, Ann2, 'DUPA'} | Code]) ->
