@@ -1236,6 +1236,8 @@ pp_ftype({list, T}) ->
     pp_beside([pp_text("list("), pp_ftype(T), pp_text(")")]);
 pp_ftype({function, Args, Res}) ->
     pp_par([pp_ftype({tuple, Args}), pp_text("=>"), pp_ftype(Res)]);
+pp_ftype({map, Key, Val}) ->
+    pp_beside([pp_text("map"), pp_ftype({tuple, [Key, Val]})]);
 pp_ftype({variant, Cons}) ->
     pp_par(
     pp_punctuate(pp_text(" |"),
