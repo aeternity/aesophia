@@ -43,6 +43,7 @@
                | nil
                | {var, var_name()}
                | {def, fun_name(), [fexpr()]}
+               | {remote, fexpr(), fun_name(), [fexpr()]}
                | {builtin, builtin(), non_neg_integer() | none} %% Unapplied builtin
                | {builtin, builtin(), [fexpr()]}
                | {con, arities(), tag(), [fexpr()]}
@@ -296,6 +297,7 @@ type_to_fcode(Env, Type) ->
     type_to_fcode(Env, #{}, Type).
 
 -spec type_to_fcode(env(), #{var_name() => ftype()}, aeso_syntax:type()) -> ftype().
+type_to_fcode(_Env, _Sub, {con, _, _}) -> contract;
 type_to_fcode(Env, Sub, {app_t, _, T = {Id, _, _}, Types}) when Id == id; Id == qid ->
     lookup_type(Env, T, [type_to_fcode(Env, Sub, Type) || Type <- Types]);
 type_to_fcode(Env, _Sub, T = {Id, _, _}) when Id == id; Id == qid ->
@@ -309,8 +311,10 @@ type_to_fcode(_Env, _Sub, {bytes_t, _, _N}) ->
     string; %% TODO: add bytes type to FATE?
 type_to_fcode(_Env, Sub, {tvar, _, X}) ->
     maps:get(X, Sub, any);
-type_to_fcode(Env, Sub, {fun_t, _, [], Args, Res}) ->
-    {function, [type_to_fcode(Env, Sub, Arg) || Arg <- Args], type_to_fcode(Env, Sub, Res)};
+type_to_fcode(Env, Sub, {fun_t, _, Named, Args, Res}) ->
+    FNamed = [type_to_fcode(Env, Sub, Arg) || {named_arg_t, _, _, Arg, _} <- Named],
+    FArgs  = [type_to_fcode(Env, Sub, Arg) || Arg <- Args],
+    {function, FNamed ++ FArgs, type_to_fcode(Env, Sub, Res)};
 type_to_fcode(_Env, _Sub, Type) ->
     error({todo, Type}).
 
@@ -358,8 +362,15 @@ expr_to_fcode(Env, _Type, {tuple, _, Es}) ->
     {tuple, [expr_to_fcode(Env, E) || E <- Es]};
 
 %% Records
-expr_to_fcode(Env, _Type, {proj, _Ann, Rec, X}) ->
-    {proj, expr_to_fcode(Env, Rec), field_index(Rec, X)};
+expr_to_fcode(Env, Type, {proj, _Ann, Rec = {typed, _, _, RecType}, {id, _, X}}) ->
+    case RecType of
+        {con, _, _} ->
+            {fun_t, _, Named, Args, _} = Type,
+            Arity = length(Named) + length(Args),
+            {remote_u, expr_to_fcode(Env, Rec), {entrypoint, list_to_binary(X)}, Arity};
+        {record_t, _} ->
+            {proj, expr_to_fcode(Env, Rec), field_index(Rec, X)}
+    end;
 
 expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Fields}) ->
     FVal = fun(F) ->
@@ -444,6 +455,8 @@ expr_to_fcode(Env, _Type, {app, _Ann, Fun = {typed, _, _, {fun_t, _, NamedArgsT,
     case expr_to_fcode(Env, Fun) of
         {builtin, B, Ar} when is_integer(Ar) -> builtin_to_fcode(B, FArgs);
         {def, F, Ar}     when is_integer(Ar) -> {def, F, FArgs};
+        {remote_u, Ct, RFun, _Ar} ->
+            {remote, Ct, RFun, FArgs};
         FFun ->
             %% FFun is a closure, with first component the function name and
             %% second component the environment
@@ -765,12 +778,14 @@ lifted_fun(FVs, Xs, Body) ->
        body   => lists:foldr(Proj, Body, indexed(FVs))
      }.
 
+make_closure(FVs, Xs, Body) ->
+    Fun   = add_lambda_fun(lifted_fun(FVs, Xs, Body)),
+    Tup = fun([Y]) -> Y; (Ys) -> {tuple, Ys} end,
+    {closure, Fun, Tup([{var, Y} || Y <- FVs])}.
+
 lambda_lift_expr({lam, Xs, Body}) ->
     FVs   = free_vars({lam, Xs, Body}),
-    Body1 = lambda_lift_expr(Body),
-    Fun   = add_lambda_fun(lifted_fun(FVs, Xs, Body1)),
-    Tup = fun([Y]) -> Y; (Ys) -> {tuple, Ys} end,
-    {closure, Fun, Tup([{var, Y} || Y <- FVs])};
+    make_closure(FVs, Xs, lambda_lift_expr(Body));
 lambda_lift_expr({Tag, F, Ar}) when is_integer(Ar), Tag == def orelse Tag == builtin ->
     Xs   = [ lists:concat(["arg", I]) || I <- lists:seq(1, Ar) ],
     Args = [{var, X} || X <- Xs],
@@ -778,8 +793,13 @@ lambda_lift_expr({Tag, F, Ar}) when is_integer(Ar), Tag == def orelse Tag == bui
                builtin -> builtin_to_fcode(F, Args);
                def     -> {def, F, Args}
            end,
-    Fun = add_lambda_fun(lifted_fun([], Xs, Body)),
-    {closure, Fun, {tuple, []}};
+    make_closure([], Xs, Body);
+lambda_lift_expr({remote_u, Ct, F, Ar}) ->
+    FVs  = free_vars(Ct),
+    Ct1  = lambda_lift_expr(Ct),
+    Xs   = [ lists:concat(["arg", I]) || I <- lists:seq(1, Ar) ],
+    Args = [{var, X} || X <- Xs],
+    make_closure(FVs, Xs, {remote, Ct1, F, Args});
 lambda_lift_expr(Expr) ->
     case Expr of
         {int, _}               -> Expr;
@@ -796,6 +816,7 @@ lambda_lift_expr(Expr) ->
         {builtin, B, As} when is_list(As)
                                -> {builtin, B, lambda_lift_exprs(As)};
         {builtin, _, _}        -> Expr;
+        {remote, Ct, F, As}    -> {remote, lambda_lift_expr(Ct), F, lambda_lift_exprs(As)};
         {con, Ar, C, As}       -> {con, Ar, C, lambda_lift_exprs(As)};
         {tuple, As}            -> {tuple, lambda_lift_exprs(As)};
         {proj, A, I}           -> {proj, lambda_lift_expr(A), I};
@@ -861,7 +882,7 @@ bind_constructors(Env = #{ con_env := ConEnv }, NewCons) ->
 %% -- Names --
 
 -spec add_fun_env(env(), [aeso_syntax:decl()]) -> env().
-add_fun_env(#{ context := {abstract_contract, _} }, _) -> #{};  %% no functions from abstract contracts
+add_fun_env(Env = #{ context := {abstract_contract, _} }, _) -> Env;  %% no functions from abstract contracts
 add_fun_env(Env = #{ fun_env := FunEnv }, Decls) ->
     Entry = fun({letfun, Ann, {id, _, Name}, Args, _, _}) ->
                 [{qname(Env, Name), {make_fun_name(Env, Ann, Name), length(Args)}}];
@@ -971,7 +992,10 @@ free_vars(Expr) ->
         {oracle_query_id, _} -> [];
         {bool, _}            -> [];
         nil                  -> [];
-        {def, _}             -> [];
+        {def, _, As} when is_list(As) -> [];
+        {def, _, _}          -> [];
+        {remote_u, Ct, _, _} -> free_vars(Ct);
+        {remote, Ct, _, As}  -> free_vars([Ct | As]);
         {builtin, _, As} when is_list(As) -> free_vars(As);
         {builtin, _, _}     -> [];
         {con, _, _, As}     -> free_vars(As);
@@ -1099,7 +1123,7 @@ rename_case(Ren, {'case', Pat, Split}) ->
 
 field_index({typed, _, _, RecTy}, X) ->
     field_index(RecTy, X);
-field_index({record_t, Fields}, {id, _, X}) ->
+field_index({record_t, Fields}, X) ->
     IsX = fun({field_t, _, {id, _, Y}, _}) -> X == Y end,
     [I] = [ I || {I, Field} <- indexed(Fields), IsX(Field) ],
     I - 1.  %% Tuples are 0-indexed
@@ -1227,6 +1251,10 @@ pp_fexpr({builtin, B, N}) when is_integer(N) ->
     pp_beside([pp_text(B), pp_text("/"), pp_text(N)]);
 pp_fexpr({builtin, B, As}) when is_list(As) ->
     pp_call(pp_text(B), As);
+pp_fexpr({remote_u, Ct, Fun, _Ar}) ->
+    pp_beside([pp_fexpr(Ct), pp_text("."), pp_fun_name(Fun)]);
+pp_fexpr({remote, Ct, Fun, As}) ->
+    pp_call(pp_beside([pp_fexpr(Ct), pp_text("."), pp_fun_name(Fun)]), As);
 pp_fexpr({funcall, Fun, As}) ->
     pp_call(pp_fexpr(Fun), As);
 pp_fexpr({switch, Split}) -> pp_split(Split).

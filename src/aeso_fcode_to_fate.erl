@@ -141,6 +141,7 @@ type_to_scode({list, Type})    -> {list, type_to_scode(Type)};
 type_to_scode({tuple, Types})  -> {tuple, lists:map(fun type_to_scode/1, Types)};
 type_to_scode({map, Key, Val}) -> {map, type_to_scode(Key), type_to_scode(Val)};
 type_to_scode({function, _Args, _Res}) -> {tuple, [string, any]};
+type_to_scode(contract)        -> address;
 type_to_scode(T)               -> T.
 
 %% -- Phase I ----------------------------------------------------------------
@@ -189,7 +190,7 @@ to_scode(_Env, {account_pubkey, K}) ->
     [push(?i(aeb_fate_data:make_address(K)))];
 
 to_scode(_Env, {contract_pubkey, K}) ->
-    [push(?i(aeb_fate_data:make_contract(K)))];
+    [push(?i(aeb_fate_data:make_address(K)))];
 
 to_scode(_Env, {oracle_pubkey, K}) ->
     [push(?i(aeb_fate_data:make_oracle(K)))];
@@ -238,27 +239,30 @@ to_scode(Env, {'let', X, Expr, Body}) ->
 to_scode(Env, {def, Fun, Args}) ->
     FName = make_function_name(Fun),
     Lbl   = aeb_fate_data:make_string(FName),
-    [ [to_scode(notail(Env), Arg) || Arg <- lists:reverse(Args)],
-      local_call(Env, ?i(Lbl)) ];
+    call_to_scode(Env, local_call(Env, ?i(Lbl)), Args);
 to_scode(Env, {funcall, Fun, Args}) ->
-    [ [to_scode(notail(Env), Arg) || Arg <- lists:reverse(Args)],
-      to_scode(Env, Fun),
-      local_call(Env, ?a) ];
-
-to_scode(Env, {switch, Case}) ->
-    split_to_scode(Env, Case);
+    call_to_scode(Env, [to_scode(Env, Fun), local_call(Env, ?a)], Args);
 
 to_scode(Env, {builtin, B, Args}) ->
     builtin_to_scode(Env, B, Args);
 
+to_scode(Env, {remote, Ct, Fun, [_Gas, _Value | Args]}) ->
+    %% TODO: FATE doesn't support value and gas arguments yet
+    Lbl  = make_function_name(Fun),
+    Call = if Env#env.tailpos -> aeb_fate_code:call_tr(?a, Lbl);
+              true            -> aeb_fate_code:call_r(?a, Lbl) end,
+    call_to_scode(Env, [to_scode(Env, Ct), Call], Args);
+
 to_scode(Env, {closure, Fun, FVs}) ->
     to_scode(Env, {tuple, [{string, make_function_name(Fun)}, FVs]});
+
+to_scode(Env, {switch, Case}) ->
+    split_to_scode(Env, Case);
 
 to_scode(_Env, Icode) -> ?TODO(Icode).
 
 local_call( Env, Fun) when Env#env.tailpos -> aeb_fate_code:call_t(Fun);
 local_call(_Env, Fun)                      -> aeb_fate_code:call(Fun).
-
 
 split_to_scode(Env, {nosplit, Expr}) ->
     [switch_body, to_scode(Env, Expr)];
@@ -1346,7 +1350,7 @@ split_calls({Ref, Code}) ->
 
 split_calls(Ref, [], Acc, Blocks) ->
     lists:reverse([{Ref, lists:reverse(Acc)} | Blocks]);
-split_calls(Ref, [I = {CALL, _} | Code], Acc, Blocks) when CALL == 'CALL'; CALL == 'CALL_R' ->
+split_calls(Ref, [I | Code], Acc, Blocks) when element(1, I) == 'CALL'; element(1, I) == 'CALL_R' ->
     split_calls(make_ref(), Code, [], [{Ref, lists:reverse([I | Acc])} | Blocks]);
 split_calls(Ref, [I | Code], Acc, Blocks) ->
     split_calls(Ref, Code, [I | Acc], Blocks).
