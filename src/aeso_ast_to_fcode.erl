@@ -700,9 +700,10 @@ decision_tree_to_fcode({'if', A, Then, Else}) ->
 -spec stmts_to_fcode(env(), [aeso_syntax:stmt()]) -> fexpr().
 stmts_to_fcode(Env, [{letval, _, {typed, _, {id, _, X}, _}, _, Expr} | Stmts]) ->
     {'let', X, expr_to_fcode(Env, Expr), stmts_to_fcode(bind_var(Env, X), Stmts)};
-
 stmts_to_fcode(Env, [Expr]) ->
-    expr_to_fcode(Env, Expr).
+    expr_to_fcode(Env, Expr);
+stmts_to_fcode(Env, [Expr | Stmts]) ->
+    {'let', "_", expr_to_fcode(Env, Expr), stmts_to_fcode(Env, Stmts)}.
 
 %% -- Builtins --
 
