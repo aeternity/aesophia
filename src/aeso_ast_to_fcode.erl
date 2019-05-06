@@ -53,7 +53,7 @@
                | {'let', var_name(), fexpr(), fexpr()}
                | {funcall, fexpr(), [fexpr()]}  %% Call to unknown function
                | {lam, [var_name()], fexpr()}   %% Lambda lifted and turned into a closure before it gets to the scode compiler
-               | {closure, fun_name(), non_neg_integer(), fexpr()}
+               | {closure, fun_name(), fexpr()}
                | {switch, fsplit()}.
 
 -type fsplit() :: {split, ftype(), var_name(), [fcase()]}
@@ -107,7 +107,7 @@
 -type con_tag() :: #con_tag{}.
 
 -type type_env() :: #{ sophia_name() => type_def() }.
--type fun_env()  :: #{ sophia_name() => fun_name() }.
+-type fun_env()  :: #{ sophia_name() => {fun_name(), non_neg_integer()} }.
 -type con_env()  :: #{ sophia_name() => con_tag() }.
 -type builtins() :: #{ sophia_name() => {builtin(), non_neg_integer() | none} }.
 
@@ -437,12 +437,8 @@ expr_to_fcode(Env, _Type, {app, _Ann, Fun = {typed, _, _, {fun_t, _, NamedArgsT,
     Args1 = get_named_args(NamedArgsT, Args),
     FArgs = [expr_to_fcode(Env, Arg) || Arg <- Args1],
     case expr_to_fcode(Env, Fun) of
-        {builtin, B, Ar} when is_integer(Ar) ->
-            case length(FArgs) of
-                N when N == Ar -> builtin_to_fcode(B, FArgs);
-                N when N < Ar  -> error({todo, eta_expand, B, FArgs})
-            end;
-        {def, F} -> {def, F, FArgs};
+        {builtin, B, Ar} when is_integer(Ar) -> builtin_to_fcode(B, FArgs);
+        {def, F, Ar}     when is_integer(Ar) -> {def, F, FArgs};
         FFun ->
             %% FFun is a closure, with first component the function name and
             %% second component the environment
@@ -768,7 +764,16 @@ lambda_lift_expr({lam, Xs, Body}) ->
     Body1 = lambda_lift_expr(Body),
     Fun   = add_lambda_fun(lifted_fun(FVs, Xs, Body1)),
     Tup = fun([Y]) -> Y; (Ys) -> {tuple, Ys} end,
-    {closure, Fun, length(Xs), Tup([{var, Y} || Y <- FVs])};
+    {closure, Fun, Tup([{var, Y} || Y <- FVs])};
+lambda_lift_expr({Tag, F, Ar}) when is_integer(Ar), Tag == def orelse Tag == builtin ->
+    Xs   = [ lists:concat(["arg", I]) || I <- lists:seq(1, Ar) ],
+    Args = [{var, X} || X <- Xs],
+    Body = case Tag of
+               builtin -> builtin_to_fcode(F, Args);
+               def     -> {def, F, Args}
+           end,
+    Fun = add_lambda_fun(lifted_fun([], Xs, Body)),
+    {closure, Fun, {tuple, []}};
 lambda_lift_expr(Expr) ->
     case Expr of
         {int, _}               -> Expr;
@@ -780,7 +785,7 @@ lambda_lift_expr(Expr) ->
         {bool, _}              -> Expr;
         nil                    -> Expr;
         {var, _}               -> Expr;
-        {closure, _, _, _}     -> Expr;
+        {closure, _, _}        -> Expr;
         {def, D, As}           -> {def, D, lambda_lift_exprs(As)};
         {builtin, B, As} when is_list(As)
                                -> {builtin, B, lambda_lift_exprs(As)};
@@ -852,8 +857,8 @@ bind_constructors(Env = #{ con_env := ConEnv }, NewCons) ->
 -spec add_fun_env(env(), [aeso_syntax:decl()]) -> env().
 add_fun_env(#{ context := {abstract_contract, _} }, _) -> #{};  %% no functions from abstract contracts
 add_fun_env(Env = #{ fun_env := FunEnv }, Decls) ->
-    Entry = fun({letfun, Ann, {id, _, Name}, _, _, _}) ->
-                [{qname(Env, Name), make_fun_name(Env, Ann, Name)}];
+    Entry = fun({letfun, Ann, {id, _, Name}, Args, _, _}) ->
+                [{qname(Env, Name), {make_fun_name(Env, Ann, Name), length(Args)}}];
                (_) -> [] end,
     FunEnv1 = maps:from_list(lists:flatmap(Entry, Decls)),
     Env#{ fun_env := maps:merge(FunEnv, FunEnv1) }.
@@ -886,8 +891,8 @@ qname(Env, Name) ->
 -spec lookup_fun(env(), sophia_name()) -> fun_name().
 lookup_fun(#{ fun_env := FunEnv }, Name) ->
     case maps:get(Name, FunEnv, false) of
-        false -> error({unbound_name, Name});
-        FName -> FName
+        false      -> error({unbound_name, Name});
+        {FName, _} -> FName
     end.
 
 -spec lookup_con(env(), aeso_syntax:con() | aeso_syntax:qcon() | sophia_name()) -> con_tag().
@@ -915,7 +920,7 @@ resolve_fun(#{ fun_env := Funs, builtins := Builtin }, Q) ->
     case {maps:get(Q, Funs, not_found), maps:get(Q, Builtin, not_found)} of
         {not_found, not_found} -> fcode_error({unbound_variable, Q});
         {_, {B, Ar}}           -> {builtin, B, Ar};
-        {Fun, _}               -> {def, Fun}
+        {{Fun, Ar}, _}         -> {def, Fun, Ar}
     end.
 
 init_fresh_names() ->
@@ -951,31 +956,31 @@ free_vars(Xs) when is_list(Xs) ->
     lists:umerge([ free_vars(X) || X <- Xs ]);
 free_vars(Expr) ->
     case Expr of
-        {var, X} -> [X];
-        {int, _} -> [];
-        {string, _} -> [];
-        {account_pubkey, _} -> [];
+        {var, X}             -> [X];
+        {int, _}             -> [];
+        {string, _}          -> [];
+        {account_pubkey, _}  -> [];
         {contract_pubkey, _} -> [];
-        {oracle_pubkey, _} -> [];
+        {oracle_pubkey, _}   -> [];
         {oracle_query_id, _} -> [];
-        {bool, _} -> [];
-        nil -> [];
-        {def, _} -> [];
+        {bool, _}            -> [];
+        nil                  -> [];
+        {def, _}             -> [];
         {builtin, _, As} when is_list(As) -> free_vars(As);
-        {builtin, _, _} -> [];
-        {con, _, _, As} -> free_vars(As);
-        {tuple, As} -> free_vars(As);
-        {proj, A, _} -> free_vars(A);
+        {builtin, _, _}     -> [];
+        {con, _, _, As}     -> free_vars(As);
+        {tuple, As}         -> free_vars(As);
+        {proj, A, _}        -> free_vars(A);
         {set_proj, A, _, B} -> free_vars([A, B]);
-        {op, _, As} -> free_vars(As);
-        {'let', X, A, B} -> free_vars([A, {lam, [X], B}]);
-        {funcall, A, Bs} -> free_vars([A | Bs]);
-        {lam, Xs, B} -> free_vars(B) -- lists:sort(Xs);
-        {closure, _, _, A} -> free_vars(A);
-        {switch, A} -> free_vars(A);
-        {split, _, X, As} -> free_vars([{var, X} | As]);
-        {nosplit, A} -> free_vars(A);
-        {'case', P, A} -> free_vars(A) -- lists:sort(pat_vars(P))
+        {op, _, As}         -> free_vars(As);
+        {'let', X, A, B}    -> free_vars([A, {lam, [X], B}]);
+        {funcall, A, Bs}    -> free_vars([A | Bs]);
+        {lam, Xs, B}        -> free_vars(B) -- lists:sort(Xs);
+        {closure, _, A}     -> free_vars(A);
+        {switch, A}         -> free_vars(A);
+        {split, _, X, As}   -> free_vars([{var, X} | As]);
+        {nosplit, A}        -> free_vars(A);
+        {'case', P, A}      -> free_vars(A) -- lists:sort(pat_vars(P))
     end.
 
 get_named_args(NamedArgsT, Args) ->
@@ -1170,8 +1175,10 @@ pp_fexpr({Tag, Lit}) when Tag == int;
     aeso_pretty:expr({Tag, [], Lit});
 pp_fexpr(nil) ->
     pp_text("[]");
-pp_fexpr({var, X})        -> pp_text(X);
-pp_fexpr({def, Fun})      -> pp_fun_name(Fun);
+pp_fexpr({var, X})   -> pp_text(X);
+pp_fexpr({def, Fun}) -> pp_fun_name(Fun);
+pp_fexpr({def, Fun, Ar}) when is_integer(Ar) ->
+    pp_beside([pp_fun_name(Fun), pp_text("/"), pp_text(Ar)]);
 pp_fexpr({def, Fun, Args}) ->
     pp_call(pp_fun_name(Fun), Args);
 pp_fexpr({con, _, I, []}) ->
@@ -1186,7 +1193,7 @@ pp_fexpr({proj, E, I}) ->
 pp_fexpr({lam, Xs, A}) ->
     pp_par([pp_fexpr({tuple, [{var, X} || X <- Xs]}), pp_text("=>"),
             prettypr:nest(2, pp_fexpr(A))]);
-pp_fexpr({closure, Fun, _Ar, ClEnv}) ->
+pp_fexpr({closure, Fun, ClEnv}) ->
     FVs = case ClEnv of
               {tuple, Xs} -> Xs;
               {var, _}    -> [ClEnv]

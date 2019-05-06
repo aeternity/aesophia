@@ -250,7 +250,7 @@ to_scode(Env, {switch, Case}) ->
 to_scode(Env, {builtin, B, Args}) ->
     builtin_to_scode(Env, B, Args);
 
-to_scode(Env, {closure, Fun, _Ar, FVs}) ->
+to_scode(Env, {closure, Fun, FVs}) ->
     to_scode(Env, {tuple, [{string, make_function_name(Fun)}, FVs]});
 
 to_scode(_Env, Icode) -> ?TODO(Icode).
