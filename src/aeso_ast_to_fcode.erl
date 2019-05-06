@@ -213,8 +213,9 @@ init_type_env() ->
 to_fcode(Env, [{contract, _, {con, _, Main}, Decls}]) ->
     #{ builtins := Builtins } = Env,
     MainEnv = Env#{ context  => {main_contract, Main},
-                    builtins => Builtins#{[Main, "state"] => {get_state, none},
-                                          [Main, "put"]   => {set_state, 1}} },
+                    builtins => Builtins#{[Main, "state"]          => {get_state, none},
+                                          [Main, "put"]            => {set_state, 1},
+                                          [Main, "Chain", "event"] => {event, 1}} },
     #{ functions := Funs } = Env1 =
         decls_to_fcode(MainEnv, Decls),
     StateType = lookup_type(Env1, [Main, "state"], [], {tuple, []}),

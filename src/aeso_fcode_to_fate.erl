@@ -378,6 +378,8 @@ builtin_to_scode(_Env, get_state, none) ->
 builtin_to_scode(Env, set_state, [_] = Args) ->
     call_to_scode(Env, [aeb_fate_code:store(?s, ?a),
                         aeb_fate_code:tuple(0)], Args);
+builtin_to_scode(_Env, event, [_] = _Args) ->
+    ?TODO(fate_event_instruction);
 builtin_to_scode(_Env, map_empty, none) ->
     [aeb_fate_code:map_empty(?a)];
 builtin_to_scode(_Env, bits_none, none) ->
