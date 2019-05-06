@@ -369,7 +369,7 @@ expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Rec, Fields}) ->
     Proj = fun(I) -> {proj, {var, X}, I - 1} end,
     Comp = fun({I, false})       -> Proj(I);
               ({_, {set, E}})    -> expr_to_fcode(Env, E);
-              ({I, {upd, Z, E}}) -> {'let', Z, Proj(I), expr_to_fcode(Env, E)}
+              ({I, {upd, Z, E}}) -> {'let', Z, Proj(I), expr_to_fcode(bind_var(Env, Z), E)}
            end,
     Set  = fun({_, false}, R)       -> R;
               ({I, {set, E}}, R)    -> {set_proj, R, I - 1, expr_to_fcode(Env, E)};
