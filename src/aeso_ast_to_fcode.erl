@@ -740,19 +740,35 @@ lambda_lift(FCode = #{ functions := Funs }) ->
 init_lambda_funs() -> put(?lambda_key, #{}).
 get_lambda_funs()  -> erase(?lambda_key).
 
-add_lambda_fun(Name, Def) ->
+add_lambda_fun(Def) ->
+    Name = fresh_fun(),
     Funs = get(?lambda_key),
-    put(?lambda_key, Funs#{ Name => Def }).
+    put(?lambda_key, Funs#{ Name => Def }),
+    Name.
 
 lambda_lift_fun(_, Def = #{ body := Body }) ->
     Def#{ body := lambda_lift_expr(Body) }.
 
+lifted_fun([Z], Xs, Body) ->
+    #{ attrs  => [private],
+       args   => [{Z, any} | [{X, any} || X <- Xs]],
+       return => any,
+       body   => Body };
+lifted_fun(FVs, Xs, Body) ->
+    Z    = "%env",
+    Proj = fun({I, Y}, E) -> {'let', Y, {proj, {var, Z}, I - 1}, E} end,
+    #{ attrs  => [private],
+       args   => [{Z, any} | [{X, any} || X <- Xs]],
+       return => any,
+       body   => lists:foldr(Proj, Body, indexed(FVs))
+     }.
+
 lambda_lift_expr({lam, Xs, Body}) ->
-    Fun   = fresh_fun(),
     FVs   = free_vars({lam, Xs, Body}),
     Body1 = lambda_lift_expr(Body),
-    add_lambda_fun(Fun, lifted_fun(FVs, Xs, Body1)),
-    {closure, Fun, length(Xs), {tuple, [{var, Y} || Y <- FVs]}};
+    Fun   = add_lambda_fun(lifted_fun(FVs, Xs, Body1)),
+    Tup = fun([Y]) -> Y; (Ys) -> {tuple, Ys} end,
+    {closure, Fun, length(Xs), Tup([{var, Y} || Y <- FVs])};
 lambda_lift_expr(Expr) ->
     case Expr of
         {int, _}               -> Expr;
@@ -783,17 +799,6 @@ lambda_lift_expr(Expr) ->
     end.
 
 lambda_lift_exprs(As) -> [lambda_lift_expr(A) || A <- As].
-
-lifted_fun(FVs, Xs, Body) ->
-    Z    = fresh_name(),
-    Proj = fun({I, Y}, E) -> {'let', Y, {proj, {var, Z}, I - 1}, E} end,
-    #{ attrs  => [private],
-       args   => [{Z, any} | [{X, any} || X <- Xs]],
-       return => any,
-       body   => lists:foldr(Proj, Body, indexed(FVs))
-     }.
-
-
 
 %% -- Optimisations ----------------------------------------------------------
 
@@ -1181,7 +1186,11 @@ pp_fexpr({proj, E, I}) ->
 pp_fexpr({lam, Xs, A}) ->
     pp_par([pp_fexpr({tuple, [{var, X} || X <- Xs]}), pp_text("=>"),
             prettypr:nest(2, pp_fexpr(A))]);
-pp_fexpr({closure, Fun, _Ar, {tuple, FVs}}) ->
+pp_fexpr({closure, Fun, _Ar, ClEnv}) ->
+    FVs = case ClEnv of
+              {tuple, Xs} -> Xs;
+              {var, _}    -> [ClEnv]
+          end,
     pp_call(pp_text("__CLOSURE__"), [{def, Fun} | FVs]);
 pp_fexpr({set_proj, E, I, A}) ->
     pp_beside(pp_fexpr(E), pp_braces(pp_beside([pp_text(I), pp_text(" = "), pp_fexpr(A)])));
