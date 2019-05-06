@@ -38,6 +38,7 @@
 
 -define(i(X), {immediate, X}).
 -define(a, {stack, 0}).
+-define(s, {var, -1}).  %% TODO: until we have state support in FATE
 
 -define(IsOp(Op), (
      Op =:= 'STORE'           orelse
@@ -372,6 +373,11 @@ call_to_scode(Env, CallCode, Args) ->
     [[to_scode(notail(Env), A) || A <- lists:reverse(Args)],
      CallCode].
 
+builtin_to_scode(_Env, get_state, none) ->
+    [push(?s)];
+builtin_to_scode(Env, set_state, [_] = Args) ->
+    call_to_scode(Env, [aeb_fate_code:store(?s, ?a),
+                        aeb_fate_code:tuple(0)], Args);
 builtin_to_scode(_Env, map_empty, none) ->
     [aeb_fate_code:map_empty(?a)];
 builtin_to_scode(_Env, bits_none, none) ->
