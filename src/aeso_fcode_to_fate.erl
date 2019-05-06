@@ -130,17 +130,16 @@ functions_to_scode(ContractName, Functions, Options) ->
                     return := Type}} <- maps:to_list(Functions),
            Name /= init ]).  %% TODO: skip init for now
 
-function_to_scode(ContractName, Functions, Name, Args, Body, ResType, Options) ->
-    debug(scode, Options, "Compiling ~p ~p : ~p ->\n  ~p\n", [Name, Args, ResType, Body]),
+function_to_scode(ContractName, Functions, _Name, Args, Body, ResType, _Options) ->
     ArgTypes = [ type_to_scode(T) || {_, T} <- Args ],
     SCode    = to_scode(init_env(ContractName, Functions, Args), Body),
-    debug(scode, Options, "  scode: ~p\n", [SCode]),
     {{ArgTypes, type_to_scode(ResType)}, SCode}.
 
 type_to_scode({variant, Cons}) -> {variant, lists:map(fun length/1, Cons)};
 type_to_scode({list, Type})    -> {list, type_to_scode(Type)};
 type_to_scode({tuple, Types})  -> {tuple, lists:map(fun type_to_scode/1, Types)};
 type_to_scode({map, Key, Val}) -> {map, type_to_scode(Key), type_to_scode(Val)};
+type_to_scode({function, _Args, _Res}) -> {tuple, [string, any]};
 type_to_scode(T)               -> T.
 
 %% -- Phase I ----------------------------------------------------------------
@@ -235,20 +234,15 @@ to_scode(Env, {'let', X, Expr, Body}) ->
       aeb_fate_code:store({var, I}, {stack, 0}),
       to_scode(Env1, Body) ];
 
+to_scode(Env, {def, Fun, Args}) ->
+    FName = make_function_name(Fun),
+    Lbl   = aeb_fate_data:make_string(FName),
+    [ [to_scode(notail(Env), Arg) || Arg <- lists:reverse(Args)],
+      local_call(Env, ?i(Lbl)) ];
 to_scode(Env, {funcall, Fun, Args}) ->
-    case Fun of
-        {var, _} ->
-            ?TODO({funcall, Fun});
-        {def, {builtin, _}} ->
-            ?TODO({funcall, Fun});
-        {def, Def} ->
-            FName = make_function_name(Def),
-            Lbl   = aeb_fate_data:make_string(FName),
-            Call = if Env#env.tailpos -> aeb_fate_code:call_t(Lbl);
-                      true            -> aeb_fate_code:call(Lbl) end,
-            [ [to_scode(notail(Env), Arg) || Arg <- lists:reverse(Args)],
-              Call ]
-    end;
+    [ [to_scode(notail(Env), Arg) || Arg <- lists:reverse(Args)],
+      to_scode(Env, Fun),
+      local_call(Env, ?a) ];
 
 to_scode(Env, {switch, Case}) ->
     split_to_scode(Env, Case);
@@ -256,7 +250,14 @@ to_scode(Env, {switch, Case}) ->
 to_scode(Env, {builtin, B, Args}) ->
     builtin_to_scode(Env, B, Args);
 
+to_scode(Env, {closure, Fun, _Ar, FVs}) ->
+    to_scode(Env, {tuple, [{string, make_function_name(Fun)}, FVs]});
+
 to_scode(_Env, Icode) -> ?TODO(Icode).
+
+local_call( Env, Fun) when Env#env.tailpos -> aeb_fate_code:call_t(Fun);
+local_call(_Env, Fun)                      -> aeb_fate_code:call(Fun).
+
 
 split_to_scode(Env, {nosplit, Expr}) ->
     [switch_body, to_scode(Env, Expr)];
@@ -321,9 +322,7 @@ split_to_scode(Env, {split, {variant, Cons}, X, Alts}) ->
         %% Skip the switch for single constructor datatypes (with no catchall)
         {[SAlt], missing} when SAlt /= missing -> SAlt;
         {SAlts, _} -> [{switch, Arg, SType, SAlts, Def}]
-    end;
-split_to_scode(_, Split = {split, _, _, _}) ->
-    ?TODO({'case', Split}).
+    end.
 
 literal_split_to_scode(_Env, _Type, Arg, [], Def) ->
     {switch, Arg, boolean, [missing, missing], Def};

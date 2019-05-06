@@ -42,7 +42,7 @@
                | {bool, false | true}
                | nil
                | {var, var_name()}
-               | {def, fun_name()}
+               | {def, fun_name(), [fexpr()]}
                | {builtin, builtin(), non_neg_integer() | none} %% Unapplied builtin
                | {builtin, builtin(), [fexpr()]}
                | {con, arities(), tag(), [fexpr()]}
@@ -51,7 +51,9 @@
                | {set_proj, fexpr(), integer(), fexpr()}    %% tuple, field, new_value
                | {op, op(), [fexpr()]}
                | {'let', var_name(), fexpr(), fexpr()}
-               | {funcall, fexpr(), [fexpr()]}
+               | {funcall, fexpr(), [fexpr()]}  %% Call to unknown function
+               | {lam, [var_name()], fexpr()}   %% Lambda lifted and turned into a closure before it gets to the scode compiler
+               | {closure, fun_name(), non_neg_integer(), fexpr()}
                | {switch, fsplit()}.
 
 -type fsplit() :: {split, ftype(), var_name(), [fcase()]}
@@ -83,6 +85,7 @@
                | channel
                | bits
                | {variant, [[ftype()]]}
+               | {function, [ftype()], ftype()}
                | any.
 
 -type fun_def() :: #{ attrs  := [attribute()],
@@ -127,7 +130,14 @@
 %% and produces Fate intermediate code.
 -spec ast_to_fcode(aeso_syntax:ast(), [option()]) -> fcode().
 ast_to_fcode(Code, Options) ->
-    optimize_fcode(to_fcode(init_env(Options), Code)).
+    Verbose = lists:member(pp_fcode, Options),
+    FCode1 = to_fcode(init_env(Options), Code),
+    [io:format("-- Before lambda lifting --\n~s\n\n", [format_fcode(FCode1)]) || Verbose],
+    FCode2 = lambda_lift(FCode1),
+    [ io:format("-- After lambda lifting --\n~s\n\n", [format_fcode(FCode2)]) || Verbose, FCode2 /= FCode1 ],
+    FCode3 = optimize_fcode(FCode2),
+    [ io:format("-- After optimization --\n~s\n\n", [format_fcode(FCode3)]) || Verbose, FCode3 /= FCode2 ],
+    FCode3.
 
 %% -- Environment ------------------------------------------------------------
 
@@ -238,7 +248,6 @@ decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, {id, _, Name}, Args, R
     FName = lookup_fun(Env, qname(Env, Name)),
     FArgs = args_to_fcode(Env, Args),
     FBody = expr_to_fcode(Env#{ vars => [X || {X, _} <- FArgs] }, Body),
-    %% io:format("Body of ~s:\n~s\n", [Name, format_fexpr(FBody)]),
     Def   = #{ attrs  => Attrs,
                args   => FArgs,
                return => type_to_fcode(Env, Ret),
@@ -295,6 +304,8 @@ type_to_fcode(_Env, _Sub, {bytes_t, _, _N}) ->
     string; %% TODO: add bytes type to FATE?
 type_to_fcode(_Env, Sub, {tvar, _, X}) ->
     maps:get(X, Sub, any);
+type_to_fcode(Env, Sub, {fun_t, _, [], Args, Res}) ->
+    {function, [type_to_fcode(Env, Sub, Arg) || Arg <- Args], type_to_fcode(Env, Sub, Res)};
 type_to_fcode(_Env, _Sub, Type) ->
     error({todo, Type}).
 
@@ -431,7 +442,16 @@ expr_to_fcode(Env, _Type, {app, _Ann, Fun = {typed, _, _, {fun_t, _, NamedArgsT,
                 N when N == Ar -> builtin_to_fcode(B, FArgs);
                 N when N < Ar  -> error({todo, eta_expand, B, FArgs})
             end;
-        FFun -> {funcall, FFun, FArgs}
+        {def, F} -> {def, F, FArgs};
+        FFun ->
+            %% FFun is a closure, with first component the function name and
+            %% second component the environment
+            Call = fun(X) -> {funcall, {proj, {var, X}, 0}, [{proj, {var, X}, 1} | FArgs]} end,
+            case FFun of
+                {var, X} -> Call(X);
+                _        -> X = fresh_name(),
+                            {'let', X, FFun, Call(X)}
+            end
     end;
 
 %% Maps
@@ -460,6 +480,11 @@ expr_to_fcode(Env, _Type, {map_get, _, Map, Key}) ->
     {op, map_get, [expr_to_fcode(Env, Map), expr_to_fcode(Env, Key)]};
 expr_to_fcode(Env, _Type, {map_get, _, Map, Key, Def}) ->
     {op, map_get_d, [expr_to_fcode(Env, Map), expr_to_fcode(Env, Key), expr_to_fcode(Env, Def)]};
+
+expr_to_fcode(Env, _Type, {lam, _, Args, Body}) ->
+    GetArg = fun({arg, _, {id, _, X}, _}) -> X end,
+    Xs = lists:map(GetArg, Args),
+    {lam, Xs, expr_to_fcode(bind_vars(Env, Xs), Body)};
 
 expr_to_fcode(_Env, Type, Expr) ->
     error({todo, {Expr, ':', Type}}).
@@ -697,6 +722,79 @@ builtin_to_fcode(Builtin, Args) ->
         false -> {builtin, Builtin, Args}
     end.
 
+%% -- Lambda lifting ---------------------------------------------------------
+%% The expr_to_fcode compiler lambda expressions to {lam, Xs, Body}, but in
+%% FATE we can only call top-level functions, so we need to lift the lambda to
+%% the top-level and replace it with a closure.
+
+-spec lambda_lift(fcode()) -> fcode().
+lambda_lift(FCode = #{ functions := Funs }) ->
+    init_fresh_names(),
+    init_lambda_funs(),
+    Funs1   = maps:map(fun lambda_lift_fun/2, Funs),
+    NewFuns = get_lambda_funs(),
+    clear_fresh_names(),
+    FCode#{ functions := maps:merge(Funs1, NewFuns) }.
+
+-define(lambda_key, '%lambdalifted').
+init_lambda_funs() -> put(?lambda_key, #{}).
+get_lambda_funs()  -> erase(?lambda_key).
+
+add_lambda_fun(Name, Def) ->
+    Funs = get(?lambda_key),
+    put(?lambda_key, Funs#{ Name => Def }).
+
+lambda_lift_fun(_, Def = #{ body := Body }) ->
+    Def#{ body := lambda_lift_expr(Body) }.
+
+lambda_lift_expr({lam, Xs, Body}) ->
+    Fun   = fresh_fun(),
+    FVs   = free_vars({lam, Xs, Body}),
+    Body1 = lambda_lift_expr(Body),
+    add_lambda_fun(Fun, lifted_fun(FVs, Xs, Body1)),
+    {closure, Fun, length(Xs), {tuple, [{var, Y} || Y <- FVs]}};
+lambda_lift_expr(Expr) ->
+    case Expr of
+        {int, _}               -> Expr;
+        {string, _}            -> Expr;
+        {account_pubkey, _}    -> Expr;
+        {contract_pubkey, _}   -> Expr;
+        {oracle_pubkey, _}     -> Expr;
+        {oracle_query_id, _}   -> Expr;
+        {bool, _}              -> Expr;
+        nil                    -> Expr;
+        {var, _}               -> Expr;
+        {closure, _, _, _}     -> Expr;
+        {def, D, As}           -> {def, D, lambda_lift_exprs(As)};
+        {builtin, B, As} when is_list(As)
+                               -> {builtin, B, lambda_lift_exprs(As)};
+        {builtin, _, _}        -> Expr;
+        {con, Ar, C, As}       -> {con, Ar, C, lambda_lift_exprs(As)};
+        {tuple, As}            -> {tuple, lambda_lift_exprs(As)};
+        {proj, A, I}           -> {proj, lambda_lift_expr(A), I};
+        {set_proj, A, I, B}    -> {set_proj, lambda_lift_expr(A), I, lambda_lift_expr(B)};
+        {op, Op, As}           -> {op, Op, lambda_lift_exprs(As)};
+        {'let', X, A, B}       -> {'let', X, lambda_lift_expr(A), lambda_lift_expr(B)};
+        {funcall, A, Bs}       -> {funcall, lambda_lift_expr(A), lambda_lift_exprs(Bs)};
+        {switch, S}            -> {switch, lambda_lift_expr(S)};
+        {split, Type, X, Alts} -> {split, Type, X, lambda_lift_exprs(Alts)};
+        {nosplit, A}           -> {nosplit, lambda_lift_expr(A)};
+        {'case', P, S}         -> {'case', P, lambda_lift_expr(S)}
+    end.
+
+lambda_lift_exprs(As) -> [lambda_lift_expr(A) || A <- As].
+
+lifted_fun(FVs, Xs, Body) ->
+    Z    = fresh_name(),
+    Proj = fun({I, Y}, E) -> {'let', Y, {proj, {var, Z}, I - 1}, E} end,
+    #{ attrs  => [private],
+       args   => [{Z, any} | [{X, any} || X <- Xs]],
+       return => any,
+       body   => lists:foldr(Proj, Body, indexed(FVs))
+     }.
+
+
+
 %% -- Optimisations ----------------------------------------------------------
 
 %% - Deadcode elimination
@@ -822,10 +920,16 @@ clear_fresh_names() ->
     erase('%fresh').
 
 -spec fresh_name() -> var_name().
-fresh_name() ->
+fresh_name() -> fresh_name("%").
+
+-spec fresh_fun() -> fun_name().
+fresh_fun() -> {local_fun, [fresh_name("^")]}.
+
+-spec fresh_name(string()) -> var_name().
+fresh_name(Prefix) ->
     N = get('%fresh'),
     put('%fresh', N + 1),
-    lists:concat(["%", N]).
+    lists:concat([Prefix, N]).
 
 -spec pat_vars(fpat()) -> [var_name()].
 pat_vars({var, X})            -> [X || X /= "_"];
@@ -837,6 +941,37 @@ pat_vars({'::', P, Q})        -> pat_vars(P) ++ pat_vars(Q);
 pat_vars({tuple, Ps})         -> pat_vars(Ps);
 pat_vars({con, _, _, Ps})     -> pat_vars(Ps);
 pat_vars(Ps) when is_list(Ps) -> [X || P <- Ps, X <- pat_vars(P)].
+
+free_vars(Xs) when is_list(Xs) ->
+    lists:umerge([ free_vars(X) || X <- Xs ]);
+free_vars(Expr) ->
+    case Expr of
+        {var, X} -> [X];
+        {int, _} -> [];
+        {string, _} -> [];
+        {account_pubkey, _} -> [];
+        {contract_pubkey, _} -> [];
+        {oracle_pubkey, _} -> [];
+        {oracle_query_id, _} -> [];
+        {bool, _} -> [];
+        nil -> [];
+        {def, _} -> [];
+        {builtin, _, As} when is_list(As) -> free_vars(As);
+        {builtin, _, _} -> [];
+        {con, _, _, As} -> free_vars(As);
+        {tuple, As} -> free_vars(As);
+        {proj, A, _} -> free_vars(A);
+        {set_proj, A, _, B} -> free_vars([A, B]);
+        {op, _, As} -> free_vars(As);
+        {'let', X, A, B} -> free_vars([A, {lam, [X], B}]);
+        {funcall, A, Bs} -> free_vars([A | Bs]);
+        {lam, Xs, B} -> free_vars(B) -- lists:sort(Xs);
+        {closure, _, _, A} -> free_vars(A);
+        {switch, A} -> free_vars(A);
+        {split, _, X, As} -> free_vars([{var, X} | As]);
+        {nosplit, A} -> free_vars(A);
+        {'case', P, A} -> free_vars(A) -- lists:sort(pat_vars(P))
+    end.
 
 get_named_args(NamedArgsT, Args) ->
     IsNamed = fun({named_arg, _, _, _}) -> true;
@@ -865,13 +1000,13 @@ rename(Ren, Expr) ->
         {oracle_query_id, _} -> Expr;
         nil                 -> nil;
         {var, X}            -> {var, rename_var(Ren, X)};
-        {def, _}            -> Expr;
+        {def, D, Es}        -> {def, D, [rename(Ren, E) || E <- Es]};
         {con, Ar, I, Es}    -> {con, Ar, I, [rename(Ren, E) || E <- Es]};
         {tuple, Es}         -> {tuple, [rename(Ren, E) || E <- Es]};
         {proj, E, I}        -> {proj, rename(Ren, E), I};
         {set_proj, R, I, E} -> {set_proj, rename(Ren, R), I, rename(Ren, E)};
         {op, Op, Es}        -> {op, Op, [rename(Ren, E) || E <- Es]};
-        {funcall, Fun, Es}  -> {funcall, Fun, [rename(Ren, E) || E <- Es]};
+        {funcall, Fun, Es}  -> {funcall, rename(Ren, Fun), [rename(Ren, E) || E <- Es]};
         {'let', X, E, Body} ->
             {Z, Ren1} = rename_binding(Ren, X),
             {'let', Z, rename(Ren, E), rename(Ren1, Body)};
@@ -977,8 +1112,23 @@ fcode_error(Err) ->
 
 %% -- Pretty printing --------------------------------------------------------
 
+format_fcode(#{ functions := Funs }) ->
+    prettypr:format(pp_above(
+        [ pp_fun(Name, Def) || {Name, Def} <- maps:to_list(Funs) ])).
+
 format_fexpr(E) ->
     prettypr:format(pp_fexpr(E)).
+
+pp_fun(Name, #{ args := Args, return := Return, body := Body }) ->
+    PPArg = fun({X, T}) -> pp_beside([pp_text(X), pp_text(" : "), pp_ftype(T)]) end,
+    pp_above(pp_beside([pp_text("function "), pp_fun_name(Name),
+               pp_parens(pp_par(pp_punctuate(pp_text(","), [PPArg(Arg) || Arg <- Args]))),
+               pp_text(" : "), pp_ftype(Return), pp_text(" =")]),
+             prettypr:nest(2, pp_fexpr(Body))).
+
+pp_fun_name(init)            -> pp_text("init");
+pp_fun_name({entrypoint, E}) -> pp_text(binary_to_list(E));
+pp_fun_name({local_fun, Q})  -> pp_text(string:join(Q, ".")).
 
 pp_text(<<>>) -> prettypr:text("\"\"");
 pp_text(Bin) when is_binary(Bin) -> prettypr:text(lists:flatten(io_lib:format("~p", [binary_to_list(Bin)])));
@@ -1015,9 +1165,10 @@ pp_fexpr({Tag, Lit}) when Tag == int;
     aeso_pretty:expr({Tag, [], Lit});
 pp_fexpr(nil) ->
     pp_text("[]");
-pp_fexpr({var, X})               -> pp_text(X);
-pp_fexpr({def, {entrypoint, E}}) -> pp_text(E);
-pp_fexpr({def, {local_fun, Q}})  -> pp_text(string:join(Q, "."));
+pp_fexpr({var, X})        -> pp_text(X);
+pp_fexpr({def, Fun})      -> pp_fun_name(Fun);
+pp_fexpr({def, Fun, Args}) ->
+    pp_call(pp_fun_name(Fun), Args);
 pp_fexpr({con, _, I, []}) ->
     pp_beside(pp_text("C"), pp_text(I));
 pp_fexpr({con, _, I, Es}) ->
@@ -1027,6 +1178,11 @@ pp_fexpr({tuple, Es}) ->
     pp_parens(pp_par(pp_punctuate(pp_text(","), [pp_fexpr(E) || E <- Es])));
 pp_fexpr({proj, E, I}) ->
     pp_beside([pp_fexpr(E), pp_text("."), pp_text(I)]);
+pp_fexpr({lam, Xs, A}) ->
+    pp_par([pp_fexpr({tuple, [{var, X} || X <- Xs]}), pp_text("=>"),
+            prettypr:nest(2, pp_fexpr(A))]);
+pp_fexpr({closure, Fun, _Ar, {tuple, FVs}}) ->
+    pp_call(pp_text("__CLOSURE__"), [{def, Fun} | FVs]);
 pp_fexpr({set_proj, E, I, A}) ->
     pp_beside(pp_fexpr(E), pp_braces(pp_beside([pp_text(I), pp_text(" = "), pp_fexpr(A)])));
 pp_fexpr({op, Op, [A, B] = Args}) ->
@@ -1057,10 +1213,13 @@ pp_call(Fun, Args) ->
     pp_beside(Fun, pp_fexpr({tuple, Args})).
 
 pp_ftype(T) when is_atom(T) -> pp_text(T);
+pp_ftype(any) -> pp_text("_");
 pp_ftype({tuple, Ts}) ->
     pp_parens(pp_par(pp_punctuate(pp_text(","), [pp_ftype(T) || T <- Ts])));
 pp_ftype({list, T}) ->
     pp_beside([pp_text("list("), pp_ftype(T), pp_text(")")]);
+pp_ftype({function, Args, Res}) ->
+    pp_par([pp_ftype({tuple, Args}), pp_text("=>"), pp_ftype(Res)]);
 pp_ftype({variant, Cons}) ->
     pp_par(
     pp_punctuate(pp_text(" |"),
