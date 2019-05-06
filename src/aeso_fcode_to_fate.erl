@@ -226,18 +226,6 @@ to_scode(Env, {set_proj, R, I, E}) ->
 to_scode(Env, {op, Op, Args}) ->
     call_to_scode(Env, op_to_scode(Op), Args);
 
-%% Maps
-to_scode(_Env, map_empty) ->
-    [aeb_fate_code:map_empty(?a)];
-to_scode(Env, {map_set, Map, Key, Val}) ->
-    call_to_scode(Env, aeb_fate_code:map_update(?a, ?a, ?a, ?a),
-                  [Map, Key, Val]);
-to_scode(Env, {map_get, Map, Key}) ->
-    call_to_scode(Env, aeb_fate_code:map_lookup(?a, ?a, ?a), [Map, Key]);
-to_scode(Env, {map_get, Map, Key, Default}) ->
-    call_to_scode(Env, aeb_fate_code:map_lookup(?a, ?a, ?a, ?a),
-                  [Map, Key, Default]);
-
 to_scode(Env, {'let', X, {var, Y}, Body}) ->
     Env1 = bind_var(X, lookup_var(Env, Y), Env),
     to_scode(Env1, Body);
@@ -385,6 +373,8 @@ call_to_scode(Env, CallCode, Args) ->
     [[to_scode(notail(Env), A) || A <- lists:reverse(Args)],
      CallCode].
 
+builtin_to_scode(_Env, map_empty, none) ->
+    [aeb_fate_code:map_empty(?a)];
 builtin_to_scode(_Env, bits_none, none) ->
     [aeb_fate_code:bits_none(?a)];
 builtin_to_scode(_Env, bits_all, none) ->
@@ -480,6 +470,9 @@ op_to_scode('>=')              -> aeb_fate_code:egt(?a, ?a, ?a);
 op_to_scode('==')              -> aeb_fate_code:eq(?a, ?a, ?a);
 op_to_scode('!=')              -> aeb_fate_code:neq(?a, ?a, ?a);
 op_to_scode('!')               -> aeb_fate_code:not_op(?a, ?a);
+op_to_scode(map_get)           -> aeb_fate_code:map_lookup(?a, ?a, ?a);
+op_to_scode(map_get_d)         -> aeb_fate_code:map_lookup(?a, ?a, ?a, ?a);
+op_to_scode(map_set)           -> aeb_fate_code:map_update(?a, ?a, ?a, ?a);
 op_to_scode(map_from_list)     -> aeb_fate_code:map_from_list(?a, ?a);
 op_to_scode(map_to_list)       -> ?TODO(fate_map_to_list_instruction);
 op_to_scode(map_delete)        -> aeb_fate_code:map_delete(?a, ?a, ?a);

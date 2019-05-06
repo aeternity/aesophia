@@ -28,9 +28,10 @@
 
 -type op() :: '+' | '-' | '*' | '/' | mod | '^' | '++' | '::' |
               '<' | '>' | '=<' | '>=' | '==' | '!=' | '!' |
-              map_from_list | map_to_list | map_delete | map_member | map_size |
-              string_length | string_concat | bits_set | bits_clear | bits_test |
-              bits_sum | bits_intersection | bits_union | bits_difference.
+              map_get | map_get_d | map_set | map_from_list | map_to_list |
+              map_delete | map_member | map_size | string_length |
+              string_concat | bits_set | bits_clear | bits_test | bits_sum |
+              bits_intersection | bits_union | bits_difference.
 
 -type fexpr() :: {int, integer()}
                | {string, binary()}
@@ -48,10 +49,6 @@
                | {tuple, [fexpr()]}
                | {proj, fexpr(), integer()}
                | {set_proj, fexpr(), integer(), fexpr()}    %% tuple, field, new_value
-               | map_empty
-               | {map_set, fexpr(), fexpr(), fexpr()}   % map, key, val
-               | {map_get, fexpr(), fexpr()}            % map, key
-               | {map_get, fexpr(), fexpr(), fexpr()}   % map, key, default
                | {op, op(), [fexpr()]}
                | {'let', var_name(), fexpr(), fexpr()}
                | {funcall, fexpr(), [fexpr()]}
@@ -439,7 +436,7 @@ expr_to_fcode(Env, _Type, {app, _Ann, Fun = {typed, _, _, {fun_t, _, NamedArgsT,
 
 %% Maps
 expr_to_fcode(_Env, _Type, {map, _, []}) ->
-    map_empty;
+    {builtin, map_empty, none};
 expr_to_fcode(Env, Type, {map, Ann, KVs}) ->
     %% Cheaper to do incremental map_update than building the list and doing
     %% map_from_list (I think).
@@ -452,17 +449,17 @@ expr_to_fcode(Env, _Type, {map, _, Map, KVs}) ->
         lists:foldr(fun(Fld, M) ->
                         case Fld of
                             {field, _, [{map_get, _, K}], V} ->
-                                {map_set, M, expr_to_fcode(Env, K), expr_to_fcode(Env, V)};
+                                {op, map_set, [M, expr_to_fcode(Env, K), expr_to_fcode(Env, V)]};
                             {field_upd, _, [{map_get, _, K}], {typed, _, {lam, _, [{arg, _, {id, _, Z}, _}], V}, _}} ->
                                 Y = fresh_name(),
                                 {'let', Y, expr_to_fcode(Env, K),
-                                {'let', Z, {map_get, Map1, {var, Y}},
-                                {map_set, M, {var, Y}, expr_to_fcode(bind_var(Env, Z), V)}}}
+                                {'let', Z, {op, map_get, [Map1, {var, Y}]},
+                                {op, map_set, [M, {var, Y}, expr_to_fcode(bind_var(Env, Z), V)]}}}
                         end end, Map1, KVs)};
 expr_to_fcode(Env, _Type, {map_get, _, Map, Key}) ->
-    {map_get, expr_to_fcode(Env, Map), expr_to_fcode(Env, Key)};
+    {op, map_get, [expr_to_fcode(Env, Map), expr_to_fcode(Env, Key)]};
 expr_to_fcode(Env, _Type, {map_get, _, Map, Key, Def}) ->
-    {map_get, expr_to_fcode(Env, Map), expr_to_fcode(Env, Key), expr_to_fcode(Env, Def)};
+    {op, map_get_d, [expr_to_fcode(Env, Map), expr_to_fcode(Env, Key), expr_to_fcode(Env, Def)]};
 
 expr_to_fcode(_Env, Type, Expr) ->
     error({todo, {Expr, ':', Type}}).
@@ -691,9 +688,9 @@ op_builtins() ->
      bits_difference, int_to_str, address_to_str].
 
 builtin_to_fcode(map_lookup, [Key, Map]) ->
-    {map_get, Map, Key};
+    {op, map_get, [Map, Key]};
 builtin_to_fcode(map_lookup_default, [Key, Map, Def]) ->
-    {map_get, Map, Key, Def};
+    {op, map_get_d, [Map, Key, Def]};
 builtin_to_fcode(Builtin, Args) ->
     case lists:member(Builtin, op_builtins()) of
         true  -> {op, Builtin, Args};
