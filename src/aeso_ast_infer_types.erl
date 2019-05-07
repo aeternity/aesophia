@@ -98,11 +98,12 @@
 -type scope() :: #scope{}.
 
 -record(env,
-    { scopes    = #{ [] => #scope{}} :: #{ qname() => scope() }
-    , vars      = []                 :: [{name(), var_info()}]
-    , typevars  = unrestricted       :: unrestricted | [name()]
-    , fields    = #{}                :: #{ name() => [field_info()] }    %% fields are global
-    , namespace = []                 :: qname()
+    { scopes     = #{ [] => #scope{}} :: #{ qname() => scope() }
+    , vars       = []                 :: [{name(), var_info()}]
+    , typevars   = unrestricted       :: unrestricted | [name()]
+    , fields     = #{}                :: #{ name() => [field_info()] }    %% fields are global
+    , namespace  = []                 :: qname()
+    , in_pattern = false              :: boolean()
     }).
 
 -type env() :: #env{}.
@@ -358,7 +359,7 @@ global_env() ->
     Fun1    = fun(S, T) -> Fun([S], T) end,
     TVar    = fun(X) -> {tvar, Ann, "'" ++ X} end,
     SignId    = {id, Ann, "signature"},
-    SignDef   = {tuple, Ann, [{int, Ann, 0}, {int, Ann, 0}]},
+    SignDef   = {bytes, Ann, <<0:64/unit:8>>},
     Signature = {named_arg_t, Ann, SignId, SignId, {typed, Ann, SignDef, SignId}},
     SignFun   = fun(Ts, T) -> {type_sig, Ann, [Signature], Ts, T} end,
     TTL       = {qid, Ann, ["Chain", "ttl"]},
@@ -378,7 +379,7 @@ global_env() ->
                      %% Abort
                      {"abort", Fun1(String, A)}])
         , types = MkDefs(
-                    [{"int", 0}, {"bool", 0}, {"string", 0}, {"address", 0},
+                    [{"int", 0}, {"bool", 0}, {"char", 0}, {"string", 0}, {"address", 0},
                      {"hash", {[], {alias_t, Bytes(32)}}},
                      {"signature", {[], {alias_t, Bytes(64)}}},
                      {"bits", 0},
@@ -908,6 +909,8 @@ infer_expr(_Env, Body={bool, As, _}) ->
     {typed, As, Body, {id, As, "bool"}};
 infer_expr(_Env, Body={int, As, _}) ->
     {typed, As, Body, {id, As, "int"}};
+infer_expr(_Env, Body={char, As, _}) ->
+    {typed, As, Body, {id, As, "char"}};
 infer_expr(_Env, Body={string, As, _}) ->
     {typed, As, Body, {id, As, "string"}};
 infer_expr(_Env, Body={bytes, As, Bin}) ->
@@ -935,8 +938,6 @@ infer_expr(Env, Id = {Tag, As, _}) when Tag == id; Tag == qid ->
 infer_expr(Env, Id = {Tag, As, _}) when Tag == con; Tag == qcon ->
     {QName, Type} = lookup_name(Env, As, Id, [freshen]),
     {typed, As, QName, Type};
-infer_expr(Env, {unit, As}) ->
-    infer_expr(Env, {tuple, As, []});
 infer_expr(Env, {tuple, As, Cpts}) ->
     NewCpts = [infer_expr(Env, C) || C <- Cpts],
     CptTypes = [T || {typed, _, _, T} <- NewCpts],
@@ -990,7 +991,7 @@ infer_expr(Env, {record, Attrs, Fields}) ->
     constrain([ #record_create_constraint{
                     record_t = RecordType1,
                     fields   = [ FieldName || {field, _, [{proj, _, FieldName}], _} <- Fields ],
-                    context  = Attrs } ] ++
+                    context  = Attrs } || not Env#env.in_pattern ] ++
               [begin
                 [{proj, _, FieldName}] = LV,
                 #field_constraint{
@@ -1119,7 +1120,7 @@ infer_case(Env, Attrs, Pattern, ExprType, Branch, SwitchType) ->
         [] -> ok;
         Nonlinear -> type_error({non_linear_pattern, Pattern, lists:usort(Nonlinear)})
     end,
-    NewEnv = bind_vars([{Var, fresh_uvar(Ann)} || Var = {id, Ann, _} <- Vars], Env),
+    NewEnv = bind_vars([{Var, fresh_uvar(Ann)} || Var = {id, Ann, _} <- Vars], Env#env{ in_pattern = true }),
     NewPattern = {typed, _, _, PatType} = infer_expr(NewEnv, Pattern),
     NewBranch  = check_expr(NewEnv, Branch, SwitchType),
     unify(Env, PatType, ExprType, {case_pat, Pattern, PatType, ExprType}),
@@ -1177,6 +1178,8 @@ infer_prefix({IntOp,As}) when IntOp =:= '-' ->
     {fun_t, As, [], [Int], Int}.
 
 free_vars({int, _, _}) ->
+    [];
+free_vars({char, _, _}) ->
     [];
 free_vars({string, _, _}) ->
     [];

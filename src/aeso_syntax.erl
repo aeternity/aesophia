@@ -75,7 +75,6 @@
      | {contract_pubkey, binary()}
      | {oracle_pubkey, binary()}
      | {oracle_query_id, binary()}
-     | {unit, ann()}
      | {string, ann(), binary()}
      | {char, ann(), integer()}.
 

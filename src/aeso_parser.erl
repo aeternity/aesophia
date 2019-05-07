@@ -441,7 +441,7 @@ build_if(Ann, Cond, Then, [{elif, Ann1, Cond1, Then1} | Elses]) ->
 build_if(Ann, Cond, Then, [{else, _Ann, Else}]) ->
     {'if', Ann, Cond, Then, Else};
 build_if(Ann, Cond, Then, []) ->
-    {'if', Ann, Cond, Then, {unit, [{origin, system}]}}.
+    {'if', Ann, Cond, Then, {tuple, [{origin, system}], []}}.
 
 else_branches([Elif = {elif, _, _, _} | Stmts], Acc) ->
     else_branches(Stmts, [Elif | Acc]);
@@ -457,7 +457,6 @@ fun_t(Domains, Type) ->
     lists:foldr(fun({Dom, Ann}, T) -> {fun_t, Ann, [], Dom, T} end,
                 Type, Domains).
 
-tuple_e(Ann, [])      -> {unit, Ann};
 tuple_e(_Ann, [Expr]) -> Expr;  %% Not a tuple
 tuple_e(Ann, Exprs)   -> {tuple, Ann, Exprs}.
 
@@ -478,7 +477,6 @@ parse_pattern({record, Ann, Fs}) ->
     {record, Ann, lists:map(fun parse_field_pattern/1, Fs)};
 parse_pattern(E = {con, _, _})    -> E;
 parse_pattern(E = {id, _, _})     -> E;
-parse_pattern(E = {unit, _})      -> E;
 parse_pattern(E = {int, _, _})    -> E;
 parse_pattern(E = {bool, _, _})   -> E;
 parse_pattern(E = {bytes, _, _})  -> E;
