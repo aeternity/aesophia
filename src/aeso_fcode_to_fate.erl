@@ -377,18 +377,18 @@ call_to_scode(Env, CallCode, Args) ->
     [[to_scode(notail(Env), A) || A <- lists:reverse(Args)],
      CallCode].
 
-builtin_to_scode(_Env, get_state, none) ->
+builtin_to_scode(_Env, get_state, []) ->
     [push(?s)];
 builtin_to_scode(Env, set_state, [_] = Args) ->
     call_to_scode(Env, [aeb_fate_code:store(?s, ?a),
                         aeb_fate_code:tuple(0)], Args);
 builtin_to_scode(_Env, event, [_] = _Args) ->
     ?TODO(fate_event_instruction);
-builtin_to_scode(_Env, map_empty, none) ->
+builtin_to_scode(_Env, map_empty, []) ->
     [aeb_fate_code:map_empty(?a)];
-builtin_to_scode(_Env, bits_none, none) ->
+builtin_to_scode(_Env, bits_none, []) ->
     [aeb_fate_code:bits_none(?a)];
-builtin_to_scode(_Env, bits_all, none) ->
+builtin_to_scode(_Env, bits_all, []) ->
     [aeb_fate_code:bits_all(?a)];
 builtin_to_scode(Env, abort, [_] = Args) ->
     call_to_scode(Env, aeb_fate_code:abort(?a), Args);
@@ -397,31 +397,31 @@ builtin_to_scode(Env, chain_spend, [_, _] = Args) ->
                         aeb_fate_code:tuple(0)], Args);
 builtin_to_scode(Env, chain_balance, [_] = Args) ->
     call_to_scode(Env, aeb_fate_code:balance_other(?a, ?a), Args);
-builtin_to_scode(_Env, chain_block_hash, [{builtin, chain_block_height, none}]) ->
+builtin_to_scode(_Env, chain_block_hash, [{builtin, chain_block_height, []}]) ->
     [aeb_fate_code:blockhash(?a)];
 builtin_to_scode(_Env, chain_block_hash, [_]) ->
     ?TODO(fate_block_hash_at_height_instruction);
-builtin_to_scode(_Env, chain_coinbase, none) ->
+builtin_to_scode(_Env, chain_coinbase, []) ->
     [aeb_fate_code:beneficiary(?a)];
-builtin_to_scode(_Env, chain_timestamp, none) ->
+builtin_to_scode(_Env, chain_timestamp, []) ->
     [aeb_fate_code:timestamp(?a)];
-builtin_to_scode(_Env, chain_block_height, none) ->
+builtin_to_scode(_Env, chain_block_height, []) ->
     [aeb_fate_code:generation(?a)];
-builtin_to_scode(_Env, chain_difficulty, none) ->
+builtin_to_scode(_Env, chain_difficulty, []) ->
     [aeb_fate_code:difficulty(?a)];
-builtin_to_scode(_Env, chain_gas_limit, none) ->
+builtin_to_scode(_Env, chain_gas_limit, []) ->
     [aeb_fate_code:gaslimit(?a)];
-builtin_to_scode(_Env, contract_balance, none) ->
+builtin_to_scode(_Env, contract_balance, []) ->
     [aeb_fate_code:balance(?a)];
-builtin_to_scode(_Env, contract_address, none) ->
+builtin_to_scode(_Env, contract_address, []) ->
     [aeb_fate_code:address(?a)];
-builtin_to_scode(_Env, call_origin, none) ->
+builtin_to_scode(_Env, call_origin, []) ->
     [aeb_fate_code:origin(?a)];
-builtin_to_scode(_Env, call_caller, none) ->
+builtin_to_scode(_Env, call_caller, []) ->
     [aeb_fate_code:caller(?a)];
-builtin_to_scode(_Env, call_value, none) ->
+builtin_to_scode(_Env, call_value, []) ->
     ?TODO(fate_call_value_instruction);
-builtin_to_scode(_Env, call_gas_price, none) ->
+builtin_to_scode(_Env, call_gas_price, []) ->
     [aeb_fate_code:gasprice(?a)];
 builtin_to_scode(_Env, call_gas_left, []) ->
     [aeb_fate_code:gas(?a)];
@@ -459,7 +459,7 @@ builtin_to_scode(_Env, crypto_sha256, [_] = _Args) ->
     ?TODO(fate_crypto_sha256_instruction);
 builtin_to_scode(_Env, crypto_blake2b, [_] = _Args) ->
     ?TODO(fate_crypto_blake2b_instruction);
-builtin_to_scode(_Env, auth_tx_hash, none) ->
+builtin_to_scode(_Env, auth_tx_hash, []) ->
     ?TODO(fate_auth_tx_hash_instruction);
 builtin_to_scode(_, B, Args) ->
     ?TODO({builtin, B, Args}).
