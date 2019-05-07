@@ -80,6 +80,7 @@
 
 -type ftype() :: integer
                | boolean
+               | string
                | {list, ftype()}
                | {map, ftype(), ftype()}
                | {tuple, [ftype()]}
@@ -268,7 +269,7 @@ decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, {id, _, Name}, Args, R
     NewFuns = Funs#{ FName => Def },
     Env#{ functions := NewFuns }.
 
--spec typedef_to_fcode(env(), aeso_syntax:id(), [aeso_syntax:tvar()], aeso_syntax:type_def()) -> env().
+-spec typedef_to_fcode(env(), aeso_syntax:id(), [aeso_syntax:tvar()], aeso_syntax:typedef()) -> env().
 typedef_to_fcode(Env, {id, _, Name}, Xs, Def) ->
     Q = qname(Env, Name),
     FDef = fun(Args) ->
@@ -659,8 +660,9 @@ pat_to_fcode(Env, Pat) ->
 
 -spec pat_to_fcode(env(), aeso_syntax:type() | no_type, aeso_syntax:pat()) -> fpat().
 pat_to_fcode(_Env, _Type, {id, _, X}) -> {var, X};
-pat_to_fcode(Env, Type, {C, _, _} = Con) when C == con; C == qcon ->
-    pat_to_fcode(Env, Type, {app, [], {typed, [], Con, Type}, []});
+pat_to_fcode(Env, _Type, {C, _, _} = Con) when C == con; C == qcon ->
+    #con_tag{tag = I, arities = As} = lookup_con(Env, Con),
+    {con, As, I, []};
 pat_to_fcode(Env, _Type, {app, _, {typed, _, {C, _, _} = Con, _}, Pats}) when C == con; C == qcon ->
     #con_tag{tag = I, arities = As} = lookup_con(Env, Con),
     {con, As, I, [pat_to_fcode(Env, Pat) || Pat <- Pats]};

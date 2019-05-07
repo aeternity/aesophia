@@ -18,7 +18,7 @@
                 | switch_body
                 | tuple().    %% FATE instruction
 
--type arg() :: aeb_fate_code:fate_arg().
+-type arg() :: tuple(). %% Not exported: aeb_fate_code:fate_arg().
 
 %% Annotated scode
 -type scode_a()  :: [sinstr_a()].
@@ -97,7 +97,7 @@
 
 debug(Tag, Options, Fmt, Args) ->
     Tags = proplists:get_value(debug, Options, []),
-    case Tags == all orelse lists:member(Tag, Tags) orelse Tag == any andalso Tags /= [] of
+    case Tags == all orelse lists:member(Tag, Tags) of
         true  -> io:format(Fmt, Args);
         false -> ok
     end.
@@ -185,7 +185,7 @@ to_scode(_Env, {lit, L}) ->
         {account_pubkey, K}  -> [push(?i(aeb_fate_data:make_address(K)))];
         {contract_pubkey, K} -> [push(?i(aeb_fate_data:make_address(K)))];
         {oracle_pubkey, K}   -> [push(?i(aeb_fate_data:make_oracle(K)))];
-        {oracle_query_id, K} -> [push(?i(aeb_fate_data:make_oracle_query(K)))] %% TODO: Not actually in FATE yet
+        {oracle_query_id, _} -> ?TODO(fate_oracle_query_id_value)
     end;
 
 to_scode(_Env, nil) ->
@@ -743,9 +743,10 @@ var_writes(I) ->
         _        -> []
     end.
 
-independent({switch, _, _, _, _}, _) -> false;
+-spec independent(sinstr_a(), sinstr_a()) -> boolean().
+%% independent({switch, _, _, _, _}, _) -> false;       %% Commented due to Dialyzer whinging
 independent(_, {switch, _, _, _, _}) -> false;
-independent(switch_body, _) -> true;
+%% independent(switch_body, _) -> true;
 independent(_, switch_body) -> true;
 independent({i, _, I}, {i, _, J}) ->
     #{ write := WI, read := RI, pure := PureI } = attributes(I),
@@ -768,7 +769,7 @@ merge_ann(#{ live_in := LiveIn }, #{ live_out := LiveOut }) ->
 
 %% Swap two instructions. Precondition: the instructions are independent/2.
 swap_instrs(I, switch_body) -> {switch_body, I};
-swap_instrs(switch_body, I) -> {I, switch_body};
+%% swap_instrs(switch_body, I) -> {I, switch_body};   %% Commented due to Dialyzer whinging
 swap_instrs({i, #{ live_in := Live1 }, I}, {i, #{ live_in := Live2, live_out := Live3 }, J}) ->
     %% Since I and J are independent the J can't read or write anything in
     %% that I writes.
