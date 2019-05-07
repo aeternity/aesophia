@@ -246,9 +246,7 @@ to_scode(Env, {closure, Fun, FVs}) ->
     to_scode(Env, {tuple, [{lit, {string, make_function_name(Fun)}}, FVs]});
 
 to_scode(Env, {switch, Case}) ->
-    split_to_scode(Env, Case);
-
-to_scode(_Env, Icode) -> ?TODO(Icode).
+    split_to_scode(Env, Case).
 
 local_call( Env, Fun) when Env#env.tailpos -> aeb_fate_code:call_t(Fun);
 local_call(_Env, Fun)                      -> aeb_fate_code:call(Fun).
@@ -447,9 +445,7 @@ builtin_to_scode(_Env, crypto_sha256, [_] = _Args) ->
 builtin_to_scode(_Env, crypto_blake2b, [_] = _Args) ->
     ?TODO(fate_crypto_blake2b_instruction);
 builtin_to_scode(_Env, auth_tx_hash, []) ->
-    ?TODO(fate_auth_tx_hash_instruction);
-builtin_to_scode(_, B, Args) ->
-    ?TODO({builtin, B, Args}).
+    ?TODO(fate_auth_tx_hash_instruction).
 
 %% -- Operators --
 
