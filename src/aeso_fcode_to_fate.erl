@@ -177,27 +177,16 @@ lookup_var(#env{vars = Vars}, X) ->
 
 %% -- The compiler --
 
-to_scode(_Env, {int, N}) ->
-    [push(?i(N))];
-
-to_scode(_Env, {string, S}) ->
-    [push(?i(aeb_fate_data:make_string(S)))];
-
-to_scode(_Env, {bool, B}) ->
-    [push(?i(B))];
-
-to_scode(_Env, {account_pubkey, K}) ->
-    [push(?i(aeb_fate_data:make_address(K)))];
-
-to_scode(_Env, {contract_pubkey, K}) ->
-    [push(?i(aeb_fate_data:make_address(K)))];
-
-to_scode(_Env, {oracle_pubkey, K}) ->
-    [push(?i(aeb_fate_data:make_oracle(K)))];
-
-to_scode(_Env, {oracle_query_id, K}) ->
-    %% Not actually in FATE yet
-    [push(?i(aeb_fate_data:make_oracle_query(K)))];
+to_scode(_Env, {lit, L}) ->
+    case L of
+        {int, N}             -> [push(?i(N))];
+        {string, S}          -> [push(?i(aeb_fate_data:make_string(S)))];
+        {bool, B}            -> [push(?i(B))];
+        {account_pubkey, K}  -> [push(?i(aeb_fate_data:make_address(K)))];
+        {contract_pubkey, K} -> [push(?i(aeb_fate_data:make_address(K)))];
+        {oracle_pubkey, K}   -> [push(?i(aeb_fate_data:make_oracle(K)))];
+        {oracle_query_id, K} -> [push(?i(aeb_fate_data:make_oracle_query(K)))] %% TODO: Not actually in FATE yet
+    end;
 
 to_scode(_Env, nil) ->
     [aeb_fate_code:nil(?a)];
@@ -254,7 +243,7 @@ to_scode(Env, {remote, Ct, Fun, [_Gas, _Value | Args]}) ->
     call_to_scode(Env, [to_scode(Env, Ct), Call], Args);
 
 to_scode(Env, {closure, Fun, FVs}) ->
-    to_scode(Env, {tuple, [{string, make_function_name(Fun)}, FVs]});
+    to_scode(Env, {tuple, [{lit, {string, make_function_name(Fun)}}, FVs]});
 
 to_scode(Env, {switch, Case}) ->
     split_to_scode(Env, Case);

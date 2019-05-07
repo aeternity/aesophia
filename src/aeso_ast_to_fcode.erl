@@ -33,13 +33,15 @@
               string_concat | bits_set | bits_clear | bits_test | bits_sum |
               bits_intersection | bits_union | bits_difference.
 
--type fexpr() :: {int, integer()}
-               | {string, binary()}
-               | {account_pubkey, binary()}
-               | {contract_pubkey, binary()}
-               | {oracle_pubkey, binary()}
-               | {oracle_query_id, binary()}
-               | {bool, false | true}
+-type flit() :: {int, integer()}
+              | {string, binary()}
+              | {account_pubkey, binary()}
+              | {contract_pubkey, binary()}
+              | {oracle_pubkey, binary()}
+              | {oracle_query_id, binary()}
+              | {bool, false | true}.
+
+-type fexpr() :: {lit, flit()}
                | nil
                | {var, var_name()}
                | {def, fun_name(), [fexpr()]}
@@ -336,16 +338,16 @@ expr_to_fcode(Env, Expr) ->
 -spec expr_to_fcode(env(), aeso_syntax:type() | no_type, aeso_syntax:expr()) -> fexpr().
 
 %% Literals
-expr_to_fcode(_Env, _Type, {int,             _, N}) -> {int, N};
-expr_to_fcode(_Env, _Type, {char,            _, N}) -> {int, N};
-expr_to_fcode(_Env, _Type, {bool,            _, B}) -> {bool, B};
-expr_to_fcode(_Env, _Type, {string,          _, S}) -> {string, S};
-expr_to_fcode(_Env, _Type, {account_pubkey,  _, K}) -> {account_pubkey, K};
-expr_to_fcode(_Env, _Type, {contract_pubkey, _, K}) -> {contract_pubkey, K};
-expr_to_fcode(_Env, _Type, {oracle_pubkey,   _, K}) -> {oracle_pubkey, K};
-expr_to_fcode(_Env, _Type, {oracle_query_id, _, K}) -> {oracle_query_id, K};
+expr_to_fcode(_Env, _Type, {int,             _, N}) -> {lit, {int, N}};
+expr_to_fcode(_Env, _Type, {char,            _, N}) -> {lit, {int, N}};
+expr_to_fcode(_Env, _Type, {bool,            _, B}) -> {lit, {bool, B}};
+expr_to_fcode(_Env, _Type, {string,          _, S}) -> {lit, {string, S}};
+expr_to_fcode(_Env, _Type, {account_pubkey,  _, K}) -> {lit, {account_pubkey, K}};
+expr_to_fcode(_Env, _Type, {contract_pubkey, _, K}) -> {lit, {contract_pubkey, K}};
+expr_to_fcode(_Env, _Type, {oracle_pubkey,   _, K}) -> {lit, {oracle_pubkey, K}};
+expr_to_fcode(_Env, _Type, {oracle_query_id, _, K}) -> {lit, {oracle_query_id, K}};
 
-expr_to_fcode(_Env, _Type, {bytes, _, Bin}) -> {string, Bin};
+expr_to_fcode(_Env, _Type, {bytes, _, Bin}) -> {lit, {string, Bin}};
 
 %% Variables
 expr_to_fcode(Env, _Type, {id, _, X})  -> resolve_var(Env, [X]);
@@ -449,7 +451,7 @@ expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A, B]}) when is_atom(Op) ->
     {op, Op, [expr_to_fcode(Env, A), expr_to_fcode(Env, B)]};
 expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
     case Op of
-        '-' -> {op, '-', [{int, 0}, expr_to_fcode(Env, A)]};
+        '-' -> {op, '-', [{lit, {int, 0}}, expr_to_fcode(Env, A)]};
         '!' -> {op, '!', [expr_to_fcode(Env, A)]}
     end;
 
@@ -704,8 +706,8 @@ expr_to_decision_tree(Env, {typed, _, Expr, _}) -> expr_to_decision_tree(Env, Ex
 expr_to_decision_tree(Env, Expr) ->
     {atom, expr_to_fcode(Env, Expr)}.
 
-decision_tree_to_fcode(false)     -> {bool, false};
-decision_tree_to_fcode(true)      -> {bool, true};
+decision_tree_to_fcode(false)     -> {lit, {bool, false}};
+decision_tree_to_fcode(true)      -> {lit, {bool, true}};
 decision_tree_to_fcode({atom, B}) -> B;
 decision_tree_to_fcode({'if', A, Then, Else}) ->
     X = fresh_name(),
@@ -806,13 +808,7 @@ lambda_lift_expr({remote_u, Ct, F, Ar}) ->
     make_closure(FVs, Xs, {remote, Ct1, F, Args});
 lambda_lift_expr(Expr) ->
     case Expr of
-        {int, _}               -> Expr;
-        {string, _}            -> Expr;
-        {account_pubkey, _}    -> Expr;
-        {contract_pubkey, _}   -> Expr;
-        {oracle_pubkey, _}     -> Expr;
-        {oracle_query_id, _}   -> Expr;
-        {bool, _}              -> Expr;
+        {lit, _}               -> Expr;
         nil                    -> Expr;
         {var, _}               -> Expr;
         {closure, _, _}        -> Expr;
@@ -987,13 +983,7 @@ free_vars(Xs) when is_list(Xs) ->
 free_vars(Expr) ->
     case Expr of
         {var, X}             -> [X];
-        {int, _}             -> [];
-        {string, _}          -> [];
-        {account_pubkey, _}  -> [];
-        {contract_pubkey, _} -> [];
-        {oracle_pubkey, _}   -> [];
-        {oracle_query_id, _} -> [];
-        {bool, _}            -> [];
+        {lit, _}             -> [];
         nil                  -> [];
         {def, _, As}         -> free_vars(As);
         {def_u, _, _}        -> [];
@@ -1034,13 +1024,7 @@ get_named_arg({named_arg_t, _, {id, _, Name}, _, Default}, Args) ->
 -spec rename([{var_name(), var_name()}], fexpr()) -> fexpr().
 rename(Ren, Expr) ->
     case Expr of
-        {int, _}              -> Expr;
-        {string, _}           -> Expr;
-        {account_pubkey, _}   -> Expr;
-        {contract_pubkey, _}  -> Expr;
-        {oracle_pubkey, _}    -> Expr;
-        {oracle_query_id, _}  -> Expr;
-        {bool, _}             -> Expr;
+        {lit, _}              -> Expr;
         nil                   -> nil;
         {var, X}              -> {var, rename_var(Ren, X)};
         {def, D, Es}          -> {def, D, [rename(Ren, E) || E <- Es]};
@@ -1207,13 +1191,7 @@ pp_punctuate(Sep, [X | Xs]) -> [pp_beside(X, Sep) | pp_punctuate(Sep, Xs)].
 
 pp_par([]) -> prettypr:empty();
 pp_par(Xs) -> prettypr:par(Xs).
-pp_fexpr({Tag, Lit}) when Tag == int;
-                          Tag == string;
-                          Tag == bool;
-                          Tag == account_pubkey;
-                          Tag == contract_pubkey;
-                          Tag == oracle_pubkey;
-                          Tag == oracle_query_id ->
+pp_fexpr({lit, {Tag, Lit}}) ->
     aeso_pretty:expr({Tag, [], Lit});
 pp_fexpr(nil) ->
     pp_text("[]");
@@ -1304,6 +1282,8 @@ pp_pat({tuple, Xs})      -> pp_fexpr({tuple, [{var, X} || X <- Xs]});
 pp_pat({'::', X, Xs})    -> pp_fexpr({op, '::', [{var, X}, {var, Xs}]});
 pp_pat({con, As, I, Xs}) -> pp_fexpr({con, As, I, [{var, X} || X <- Xs]});
 pp_pat({var, X})         -> pp_fexpr({var, X});
+pp_pat(P = {Tag, _}) when Tag == bool; Tag == int; Tag == string
+                         -> pp_fexpr({lit, P});
 pp_pat(Pat)              -> pp_fexpr(Pat).
 
 is_infix(Op) ->
