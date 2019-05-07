@@ -386,10 +386,8 @@ builtin_to_scode(Env, chain_spend, [_, _] = Args) ->
                         aeb_fate_code:tuple(0)], Args);
 builtin_to_scode(Env, chain_balance, [_] = Args) ->
     call_to_scode(Env, aeb_fate_code:balance_other(?a, ?a), Args);
-builtin_to_scode(_Env, chain_block_hash, [{builtin, chain_block_height, []}]) ->
-    [aeb_fate_code:blockhash(?a)];
-builtin_to_scode(_Env, chain_block_hash, [_]) ->
-    ?TODO(fate_block_hash_at_height_instruction);
+builtin_to_scode(Env, chain_block_hash, [_] = Args) ->
+    call_to_scode(Env, aeb_fate_code:blockhash(?a, ?a), Args);
 builtin_to_scode(_Env, chain_coinbase, []) ->
     [aeb_fate_code:beneficiary(?a)];
 builtin_to_scode(_Env, chain_timestamp, []) ->
