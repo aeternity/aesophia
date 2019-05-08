@@ -9,6 +9,7 @@
 
 -module(aeso_aci).
 
+%% Old deprecated interface.
 -export([encode/1,encode/2,decode/1]).
 
 -export([encode_contract/1,encode_contract/2,decode_contract/1]).
@@ -93,13 +94,13 @@ encode_contract(ContractString, Options) ->
         %% We find and look at the last contract.
         Contract = lists:last(TypedAst),
         Cname = contract_name(Contract),
-        Tdefs = [ do_encode_typedef(T) ||
-                    T <- sort_decls(contract_types(Contract)) ],
+        Tdefs = do_encode_contract_typedefs(sort_decls(contract_types(Contract))),
         Fdefs = [ do_encode_func(F) || F <- sort_decls(contract_funcs(Contract)),
                                        not is_private_func(F) ],
-        Jmap = [{<<"contract">>, [{<<"name">>, do_encode_name(Cname)},
-                                  {<<"type_defs">>, Tdefs},
-                                  {<<"functions">>, Fdefs}]}],
+        Jmap = [{<<"contract">>,
+                 [{<<"name">>, do_encode_name(Cname)}] ++
+                     Tdefs ++
+                     [{<<"functions">>, Fdefs}]}],
         %% io:format("~p\n", [Jmap]),
         {ok,jsx:encode(Jmap)}
     catch
@@ -117,6 +118,32 @@ encode_contract(ContractString, Options) ->
 join_errors(Prefix, Errors, Pfun) ->
     Ess = [ Pfun(E) || E <- Errors ],
     list_to_binary(string:join([Prefix|Ess], "\n")).
+
+%% do_encode_contract_typedefs(TypeDefs) -> [JSON].
+%%  Return a list of typedefs and state and event if they occur.
+
+do_encode_contract_typedefs(Tdefs) ->
+    Fun = fun(T, {Ts,Ss,Es}) ->
+                  %% Only one state and event.
+                  case typedef_name(T) of
+                      "state" -> {Ts,[do_encode_state_typedef(T)],Es};
+                      "event" -> {Ts,Ss,[do_encode_event_typedef(T)]};
+                      _Name  -> {Ts ++ [do_encode_typedef(T)],Ss,Es}
+                  end
+          end,
+    {Ts,Ss,Es} = lists:foldl(Fun, {[],[],[]}, Tdefs),
+    Ss ++ [{<<"type_defs">>, Ts}] ++ Es.
+
+%% do_encode_state_typedef(StateTdef) -> JSON.
+%% do_encode_event_typedef(EventTdef) -> JSON.
+
+do_encode_state_typedef(State) ->
+    Def = typedef_def(State),
+    {<<"state">>,do_encode_alias(Def)}.
+
+do_encode_event_typedef(State) ->
+    Def = typedef_def(State),
+    {<<"event">>,do_encode_alias(Def)}.
 
 %% encode_func(TypedAST) -> JSON.
 %%  Encode a function AST into a JSON structure.
@@ -276,7 +303,7 @@ do_encode_stmt(E) ->
     do_encode_expr(E).
 
 do_encode_stmt_case(#'case'{pat=Pat,body=Body}) ->
-    Epat = do_encode_expr(Pat),	                %Patterns are expessions
+    Epat = do_encode_expr(Pat),                 %Patterns are expessions
     Ebody = do_encode_stmt(Body),
     [{<<"pattern">>,Epat},{<<"body">>,Ebody}].
 

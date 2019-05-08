@@ -31,24 +31,20 @@ generates the following JSON structure representing the contract interface:
 {
   "contract": {
     "name": "Answers",
-    "type_defs": [
-      {
-        "name": "state",
-        "vars": [],
-        "typedef": {
-          "record": [
-            {
-              "name": "a",
-              "type": {
-                "map": {
-                  "key": "string",
-                  "value": "int"
-                }
-              }
+    "state": {
+      "record": [
+        {
+          "name": "a",
+          "type": {
+            "map": {
+              "key": "string",
+              "value": "int"
             }
-          ]
+          }
         }
-      },
+      ]
+    },
+    "type_defs": [
       {
         "name": "answers",
         "vars": [],
@@ -84,15 +80,11 @@ generates the following JSON structure representing the contract interface:
         "arguments": [
           {
             "name": "q",
-            "type": [
-              "string"
-            ]
+            "type": "string"
           },
           {
             "name": "a",
-            "type": [
-              "int"
-            ]
+            "type": "int"
           }
         ],
         "returns": {
@@ -129,6 +121,18 @@ Types
 
 ``` erlang
 ConstractString = contract_string()
+JSONstring = json_string()
+```
+
+This is equivalent to `aeso_aci:encode_contract(ConstractString, [])`.
+
+#### encode_contract(ContractString, Options) -> {ok,JSONstring} | {error,ErrorString}
+
+Types
+
+``` erlang
+ConstractString = contract_string()
+Options = [option()]
 JSONstring = json_string()
 ```
 
@@ -185,15 +189,19 @@ JSONstring = json_string()
 
 Generate the JSON encoding of an expression from the AST of the expression.
 
+### Notes
+
+The deprecated functions `aseo_aci:encode/2` and `aeso_aci:decode/1` are still available but should not be used.
+
 ### Example run
 
 This is an example of using the ACI generator from an Erlang shell. The file called `aci_test.aes` contains the contract in the description from which we want to generate files `aci_test.json` which is the JSON encoding of the contract interface and `aci_test.include` which is the contract definition to be included inside another contract.
 
 ``` erlang
 1> {ok,Contract} = file:read_file("aci_test.aes").
-{ok,<<"contract Answers =\n  record state = { a : answers }\n  type answers() = map(string, int)\n\n  stateful function"...>>}
+{ok,<<"contract Answers =\n\n  record state = { a : answers }\n  type answers() = map(string, int)\n\n  stateful functio"...>>}
 2> {ok,Encoding} = aeso_aci:encode_contract(Contract).
-<<"{\"contract\":{\"name\":\"Answers\",\"type_defs\":[{\"name\":\"state\",\"vars\":[],\"typedef\":\"{a : map(string,int)}\"},{\"name\":\"ans"...>>
+{ok,<<"{\"contract\":{\"name\":\"Answers\",\"state\":{\"record\":[{\"name\":\"a\",\"type\":{\"map\":{\"key\":\"string\",\"value\":\"int\"}}}]"...>>}
 3> file:write_file("aci_test.aci", Encoding).
 ok
 4> Decoded = aeso_aci:decode_contract(Encoding).
@@ -201,7 +209,7 @@ ok
 5> file:write_file("aci_test.include", Decoded).
 ok
 6> jsx:prettify(Encoding).
-<<"{\n  \"contract\": {\n    \"name\": \"Answers\",\n    \"type_defs\": [\n      {\n        \"name\": \"state\",\n        \"vars\": [],\n   "...>>
+<<"{\n  \"contract\": {\n    \"name\": \"Answers\",\n    \"state\": {\n      \"record\": [\n        {\n          \"name\": \"a\",\n         "...>>
 ```
 
 The final call to `jsx:prettify(Encoding)` returns the encoding in a
