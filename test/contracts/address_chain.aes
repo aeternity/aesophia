@@ -1,0 +1,33 @@
+contract Remote =
+  function main : (int) => ()
+
+contract AddrChain =
+  type o_type = oracle(string, map(string, int))
+  type oq_type = oracle_query(string, map(string, int))
+
+  function is_o(a : address) =
+    Address.is_oracle(a)
+
+  function is_c(a : address) =
+    Address.is_contract(a)
+
+//   function get_o(a : address) : option(o_type) =
+//     Address.get_oracle(a)
+
+//   function get_c(a : address) : option(Remote) =
+//     Address.get_contract(a)
+
+  function check_o(o : o_type) =
+    Oracle.check(o)
+
+  function check_oq(o : o_type, oq : oq_type) =
+    Oracle.check_query(o, oq)
+
+//   function h_to_i(h : hash) : int =
+//     Hash.to_int(h)
+
+//   function a_to_i(a : address) : int =
+//     Address.to_int(a) mod 10 ^ 16
+
+  function c_creator() : address =
+    Contract.creator

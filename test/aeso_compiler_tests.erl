@@ -107,7 +107,8 @@ compilable_contracts() ->
      "basic_auth",
      "bitcoin_auth",
      "address_literals",
-     "bytes_equality"
+     "bytes_equality",
+     "address_chain"
     ].
 
 %% Contracts that should produce type errors

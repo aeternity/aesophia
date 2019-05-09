@@ -343,6 +343,8 @@ assemble_expr(Funs, Stack, _Tail, #prim_put{ state = State }) ->
 %% Environment primitives
 assemble_expr(_Funs, _Stack, _Tail, prim_contract_address) ->
     [i(?ADDRESS)];
+assemble_expr(_Funs, _Stack, _Tail, prim_contract_creator) ->
+    [i(?CREATOR)];
 assemble_expr(_Funs, _Stack, _Tail, prim_call_origin) ->
     [i(?ORIGIN)];
 assemble_expr(_Funs, _Stack, _Tail, prim_caller) ->

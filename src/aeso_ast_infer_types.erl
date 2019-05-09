@@ -404,7 +404,7 @@ global_env() ->
     ContractScope = #scope
         { funs = MkDefs(
                     [{"address", Address},
-                     %% {"owner",   Int},    %% Not in EVM
+                     {"creator", Address},
                      {"balance", Int}]) },
 
     CallScope = #scope
@@ -424,7 +424,9 @@ global_env() ->
                      {"get_question", Fun([Oracle(Q, R), Query(Q, R)], Q)},
                      {"respond",      SignFun([Oracle(Q, R), Query(Q, R), R], Unit)},
                      {"extend",       SignFun([Oracle(Q, R), TTL], Unit)},
-                     {"get_answer",   Fun([Oracle(Q, R), Query(Q, R)], option_t(Ann, R))}]) },
+                     {"get_answer",   Fun([Oracle(Q, R), Query(Q, R)], option_t(Ann, R))},
+                     {"check",        Fun([Oracle(Q, R)], Bool)},
+                     {"check_query",  Fun([Oracle(Q,R), Query(Q, R)], Bool)}]) },
 
     AENSScope = #scope
         { funs = MkDefs(
@@ -482,7 +484,9 @@ global_env() ->
 
     %% Conversion
     IntScope     = #scope{ funs = MkDefs([{"to_str", Fun1(Int,     String)}]) },
-    AddressScope = #scope{ funs = MkDefs([{"to_str", Fun1(Address, String)}]) },
+    AddressScope = #scope{ funs = MkDefs([{"to_str", Fun1(Address, String)},
+                                          {"is_oracle", Fun1(Address, Bool)},
+                                          {"is_contract", Fun1(Address, Bool)}]) },
 
     #env{ scopes =
             #{ []           => TopScope
