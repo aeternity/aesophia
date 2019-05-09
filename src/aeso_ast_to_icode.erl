@@ -152,6 +152,7 @@ ast_body(?qid_app(["Chain", "block_hash"], [Height], _, _), Icode) ->
 ast_body(?qid_app(["Call", "gas_left"], [], _, _), _Icode) ->
     prim_gas_left;
 ast_body({qid, _, ["Contract", "address"]}, _Icode)      -> prim_contract_address;
+ast_body({qid, _, ["Contract", "creator"]}, _Icode)      -> prim_contract_creator;
 ast_body({qid, _, ["Contract", "balance"]}, _Icode)      -> #prim_balance{ address = prim_contract_address };
 ast_body({qid, _, ["Call",     "origin"]}, _Icode)       -> prim_call_origin;
 ast_body({qid, _, ["Call",     "caller"]}, _Icode)       -> prim_caller;
@@ -223,6 +224,17 @@ ast_body(?qid_app(["Oracle", "get_question"], [Oracle, Q], [_, ?query_t(QType, _
 ast_body(?qid_app(["Oracle", "get_answer"], [Oracle, Q], [_, ?query_t(_, RType)], _), Icode) ->
     prim_call(?PRIM_CALL_ORACLE_GET_ANSWER, #integer{value = 0},
               [ast_body(Oracle, Icode), ast_body(Q, Icode)], [word, word], aeso_icode:option_typerep(ast_type(RType, Icode)));
+
+ast_body(?qid_app(["Oracle", "check"], [Oracle], [?oracle_t(Q, R)], _), Icode) ->
+    prim_call(?PRIM_CALL_ORACLE_CHECK, #integer{value = 0},
+              [ast_body(Oracle, Icode), ast_type_value(Q, Icode), ast_type_value(R, Icode)],
+              [word, typerep, typerep], word);
+
+ast_body(?qid_app(["Oracle", "check_query"], [Oracle, Query], [_, ?query_t(Q, R)], _), Icode) ->
+    prim_call(?PRIM_CALL_ORACLE_CHECK_QUERY, #integer{value = 0},
+              [ast_body(Oracle, Icode), ast_body(Query, Icode),
+               ast_type_value(Q, Icode), ast_type_value(R, Icode)],
+              [word, typerep, typerep], word);
 
 ast_body({qid, _, ["Oracle", "register"]}, _Icode)     -> gen_error({underapplied_primitive, 'Oracle.register'});
 ast_body({qid, _, ["Oracle", "query"]}, _Icode)        -> gen_error({underapplied_primitive, 'Oracle.query'});
@@ -410,6 +422,12 @@ ast_body(?qid_app(["Int", "to_str"], [Int], _, _), Icode) ->
 
 ast_body(?qid_app(["Address", "to_str"], [Addr], _, _), Icode) ->
     builtin_call(addr_to_str, [ast_body(Addr, Icode)]);
+ast_body(?qid_app(["Address", "is_oracle"], [Addr], _, _), Icode) ->
+    prim_call(?PRIM_CALL_ADDR_IS_ORACLE, #integer{value = 0},
+              [ast_body(Addr, Icode)], [word], word);
+ast_body(?qid_app(["Address", "is_contract"], [Addr], _, _), Icode) ->
+    prim_call(?PRIM_CALL_ADDR_IS_CONTRACT, #integer{value = 0},
+              [ast_body(Addr, Icode)], [word], word);
 
 %% Other terms
 ast_body({id, _, Name}, _Icode) ->
