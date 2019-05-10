@@ -235,7 +235,7 @@ to_scode(Env, {funcall, Fun, Args}) ->
 to_scode(Env, {builtin, B, Args}) ->
     builtin_to_scode(Env, B, Args);
 
-to_scode(Env, {remote, Ct, Fun, [{builtin, call_gas_left, _}, Value |Args]}) ->
+to_scode(Env, {remote, Ct, Fun, [{builtin, call_gas_left, _}, Value | Args]}) ->
     %% Gas is not limited.
     Lbl = make_function_name(Fun),
     Call = if Env#env.tailpos -> aeb_fate_code:call_tr(?a, Lbl, ?a);
@@ -243,7 +243,7 @@ to_scode(Env, {remote, Ct, Fun, [{builtin, call_gas_left, _}, Value |Args]}) ->
            end,
     call_to_scode(Env, [to_scode(Env, Value), to_scode(Env, Ct), Call], Args);
 
-to_scode(Env, {remote, Ct, Fun, [Gas, Value |Args]}) ->
+to_scode(Env, {remote, Ct, Fun, [Gas, Value | Args]}) ->
     %% Gas is limited.
     Lbl = make_function_name(Fun),
     Call = if Env#env.tailpos -> aeb_fate_code:call_gtr(?a, Lbl, ?a, ?a);
