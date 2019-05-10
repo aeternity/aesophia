@@ -40,3 +40,5 @@ contract Test =
 
   function type_error(r, x) =
     set_x(set_x(x, r), x)
+
+  function repeated_arg(x : int, y, x : string, y : bool) : string = x

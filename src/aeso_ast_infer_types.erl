@@ -862,7 +862,8 @@ infer_letrec(Env, Defs) ->
     [print_typesig(S) || S <- TypeSigs],
     {TypeSigs, NewDefs}.
 
-infer_letfun(Env, {letfun, Attrib, {id, NameAttrib, Name}, Args, What, Body}) ->
+infer_letfun(Env, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, Body}) ->
+    check_unique_arg_names(Fun, Args),
     ArgTypes  = [{ArgName, check_type(Env, arg_type(T))} || {arg, _, ArgName, T} <- Args],
     ExpectedType = check_type(Env, arg_type(What)),
     NewBody={typed, _, _, ResultType} = check_expr(bind_vars(ArgTypes, Env), Body, ExpectedType),
@@ -872,6 +873,13 @@ infer_letfun(Env, {letfun, Attrib, {id, NameAttrib, Name}, Args, What, Body}) ->
     TypeSig = {type_sig, Attrib, NamedArgs, [T || {arg, _, _, T} <- NewArgs], ResultType},
     {{Name, TypeSig},
      {letfun, Attrib, {id, NameAttrib, Name}, NewArgs, ResultType, NewBody}}.
+
+check_unique_arg_names(Fun, Args) ->
+    Name = fun({arg, _, {id, _, X}, _}) -> X end,
+    Names = lists:map(Name, Args),
+    Dups = lists:usort(Names -- lists:usort(Names)),
+    [ type_error({repeated_arg, Fun, Arg}) || Arg <- Dups ],
+    ok.
 
 print_typesig({Name, TypeSig}) ->
     ?PRINT_TYPES("Inferred ~s : ~s\n", [Name, pp(TypeSig)]).
@@ -1929,6 +1937,9 @@ pp_error({include, {string, Pos, Name}}) ->
 pp_error({namespace, _Pos, {con, Pos, Name}, _Def}) ->
     io_lib:format("Nested namespace not allowed\nNamespace '~s' at ~s not defined at top level.\n",
                   [Name, pp_loc(Pos)]);
+pp_error({repeated_arg, Fun, Arg}) ->
+    io_lib:format("Repeated argument ~s to function ~s (at ~s).\n",
+                  [Arg, pp(Fun), pp_loc(Fun)]);
 pp_error(Err) ->
     io_lib:format("Unknown error: ~p\n", [Err]).
 
