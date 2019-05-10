@@ -417,7 +417,7 @@ builtin_to_scode(_Env, call_origin, []) ->
 builtin_to_scode(_Env, call_caller, []) ->
     [aeb_fate_code:caller(?a)];
 builtin_to_scode(_Env, call_value, []) ->
-    ?TODO(fate_call_value_instruction);
+    [aeb_fate_code:call_value(?a)];
 builtin_to_scode(_Env, call_gas_price, []) ->
     [aeb_fate_code:gasprice(?a)];
 builtin_to_scode(_Env, call_gas_left, []) ->
@@ -639,6 +639,7 @@ attributes(I) ->
         {'CALL_T', _}                         -> Impure(pc, []);
         {'CALL_TR', A, _, B}                  -> Impure(pc, [A, B]);
         {'CALL_GTR', A, _, B, C}              -> Impure(pc, [A, B, C]);
+        {'CALL_VALUE', A}                     -> Pure(A, []);
         {'JUMP', _}                           -> Impure(pc, []);
         {'JUMPIF', A, _}                      -> Impure(pc, A);
         {'SWITCH_V2', A, _, _}                -> Impure(pc, A);
