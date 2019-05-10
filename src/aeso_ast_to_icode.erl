@@ -530,6 +530,8 @@ ast_body({switch,_,A,Cases}, Icode) ->
 ast_body({block,As,[{letval,_,Pat,_,E}|Rest]}, Icode) ->
     #switch{expr=ast_body(E, Icode),
             cases=[{ast_body(Pat, Icode),ast_body({block,As,Rest}, Icode)}]};
+ast_body({block, As, [{letfun, Ann, F, Args, _Type, Expr} | Rest]}, Icode) ->
+    ast_body({block, As, [{letval, Ann, F, unused, {lam, Ann, Args, Expr}} | Rest]}, Icode);
 ast_body({block,_,[]}, _Icode) ->
     #tuple{cpts=[]};
 ast_body({block,_,[E]}, Icode) ->

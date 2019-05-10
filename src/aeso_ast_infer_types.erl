@@ -1133,9 +1133,11 @@ infer_case(Env, Attrs, Pattern, ExprType, Branch, SwitchType) ->
 %% NewStmts = infer_block(Env, Attrs, Stmts, BlockType)
 infer_block(_Env, Attrs, [], BlockType) ->
     error({impossible, empty_block, Attrs, BlockType});
-infer_block(Env, Attrs, [Def={letfun, _, _, _, _, _}|Rest], BlockType) ->
-    NewDef = infer_letfun(Env, Def),
-    [NewDef|infer_block(Env, Attrs, Rest, BlockType)];
+infer_block(Env, Attrs, [Def={letfun, Ann, _, _, _, _}|Rest], BlockType) ->
+    {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
+    FunT = freshen_type(typesig_to_fun_t(TypeSig)),
+    NewE = bind_var({id, Ann, Name}, FunT, Env),
+    [LetFun|infer_block(NewE, Attrs, Rest, BlockType)];
 infer_block(Env, Attrs, [Def={letrec, _, _}|Rest], BlockType) ->
     NewDef = infer_letrec(Env, Def),
     [NewDef|infer_block(Env, Attrs, Rest, BlockType)];
