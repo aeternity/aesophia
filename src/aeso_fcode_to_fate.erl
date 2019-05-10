@@ -235,12 +235,24 @@ to_scode(Env, {funcall, Fun, Args}) ->
 to_scode(Env, {builtin, B, Args}) ->
     builtin_to_scode(Env, B, Args);
 
-to_scode(Env, {remote, Ct, Fun, [_Gas, _Value | Args]}) ->
-    %% TODO: FATE doesn't support value and gas arguments yet
-    Lbl  = make_function_name(Fun),
-    Call = if Env#env.tailpos -> aeb_fate_code:call_tr(?a, Lbl);
-              true            -> aeb_fate_code:call_r(?a, Lbl) end,
-    call_to_scode(Env, [to_scode(Env, Ct), Call], Args);
+to_scode(Env, {remote, Ct, Fun, [{builtin, call_gas_left, _}, Value | Args]}) ->
+    %% Gas is not limited.
+    Lbl = make_function_name(Fun),
+    Call = if Env#env.tailpos -> aeb_fate_code:call_tr(?a, Lbl, ?a);
+              true            -> aeb_fate_code:call_r(?a, Lbl, ?a)
+           end,
+    call_to_scode(Env, [to_scode(Env, Value), to_scode(Env, Ct), Call], Args);
+
+to_scode(Env, {remote, Ct, Fun, [Gas, Value | Args]}) ->
+    %% Gas is limited.
+    Lbl = make_function_name(Fun),
+    Call = if Env#env.tailpos -> aeb_fate_code:call_gtr(?a, Lbl, ?a, ?a);
+              true            -> aeb_fate_code:call_gr(?a, Lbl, ?a, ?a)
+           end,
+    call_to_scode(Env, [to_scode(Env, Gas),
+                        to_scode(Env, Value),
+                        to_scode(Env, Ct), Call],
+                  Args);
 
 to_scode(Env, {closure, Fun, FVs}) ->
     to_scode(Env, {tuple, [{lit, {string, make_function_name(Fun)}}, FVs]});
@@ -622,9 +634,11 @@ attributes(I) ->
         'RETURN'                              -> Impure(pc, []);
         {'RETURNR', A}                        -> Impure(pc, A);
         {'CALL', _}                           -> Impure(?a, []);
-        {'CALL_R', A, _}                      -> Impure(?a, A);
+        {'CALL_R', A, _, B}                   -> Impure(?a, [A, B]);
+        {'CALL_GR', A, _, B, C}               -> Impure(?a, [A, B, C]);
         {'CALL_T', _}                         -> Impure(pc, []);
-        {'CALL_TR', A, _}                     -> Impure(pc, A);
+        {'CALL_TR', A, _, B}                  -> Impure(pc, [A, B]);
+        {'CALL_GTR', A, _, B, C}              -> Impure(pc, [A, B, C]);
         {'JUMP', _}                           -> Impure(pc, []);
         {'JUMPIF', A, _}                      -> Impure(pc, A);
         {'SWITCH_V2', A, _, _}                -> Impure(pc, A);
@@ -1281,7 +1295,8 @@ reorder_blocks(Ref, Code, Blocks, Acc) ->
         ['RETURN'|_]          -> reorder_blocks(Blocks, Acc1);
         [{'RETURNR', _}|_]    -> reorder_blocks(Blocks, Acc1);
         [{'CALL_T', _}|_]     -> reorder_blocks(Blocks, Acc1);
-        [{'CALL_TR', _, _}|_] -> reorder_blocks(Blocks, Acc1);
+        [{'CALL_TR', _, _, _}|_] -> reorder_blocks(Blocks, Acc1);
+        [{'CALL_GTR', _, _, _}|_] -> reorder_blocks(Blocks, Acc1);
         [{'ABORT', _}|_]      -> reorder_blocks(Blocks, Acc1);
         [{switch, _, _}|_]    -> reorder_blocks(Blocks, Acc1);
         [{jump, L}|_]         ->
