@@ -160,8 +160,7 @@ decl(D = {letfun, Attrs, _, _, _, _}) ->
                             text(atom_to_list(Mod));
              (_) -> empty() end,
     hsep(lists:map(Mod, Attrs) ++ [letdecl("function", D)]);
-decl(D = {letval, _, _, _, _})    -> letdecl("let", D);
-decl(D = {letrec, _, _})          -> letdecl("let", D).
+decl(D = {letval, _, _, _, _}) -> letdecl("let", D).
 
 -spec expr(aeso_syntax:expr(), options()) -> doc().
 expr(E, Options) ->
@@ -184,9 +183,7 @@ name({typed, _, Name, _}) -> name(Name).
 letdecl(Let, {letval, _, F, T, E}) ->
     block_expr(0, hsep([text(Let), typed(name(F), T), text("=")]), E);
 letdecl(Let, {letfun, _, F, Args, T, E}) ->
-    block_expr(0, hsep([text(Let), typed(beside(name(F), args(Args)), T), text("=")]), E);
-letdecl(Let, {letrec, _, [D | Ds]}) ->
-    hsep(text(Let), above([ letdecl("rec", D) | [ letdecl("and", D1) || D1 <- Ds ] ])).
+    block_expr(0, hsep([text(Let), typed(beside(name(F), args(Args)), T), text("=")]), E).
 
 -spec args([aeso_syntax:arg()]) -> doc().
 args(Args) ->
@@ -435,7 +432,6 @@ statements(Stmts) ->
 
 statement(S = {letval, _, _, _, _})    -> letdecl("let", S);
 statement(S = {letfun, _, _, _, _, _}) -> letdecl("let", S);
-statement(S = {letrec, _, _})          -> letdecl("let", S);
 statement(E) -> expr(E).
 
 get_elifs(Expr) -> get_elifs(Expr, []).

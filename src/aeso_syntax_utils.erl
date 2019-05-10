@@ -39,11 +39,6 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
     BindExpr = fun(P) -> fold(Alg, Fun, bind_expr, P) end,
     BindType = fun(T) -> fold(Alg, Fun, bind_type, T) end,
     Top = Fun(K, X),
-    Bound = fun LB ({letval, _, Y, _, _})    -> BindExpr(Y);
-                LB ({letfun, _, F, _, _, _}) -> BindExpr(F);
-                LB ({letrec, _, Ds})         -> Sum(lists:map(LB, Ds));
-                LB (_)                       -> Zero
-            end,
     Rec = case X of
             %% lists (bound things in head scope over tail)
             [A | As]                 -> Scoped(Same(A), Same(As));
@@ -55,7 +50,6 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
             {fun_decl, _, _, T}      -> Type(T);
             {letval, _, F, T, E}     -> Sum([BindExpr(F), Type(T), Expr(E)]);
             {letfun, _, F, Xs, T, E} -> Sum([BindExpr(F), Type(T), Scoped(BindExpr(Xs), Expr(E))]);
-            {letrec, _, Ds}          -> Plus(Bound(Ds), Decl(Ds));
             %% typedef()
             {alias_t, T}    -> Type(T);
             {record_t, Fs}  -> Type(Fs);

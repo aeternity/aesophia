@@ -87,7 +87,7 @@ constructors() ->
     sep1(constructor(), tok('|')).
 
 constructor() ->    %% TODO: format for Con() vs Con
-    choice(?RULE(con(),              {constr_t, get_ann(_1), _1, []}),
+    choice(?RULE(con(),             {constr_t, get_ann(_1), _1, []}),
            ?RULE(con(), con_args(), {constr_t, get_ann(_1), _1, _2})).
 
 con_args()   -> paren_list(con_arg()).
@@ -99,9 +99,7 @@ con_arg()    -> choice(type(), ?RULE(keyword(indexed), type(), set_ann(indexed, 
 %% -- Let declarations -------------------------------------------------------
 
 letdecl() ->
-    choice(
-        ?RULE(keyword('let'), letdef(),                             set_pos(get_pos(_1), _2)),
-        ?RULE(keyword('let'), tok(rec), sep1(letdef(), tok('and')), {letrec, _1, _3})).
+    ?RULE(keyword('let'), letdef(), set_pos(get_pos(_1), _2)).
 
 letdef() -> choice(valdef(), fundef()).
 
