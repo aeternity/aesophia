@@ -798,7 +798,7 @@ check_sccs(Env = #env{}, Funs, [{acyclic, X} | SCCs], Acc) ->
     end;
 check_sccs(Env = #env{}, Funs, [{cyclic, Xs} | SCCs], Acc) ->
     Defs = [ maps:get(X, Funs) || X <- Xs ],
-    {TypeSigs, {letrec, _, Defs1}} = infer_letrec(Env, {letrec, [], Defs}),
+    {TypeSigs, Defs1} = infer_letrec(Env, Defs),
     Env1 = bind_funs(TypeSigs, Env),
     check_sccs(Env1, Funs, SCCs, Defs1 ++ Acc).
 
@@ -840,7 +840,7 @@ check_special_funs(_, _) -> ok.
 
 typesig_to_fun_t({type_sig, Ann, Named, Args, Res}) -> {fun_t, Ann, Named, Args, Res}.
 
-infer_letrec(Env, {letrec, Attrs, Defs}) ->
+infer_letrec(Env, Defs) ->
     create_constraints(),
     Funs = [{Name, fresh_uvar(A)}
                  || {letfun, _, {id, A, Name}, _, _, _} <- Defs],
@@ -860,7 +860,7 @@ infer_letrec(Env, {letrec, Attrs, Defs}) ->
     TypeSigs = instantiate([Sig || {Sig, _} <- Inferred]),
     NewDefs  = instantiate([D || {_, D} <- Inferred]),
     [print_typesig(S) || S <- TypeSigs],
-    {TypeSigs, {letrec, Attrs, NewDefs}}.
+    {TypeSigs, NewDefs}.
 
 infer_letfun(Env, {letfun, Attrib, {id, NameAttrib, Name}, Args, What, Body}) ->
     ArgTypes  = [{ArgName, check_type(Env, arg_type(T))} || {arg, _, ArgName, T} <- Args],
@@ -1138,9 +1138,6 @@ infer_block(Env, Attrs, [Def={letfun, Ann, _, _, _, _}|Rest], BlockType) ->
     FunT = freshen_type(typesig_to_fun_t(TypeSig)),
     NewE = bind_var({id, Ann, Name}, FunT, Env),
     [LetFun|infer_block(NewE, Attrs, Rest, BlockType)];
-infer_block(Env, Attrs, [Def={letrec, _, _}|Rest], BlockType) ->
-    NewDef = infer_letrec(Env, Def),
-    [NewDef|infer_block(Env, Attrs, Rest, BlockType)];
 infer_block(Env, _, [{letval, Attrs, Pattern, Type, E}|Rest], BlockType) ->
     NewE = {typed, _, _, PatType} = infer_expr(Env, {typed, Attrs, E, arg_type(Type)}),
     {'case', _, NewPattern, {typed, _, {block, _, NewRest}, _}} =

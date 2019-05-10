@@ -102,13 +102,6 @@ contract_to_icode([{letfun, Attrib, Name, Args, _What, Body={typed,_,_,T}}|Rest]
     QName    = aeso_icode:qualify(Name, Icode),
     NewIcode = ast_fun_to_icode(ast_id(QName), FunAttrs, FunArgs, FunBody, TypeRep, Icode),
     contract_to_icode(Rest, NewIcode);
-contract_to_icode([{letrec,_,Defs}|Rest], Icode) ->
-    %% OBS! This code ignores the letrec structure of the source,
-    %% because the back end treats ALL declarations as recursive! We
-    %% need to decide whether to (a) modify the back end to respect
-    %% the letrec structure, or (b) (preferably) modify the front end
-    %% just to parse a list of (mutually recursive) definitions.
-    contract_to_icode(Defs++Rest, Icode);
 contract_to_icode([], Icode) -> Icode;
 contract_to_icode([{fun_decl, _, _, _} | Code], Icode) ->
     contract_to_icode(Code, Icode);

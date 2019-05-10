@@ -36,11 +36,6 @@ contract AllSyntax =
       (x, [y, z]) => bar({x = z, y = -y + - -z * (-1)})
       (x, y :: _) => ()
 
-  function mutual() =
-    let rec recFun(x : int) = mutFun(x)
-        and mutFun(x) = if(x =< 0) 1 else x * recFun(x - 1)
-    recFun(0)
-
   let hash : address = #01ab0fff11
   let b = false
   let qcon = Mod.Con
