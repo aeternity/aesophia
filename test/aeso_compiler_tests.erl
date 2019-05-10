@@ -191,6 +191,8 @@ failing_contracts() ->
           "  - r' (at line 5, column 10)">>,
         <<"Repeated name x in pattern\n"
           "  x :: x (at line 26, column 7)">>,
+        <<"Repeated argument x to function repeated_arg (at line 44, column 12).">>,
+        <<"Repeated argument y to function repeated_arg (at line 44, column 12).">>,
         <<"No record type with fields y, z (at line 14, column 22)">>,
         <<"The field z is missing when constructing an element of type r2 (at line 15, column 24)">>,
         <<"Record type r2 does not have field y (at line 15, column 22)">>]}
