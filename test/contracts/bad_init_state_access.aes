@@ -1,0 +1,13 @@
+contract BadInit =
+
+  type state = int
+
+  function new_state(n) = state + n
+
+  stateful function roundabout(n) = put(n)
+  stateful function set_state(n) = roundabout(n)
+
+  stateful function init() =
+    set_state(4)
+    new_state(0)
+    state + state

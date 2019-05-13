@@ -605,6 +605,8 @@ infer_contract(Env, What, Defs) ->
     SCCs      = aeso_utils:scc(DepGraph),
     %% io:format("Dependency sorted functions:\n  ~p\n", [SCCs]),
     {Env4, Defs1} = check_sccs(Env3, FunMap, SCCs, []),
+    %% Check that `init` doesn't read or write the state
+    check_state_dependencies(Env4, Defs1),
     destroy_and_report_type_errors(Env4),
     {Env4, TypeDefs ++ Decls ++ Defs1}.
 
@@ -934,6 +936,47 @@ check_stateful_named_arg(#env{ stateful = false, current_function = Fun }, {id, 
         _           -> type_error({value_arg_not_allowed, Default, Fun})
     end;
 check_stateful_named_arg(_, _, _) -> ok.
+
+%% Check that `init` doesn't read or write the state
+check_state_dependencies(Env, Defs) ->
+    Top       = Env#env.namespace,
+    GetState  = Top ++ ["state"],
+    SetState  = Top ++ ["put"],
+    Init      = Top ++ ["init"],
+    UsedNames = fun(X) -> [{Xs, Ann} || {{term, Xs}, Ann} <- aeso_syntax_utils:used(X)] end,
+    Funs      = [ {Top ++ [Name], Fun} || Fun = {letfun, _, {id, _, Name}, _Args, _Type, _Body} <- Defs ],
+    Deps      = maps:from_list([{Name, UsedNames(Def)} || {Name, Def} <- Funs]),
+    case maps:get(Init, Deps, false) of
+        false -> ok;    %% No init, so nothing to check
+        _     ->
+            [ type_error({init_depends_on_state, state, Chain})
+              || Chain <- get_call_chains(Deps, Init, GetState) ],
+            [ type_error({init_depends_on_state, put, Chain})
+              || Chain <- get_call_chains(Deps, Init, SetState) ],
+            ok
+    end.
+
+%% Compute all paths (not sharing intermediate nodes) from Start to Stop in Graph.
+get_call_chains(Graph, Start, Stop) ->
+    get_call_chains(Graph, #{}, queue:from_list([{Start, [], []}]), Stop, []).
+
+get_call_chains(_Graph, _Visit, [], _, Acc) -> lists:reverse(Acc);
+get_call_chains(Graph, Visited, [{Stop, Path} | Queue], Stop, Acc) ->
+    get_call_chains(Graph, Visited, Queue, Stop, [lists:reverse(Path) | Acc]);
+get_call_chains(Graph, Visited, Queue, Stop, Acc) ->
+    case queue:out(Queue) of
+        {empty, _} -> lists:reverse(Acc);
+        {{value, {Stop, Ann, Path}}, Queue1} ->
+            get_call_chains(Graph, Visited, Queue1, Stop, [lists:reverse([{Stop, Ann} | Path]) | Acc]);
+        {{value, {Node, Ann, Path}}, Queue1} ->
+            case maps:is_key(Node, Visited) of
+                true  -> get_call_chains(Graph, Visited, Queue1, Stop, Acc);
+                false ->
+                    Calls = maps:get(Node, Graph, []),
+                    NewQ  = queue:from_list([{New, Ann1, [{Node, Ann} | Path]} || {New, Ann1} <- Calls]),
+                    get_call_chains(Graph, Visited#{Node => true}, queue:join(Queue1, NewQ), Stop, Acc)
+            end
+    end.
 
 check_expr(Env, Expr, Type) ->
     E = {typed, _, _, Type1} = infer_expr(Env, Expr),
@@ -1970,6 +2013,12 @@ pp_error({stateful_not_allowed, Id, Fun}) ->
 pp_error({value_arg_not_allowed, Value, Fun}) ->
     io_lib:format("Cannot pass non-zero value argument ~s (at ~s)\nin the definition of non-stateful function ~s.\n",
                   [pp_expr("", Value), pp_loc(Value), pp(Fun)]);
+pp_error({init_depends_on_state, Which, [_Init | Chain]}) ->
+    WhichCalls = fun("put") -> ""; ("state") -> ""; (_) -> ", which calls" end,
+    io_lib:format("The init function should return the initial state as its result and cannot ~s the state,\nbut it calls\n~s",
+                  [if Which == put -> "write"; true -> "read" end,
+                   [ io_lib:format("  - ~s (at ~s)~s\n", [Fun, pp_loc(Ann), WhichCalls(Fun)])
+                     || {[_, Fun], Ann} <- Chain]]);
 pp_error(Err) ->
     io_lib:format("Unknown error: ~p\n", [Err]).
 
