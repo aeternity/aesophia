@@ -104,6 +104,8 @@
     , fields     = #{}                :: #{ name() => [field_info()] }    %% fields are global
     , namespace  = []                 :: qname()
     , in_pattern = false              :: boolean()
+    , stateful   = false              :: boolean()
+    , current_function = none         :: none | aeso_syntax:id()
     }).
 
 -type env() :: #env{}.
@@ -197,7 +199,7 @@ bind_state(Env) ->
             false  -> {id, Ann, "event"}    %% will cause type error if used(?)
         end,
     Env1 = bind_funs([{"state", State},
-                      {"put", {fun_t, Ann, [], [State], Unit}}], Env),
+                      {"put", {type_sig, [stateful | Ann], [], [State], Unit}}], Env),
 
     %% We bind Chain.event in a local 'Chain' namespace.
     pop_scope(
@@ -357,11 +359,12 @@ global_env() ->
     Pair    = fun(A, B) -> {tuple_t, Ann, [A, B]} end,
     Fun     = fun(Ts, T) -> {type_sig, Ann, [], Ts, T} end,
     Fun1    = fun(S, T) -> Fun([S], T) end,
-    TVar    = fun(X) -> {tvar, Ann, "'" ++ X} end,
+    StateFun  = fun(Ts, T) -> {type_sig, [stateful|Ann], [], Ts, T} end,
+    TVar      = fun(X) -> {tvar, Ann, "'" ++ X} end,
     SignId    = {id, Ann, "signature"},
     SignDef   = {bytes, Ann, <<0:64/unit:8>>},
     Signature = {named_arg_t, Ann, SignId, SignId, {typed, Ann, SignDef, SignId}},
-    SignFun   = fun(Ts, T) -> {type_sig, Ann, [Signature], Ts, T} end,
+    SignFun   = fun(Ts, T) -> {type_sig, [stateful|Ann], [Signature], Ts, T} end,
     TTL       = {qid, Ann, ["Chain", "ttl"]},
     Fee       = Int,
     [A, Q, R, K, V] = lists:map(TVar, ["a", "q", "r", "k", "v"]),
@@ -390,7 +393,7 @@ global_env() ->
     ChainScope = #scope
         { funs = MkDefs(
                      %% Spend transaction.
-                    [{"spend",        Fun([Address, Int], Unit)},
+                    [{"spend",        StateFun([Address, Int], Unit)},
                      %% Chain environment
                      {"balance",      Fun1(Address, Int)},
                      {"block_hash",   Fun1(Int, Int)},
@@ -420,7 +423,7 @@ global_env() ->
         { funs = MkDefs(
                     [{"register",     SignFun([Address, Fee, TTL], Oracle(Q, R))},
                      {"query_fee",    Fun([Oracle(Q, R)], Fee)},
-                     {"query",        Fun([Oracle(Q, R), Q, Fee, TTL, TTL], Query(Q, R))},
+                     {"query",        StateFun([Oracle(Q, R), Q, Fee, TTL, TTL], Query(Q, R))},
                      {"get_question", Fun([Oracle(Q, R), Query(Q, R)], Q)},
                      {"respond",      SignFun([Oracle(Q, R), Query(Q, R), R], Unit)},
                      {"extend",       SignFun([Oracle(Q, R), TTL], Unit)},
@@ -862,7 +865,9 @@ infer_letrec(Env, Defs) ->
     [print_typesig(S) || S <- TypeSigs],
     {TypeSigs, NewDefs}.
 
-infer_letfun(Env, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, Body}) ->
+infer_letfun(Env0, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, Body}) ->
+    Env = Env0#env{ stateful = aeso_syntax:get_ann(stateful, Attrib, false),
+                    current_function = Fun },
     check_unique_arg_names(Fun, Args),
     ArgTypes  = [{ArgName, check_type(Env, arg_type(T))} || {arg, _, ArgName, T} <- Args],
     ExpectedType = check_type(Env, arg_type(What)),
@@ -904,6 +909,7 @@ lookup_name(Env, As, Id, Options) ->
             {Id, fresh_uvar(As)};
         {QId, {_, Ty}} ->
             Freshen = proplists:get_value(freshen, Options, false),
+            check_stateful(Env, Id, Ty),
             Ty1 = case Ty of
                     {type_sig, _, _, _, _} -> freshen_type(typesig_to_fun_t(Ty));
                     _ when Freshen         -> freshen_type(Ty);
@@ -911,6 +917,23 @@ lookup_name(Env, As, Id, Options) ->
                   end,
             {set_qname(QId, Id), Ty1}
     end.
+
+check_stateful(#env{ stateful = false, current_function = Fun }, Id, Type = {type_sig, _, _, _, _}) ->
+    case aeso_syntax:get_ann(stateful, Type, false) of
+        false -> ok;
+        true  ->
+            type_error({stateful_not_allowed, Id, Fun})
+    end;
+check_stateful(_Env, _Id, _Type) -> ok.
+
+%% Hack: don't allow passing the 'value' named arg if not stateful. This only
+%% works since the user can't create functions with named arguments.
+check_stateful_named_arg(#env{ stateful = false, current_function = Fun }, {id, _, "value"}, Default) ->
+    case Default of
+        {int, _, 0} -> ok;
+        _           -> type_error({value_arg_not_allowed, Default, Fun})
+    end;
+check_stateful_named_arg(_, _, _) -> ok.
 
 check_expr(Env, Expr, Type) ->
     E = {typed, _, _, Type1} = infer_expr(Env, Expr),
@@ -1072,6 +1095,7 @@ infer_expr(Env, {lam, Attrs, Args, Body}) ->
 
 infer_named_arg(Env, NamedArgs, {named_arg, Ann, Id, E}) ->
     CheckedExpr = {typed, _, _, ArgType} = infer_expr(Env, E),
+    check_stateful_named_arg(Env, Id, E),
     add_named_argument_constraint(
         #named_argument_constraint{
             args = NamedArgs,
@@ -1821,7 +1845,7 @@ create_type_errors() ->
     ets_new(type_errors, [bag]).
 
 destroy_and_report_type_errors(Env) ->
-    Errors   = ets_tab2list(type_errors),
+    Errors   = lists:reverse(ets_tab2list(type_errors)),
     %% io:format("Type errors now: ~p\n", [Errors]),
     PPErrors = [ pp_error(unqualify(Env, Err)) || Err <- Errors ],
     ets_delete(type_errors),
@@ -1940,6 +1964,12 @@ pp_error({namespace, _Pos, {con, Pos, Name}, _Def}) ->
 pp_error({repeated_arg, Fun, Arg}) ->
     io_lib:format("Repeated argument ~s to function ~s (at ~s).\n",
                   [Arg, pp(Fun), pp_loc(Fun)]);
+pp_error({stateful_not_allowed, Id, Fun}) ->
+    io_lib:format("Cannot reference stateful function ~s (at ~s)\nin the definition of non-stateful function ~s.\n",
+                  [pp(Id), pp_loc(Id), pp(Fun)]);
+pp_error({value_arg_not_allowed, Value, Fun}) ->
+    io_lib:format("Cannot pass non-zero value argument ~s (at ~s)\nin the definition of non-stateful function ~s.\n",
+                  [pp_expr("", Value), pp_loc(Value), pp(Fun)]);
 pp_error(Err) ->
     io_lib:format("Unknown error: ~p\n", [Err]).
 
