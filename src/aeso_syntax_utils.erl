@@ -98,29 +98,31 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
 %% Name dependencies
 
 used_ids(E) ->
-    [ X || {term, [X]} <- used(E) ].
+    [ X || {{term, [X]}, _} <- used(E) ].
 
 used_types(T) ->
-    [ X || {type, [X]} <- used(T) ].
+    [ X || {{type, [X]}, _} <- used(T) ].
 
 -type entity() :: {term, [string()]}
                 | {type, [string()]}
                 | {namespace, [string()]}.
 
--spec entity_alg() -> alg([entity()]).
+-spec entity_alg() -> alg(#{entity() => aeso_syntax:ann()}).
 entity_alg() ->
     IsBound = fun({K, _}) -> lists:member(K, [bound_term, bound_type]) end,
     Unbind  = fun(bound_term) -> term; (bound_type) -> type end,
+    Remove  = fun(Keys, Map) -> lists:foldl(fun maps:remove/2, Map, Keys) end,
     Scoped = fun(Xs, Ys) ->
-                {Bound, Others} = lists:partition(IsBound, Ys),
+                Bound  = [E || E <- maps:keys(Ys), IsBound(E)],
+                Others = Remove(Bound, Ys),
                 Bound1 = [ {Unbind(Tag), X} || {Tag, X} <- Bound ],
-                lists:umerge(Xs -- Bound1, Others)
+                maps:merge(Remove(Bound1, Xs), Others)
             end,
-    #alg{ zero   = []
-        , plus   = fun lists:umerge/2
+    #alg{ zero   = #{}
+        , plus   = fun maps:merge/2
         , scoped = Scoped }.
 
--spec used(_) -> [entity()].
+-spec used(_) -> [{entity(), aeso_syntax:ann()}].
 used(D) ->
     Kind = fun(expr)      -> term;
               (bind_expr) -> bound_term;
@@ -128,14 +130,14 @@ used(D) ->
               (bind_type) -> bound_type
            end,
     NS = fun(Xs) -> {namespace, lists:droplast(Xs)} end,
-    NotBound = fun({Tag, _}) -> not lists:member(Tag, [bound_term, bound_type]) end,
+    NotBound = fun({{Tag, _}, _}) -> not lists:member(Tag, [bound_term, bound_type]) end,
     Xs =
-        fold(entity_alg(),
-            fun(K, {id,   _, X})  -> [{Kind(K), [X]}];
-               (K, {qid,  _, Xs}) -> [{Kind(K), Xs}, NS(Xs)];
-               (K, {con,  _, X})  -> [{Kind(K), [X]}];
-               (K, {qcon, _, Xs}) -> [{Kind(K), Xs}, NS(Xs)];
-               (_, _)             -> []
-            end, decl, D),
+        maps:to_list(fold(entity_alg(),
+            fun(K, {id,   Ann, X})  -> #{{Kind(K), [X]} => Ann};
+               (K, {qid,  Ann, Xs}) -> #{{Kind(K), Xs}  => Ann, NS(Xs) => Ann};
+               (K, {con,  Ann, X})  -> #{{Kind(K), [X]} => Ann};
+               (K, {qcon, Ann, Xs}) -> #{{Kind(K), Xs}  => Ann, NS(Xs) => Ann};
+               (_, _)             -> #{}
+            end, decl, D)),
     lists:filter(NotBound, Xs).
 
