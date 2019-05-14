@@ -960,9 +960,6 @@ check_state_dependencies(Env, Defs) ->
 get_call_chains(Graph, Start, Stop) ->
     get_call_chains(Graph, #{}, queue:from_list([{Start, [], []}]), Stop, []).
 
-get_call_chains(_Graph, _Visit, [], _, Acc) -> lists:reverse(Acc);
-get_call_chains(Graph, Visited, [{Stop, Path} | Queue], Stop, Acc) ->
-    get_call_chains(Graph, Visited, Queue, Stop, [lists:reverse(Path) | Acc]);
 get_call_chains(Graph, Visited, Queue, Stop, Acc) ->
     case queue:out(Queue) of
         {empty, _} -> lists:reverse(Acc);
