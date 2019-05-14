@@ -141,7 +141,6 @@ type_to_scode({list, Type})    -> {list, type_to_scode(Type)};
 type_to_scode({tuple, Types})  -> {tuple, lists:map(fun type_to_scode/1, Types)};
 type_to_scode({map, Key, Val}) -> {map, type_to_scode(Key), type_to_scode(Val)};
 type_to_scode({function, _Args, _Res}) -> {tuple, [string, any]};
-type_to_scode(contract)        -> address;
 type_to_scode(T)               -> T.
 
 %% -- Phase I ----------------------------------------------------------------
@@ -183,7 +182,7 @@ to_scode(_Env, {lit, L}) ->
         {string, S}          -> [push(?i(aeb_fate_data:make_string(S)))];
         {bool, B}            -> [push(?i(B))];
         {account_pubkey, K}  -> [push(?i(aeb_fate_data:make_address(K)))];
-        {contract_pubkey, K} -> [push(?i(aeb_fate_data:make_address(K)))];
+        {contract_pubkey, K} -> [push(?i(aeb_fate_data:make_contract(K)))];
         {oracle_pubkey, K}   -> [push(?i(aeb_fate_data:make_oracle(K)))];
         {oracle_query_id, _} -> ?TODO(fate_oracle_query_id_value)
     end;
