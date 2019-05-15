@@ -188,7 +188,7 @@ insert_call_function(Code, FunName, Args, Options) ->
         [ Code,
           "\n\n",
           lists:duplicate(Ind, " "),
-          "function __call() = ", FunName, "(", string:join(Args, ","), ")\n"
+          "stateful function __call() = ", FunName, "(", string:join(Args, ","), ")\n"
         ]).
 
 -spec insert_init_function(string(), options()) -> string().

@@ -160,7 +160,7 @@ oracle_test() ->
 permissive_literals_fail_test() ->
     Contract =
         "contract OracleTest =\n"
-        "  function haxx(o : oracle(list(string), option(int))) =\n"
+        "  stateful function haxx(o : oracle(list(string), option(int))) =\n"
         "    Chain.spend(o, 1000000)\n",
         {error, <<"Type errors\nCannot unify", _/binary>>} =
             aeso_compiler:check_call(Contract, "haxx", ["#123"], []),

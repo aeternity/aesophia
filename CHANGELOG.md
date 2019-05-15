@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- `stateful` annotations are now properly enforced. Functions must be marked stateful
+  in order to update the state or spend tokens.
 ### Changed
 ### Removed
 

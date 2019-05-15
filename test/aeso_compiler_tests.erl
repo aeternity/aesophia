@@ -307,4 +307,26 @@ failing_contracts() ->
            "  ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt : address\n"
            "against the expected type\n"
            "  bytes(32)">>]}
+    , {"stateful",
+       [<<"Cannot reference stateful function Chain.spend (at line 13, column 33)\nin the definition of non-stateful function fail1.">>,
+        <<"Cannot reference stateful function local_spend (at line 14, column 33)\nin the definition of non-stateful function fail2.">>,
+        <<"Cannot reference stateful function Chain.spend (at line 16, column 15)\nin the definition of non-stateful function fail3.">>,
+        <<"Cannot reference stateful function Chain.spend (at line 20, column 31)\nin the definition of non-stateful function fail4.">>,
+        <<"Cannot reference stateful function Chain.spend (at line 35, column 53)\nin the definition of non-stateful function fail5.">>,
+        <<"Cannot pass non-zero value argument 1000 (at line 48, column 55)\nin the definition of non-stateful function fail6.">>,
+        <<"Cannot pass non-zero value argument 1000 (at line 49, column 54)\nin the definition of non-stateful function fail7.">>,
+        <<"Cannot pass non-zero value argument 1000 (at line 52, column 17)\nin the definition of non-stateful function fail8.">>]}
+    , {"bad_init_state_access",
+       [<<"The init function should return the initial state as its result and cannot write the state,\n"
+          "but it calls\n"
+          "  - set_state (at line 11, column 5), which calls\n"
+          "  - roundabout (at line 8, column 36), which calls\n"
+          "  - put (at line 7, column 37)">>,
+        <<"The init function should return the initial state as its result and cannot read the state,\n"
+          "but it calls\n"
+          "  - new_state (at line 12, column 5), which calls\n"
+          "  - state (at line 5, column 27)">>,
+        <<"The init function should return the initial state as its result and cannot read the state,\n"
+          "but it calls\n"
+          "  - state (at line 13, column 13)">>]}
     ].
