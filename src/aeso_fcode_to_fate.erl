@@ -111,12 +111,12 @@ compile(FCode, Options) ->
        functions     := Functions } = FCode,
     SFuns  = functions_to_scode(ContractName, Functions, Options),
     SFuns1 = optimize_scode(SFuns, Options),
-    BBFuns = to_basic_blocks(SFuns1, Options),
-    FateCode = #{ functions   => BBFuns,
-                  symbols     => #{},
-                  annotations => #{} },
+    FateCode = to_basic_blocks(SFuns1, aeb_fate_code:new(), Options),
     debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
     FateCode.
+
+make_function_id(X) ->
+    aeb_fate_code:symbol_identifier(make_function_name(X)).
 
 make_function_name(init)               -> <<"init">>;
 make_function_name({entrypoint, Name}) -> Name;
@@ -225,7 +225,7 @@ to_scode(Env, {'let', X, Expr, Body}) ->
       to_scode(Env1, Body) ];
 
 to_scode(Env, {def, Fun, Args}) ->
-    FName = make_function_name(Fun),
+    FName = make_function_id(Fun),
     Lbl   = aeb_fate_data:make_string(FName),
     call_to_scode(Env, local_call(Env, ?i(Lbl)), Args);
 to_scode(Env, {funcall, Fun, Args}) ->
@@ -236,7 +236,7 @@ to_scode(Env, {builtin, B, Args}) ->
 
 to_scode(Env, {remote, Ct, Fun, [{builtin, call_gas_left, _}, Value | Args]}) ->
     %% Gas is not limited.
-    Lbl = make_function_name(Fun),
+    Lbl = make_function_id(Fun),
     Call = if Env#env.tailpos -> aeb_fate_ops:call_tr(?a, Lbl, ?a);
               true            -> aeb_fate_ops:call_r(?a, Lbl, ?a)
            end,
@@ -244,14 +244,14 @@ to_scode(Env, {remote, Ct, Fun, [{builtin, call_gas_left, _}, Value | Args]}) ->
 
 to_scode(Env, {remote, Ct, Fun, [Gas, Value | Args]}) ->
     %% Gas is limited.
-    Lbl = make_function_name(Fun),
+    Lbl = make_function_id(Fun),
     Call = if Env#env.tailpos -> aeb_fate_ops:call_gtr(?a, Lbl, ?a, ?a);
               true            -> aeb_fate_ops:call_gr(?a, Lbl, ?a, ?a)
            end,
     call_to_scode(Env, Call, [Ct, Value, Gas | Args]);
 
 to_scode(Env, {closure, Fun, FVs}) ->
-    to_scode(Env, {tuple, [{lit, {string, make_function_name(Fun)}}, FVs]});
+    to_scode(Env, {tuple, [{lit, {string, make_function_id(Fun)}}, FVs]});
 
 to_scode(Env, {switch, Case}) ->
     split_to_scode(Env, Case).
@@ -1163,10 +1163,11 @@ desugar(I) -> [I].
 %% -- Phase III --------------------------------------------------------------
 %%  Constructing basic blocks
 
-to_basic_blocks(Funs, Options) ->
-    maps:from_list([ {Name, {{Args, Res},
-                             bb(Name, Code ++ [aeb_fate_code:return()], Options)}}
-                     || {Name, {{Args, Res}, Code}} <- maps:to_list(Funs) ]).
+to_basic_blocks(Funs, FateCode, Options) ->
+    lists:foldl(fun({Name, {Sig, Code}}, Acc) ->
+                        BB = bb(Name, Code ++ [aeb_fate_ops:return()], Options),
+                        aeb_fate_code:insert_fun(Name, Sig, BB, Acc)
+                end, FateCode, maps:to_list(Funs)).
 
 bb(_Name, Code, _Options) ->
     Blocks0 = blocks(Code),
