@@ -1335,6 +1335,8 @@ chase_labels([L | Ls], Map, Live) ->
 tweak_returns(['RETURN', {'PUSH', A} | Code])              -> [{'RETURNR', A} | Code];
 tweak_returns(['RETURN' | Code = [{'CALL_T', _} | _]])     -> Code;
 tweak_returns(['RETURN' | Code = [{'CALL_TR', _, _} | _]]) -> Code;
+tweak_returns(['RETURN' | Code = [{'CALL_GT', _} | _]])    -> Code;
+tweak_returns(['RETURN' | Code = [{'CALL_GTR', _, _} | _]])-> Code;
 tweak_returns(['RETURN' | Code = [{'ABORT', _} | _]])      -> Code;
 tweak_returns(Code) -> Code.
 
@@ -1346,7 +1348,9 @@ split_calls({Ref, Code}) ->
 
 split_calls(Ref, [], Acc, Blocks) ->
     lists:reverse([{Ref, lists:reverse(Acc)} | Blocks]);
-split_calls(Ref, [I | Code], Acc, Blocks) when element(1, I) == 'CALL'; element(1, I) == 'CALL_R' ->
+split_calls(Ref, [I | Code], Acc, Blocks) when element(1, I) == 'CALL';
+                                               element(1, I) == 'CALL_R';
+                                               element(1, I) == 'CALL_GR' ->
     split_calls(make_ref(), Code, [], [{Ref, lists:reverse([I | Acc])} | Blocks]);
 split_calls(Ref, [I | Code], Acc, Blocks) ->
     split_calls(Ref, Code, [I | Acc], Blocks).
