@@ -18,7 +18,7 @@
                 | switch_body
                 | tuple().    %% FATE instruction
 
--type arg() :: tuple(). %% Not exported: aeb_fate_code:fate_arg().
+-type arg() :: tuple(). %% Not exported: aeb_fate_ops:fate_arg().
 
 %% Annotated scode
 -type scode_a()  :: [sinstr_a()].
@@ -188,7 +188,7 @@ to_scode(_Env, {lit, L}) ->
     end;
 
 to_scode(_Env, nil) ->
-    [aeb_fate_code:nil(?a)];
+    [aeb_fate_ops:nil(?a)];
 
 to_scode(Env, {var, X}) ->
     [push(lookup_var(Env, X))];
@@ -196,21 +196,21 @@ to_scode(Env, {var, X}) ->
 to_scode(Env, {con, Ar, I, As}) ->
     N = length(As),
     [[to_scode(notail(Env), A) || A <- As],
-     aeb_fate_code:variant(?a, ?i(Ar), ?i(I), ?i(N))];
+     aeb_fate_ops:variant(?a, ?i(Ar), ?i(I), ?i(N))];
 
 to_scode(Env, {tuple, As}) ->
     N = length(As),
     [[ to_scode(notail(Env), A) || A <- As ],
-     aeb_fate_code:tuple(N)];
+     aeb_fate_ops:tuple(N)];
 
 to_scode(Env, {proj, E, I}) ->
     [to_scode(notail(Env), E),
-     aeb_fate_code:element_op(?a, ?i(I), ?a)];
+     aeb_fate_ops:element_op(?a, ?i(I), ?a)];
 
 to_scode(Env, {set_proj, R, I, E}) ->
     [to_scode(notail(Env), E),
      to_scode(notail(Env), R),
-     aeb_fate_code:setelement(?a, ?i(I), ?a, ?a)];
+     aeb_fate_ops:setelement(?a, ?i(I), ?a, ?a)];
 
 to_scode(Env, {op, Op, Args}) ->
     call_to_scode(Env, op_to_scode(Op), Args);
@@ -221,7 +221,7 @@ to_scode(Env, {'let', X, {var, Y}, Body}) ->
 to_scode(Env, {'let', X, Expr, Body}) ->
     {I, Env1} = bind_local(X, Env),
     [ to_scode(notail(Env), Expr),
-      aeb_fate_code:store({var, I}, {stack, 0}),
+      aeb_fate_ops:store({var, I}, {stack, 0}),
       to_scode(Env1, Body) ];
 
 to_scode(Env, {def, Fun, Args}) ->
@@ -237,16 +237,16 @@ to_scode(Env, {builtin, B, Args}) ->
 to_scode(Env, {remote, Ct, Fun, [{builtin, call_gas_left, _}, Value | Args]}) ->
     %% Gas is not limited.
     Lbl = make_function_name(Fun),
-    Call = if Env#env.tailpos -> aeb_fate_code:call_tr(?a, Lbl, ?a);
-              true            -> aeb_fate_code:call_r(?a, Lbl, ?a)
+    Call = if Env#env.tailpos -> aeb_fate_ops:call_tr(?a, Lbl, ?a);
+              true            -> aeb_fate_ops:call_r(?a, Lbl, ?a)
            end,
     call_to_scode(Env, Call, [Ct, Value | Args]);
 
 to_scode(Env, {remote, Ct, Fun, [Gas, Value | Args]}) ->
     %% Gas is limited.
     Lbl = make_function_name(Fun),
-    Call = if Env#env.tailpos -> aeb_fate_code:call_gtr(?a, Lbl, ?a, ?a);
-              true            -> aeb_fate_code:call_gr(?a, Lbl, ?a, ?a)
+    Call = if Env#env.tailpos -> aeb_fate_ops:call_gtr(?a, Lbl, ?a, ?a);
+              true            -> aeb_fate_ops:call_gr(?a, Lbl, ?a, ?a)
            end,
     call_to_scode(Env, Call, [Ct, Value, Gas | Args]);
 
@@ -256,8 +256,8 @@ to_scode(Env, {closure, Fun, FVs}) ->
 to_scode(Env, {switch, Case}) ->
     split_to_scode(Env, Case).
 
-local_call( Env, Fun) when Env#env.tailpos -> aeb_fate_code:call_t(Fun);
-local_call(_Env, Fun)                      -> aeb_fate_code:call(Fun).
+local_call( Env, Fun) when Env#env.tailpos -> aeb_fate_ops:call_t(Fun);
+local_call(_Env, Fun)                      -> aeb_fate_ops:call(Fun).
 
 split_to_scode(Env, {nosplit, Expr}) ->
     [switch_body, to_scode(Env, Expr)];
@@ -295,13 +295,13 @@ split_to_scode(Env, {split, {list, _}, X, Alts}) ->
                      [{'case', {'::', Y, Z}, S} | _] ->
                          {I, Env1} = bind_local(Y, Env),
                          {J, Env2} = bind_local(Z, Env1),
-                         [aeb_fate_code:hd({var, I}, Arg),
-                          aeb_fate_code:tl({var, J}, Arg),
+                         [aeb_fate_ops:hd({var, I}, Arg),
+                          aeb_fate_ops:tl({var, J}, Arg),
                           split_to_scode(Env2, S)]
                  end
              end,
     SAlts = [GetAlt('::'), GetAlt(nil)],
-    [aeb_fate_code:is_nil(?a, Arg),
+    [aeb_fate_ops:is_nil(?a, Arg),
      {switch, ?a, boolean, SAlts, Def}];
 split_to_scode(Env, {split, Type, X, Alts}) when Type == integer; Type == string ->
     {Def, Alts1} = catchall_to_scode(Env, X, Alts),
@@ -337,7 +337,7 @@ literal_split_to_scode(Env, Type, Arg, [{'case', Lit, Body} | Alts], Def) when T
                {int, N} -> N;
                {string, S} -> aeb_fate_data:make_string(S)
            end,
-    [aeb_fate_code:eq(?a, Arg, ?i(SLit)),
+    [aeb_fate_ops:eq(?a, Arg, ?i(SLit)),
      {switch, ?a, boolean, [False, True], Def}].
 
 catchall_to_scode(Env, X, Alts) -> catchall_to_scode(Env, X, Alts, []).
@@ -351,10 +351,10 @@ catchall_to_scode(_, _, [], Acc) -> {missing, lists:reverse(Acc)}.
 
 %% Tuple is in the accumulator. Arguments are the variable names.
 match_tuple(Env, Arg, Xs) ->
-    match_tuple(Env, 0, fun aeb_fate_code:element_op/3, Arg, Xs).
+    match_tuple(Env, 0, fun aeb_fate_ops:element_op/3, Arg, Xs).
 
 match_variant(Env, Arg, Xs) ->
-    Elem = fun(Dst, I, Val) -> aeb_fate_code:variant_element(Dst, Val, I) end,
+    Elem = fun(Dst, I, Val) -> aeb_fate_ops:variant_element(Dst, Val, I) end,
     match_tuple(Env, 0, Elem, Arg, Xs).
 
 match_tuple(Env, I, Elem, Arg, ["_" | Xs]) ->
@@ -375,49 +375,49 @@ call_to_scode(Env, CallCode, Args) ->
 builtin_to_scode(_Env, get_state, []) ->
     [push(?s)];
 builtin_to_scode(Env, set_state, [_] = Args) ->
-    call_to_scode(Env, [aeb_fate_code:store(?s, ?a),
-                        aeb_fate_code:tuple(0)], Args);
+    call_to_scode(Env, [aeb_fate_ops:store(?s, ?a),
+                        aeb_fate_ops:tuple(0)], Args);
 builtin_to_scode(_Env, event, [_] = _Args) ->
     ?TODO(fate_event_instruction);
 builtin_to_scode(_Env, map_empty, []) ->
-    [aeb_fate_code:map_empty(?a)];
+    [aeb_fate_ops:map_empty(?a)];
 builtin_to_scode(_Env, bits_none, []) ->
-    [aeb_fate_code:bits_none(?a)];
+    [aeb_fate_ops:bits_none(?a)];
 builtin_to_scode(_Env, bits_all, []) ->
-    [aeb_fate_code:bits_all(?a)];
+    [aeb_fate_ops:bits_all(?a)];
 builtin_to_scode(Env, abort, [_] = Args) ->
-    call_to_scode(Env, aeb_fate_code:abort(?a), Args);
+    call_to_scode(Env, aeb_fate_ops:abort(?a), Args);
 builtin_to_scode(Env, chain_spend, [_, _] = Args) ->
-    call_to_scode(Env, [aeb_fate_code:spend(?a, ?a),
-                        aeb_fate_code:tuple(0)], Args);
+    call_to_scode(Env, [aeb_fate_ops:spend(?a, ?a),
+                        aeb_fate_ops:tuple(0)], Args);
 builtin_to_scode(Env, chain_balance, [_] = Args) ->
-    call_to_scode(Env, aeb_fate_code:balance_other(?a, ?a), Args);
+    call_to_scode(Env, aeb_fate_ops:balance_other(?a, ?a), Args);
 builtin_to_scode(Env, chain_block_hash, [_] = Args) ->
-    call_to_scode(Env, aeb_fate_code:blockhash(?a, ?a), Args);
+    call_to_scode(Env, aeb_fate_ops:blockhash(?a, ?a), Args);
 builtin_to_scode(_Env, chain_coinbase, []) ->
-    [aeb_fate_code:beneficiary(?a)];
+    [aeb_fate_ops:beneficiary(?a)];
 builtin_to_scode(_Env, chain_timestamp, []) ->
-    [aeb_fate_code:timestamp(?a)];
+    [aeb_fate_ops:timestamp(?a)];
 builtin_to_scode(_Env, chain_block_height, []) ->
-    [aeb_fate_code:generation(?a)];
+    [aeb_fate_ops:generation(?a)];
 builtin_to_scode(_Env, chain_difficulty, []) ->
-    [aeb_fate_code:difficulty(?a)];
+    [aeb_fate_ops:difficulty(?a)];
 builtin_to_scode(_Env, chain_gas_limit, []) ->
-    [aeb_fate_code:gaslimit(?a)];
+    [aeb_fate_ops:gaslimit(?a)];
 builtin_to_scode(_Env, contract_balance, []) ->
-    [aeb_fate_code:balance(?a)];
+    [aeb_fate_ops:balance(?a)];
 builtin_to_scode(_Env, contract_address, []) ->
-    [aeb_fate_code:address(?a)];
+    [aeb_fate_ops:address(?a)];
 builtin_to_scode(_Env, call_origin, []) ->
-    [aeb_fate_code:origin(?a)];
+    [aeb_fate_ops:origin(?a)];
 builtin_to_scode(_Env, call_caller, []) ->
-    [aeb_fate_code:caller(?a)];
+    [aeb_fate_ops:caller(?a)];
 builtin_to_scode(_Env, call_value, []) ->
-    [aeb_fate_code:call_value(?a)];
+    [aeb_fate_ops:call_value(?a)];
 builtin_to_scode(_Env, call_gas_price, []) ->
-    [aeb_fate_code:gasprice(?a)];
+    [aeb_fate_ops:gasprice(?a)];
 builtin_to_scode(_Env, call_gas_left, []) ->
-    [aeb_fate_code:gas(?a)];
+    [aeb_fate_ops:gas(?a)];
 builtin_to_scode(_Env, oracle_register, [_, _, _, _] = _Args) ->
     ?TODO(fate_oracle_register_instruction);
 builtin_to_scode(_Env, oracle_query_fee, [_] = _Args) ->
@@ -457,44 +457,44 @@ builtin_to_scode(_Env, auth_tx_hash, []) ->
 
 %% -- Operators --
 
-op_to_scode('+')               -> aeb_fate_code:add(?a, ?a, ?a);
-op_to_scode('-')               -> aeb_fate_code:sub(?a, ?a, ?a);
-op_to_scode('*')               -> aeb_fate_code:mul(?a, ?a, ?a);
-op_to_scode('/')               -> aeb_fate_code:divide(?a, ?a, ?a);
-op_to_scode(mod)               -> aeb_fate_code:modulo(?a, ?a, ?a);
-op_to_scode('^')               -> aeb_fate_code:pow(?a, ?a, ?a);
-op_to_scode('++')              -> aeb_fate_code:append(?a, ?a, ?a);
-op_to_scode('::')              -> aeb_fate_code:cons(?a, ?a, ?a);
-op_to_scode('<')               -> aeb_fate_code:lt(?a, ?a, ?a);
-op_to_scode('>')               -> aeb_fate_code:gt(?a, ?a, ?a);
-op_to_scode('=<')              -> aeb_fate_code:elt(?a, ?a, ?a);
-op_to_scode('>=')              -> aeb_fate_code:egt(?a, ?a, ?a);
-op_to_scode('==')              -> aeb_fate_code:eq(?a, ?a, ?a);
-op_to_scode('!=')              -> aeb_fate_code:neq(?a, ?a, ?a);
-op_to_scode('!')               -> aeb_fate_code:not_op(?a, ?a);
-op_to_scode(map_get)           -> aeb_fate_code:map_lookup(?a, ?a, ?a);
-op_to_scode(map_get_d)         -> aeb_fate_code:map_lookup(?a, ?a, ?a, ?a);
-op_to_scode(map_set)           -> aeb_fate_code:map_update(?a, ?a, ?a, ?a);
-op_to_scode(map_from_list)     -> aeb_fate_code:map_from_list(?a, ?a);
+op_to_scode('+')               -> aeb_fate_ops:add(?a, ?a, ?a);
+op_to_scode('-')               -> aeb_fate_ops:sub(?a, ?a, ?a);
+op_to_scode('*')               -> aeb_fate_ops:mul(?a, ?a, ?a);
+op_to_scode('/')               -> aeb_fate_ops:divide(?a, ?a, ?a);
+op_to_scode(mod)               -> aeb_fate_ops:modulo(?a, ?a, ?a);
+op_to_scode('^')               -> aeb_fate_ops:pow(?a, ?a, ?a);
+op_to_scode('++')              -> aeb_fate_ops:append(?a, ?a, ?a);
+op_to_scode('::')              -> aeb_fate_ops:cons(?a, ?a, ?a);
+op_to_scode('<')               -> aeb_fate_ops:lt(?a, ?a, ?a);
+op_to_scode('>')               -> aeb_fate_ops:gt(?a, ?a, ?a);
+op_to_scode('=<')              -> aeb_fate_ops:elt(?a, ?a, ?a);
+op_to_scode('>=')              -> aeb_fate_ops:egt(?a, ?a, ?a);
+op_to_scode('==')              -> aeb_fate_ops:eq(?a, ?a, ?a);
+op_to_scode('!=')              -> aeb_fate_ops:neq(?a, ?a, ?a);
+op_to_scode('!')               -> aeb_fate_ops:not_op(?a, ?a);
+op_to_scode(map_get)           -> aeb_fate_ops:map_lookup(?a, ?a, ?a);
+op_to_scode(map_get_d)         -> aeb_fate_ops:map_lookup(?a, ?a, ?a, ?a);
+op_to_scode(map_set)           -> aeb_fate_ops:map_update(?a, ?a, ?a, ?a);
+op_to_scode(map_from_list)     -> aeb_fate_ops:map_from_list(?a, ?a);
 op_to_scode(map_to_list)       -> ?TODO(fate_map_to_list_instruction);
-op_to_scode(map_delete)        -> aeb_fate_code:map_delete(?a, ?a, ?a);
-op_to_scode(map_member)        -> aeb_fate_code:map_member(?a, ?a, ?a);
+op_to_scode(map_delete)        -> aeb_fate_ops:map_delete(?a, ?a, ?a);
+op_to_scode(map_member)        -> aeb_fate_ops:map_member(?a, ?a, ?a);
 op_to_scode(map_size)          -> ?TODO(fate_map_size_instruction);
 op_to_scode(string_length)     -> ?TODO(fate_string_length_instruction);
-op_to_scode(string_concat)     -> aeb_fate_code:str_join(?a, ?a, ?a);
-op_to_scode(bits_set)          -> aeb_fate_code:bits_set(?a, ?a, ?a);
-op_to_scode(bits_clear)        -> aeb_fate_code:bits_clear(?a, ?a, ?a);
-op_to_scode(bits_test)         -> aeb_fate_code:bits_test(?a, ?a, ?a);
-op_to_scode(bits_sum)          -> aeb_fate_code:bits_sum(?a, ?a);
-op_to_scode(bits_intersection) -> aeb_fate_code:bits_and(?a, ?a, ?a);
-op_to_scode(bits_union)        -> aeb_fate_code:bits_or(?a, ?a, ?a);
-op_to_scode(bits_difference)   -> aeb_fate_code:bits_diff(?a, ?a, ?a);
-op_to_scode(address_to_str)    -> aeb_fate_code:addr_to_str(?a, ?a);
-op_to_scode(int_to_str)        -> aeb_fate_code:int_to_str(?a, ?a).
+op_to_scode(string_concat)     -> aeb_fate_ops:str_join(?a, ?a, ?a);
+op_to_scode(bits_set)          -> aeb_fate_ops:bits_set(?a, ?a, ?a);
+op_to_scode(bits_clear)        -> aeb_fate_ops:bits_clear(?a, ?a, ?a);
+op_to_scode(bits_test)         -> aeb_fate_ops:bits_test(?a, ?a, ?a);
+op_to_scode(bits_sum)          -> aeb_fate_ops:bits_sum(?a, ?a);
+op_to_scode(bits_intersection) -> aeb_fate_ops:bits_and(?a, ?a, ?a);
+op_to_scode(bits_union)        -> aeb_fate_ops:bits_or(?a, ?a, ?a);
+op_to_scode(bits_difference)   -> aeb_fate_ops:bits_diff(?a, ?a, ?a);
+op_to_scode(address_to_str)    -> aeb_fate_ops:addr_to_str(?a, ?a);
+op_to_scode(int_to_str)        -> aeb_fate_ops:int_to_str(?a, ?a).
 
 %% PUSH and STORE ?a are the same, so we use STORE to make optimizations
 %% easier, and specialize to PUSH (which is cheaper) at the end.
-push(A) -> aeb_fate_code:store(?a, A).
+push(A) -> aeb_fate_ops:store(?a, A).
 
 %% -- Phase II ---------------------------------------------------------------
 %%  Optimize
@@ -1150,9 +1150,9 @@ unannotate(Code) when is_list(Code) ->
 unannotate({i, _Ann, I}) -> [I].
 
 %% Desugar and specialize
-desugar({'ADD', ?a, ?i(1), ?a})     -> [aeb_fate_code:inc()];
-desugar({'SUB', ?a, ?a, ?i(1)})     -> [aeb_fate_code:dec()];
-desugar({'STORE', ?a, A})           -> [aeb_fate_code:push(A)];
+desugar({'ADD', ?a, ?i(1), ?a})     -> [aeb_fate_ops:inc()];
+desugar({'SUB', ?a, ?a, ?i(1)})     -> [aeb_fate_ops:dec()];
+desugar({'STORE', ?a, A})           -> [aeb_fate_ops:push(A)];
 desugar({switch, Arg, Type, Alts, Def}) ->
     [{switch, Arg, Type, [desugar(A) || A <- Alts], desugar(Def)}];
 desugar(missing) -> missing;
@@ -1219,7 +1219,7 @@ block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
     {DefRef, DefBlk} =
         case Default of
             missing when Catchall == none ->
-                FreshBlk([aeb_fate_code:abort(?i(<<"Incomplete patterns">>))], none);
+                FreshBlk([aeb_fate_ops:abort(?i(<<"Incomplete patterns">>))], none);
             missing -> {Catchall, []};
             _       -> FreshBlk(Default ++ [{jump, RestRef}], Catchall)
                        %% ^ fall-through to the outer catchall
@@ -1355,13 +1355,13 @@ split_calls(Ref, [I | Code], Acc, Blocks) ->
 
 set_labels(Labels, {Ref, Code}) when is_reference(Ref) ->
     {maps:get(Ref, Labels), [ set_labels(Labels, I) || I <- Code ]};
-set_labels(Labels, {jump, Ref})   -> aeb_fate_code:jump(maps:get(Ref, Labels));
-set_labels(Labels, {jumpif, Arg, Ref}) -> aeb_fate_code:jumpif(Arg, maps:get(Ref, Labels));
+set_labels(Labels, {jump, Ref})   -> aeb_fate_ops:jump(maps:get(Ref, Labels));
+set_labels(Labels, {jumpif, Arg, Ref}) -> aeb_fate_ops:jumpif(Arg, maps:get(Ref, Labels));
 set_labels(Labels, {switch, Arg, Refs}) ->
     case [ maps:get(Ref, Labels) || Ref <- Refs ] of
-        [R1, R2]     -> aeb_fate_code:switch(Arg, R1, R2);
-        [R1, R2, R3] -> aeb_fate_code:switch(Arg, R1, R2, R3);
-        Rs           -> aeb_fate_code:switch(Arg, Rs)
+        [R1, R2]     -> aeb_fate_ops:switch(Arg, R1, R2);
+        [R1, R2, R3] -> aeb_fate_ops:switch(Arg, R1, R2, R3);
+        Rs           -> aeb_fate_ops:switch(Arg, Rs)
     end;
 set_labels(_, I) -> I.
 
