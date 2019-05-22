@@ -723,7 +723,7 @@ attributes(I) ->
         {'ORIGIN', A}                         -> Pure(A, []);
         {'CALLER', A}                         -> Pure(A, []);
         {'GASPRICE', A}                       -> Pure(A, []);
-        {'BLOCKHASH', A}                      -> Pure(A, []);
+        {'BLOCKHASH', A, B}                   -> Impure(A, [B]);
         {'BENEFICIARY', A}                    -> Pure(A, []);
         {'TIMESTAMP', A}                      -> Pure(A, []);
         {'GENERATION', A}                     -> Pure(A, []);
