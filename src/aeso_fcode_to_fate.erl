@@ -107,11 +107,12 @@ debug(Tag, Options, Fmt, Args) ->
 %% @doc Main entry point.
 compile(FCode, Options) ->
     #{ contract_name := ContractName,
-       state_type    := _StateType,
+       state_type    := StateType,
        functions     := Functions } = FCode,
     SFuns  = functions_to_scode(ContractName, Functions, Options),
     SFuns1 = optimize_scode(SFuns, Options),
-    FateCode = to_basic_blocks(SFuns1, aeb_fate_code:new(), Options),
+    SFuns2 = add_default_init_function(SFuns1, StateType),
+    FateCode = to_basic_blocks(SFuns2, aeb_fate_code:new(), Options),
     debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
     FateCode.
 
@@ -128,8 +129,7 @@ functions_to_scode(ContractName, Functions, Options) ->
         [ {make_function_name(Name), function_to_scode(ContractName, FunNames, Name, Args, Body, Type, Options)}
         || {Name, #{args   := Args,
                     body   := Body,
-                    return := Type}} <- maps:to_list(Functions),
-           Name /= init ]).  %% TODO: skip init for now
+                    return := Type}} <- maps:to_list(Functions)]).
 
 function_to_scode(ContractName, Functions, _Name, Args, Body, ResType, _Options) ->
     ArgTypes = [ type_to_scode(T) || {_, T} <- Args ],
@@ -142,6 +142,21 @@ type_to_scode({tuple, Types})  -> {tuple, lists:map(fun type_to_scode/1, Types)}
 type_to_scode({map, Key, Val}) -> {map, type_to_scode(Key), type_to_scode(Val)};
 type_to_scode({function, _Args, _Res}) -> {tuple, [string, any]};
 type_to_scode(T)               -> T.
+
+add_default_init_function(SFuns, StateType) when StateType /= {tuple, []} ->
+    %% Only add default if the type is unit.
+    SFuns;
+add_default_init_function(SFuns, {tuple, []}) ->
+    %% Only add default if the init function is not present
+    InitName = make_function_name(init),
+    case maps:find(InitName, SFuns) of
+        {ok, _} ->
+            SFuns;
+        error ->
+            Sig = {[], {tuple, []}},
+            Body = [aeb_fate_ops:tuple(0)],
+            SFuns#{ InitName => {Sig, Body} }
+    end.
 
 %% -- Phase I ----------------------------------------------------------------
 %%  Icode to structured assembly
