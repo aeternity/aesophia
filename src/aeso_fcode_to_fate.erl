@@ -112,7 +112,7 @@ compile(FCode, Options) ->
     SFuns  = functions_to_scode(ContractName, Functions, Options),
     SFuns1 = optimize_scode(SFuns, Options),
     SFuns2 = add_default_init_function(SFuns1, StateType),
-    FateCode = to_basic_blocks(SFuns2, aeb_fate_code:new(), Options),
+    FateCode = to_basic_blocks(SFuns2),
     debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
     FateCode.
 
@@ -1178,13 +1178,16 @@ desugar(I) -> [I].
 %% -- Phase III --------------------------------------------------------------
 %%  Constructing basic blocks
 
-to_basic_blocks(Funs, FateCode, Options) ->
-    lists:foldl(fun({Name, {Sig, Code}}, Acc) ->
-                        BB = bb(Name, Code ++ [aeb_fate_ops:return()], Options),
-                        aeb_fate_code:insert_fun(Name, Sig, BB, Acc)
-                end, FateCode, maps:to_list(Funs)).
+to_basic_blocks(Funs) ->
+    to_basic_blocks(maps:to_list(Funs), aeb_fate_code:new()).
 
-bb(_Name, Code, _Options) ->
+to_basic_blocks([{Name, {Sig, Code}}|Left], Acc) ->
+    BB = bb(Name, Code ++ [aeb_fate_ops:return()]),
+    to_basic_blocks(Left, aeb_fate_code:insert_fun(Name, Sig, BB, Acc));
+to_basic_blocks([], Acc) ->
+    Acc.
+
+bb(_Name, Code) ->
     Blocks0 = blocks(Code),
     Blocks1 = optimize_blocks(Blocks0),
     Blocks  = lists:flatmap(fun split_calls/1, Blocks1),
