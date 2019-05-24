@@ -28,8 +28,8 @@ contract MultiSig =
       let n = length(owners) + 1
       { nRequired  = nRequired,
         nOwners    = n,
-        owners     = Map.from_list(List.zip([1..n], caller() :: owners)),
-        ownerIndex = Map.from_list(List.zip(caller() :: owners, [1..n])) }
+        owners     = Map.from_list(MyList.zip([1..n], caller() :: owners)),
+        ownerIndex = Map.from_list(MyList.zip(caller() :: owners, [1..n])) }
 
     function lookup(map, key) =
       switch(Map.get(key, map))

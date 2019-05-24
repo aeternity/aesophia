@@ -118,7 +118,8 @@ compilable_contracts() ->
      "namespace_bug",
      "bytes_to_x",
      "aens",
-     "tuple_match"
+     "tuple_match",
+     "list_comp"
     ].
 
 not_yet_compilable(fate) -> [];

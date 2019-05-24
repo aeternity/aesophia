@@ -230,10 +230,14 @@ exprAtom() ->
         , {bool, keyword(false), false}
         , ?LET_P(Fs, brace_list(?LAZY_P(field_assignment())), record(Fs))
         , {list, [], bracket_list(Expr)}
+        , ?RULE(keyword('['), Expr, tok('|'), comma_sep(?LAZY_P(comprehension_bind())), tok(']'), list_comp_e(_1, _2, _4))
         , ?RULE(tok('['), Expr, binop('..'), Expr, tok(']'), _3(_2, _4))
         , ?RULE(keyword('('), comma_sep(Expr), tok(')'), tuple_e(_1, _2))
         ])
     end).
+
+comprehension_bind() ->
+    ?RULE(id(), tok('<-'), expr(), {comprehension_bind, _1, _3}).
 
 arg_expr() ->
     ?LAZY_P(
@@ -481,6 +485,8 @@ fun_t(Domains, Type) ->
 tuple_e(_Ann, [Expr]) -> Expr;  %% Not a tuple
 tuple_e(Ann, Exprs)   -> {tuple, Ann, Exprs}.
 
+list_comp_e(Ann, Expr, Binds) -> {list_comp, Ann, Expr, Binds}.
+
 -spec parse_pattern(aeso_syntax:expr()) -> aeso_parse_lib:parser(aeso_syntax:pat()).
 parse_pattern({app, Ann, Con = {'::', _}, Es}) ->
     {app, Ann, Con, lists:map(fun parse_pattern/1, Es)};
@@ -527,8 +533,15 @@ expand_includes(AST, Opts) ->
 expand_includes([], Acc, _Opts) ->
     {ok, lists:reverse(Acc)};
 expand_includes([{include, _, S = {string, _, File}} | AST], Acc, Opts) ->
-    case read_file(File, Opts) of
-        {ok, Bin} ->
+    case {read_file(File, Opts), maps:find(File, aeso_stdlib:stdlib())} of
+        {_, {ok, Lib}} ->
+            case string(Lib) of
+                {ok, AST1} ->
+                    expand_includes(AST1 ++ AST, Acc, Opts);
+                Err = {error, _} ->
+                    Err
+            end;
+        {{ok, Bin}, _} ->
             Opts1 = lists:keystore(src_file, 1, Opts, {src_file, File}),
             case string(binary_to_list(Bin), Opts1) of
                 {ok, AST1} ->
@@ -536,7 +549,7 @@ expand_includes([{include, _, S = {string, _, File}} | AST], Acc, Opts) ->
                 Err = {error, _} ->
                     Err
             end;
-        {error, _} ->
+        {{error, _}, _} ->
             {error, {get_pos(S), include_error, File}}
     end;
 expand_includes([E | AST], Acc, Opts) ->

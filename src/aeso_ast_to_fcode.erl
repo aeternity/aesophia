@@ -360,7 +360,6 @@ make_let(Expr, Body) ->
             {'let', X, Expr, Body({var, X})}
     end.
 
--spec expr_to_fcode(env(), aeso_syntax:expr()) -> fexpr().
 expr_to_fcode(Env, {typed, _, Expr, Type}) ->
     expr_to_fcode(Env, Type, Expr);
 expr_to_fcode(Env, Expr) ->
@@ -443,6 +442,14 @@ expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Rec, Fields}) ->
 expr_to_fcode(Env, _Type, {list, _, Es}) ->
     lists:foldr(fun(E, L) -> {op, '::', [expr_to_fcode(Env, E), L]} end,
                 nil, Es);
+
+expr_to_fcode(Env, _Type, {list_comp, _, Yield, []}) ->
+    {op, '::', [expr_to_fcode(Env, Yield), nil]};
+expr_to_fcode(Env, _Type, {list_comp, As, Yield, [{comprehension_bind, {typed, {id, _, Arg}, _}, BindExpr}|Rest]}) ->
+    Env1 = bind_var(Env, Arg),
+    Bind = {lam, [Arg], expr_to_fcode(Env1, {list_comp, As, Yield, Rest})},
+    {funcall, resolve_fun(Env, ["List", "flat_map"]), [expr_to_fcode(Env, BindExpr), Bind]};
+
 
 %% Conditionals
 expr_to_fcode(Env, _Type, {'if', _, Cond, Then, Else}) ->

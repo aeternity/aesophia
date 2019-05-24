@@ -519,6 +519,18 @@ ast_body({app,As,Fun,Args}, Icode) ->
             #funcall{function=ast_body(Fun, Icode),
                      args=[ast_body(A, Icode) || A <- Args]}
     end;
+ast_body({list_comp, _, Yield, []}, Icode) ->
+    #list{elems = [ast_body(Yield, Icode)]};
+ast_body({list_comp, As, Yield, [{comprehension_bind, {typed, Arg, ArgType}, BindExpr}|Rest]}, Icode) ->
+    #funcall
+        { function = #var_ref{ name = ["List", "flat_map"] }
+        , args =
+              [ #lambda{ args=[#arg{name = ast_id(Arg), type = ast_type(ArgType, Icode)}]
+                       , body = ast_body({list_comp, As, Yield, Rest}, Icode)
+                       }
+              , ast_body(BindExpr, Icode)
+              ]
+        };
 ast_body({'if',_,Dec,Then,Else}, Icode) ->
     #ifte{decision = ast_body(Dec, Icode)
          ,then     = ast_body(Then, Icode)
