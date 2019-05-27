@@ -611,11 +611,11 @@ infer_contract(Env, What, Defs) ->
     {Env4, TypeDefs ++ Decls ++ Defs1}.
 
 -spec check_typedefs(env(), [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
-check_typedefs(Env, Defs) ->
+check_typedefs(Env = #env{ namespace = Ns }, Defs) ->
     create_type_errors(),
     GetName  = fun({type_def, _, {id, _, Name}, _, _}) -> Name end,
     TypeMap  = maps:from_list([ {GetName(Def), Def} || Def <- Defs ]),
-    DepGraph = maps:map(fun(_, Def) -> aeso_syntax_utils:used_types(Def) end, TypeMap),
+    DepGraph = maps:map(fun(_, Def) -> aeso_syntax_utils:used_types(Ns, Def) end, TypeMap),
     SCCs     = aeso_utils:scc(DepGraph),
     {Env1, Defs1} = check_typedef_sccs(Env, TypeMap, SCCs, []),
     destroy_and_report_type_errors(Env),
