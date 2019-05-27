@@ -329,4 +329,7 @@ failing_contracts() ->
         <<"The init function should return the initial state as its result and cannot read the state,\n"
           "but it calls\n"
           "  - state (at line 13, column 13)">>]}
+    , {"field_parse_error",
+       [<<"line 6, column 1: In field_parse_error at 5:26:\n"
+          "Cannot use nested fields or keys in record construction: p.x\n">>]}
     ].

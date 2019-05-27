@@ -361,6 +361,7 @@ stmt_p({else, Else}) ->
 -spec bin_prec(aeso_syntax:bin_op()) -> {integer(), integer(), integer()}.
 bin_prec('..')   -> {  0,   0,   0};  %% Always printed inside '[ ]'
 bin_prec('=')    -> {  0,   0,   0};  %% Always printed inside '[ ]'
+bin_prec('@')    -> {  0,   0,   0};  %% Only in error messages
 bin_prec('||')   -> {200, 300, 200};
 bin_prec('&&')   -> {300, 400, 300};
 bin_prec('<')    -> {400, 500, 500};

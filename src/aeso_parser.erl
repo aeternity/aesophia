@@ -211,7 +211,7 @@ exprAtom() ->
         , ?RULE(token(hex), set_ann(format, hex, setelement(1, _1, int)))
         , {bool, keyword(true), true}
         , {bool, keyword(false), false}
-        , ?RULE(brace_list(?LAZY_P(field_assignment())), record(_1))
+        , ?LET_P(Fs, brace_list(?LAZY_P(field_assignment())), record(Fs))
         , {list, [], bracket_list(Expr)}
         , ?RULE(tok('['), Expr, binop('..'), Expr, tok(']'), _3(_2, _4))
         , ?RULE(keyword('('), comma_sep(Expr), tok(')'), tuple_e(_1, _2))
@@ -254,14 +254,20 @@ record_update(Ann, E, Flds) ->
 record([]) -> {map, [], []};
 record(Fs) ->
     case record_or_map(Fs) of
-        record -> {record, get_ann(hd(Fs)), Fs};
+        record ->
+            Fld = fun({field, _, [_], _} = F) -> F;
+                     ({field, Ann, LV, Id, _}) ->
+                         bad_expr_err("Cannot use '@' in record construction", infix({lvalue, Ann, LV}, {'@', Ann}, Id));
+                     ({field, Ann, LV, _}) ->
+                         bad_expr_err("Cannot use nested fields or keys in record construction", {lvalue, Ann, LV}) end,
+            {record, get_ann(hd(Fs)), lists:map(Fld, Fs)};
         map    ->
             Ann = get_ann(hd(Fs ++ [{empty, []}])), %% TODO: source location for empty maps
             KV = fun({field, _, [{map_get, _, Key}], Val}) -> {Key, Val};
-                    ({field, _, LV, Id, _}) ->
-                        bad_expr_err("Cannot use '@' in map construction", infix(LV, {op, Ann, '@'}, Id));
-                    ({field, _, LV, _}) ->
-                        bad_expr_err("Cannot use nested fields or keys in map construction", LV) end,
+                    ({field, FAnn, LV, Id, _}) ->
+                        bad_expr_err("Cannot use '@' in map construction", infix({lvalue, FAnn, LV}, {'@', Ann}, Id));
+                    ({field, FAnn, LV, _}) ->
+                        bad_expr_err("Cannot use nested fields or keys in map construction", {lvalue, FAnn, LV}) end,
             {map, Ann, lists:map(KV, Fs)}
     end.
 
@@ -491,11 +497,11 @@ return_error({no_file, L, C}, Err) ->
 return_error({F, L, C}, Err) ->
     fail(io_lib:format("In ~s at ~p:~p:\n~s", [F, L, C, Err])).
 
--spec ret_doc_err(ann(), prettypr:document()) -> no_return().
+-spec ret_doc_err(ann(), prettypr:document()) -> aeso_parse_lib:parser(none()).
 ret_doc_err(Ann, Doc) ->
     return_error(ann_pos(Ann), prettypr:format(Doc)).
 
--spec bad_expr_err(string(), aeso_syntax:expr()) -> no_return().
+-spec bad_expr_err(string(), aeso_syntax:expr()) -> aeso_parse_lib:parser(none()).
 bad_expr_err(Reason, E) ->
   ret_doc_err(get_ann(E),
               prettypr:sep([prettypr:text(Reason ++ ":"),
