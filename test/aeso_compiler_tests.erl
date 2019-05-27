@@ -207,7 +207,7 @@ failing_contracts() ->
     , {"missing_fields_in_record_expression",
        [<<"The field x is missing when constructing an element of type r('a) (at line 7, column 40)">>,
         <<"The field y is missing when constructing an element of type r(int) (at line 8, column 40)">>,
-        <<"The fields y, z are missing when constructing an element of type r('1) (at line 6, column 40)">>]}
+        <<"The fields y, z are missing when constructing an element of type r('a) (at line 6, column 40)">>]}
     , {"namespace_clash",
        [<<"The contract Call (at line 4, column 10) has the same name as a namespace at (builtin location)">>]}
     , {"bad_events",
@@ -242,46 +242,46 @@ failing_contracts() ->
            "  ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ\n"
            "has the type\n"
            "  address">>,
-         <<"Cannot unify oracle_query('1, '2)\n"
+         <<"Cannot unify oracle_query('a, 'b)\n"
            "         and Remote\n"
            "when checking the type of the expression at line 25, column 5\n"
            "  oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY :\n"
-           "    oracle_query('1, '2)\n"
+           "    oracle_query('a, 'b)\n"
            "against the expected type\n"
            "  Remote">>,
-         <<"Cannot unify oracle_query('3, '4)\n"
+         <<"Cannot unify oracle_query('c, 'd)\n"
            "         and bytes(32)\n"
            "when checking the type of the expression at line 23, column 5\n"
            "  oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY :\n"
-           "    oracle_query('3, '4)\n"
+           "    oracle_query('c, 'd)\n"
            "against the expected type\n"
            "  bytes(32)">>,
-         <<"Cannot unify oracle_query('5, '6)\n"
+         <<"Cannot unify oracle_query('e, 'f)\n"
            "         and oracle(int, bool)\n"
            "when checking the type of the expression at line 21, column 5\n"
            "  oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY :\n"
-           "    oracle_query('5, '6)\n"
+           "    oracle_query('e, 'f)\n"
            "against the expected type\n"
            "  oracle(int, bool)">>,
-         <<"Cannot unify oracle('7, '8)\n"
+         <<"Cannot unify oracle('g, 'h)\n"
            "         and Remote\n"
            "when checking the type of the expression at line 18, column 5\n"
            "  ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5 :\n"
-           "    oracle('7, '8)\n"
+           "    oracle('g, 'h)\n"
            "against the expected type\n"
            "  Remote">>,
-         <<"Cannot unify oracle('9, '10)\n"
+         <<"Cannot unify oracle('i, 'j)\n"
            "         and bytes(32)\n"
            "when checking the type of the expression at line 16, column 5\n"
            "  ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5 :\n"
-           "    oracle('9, '10)\n"
+           "    oracle('i, 'j)\n"
            "against the expected type\n"
            "  bytes(32)">>,
-         <<"Cannot unify oracle('11, '12)\n"
+         <<"Cannot unify oracle('k, 'l)\n"
            "         and oracle_query(int, bool)\n"
            "when checking the type of the expression at line 14, column 5\n"
            "  ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5 :\n"
-           "    oracle('11, '12)\n"
+           "    oracle('k, 'l)\n"
            "against the expected type\n"
            "  oracle_query(int, bool)">>,
          <<"Cannot unify address\n"

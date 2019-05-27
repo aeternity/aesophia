@@ -1850,8 +1850,8 @@ instantiate(E) ->
     instantiate1(dereference(E)).
 
 instantiate1({uvar, Attr, R}) ->
-    Next = proplists:get_value(next, ets_lookup(type_vars, next), 1),
-    TVar = {tvar, Attr, "'" ++ integer_to_list(Next)},
+    Next = proplists:get_value(next, ets_lookup(type_vars, next), 0),
+    TVar = {tvar, Attr, "'" ++ integer_to_tvar(Next)},
     ets_insert(type_vars, [{next, Next + 1}, {R, TVar}]),
     TVar;
 instantiate1({fun_t, Ann, Named, Args, Ret}) ->
@@ -1870,6 +1870,12 @@ instantiate1([A|B]) ->
     [instantiate(A)|instantiate(B)];
 instantiate1(X) ->
     X.
+
+integer_to_tvar(X) when X < 26 ->
+    [$a + X];
+integer_to_tvar(X) ->
+    [integer_to_tvar(X div 26)] ++ [$a + (X rem 26)].
+
 
 %% Save unification failures for error messages.
 
