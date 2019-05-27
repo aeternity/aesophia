@@ -211,16 +211,11 @@ failing_contracts() ->
     , {"namespace_clash",
        [<<"The contract Call (at line 4, column 10) has the same name as a namespace at (builtin location)">>]}
     , {"bad_events",
-        [<<"The payload type int (at line 10, column 30) should be string">>,
-         <<"The payload type alias_address (at line 12, column 30) equals address but it should be string">>,
-         <<"The indexed type string (at line 9, column 25) is not a word type">>,
-         <<"The indexed type alias_string (at line 11, column 25) equals string which is not a word type">>]}
+        [<<"The indexed type string (at line 9, column 25) is not a word type">>,
+         <<"The indexed type alias_string (at line 10, column 25) equals string which is not a word type">>]}
     , {"bad_events2",
         [<<"The event constructor BadEvent1 (at line 9, column 7) has too many non-indexed values (max 1)">>,
-         <<"The event constructor BadEvent2 (at line 10, column 7) has too many indexed values (max 3)">>,
-         <<"The event constructor BadEvent3 (at line 11, column 7) has too many non-indexed values (max 1)">>,
-         <<"The payload type address (at line 11, column 17) should be string">>,
-         <<"The payload type int (at line 11, column 26) should be string">>]}
+         <<"The event constructor BadEvent2 (at line 10, column 7) has too many indexed values (max 3)">>]}
     , {"type_clash",
         [<<"Cannot unify int\n"
            "         and string\n"

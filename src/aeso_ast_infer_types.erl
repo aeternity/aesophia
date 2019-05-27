@@ -738,24 +738,22 @@ check_event(Env, "event", Ann, Def) ->
 check_event(_Env, _Name, _Ann, Def) -> Def.
 
 check_event_con(Env, {constr_t, Ann, Con, Args}) ->
-    IsIndexed  = fun(T) -> case aeso_syntax:get_ann(indexed, T, false) of
-                               true  -> indexed;
-                               false -> notindexed
-                           end end,
+    IsIndexed  = fun(T) ->
+                     T1 = unfold_types_in_type(Env, T),
+                     %% `indexed` is optional but if used it has to be correctly used
+                     case {is_word_type(T1), is_string_type(T1), aeso_syntax:get_ann(indexed, T, false)} of
+                         {true, _, _}        -> indexed;
+                         {false, true, true} -> type_error({indexed_type_must_be_word, T, T1});
+                         {false, true, _}    -> notindexed;
+                         {false, false, _}   -> type_error({event_arg_type_word_or_string, T, T1}), error
+                     end
+                 end,
     Indices    = lists:map(IsIndexed, Args),
     Indexed    = [ T || T <- Args, IsIndexed(T) == indexed ],
     NonIndexed = Args -- Indexed,
-    [ check_event_arg_type(Env, Ix, Type) || {Ix, Type} <- lists:zip(Indices, Args) ],
     [ type_error({event_0_to_3_indexed_values, Con}) || length(Indexed) > 3 ],
     [ type_error({event_0_to_1_string_values, Con}) || length(NonIndexed) > 1 ],
     {constr_t, [{indices, Indices} | Ann], Con, Args}.
-
-check_event_arg_type(Env, Ix, Type0) ->
-    Type = unfold_types_in_type(Env, Type0),
-    case Ix of
-        indexed    -> [ type_error({indexed_type_must_be_word, Type0, Type})   || not is_word_type(Type) ];
-        notindexed -> [ type_error({payload_type_must_be_string, Type0, Type}) || not is_string_type(Type) ]
-    end.
 
 %% Not so nice.
 is_word_type({id, _, Name}) ->
