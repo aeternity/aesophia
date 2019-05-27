@@ -514,7 +514,7 @@ map_t(As, K, V) -> {app_t, As, {id, As, "map"}, [K, V]}.
 infer(Contracts) ->
     infer(Contracts, []).
 
--type option() :: return_env.
+-type option() :: return_env | dont_unfold.
 
 -spec init_env(list(option())) -> env().
 init_env(_Options) -> global_env().
@@ -526,7 +526,7 @@ infer(Contracts, Options) ->
         Env = init_env(Options),
         create_options(Options),
         ets_new(type_vars, [set]),
-        {Env1, Decls} = infer1(Env, Contracts, []),
+        {Env1, Decls} = infer1(Env, Contracts, [], Options),
         case proplists:get_value(return_env, Options, false) of
             false -> Decls;
             true  -> {Env1, Decls}
@@ -535,21 +535,22 @@ infer(Contracts, Options) ->
         clean_up_ets()
     end.
 
--spec infer1(env(), [aeso_syntax:decl()], [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
-infer1(Env, [], Acc) -> {Env, lists:reverse(Acc)};
-infer1(Env, [{contract, Ann, ConName, Code} | Rest], Acc) ->
+-spec infer1(env(), [aeso_syntax:decl()], [aeso_syntax:decl()], list(option())) ->
+    {env(), [aeso_syntax:decl()]}.
+infer1(Env, [], Acc, _Options) -> {Env, lists:reverse(Acc)};
+infer1(Env, [{contract, Ann, ConName, Code} | Rest], Acc, Options) ->
     %% do type inference on each contract independently.
     check_scope_name_clash(Env, contract, ConName),
-    {Env1, Code1} = infer_contract_top(push_scope(contract, ConName, Env), contract, Code),
+    {Env1, Code1} = infer_contract_top(push_scope(contract, ConName, Env), contract, Code, Options),
     Contract1 = {contract, Ann, ConName, Code1},
     Env2 = pop_scope(Env1),
     Env3 = bind_contract(Contract1, Env2),
-    infer1(Env3, Rest, [Contract1 | Acc]);
-infer1(Env, [{namespace, Ann, Name, Code} | Rest], Acc) ->
+    infer1(Env3, Rest, [Contract1 | Acc], Options);
+infer1(Env, [{namespace, Ann, Name, Code} | Rest], Acc, Options) ->
     check_scope_name_clash(Env, namespace, Name),
-    {Env1, Code1} = infer_contract_top(push_scope(namespace, Name, Env), namespace, Code),
+    {Env1, Code1} = infer_contract_top(push_scope(namespace, Name, Env), namespace, Code, Options),
     Namespace1 = {namespace, Ann, Name, Code1},
-    infer1(pop_scope(Env1), Rest, [Namespace1 | Acc]).
+    infer1(pop_scope(Env1), Rest, [Namespace1 | Acc], Options).
 
 check_scope_name_clash(Env, Kind, Name) ->
     case get_scope(Env, qname(Name)) of
@@ -560,13 +561,16 @@ check_scope_name_clash(Env, Kind, Name) ->
             destroy_and_report_type_errors(Env)
     end.
 
--spec infer_contract_top(env(), contract | namespace, [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
-infer_contract_top(Env, Kind, Defs0) ->
+-spec infer_contract_top(env(), contract | namespace, [aeso_syntax:decl()], list(option())) ->
+    {env(), [aeso_syntax:decl()]}.
+infer_contract_top(Env, Kind, Defs0, Options) ->
     Defs = desugar(Defs0),
     {Env1, Defs1} = infer_contract(Env, Kind, Defs),
-    Env2  = on_current_scope(Env1, fun(Scope) -> unfold_record_types(Env1, Scope) end),
-    Defs2 = unfold_record_types(Env2, Defs1),
-    {Env2, Defs2}.
+    case proplists:get_value(dont_unfold, Options, false) of
+        true  -> {Env1, Defs1};
+        false -> Env2 = on_current_scope(Env1, fun(Scope) -> unfold_record_types(Env1, Scope) end),
+                 {Env2, unfold_record_types(Env2, Defs1)}
+    end.
 
 %% TODO: revisit
 infer_constant({letval, Attrs,_Pattern, Type, E}) ->
