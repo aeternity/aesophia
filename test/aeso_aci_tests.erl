@@ -2,16 +2,15 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
-
-do_test() ->
-    test_contract(1),
-    test_contract(2),
-    test_contract(3).
+simple_aci_test_() ->
+    [{"Test contract " ++ integer_to_list(N),
+      fun() -> test_contract(N) end}
+     || N <- [1, 2, 3]].
 
 test_contract(N) ->
     {Contract,MapACI,DecACI} = test_cases(N),
     {ok,JSON} = aeso_aci:encode(Contract),
-    ?assertEqual(MapACI, jsx:decode(JSON, [return_maps])),
+    ?assertEqual([MapACI], jsx:decode(JSON, [return_maps])),
     ?assertEqual(DecACI, aeso_aci:decode(JSON)).
 
 test_cases(1) ->
@@ -22,9 +21,9 @@ test_cases(1) ->
 		     <<"type_defs">> => [],
 		     <<"functions">> =>
 			 [#{<<"name">> => <<"a">>,
-			    <<"arguments">> => 
+			    <<"arguments">> =>
 				[#{<<"name">> => <<"i">>,
-				   <<"type">> => [<<"int">>]}],
+				   <<"type">> => <<"int">>}],
 			    <<"returns">> => <<"int">>,
 			    <<"stateful">> => false}]}},
     DecACI = <<"contract C =\n"
@@ -44,12 +43,11 @@ test_cases(2) ->
 			 <<"functions">> =>
                              [#{<<"arguments">> =>
                                     [#{<<"name">> => <<"i">>,
-                                       <<"type">> => [<<"int">>]}],
+                                       <<"type">> => <<"C.allan">>}],
                                 <<"name">> => <<"a">>,
                                 <<"returns">> => <<"int">>,
                                 <<"stateful">> => false}]}},
-    DecACI = <<"contract C =\n"
-	       "  function a : (int) => int\n">>,
+    DecACI = <<"contract C =\n  type allan = int\n  function a : (C.allan) => int\n">>,
     {Contract,MapACI,DecACI};
 test_cases(3) ->
     Contract = <<"contract C =\n"
@@ -60,7 +58,7 @@ test_cases(3) ->
 			 [#{<<"arguments">> =>
 				[#{<<"name">> => <<"i">>,
 				   <<"type">> =>
-				       [#{<<"C.bert">> => [<<"string">>]}]}],
+				       #{<<"C.bert">> => [<<"string">>]}}],
 			    <<"name">> => <<"a">>,<<"returns">> => <<"int">>,
 			    <<"stateful">> => false}],
 		     <<"name">> => <<"C">>,
@@ -74,3 +72,42 @@ test_cases(3) ->
 	       "  datatype bert('a) = Bin('a)\n"
 	       "  function a : (C.bert(string)) => int\n">>,
     {Contract,MapACI,DecACI}.
+
+%% Rounttrip
+aci_test_() ->
+    [{"Testing ACI generation for " ++ ContractName,
+      fun() -> aci_test_contract(ContractName) end}
+     || ContractName <- all_contracts()].
+
+all_contracts() -> aeso_compiler_tests:compilable_contracts().
+
+aci_test_contract(Name) ->
+    String = aeso_test_utils:read_contract(Name),
+    {ok, JSON} = aeso_aci:encode(String, [{include, {file_system, [aeso_test_utils:contract_path()]}}]),
+
+    %% io:format("JSON:\n~s\n", [JSON]),
+    ContractStub = aeso_aci:decode(JSON),
+
+    %% io:format("STUB:\n~s\n", [ContractStub]),
+    check_stub(ContractStub, [{src_file, Name}]),
+
+    ok.
+
+check_stub(Stub, Options) ->
+    case aeso_parser:string(binary_to_list(Stub), Options) of
+        {ok, Ast} ->
+            try
+                %% io:format("AST: ~120p\n", [Ast]),
+                aeso_ast_infer_types:infer(Ast, [])
+            catch _:{type_errors, TE} ->
+                io:format("Type error:\n~s\n", [TE]),
+                error(TE);
+                  _:R ->
+                io:format("Error: ~p\n", [R]),
+                error(R)
+            end;
+        {error, E} ->
+            io:format("Error: ~p\n", [E]),
+            error({parse_error, E})
+    end.
+
