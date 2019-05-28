@@ -67,6 +67,8 @@
      Op =:= 'MAP_DELETE'      orelse
      Op =:= 'MAP_MEMBER'      orelse
      Op =:= 'MAP_FROM_LIST'   orelse
+     Op =:= 'MAP_TO_LIST'     orelse
+     Op =:= 'MAP_SIZE'        orelse
      Op =:= 'NIL'             orelse
      Op =:= 'IS_NIL'          orelse
      Op =:= 'CONS'            orelse
@@ -78,6 +80,7 @@
      Op =:= 'INT_TO_STR'      orelse
      Op =:= 'ADDR_TO_STR'     orelse
      Op =:= 'STR_REVERSE'     orelse
+     Op =:= 'STR_LENGTH'      orelse
      Op =:= 'INT_TO_ADDR'     orelse
      Op =:= 'VARIANT_TEST'    orelse
      Op =:= 'VARIANT_ELEMENT' orelse
@@ -493,11 +496,11 @@ op_to_scode(map_get)           -> aeb_fate_ops:map_lookup(?a, ?a, ?a);
 op_to_scode(map_get_d)         -> aeb_fate_ops:map_lookup(?a, ?a, ?a, ?a);
 op_to_scode(map_set)           -> aeb_fate_ops:map_update(?a, ?a, ?a, ?a);
 op_to_scode(map_from_list)     -> aeb_fate_ops:map_from_list(?a, ?a);
-op_to_scode(map_to_list)       -> ?TODO(fate_map_to_list_instruction);
+op_to_scode(map_to_list)       -> aeb_fate_ops:map_to_list(?a, ?a);
 op_to_scode(map_delete)        -> aeb_fate_ops:map_delete(?a, ?a, ?a);
 op_to_scode(map_member)        -> aeb_fate_ops:map_member(?a, ?a, ?a);
-op_to_scode(map_size)          -> ?TODO(fate_map_size_instruction);
-op_to_scode(string_length)     -> ?TODO(fate_string_length_instruction);
+op_to_scode(map_size)          -> aeb_fate_ops:map_size_(?a, ?a);
+op_to_scode(string_length)     -> aeb_fate_ops:str_length(?a, ?a);
 op_to_scode(string_concat)     -> aeb_fate_ops:str_join(?a, ?a, ?a);
 op_to_scode(bits_set)          -> aeb_fate_ops:bits_set(?a, ?a, ?a);
 op_to_scode(bits_clear)        -> aeb_fate_ops:bits_clear(?a, ?a, ?a);
@@ -692,6 +695,8 @@ attributes(I) ->
         {'MAP_DELETE', A, B, C}               -> Pure(A, [B, C]);
         {'MAP_MEMBER', A, B, C}               -> Pure(A, [B, C]);
         {'MAP_FROM_LIST', A, B}               -> Pure(A, B);
+        {'MAP_TO_LIST', A, B}                 -> Pure(A, B);
+        {'MAP_SIZE', A, B}                    -> Pure(A, B);
         {'NIL', A}                            -> Pure(A, []);
         {'IS_NIL', A, B}                      -> Pure(A, B);
         {'CONS', A, B, C}                     -> Pure(A, [B, C]);
@@ -703,6 +708,7 @@ attributes(I) ->
         {'INT_TO_STR', A, B}                  -> Pure(A, B);
         {'ADDR_TO_STR', A, B}                 -> Pure(A, B);
         {'STR_REVERSE', A, B}                 -> Pure(A, B);
+        {'STR_LENGTH', A, B}                  -> Pure(A, B);
         {'INT_TO_ADDR', A, B}                 -> Pure(A, B);
         {'VARIANT', A, B, C, D}               -> Pure(A, [?a, B, C, D]);
         {'VARIANT_TEST', A, B, C}             -> Pure(A, [B, C]);
