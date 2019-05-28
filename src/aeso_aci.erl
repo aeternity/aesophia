@@ -190,7 +190,7 @@ encode_expr({app, _, F, As}) ->
     Ef = encode_expr(F),
     Eas = encode_exprs(As),
     #{Ef => Eas};
-encode_expr({record, _, Flds}) -> encode_fields(Flds);
+encode_expr({record, _, Flds}) -> maps:from_list(encode_fields(Flds));
 encode_expr({map, _, KVs})     -> [ [encode_expr(K), encode_expr(V)] || {K, V} <- KVs ];
 encode_expr({Op,_Ann}) ->
     error({encode_expr_todo, Op}).
@@ -198,7 +198,7 @@ encode_expr({Op,_Ann}) ->
 encode_fields(Flds) -> [ encode_field(F) || F <- Flds ].
 
 encode_field({field, _, [{proj, _, {id, _, Fld}}], Val}) ->
-    #{encode_name(Fld) => encode_expr(Val)}.
+    {encode_name(Fld), encode_expr(Val)}.
 
 do_render_aci_json(Json) ->
     Contracts =
