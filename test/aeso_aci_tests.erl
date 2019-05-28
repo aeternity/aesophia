@@ -9,25 +9,25 @@ simple_aci_test_() ->
 
 test_contract(N) ->
     {Contract,MapACI,DecACI} = test_cases(N),
-    {ok,JSON} = aeso_aci:encode(Contract),
-    ?assertEqual([MapACI], jsx:decode(JSON, [return_maps])),
-    ?assertEqual(DecACI, aeso_aci:decode(JSON)).
+    {ok,JSON} = aeso_aci:contract_interface(json, Contract),
+    ?assertEqual([MapACI], JSON),
+    ?assertEqual({ok, DecACI}, aeso_aci:render_aci_json(JSON)).
 
 test_cases(1) ->
     Contract = <<"contract C =\n"
 		 "  function a(i : int) = i+1\n">>,
-    MapACI = #{<<"contract">> =>
-		   #{<<"name">> => <<"C">>,
-		     <<"type_defs">> => [],
-                     <<"event">> => #{<<"variant">> => [#{<<"NoEventsDefined">> => []}]},
-                     <<"state">> => #{<<"tuple">> => []},
-		     <<"functions">> =>
-			 [#{<<"name">> => <<"a">>,
-			    <<"arguments">> =>
-				[#{<<"name">> => <<"i">>,
-				   <<"type">> => <<"int">>}],
-			    <<"returns">> => <<"int">>,
-			    <<"stateful">> => false}]}},
+    MapACI = #{contract =>
+		   #{name => <<"C">>,
+		     type_defs => [],
+                     event => #{variant => [#{<<"NoEventsDefined">> => []}]},
+                     state => #{tuple => []},
+		     functions =>
+			 [#{name => <<"a">>,
+			    arguments =>
+				[#{name => <<"i">>,
+				   type => <<"int">>}],
+			    returns => <<"int">>,
+			    stateful => false}]}},
     DecACI = <<"contract C =\n"
                "  type state = ()\n"
                "  datatype event = NoEventsDefined\n"
@@ -38,21 +38,21 @@ test_cases(2) ->
     Contract = <<"contract C =\n"
 		 "  type allan = int\n"
 		 "  function a(i : allan) = i+1\n">>,
-    MapACI = #{<<"contract">> =>
-                       #{<<"name">> => <<"C">>,
-                         <<"type_defs">> =>
-                             [#{<<"name">> => <<"allan">>,
-                                <<"typedef">> => <<"int">>,
-                                <<"vars">> => []}],
-                         <<"event">> => #{<<"variant">> => [#{<<"NoEventsDefined">> => []}]},
-                         <<"state">> => #{<<"tuple">> => []},
-			 <<"functions">> =>
-                             [#{<<"arguments">> =>
-                                    [#{<<"name">> => <<"i">>,
-                                       <<"type">> => <<"C.allan">>}],
-                                <<"name">> => <<"a">>,
-                                <<"returns">> => <<"int">>,
-                                <<"stateful">> => false}]}},
+    MapACI = #{contract =>
+                       #{name => <<"C">>,
+                         type_defs =>
+                             [#{name => <<"allan">>,
+                                typedef => <<"int">>,
+                                vars => []}],
+                         event => #{variant => [#{<<"NoEventsDefined">> => []}]},
+                         state => #{tuple => []},
+			 functions =>
+                             [#{arguments =>
+                                    [#{name => <<"i">>,
+                                       type => <<"C.allan">>}],
+                                name => <<"a">>,
+                                returns => <<"int">>,
+                                stateful => false}]}},
     DecACI = <<"contract C =\n"
                "  type state = ()\n"
                "  datatype event = NoEventsDefined\n"
@@ -62,29 +62,29 @@ test_cases(2) ->
 test_cases(3) ->
     Contract = <<"contract C =\n"
                  "  type state = ()\n"
-                 "  datatype event = NoEventsDefined\n"
+                 "  datatype event = SingleEventDefined\n"
 		 "  datatype bert('a) = Bin('a)\n"
 		 "  function a(i : bert(string)) = 1\n">>,
-    MapACI = #{<<"contract">> =>
-		   #{<<"functions">> =>
-			 [#{<<"arguments">> =>
-				[#{<<"name">> => <<"i">>,
-				   <<"type">> =>
+    MapACI = #{contract =>
+		   #{functions =>
+			 [#{arguments =>
+				[#{name => <<"i">>,
+				   type =>
 				       #{<<"C.bert">> => [<<"string">>]}}],
-			    <<"name">> => <<"a">>,<<"returns">> => <<"int">>,
-			    <<"stateful">> => false}],
-		     <<"name">> => <<"C">>,
-                     <<"event">> => #{<<"variant">> => [#{<<"NoEventsDefined">> => []}]},
-                     <<"state">> => #{<<"tuple">> => []},
-		     <<"type_defs">> =>
-			 [#{<<"name">> => <<"bert">>,
-			    <<"typedef">> =>
-				#{<<"variant">> =>
+			    name => <<"a">>,returns => <<"int">>,
+			    stateful => false}],
+		     name => <<"C">>,
+                     event => #{variant => [#{<<"SingleEventDefined">> => []}]},
+                     state => #{tuple => []},
+		     type_defs =>
+			 [#{name => <<"bert">>,
+			    typedef =>
+				#{variant =>
 				      [#{<<"Bin">> => [<<"'a">>]}]},
-			    <<"vars">> => [#{<<"name">> => <<"'a">>}]}]}},
+			    vars => [#{name => <<"'a">>}]}]}},
     DecACI = <<"contract C =\n"
                "  type state = ()\n"
-               "  datatype event = NoEventsDefined\n"
+               "  datatype event = SingleEventDefined\n"
 	       "  datatype bert('a) = Bin('a)\n"
 	       "  function a : (C.bert(string)) => int\n">>,
     {Contract,MapACI,DecACI}.
@@ -99,10 +99,11 @@ all_contracts() -> aeso_compiler_tests:compilable_contracts().
 
 aci_test_contract(Name) ->
     String = aeso_test_utils:read_contract(Name),
-    {ok, JSON} = aeso_aci:encode(String, [{include, {file_system, [aeso_test_utils:contract_path()]}}]),
+    Opts   = [{include, {file_system, [aeso_test_utils:contract_path()]}}],
+    {ok, JSON} = aeso_aci:contract_interface(json, String, Opts),
 
-    io:format("JSON:\n~s\n", [JSON]),
-    ContractStub = aeso_aci:decode(JSON),
+    io:format("JSON:\n~p\n", [JSON]),
+    {ok, ContractStub} = aeso_aci:render_aci_json(JSON),
 
     io:format("STUB:\n~s\n", [ContractStub]),
     check_stub(ContractStub, [{src_file, Name}]),

@@ -9,30 +9,56 @@
 
 -module(aeso_aci).
 
--export([ encode/1
-        , encode/2
-        , decode/1]).
+-export([ contract_interface/2
+        , contract_interface/3
 
--export([ encode_type/1
-        , encode_expr/1]).
+        , render_aci_json/1
 
-%% encode(ContractString) -> {ok,JSON} | {error,String}.
-%% encode(ContractString, Options) -> {ok,JSON} | {error,String}.
-%%  Build a JSON structure with lists and tuples, not maps, as this
-%%  allows us to order the fields in the contructed JSON string.
+        , json_encode_expr/1
+        , json_encode_type/1]).
 
-encode(ContractString) -> encode(ContractString, []).
+-type aci_type()  :: json | string.
+-type json()      :: jsx:json_term().
+-type json_text() :: binary().
 
-encode(ContractString, Options) when is_binary(ContractString) ->
-    encode(binary_to_list(ContractString), Options);
-encode(ContractString, Options) ->
+%% External API
+-spec contract_interface(aci_type(), string()) ->
+    {ok, json() | string()} | {error, term()}.
+contract_interface(Type, ContractString) ->
+    contract_interface(Type, ContractString, []).
+
+-spec contract_interface(aci_type(), string(), [term()]) ->
+    {ok, json() | string()} | {error, term()}.
+contract_interface(Type, ContractString, CompilerOpts) ->
+    do_contract_interface(Type, ContractString, CompilerOpts).
+
+-spec render_aci_json(json() | json_text()) -> {ok, binary()}.
+render_aci_json(Json) ->
+    do_render_aci_json(Json).
+
+-spec json_encode_expr(aeso_syntax:expr()) -> json().
+json_encode_expr(Expr) ->
+    encode_expr(Expr).
+
+-spec json_encode_type(aeso_syntax:type()) -> json().
+json_encode_type(Type) ->
+    encode_type(Type).
+
+%% Internal functions
+do_contract_interface(Type, Contract, Options) when is_binary(Contract) ->
+    do_contract_interface(Type, binary_to_list(Contract), Options);
+do_contract_interface(Type, ContractString, Options) ->
     try
         Ast = aeso_compiler:parse(ContractString, Options),
         %% io:format("~p\n", [Ast]),
         TypedAst = aeso_ast_infer_types:infer(Ast, [dont_unfold]),
         %% io:format("~p\n", [TypedAst]),
-        JList = [ encode_contract(C) || C <- TypedAst ],
-        {ok,jsx:encode(JList)}
+        JArray = [ encode_contract(C) || C <- TypedAst ],
+
+        case Type of
+            json   -> {ok, JArray};
+            string -> do_render_aci_json(JArray)
+        end
     catch
         %% The compiler errors.
         error:{parse_errors, Errors} ->
@@ -54,61 +80,60 @@ encode_contract(Contract) ->
 
     Tdefs0 = [ encode_typedef(T)
                || T <- sort_decls(contract_types(Contract)) ],
-    Tdefs  = [ T || T = #{<<"name">> := N} <- Tdefs0,
-                    N /= <<"state">>, N /= <<"event">> ],
-    StateT = case [ T || T = #{<<"name">> := N} <- Tdefs0, N == <<"state">> ] of
-                 [#{<<"typedef">> := ST}] -> ST;
-                 []                       -> #{<<"tuple">> => []}
+    Tdefs  = [ T || T = #{name := N} <- Tdefs0, N /= <<"state">>, N /= <<"event">> ],
+    StateT = case [ T || T = #{name := N} <- Tdefs0, N == <<"state">> ] of
+                 [#{typedef := ST}] -> ST;
+                 []                 -> #{tuple => []}
              end,
-    EventT = case [ T || T = #{<<"name">> := N} <- Tdefs0, N == <<"event">> ] of
-                 [#{<<"typedef">> := ET}] -> ET;
-                 []                       -> #{<<"variant">> => [#{<<"NoEventsDefined">> => []}]}
+    EventT = case [ T || T = #{name := N} <- Tdefs0, N == <<"event">> ] of
+                 [#{typedef := ET}] -> ET;
+                 []                 -> #{variant => [#{<<"NoEventsDefined">> => []}]}
              end,
 
     Fdefs  = [ encode_function(F)
                || F <- sort_decls(contract_funcs(Contract)),
                  not is_private(F) ],
 
-    #{<<"contract">> => #{<<"name">>      => encode_name(Cname),
-                          <<"type_defs">> => Tdefs,
-                          <<"state">>     => StateT,
-                          <<"event">>     => EventT,
-                          <<"functions">> => Fdefs}}.
+    #{contract => #{name      => encode_name(Cname),
+                    type_defs => Tdefs,
+                    state     => StateT,
+                    event     => EventT,
+                    functions => Fdefs}}.
 
 %%  Encode a function definition. Currently we are only interested in
 %%  the interface and type.
 encode_function(FDef = {letfun, _, {id, _, Name}, Args, Type, _}) ->
-    #{<<"name">>      => encode_name(Name),
-      <<"arguments">> => encode_args(Args),
-      <<"returns">>   => encode_type(Type),
-      <<"stateful">>  => is_stateful(FDef)};
+    #{name      => encode_name(Name),
+      arguments => encode_args(Args),
+      returns   => encode_type(Type),
+      stateful  => is_stateful(FDef)};
 encode_function(FDecl = {fun_decl, _, {id, _, Name}, {fun_t, _, _, Args, Type}}) ->
-    #{<<"name">>      => encode_name(Name),
-      <<"arguments">> => encode_anon_args(Args),
-      <<"returns">>   => encode_type(Type),
-      <<"stateful">>  => is_stateful(FDecl)}.
+    #{name      => encode_name(Name),
+      arguments => encode_anon_args(Args),
+      returns   => encode_type(Type),
+      stateful  => is_stateful(FDecl)}.
 
 encode_anon_args(Types) ->
     Anons = [ list_to_binary("_" ++ integer_to_list(X)) || X <- lists:seq(1, length(Types))],
-    [ #{<<"name">> => V, <<"type">> => encode_type(T)}
+    [ #{name => V, type => encode_type(T)}
       || {V, T} <- lists:zip(Anons, Types) ].
 
 encode_args(Args) -> [ encode_arg(A) || A <- Args ].
 
 encode_arg({arg, _, Id, T}) ->
-    #{<<"name">> => encode_type(Id),
-      <<"type">> => encode_type(T)}.
+    #{name => encode_type(Id),
+      type => encode_type(T)}.
 
 encode_typedef(Type) ->
     Name = typedef_name(Type),
     Vars = typedef_vars(Type),
     Def  = typedef_def(Type),
-    #{<<"name">>    => encode_name(Name),
-      <<"vars">>    => encode_tvars(Vars),
-      <<"typedef">> => encode_type(Def)}.
+    #{name    => encode_name(Name),
+      vars    => encode_tvars(Vars),
+      typedef => encode_type(Def)}.
 
 encode_tvars(Vars) ->
-    [ #{<<"name">> => encode_type(V)} || V <- Vars ].
+    [ #{name => encode_type(V)} || V <- Vars ].
 
 %% Encode type
 encode_type({tvar, _, N})         -> encode_name(N);
@@ -116,24 +141,24 @@ encode_type({id, _, N})           -> encode_name(N);
 encode_type({con, _, N})          -> encode_name(N);
 encode_type({qid, _, Ns})         -> encode_name(lists:join(".", Ns));
 encode_type({qcon, _, Ns})        -> encode_name(lists:join(".", Ns));
-encode_type({tuple_t, _, As})     -> #{<<"tuple">> => encode_types(As)};
-encode_type({bytes_t, _, Len})    -> #{<<"bytes">> => Len};
-encode_type({record_t, Fs})       -> #{<<"record">> => encode_type_fields(Fs)};
+encode_type({tuple_t, _, As})     -> #{tuple => encode_types(As)};
+encode_type({bytes_t, _, Len})    -> #{bytes => Len};
+encode_type({record_t, Fs})       -> #{record => encode_type_fields(Fs)};
 encode_type({app_t, _, Id, Fs})   -> #{encode_type(Id) => encode_types(Fs)};
-encode_type({variant_t, Cs})      -> #{<<"variant">> => encode_types(Cs)};
+encode_type({variant_t, Cs})      -> #{variant => encode_types(Cs)};
 encode_type({constr_t, _, C, As}) -> #{encode_type(C) => encode_types(As)};
 encode_type({alias_t, Type})      -> encode_type(Type);
-encode_type({fun_t, _, _, As, T}) -> #{<<"function">> =>
-                                         #{<<"arguments">> => encode_types(As),
-                                           <<"returns">> => encode_type(T)}}.
+encode_type({fun_t, _, _, As, T}) -> #{function =>
+                                         #{arguments => encode_types(As),
+                                           returns => encode_type(T)}}.
 
 encode_types(Ts) -> [ encode_type(T) || T <- Ts ].
 
 encode_type_fields(Fs) -> [ encode_type_field(F) || F <- Fs ].
 
 encode_type_field({field_t, _, Id, T}) ->
-    #{<<"name">> => encode_type(Id),
-      <<"type">> => encode_type(T)}.
+    #{name => encode_type(Id),
+      type => encode_type(T)}.
 
 encode_name(Name) when is_list(Name) ->
     list_to_binary(Name);
@@ -174,67 +199,66 @@ encode_fields(Flds) -> [ encode_field(F) || F <- Flds ].
 encode_field({field, _, [{proj, _, {id, _, Fld}}], Val}) ->
     #{encode_name(Fld) => encode_expr(Val)}.
 
-%% decode(JSON) -> ContractString.
-%%  Decode a JSON string and generate a suitable contract string which
-%%  can be included in a contract definition. We decode into a map
-%%  here as this is easier to work with and order is not important.
-
-decode(Json) ->
-    Cs =
-        case jsx:decode(Json, [return_maps]) of
-            Map when is_map(Map) -> [Map];
-            List                 -> List
+do_render_aci_json(Json) ->
+    Contracts =
+        case Json of
+            JArray when is_list(JArray)  -> JArray;
+            JObject when is_map(JObject) -> [JObject];
+            JText when is_binary(JText)  ->
+                case jsx:decode(Json, [{labels, atom}, return_maps]) of
+                    JArray when is_list(JArray)  -> JArray;
+                    JObject when is_map(JObject) -> [JObject];
+                    _                            -> error(bad_aci_json)
+                end
         end,
+    DecodedContracts = [ decode_contract(C) || #{contract := C} <- Contracts ],
+    {ok, list_to_binary(string:join(DecodedContracts, "\n"))}.
 
-    %% io:format("~p\n", [Map]),
-    DecCs = [ decode_contract(C) || #{<<"contract">> := C} <- Cs ],
-    list_to_binary(string:join(DecCs, "\n")).
-
-decode_contract(#{<<"name">> := Name,
-                  <<"type_defs">> := Ts,
-                  <<"event">>     := E,
-                  <<"state">>     := S,
-                  <<"functions">> := Fs}) ->
-    MkTDef = fun(N, T) -> #{<<"name">> => N, <<"vars">> => [], <<"typedef">> => T} end,
+decode_contract(#{name := Name,
+                  type_defs := Ts,
+                  event     := E,
+                  state     := S,
+                  functions := Fs}) ->
+    MkTDef = fun(N, T) -> #{name => N, vars => [], typedef => T} end,
     ["contract"," ",io_lib:format("~s", [Name])," =\n",
-     decode_tdefs([MkTDef(<<"state">>, S), MkTDef(<<"event">>, E) | Ts]),
+     decode_tdefs([MkTDef(state, S), MkTDef(event, E) | Ts]),
      decode_funcs(Fs)].
 
 decode_funcs(Fs) -> [ decode_func(F) || F <- Fs ].
 
-%% decode_func(#{<<"name">> := <<"init">>}) -> [];
-decode_func(#{<<"name">> := Name,<<"arguments">> := As,<<"returns">> := T}) ->
-    ["  function"," ",io_lib:format("~s", [Name])," : ",
-     decode_args(As)," => ",decode_type(T),$\n].
+%% decode_func(#{name := init}) -> [];
+decode_func(#{name := Name, arguments := As, returns := T}) ->
+    ["  function", " ", io_lib:format("~s", [Name]), " : ",
+     decode_args(As), " => ", decode_type(T), $\n].
 
 decode_args(As) ->
     Das = [ decode_arg(A) || A <- As ],
     [$(,lists:join(", ", Das),$)].
 
-decode_arg(#{<<"type">> := T}) -> decode_type(T).
+decode_arg(#{type := T}) -> decode_type(T).
 
 decode_types(Ets) ->
     [ decode_type(Et) || Et <- Ets ].
 
-decode_type(#{<<"tuple">> := Ets}) ->
+decode_type(#{tuple := Ets}) ->
     Ts = decode_types(Ets),
     [$(,lists:join(",", Ts),$)];
-decode_type(#{<<"record">> := Efs}) ->
+decode_type(#{record := Efs}) ->
     Fs = decode_fields(Efs),
     [${,lists:join(",", Fs),$}];
-decode_type(#{<<"list">> := [Et]}) ->
+decode_type(#{list := [Et]}) ->
     T = decode_type(Et),
     ["list",$(,T,$)];
-decode_type(#{<<"map">> := Ets}) ->
+decode_type(#{map := Ets}) ->
     Ts = decode_types(Ets),
     ["map",$(,lists:join(",", Ts),$)];
-decode_type(#{<<"bytes">> := Len}) ->
+decode_type(#{bytes := Len}) ->
     ["bytes(", integer_to_list(Len), ")"];
-decode_type(#{<<"variant">> := Ets}) ->
+decode_type(#{variant := Ets}) ->
     Ts = decode_types(Ets),
     lists:join(" | ", Ts);
-decode_type(#{<<"function">> := #{<<"arguments">> := Args, <<"returns">> := R}}) ->
-    [decode_type(#{<<"tuple">> => Args}), " => ", decode_type(R)];
+decode_type(#{function := #{arguments := Args, returns := R}}) ->
+    [decode_type(#{tuple => Args}), " => ", decode_type(R)];
 decode_type(Econs) when is_map(Econs) ->	%General constructor
     [{Ec,Ets}] = maps:to_list(Econs),
     AppName = decode_name(Ec),
@@ -246,13 +270,13 @@ decode_type(Econs) when is_map(Econs) ->	%General constructor
 decode_type(T) ->				%Just raw names.
     decode_name(T).
 
-decode_name(En) ->
-    binary_to_list(En).
+decode_name(En) when is_atom(En)   -> erlang:atom_to_list(En);
+decode_name(En) when is_binary(En) -> binary_to_list(En).
 
 decode_fields(Efs) ->
     [ decode_field(Ef) || Ef <- Efs ].
 
-decode_field(#{<<"name">> := En,<<"type">> := Et}) ->
+decode_field(#{name := En, type := Et}) ->
     Name = decode_name(En),
     Type = decode_type(Et),
     [Name," : ",Type].
@@ -263,13 +287,13 @@ decode_field(#{<<"name">> := En,<<"type">> := Et}) ->
 
 decode_tdefs(Ts) -> [ decode_tdef(T) || T <- Ts ].
 
-decode_tdef(#{<<"name">> := Name, <<"vars">> := Vs, <<"typedef">> := T}) ->
+decode_tdef(#{name := Name, vars := Vs, typedef := T}) ->
     TypeDef = decode_type(T),
     DefType = decode_deftype(T),
     ["  ", DefType, " ", decode_name(Name), decode_tvars(Vs), " = ", TypeDef, $\n].
 
-decode_deftype(#{<<"record">> := _Efs}) -> "record";
-decode_deftype(#{<<"variant">> := _})   -> "datatype";
+decode_deftype(#{record := _Efs}) -> "record";
+decode_deftype(#{variant := _})   -> "datatype";
 decode_deftype(_T)                      -> "type".
 
 decode_tvars([]) -> [];                         %No tvars, no parentheses
@@ -277,7 +301,7 @@ decode_tvars(Vs) ->
     Dvs = [ decode_tvar(V) || V <- Vs ],
     [$(,lists:join(", ", Dvs),$)].
 
-decode_tvar(#{<<"name">> := N}) -> io_lib:format("~s", [N]).
+decode_tvar(#{name := N}) -> io_lib:format("~s", [N]).
 
 %% #contract{Ann, Con, [Declarations]}.
 
