@@ -330,6 +330,19 @@ type_to_fcode(_Env, _Sub, Type) ->
 args_to_fcode(Env, Args) ->
     [ {Name, type_to_fcode(Env, Type)} || {arg, _, {id, _, Name}, Type} <- Args ].
 
+-define(make_let(X, Expr, Body),
+        make_let(Expr, fun(X) -> Body end)).
+
+make_let(Expr, Body) ->
+    case Expr of
+        {var, _}         -> Body(Expr);
+        {lit, {int, _}}  -> Body(Expr);
+        {lit, {bool, _}} -> Body(Expr);
+        _                ->
+            X = fresh_name(),
+            {'let', X, Expr, Body({var, X})}
+    end.
+
 -spec expr_to_fcode(env(), aeso_syntax:expr()) -> fexpr().
 expr_to_fcode(Env, {typed, _, Expr, Type}) ->
     expr_to_fcode(Env, Type, Expr);
@@ -415,17 +428,9 @@ expr_to_fcode(Env, _Type, {list, _, Es}) ->
 
 %% Conditionals
 expr_to_fcode(Env, _Type, {'if', _, Cond, Then, Else}) ->
-    Switch = fun(X) ->
-                 {switch, {split, boolean, X,
-                    [{'case', {bool, false}, {nosplit, expr_to_fcode(Env, Else)}},
-                     {'case', {bool, true},  {nosplit, expr_to_fcode(Env, Then)}}]}}
-             end,
-    case Cond of
-        {var, X} -> Switch(X);
-        _          ->
-            X = fresh_name(),
-            {'let', X, expr_to_fcode(Env, Cond), Switch(X)}
-    end;
+    make_if(expr_to_fcode(Env, Cond),
+            expr_to_fcode(Env, Then),
+            expr_to_fcode(Env, Else));
 
 %% Switch
 expr_to_fcode(Env, _, {switch, _, Expr = {typed, _, E, Type}, Alts}) ->
@@ -484,25 +489,24 @@ expr_to_fcode(Env, Type, {map, Ann, KVs}) ->
     Fields = [{field, Ann, [{map_get, Ann, K}], V} || {K, V} <- KVs],
     expr_to_fcode(Env, Type, {map, Ann, {map, Ann, []}, Fields});
 expr_to_fcode(Env, _Type, {map, _, Map, KVs}) ->
-    X    = fresh_name(),
-    Map1 = {var, X},
-    {'let', X, expr_to_fcode(Env, Map),
+    ?make_let(Map1, expr_to_fcode(Env, Map),
         lists:foldr(fun(Fld, M) ->
                         case Fld of
                             {field, _, [{map_get, _, K}], V} ->
                                 {op, map_set, [M, expr_to_fcode(Env, K), expr_to_fcode(Env, V)]};
                             {field_upd, _, [MapGet], {typed, _, {lam, _, [{arg, _, {id, _, Z}, _}], V}, _}} when element(1, MapGet) == map_get ->
-                                Y = fresh_name(),
                                 [map_get, _, K | Default] = tuple_to_list(MapGet),
-                                GetExpr =
-                                    case Default of
-                                        []  -> {op, map_get, [Map1, {var, Y}]};
-                                        [D] -> {op, map_get_d, [Map1, {var, Y}, expr_to_fcode(Env, D)]}
-                                    end,
-                                {'let', Y, expr_to_fcode(Env, K),
-                                {'let', Z, GetExpr,
-                                {op, map_set, [M, {var, Y}, expr_to_fcode(bind_var(Env, Z), V)]}}}
-                        end end, Map1, KVs)};
+                                ?make_let(Key, expr_to_fcode(Env, K),
+                                begin
+                                    GetExpr =
+                                        case Default of
+                                            []  -> {op, map_get, [Map1, Key]};
+                                            [D] -> {op, map_get_d, [Map1, Key, expr_to_fcode(Env, D)]}
+                                        end,
+                                    {'let', Z, GetExpr,
+                                    {op, map_set, [M, Key, expr_to_fcode(bind_var(Env, Z), V)]}}
+                                end)
+                        end end, Map1, KVs));
 expr_to_fcode(Env, _Type, {map_get, _, Map, Key}) ->
     {op, map_get, [expr_to_fcode(Env, Map), expr_to_fcode(Env, Key)]};
 expr_to_fcode(Env, _Type, {map_get, _, Map, Key, Def}) ->
@@ -515,6 +519,14 @@ expr_to_fcode(Env, _Type, {lam, _, Args, Body}) ->
 
 expr_to_fcode(_Env, Type, Expr) ->
     error({todo, {Expr, ':', Type}}).
+
+make_if({var, X}, Then, Else) ->
+    {switch, {split, boolean, X,
+        [{'case', {bool, false}, {nosplit, Else}},
+         {'case', {bool, true},  {nosplit, Then}}]}};
+make_if(Cond, Then, Else) ->
+    X = fresh_name(),
+    {'let', X, Cond, make_if({var, X}, Then, Else)}.
 
 %% -- Pattern matching --
 
@@ -744,8 +756,14 @@ op_builtins() ->
      bits_set, bits_clear, bits_test, bits_sum, bits_intersection, bits_union,
      bits_difference, int_to_str, address_to_str].
 
-builtin_to_fcode(map_lookup, [Key, Map]) ->
-    {op, map_get, [Map, Key]};
+builtin_to_fcode(map_member, [Key, Map]) ->
+    {op, map_member, [Map, Key]};
+builtin_to_fcode(map_lookup, [Key0, Map0]) ->
+    ?make_let(Key, Key0,
+    ?make_let(Map, Map0,
+     make_if({op, map_member, [Map, Key]},
+             {con, [0, 1], 1, [{op, map_get, [Map, Key]}]},
+             {con, [0, 1], 0, []})));
 builtin_to_fcode(map_lookup_default, [Key, Map, Def]) ->
     {op, map_get_d, [Map, Key, Def]};
 builtin_to_fcode(Builtin, Args) ->

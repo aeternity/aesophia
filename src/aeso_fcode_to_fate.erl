@@ -142,7 +142,7 @@ function_to_scode(ContractName, Functions, _Name, Args, Body, ResType, _Options)
     SCode    = to_scode(init_env(ContractName, Functions, Args), Body),
     {{ArgTypes, type_to_scode(ResType)}, SCode}.
 
-type_to_scode({variant, Cons}) -> {variant, lists:map(fun length/1, Cons)};
+type_to_scode({variant, Cons}) -> {variant, lists:map(fun(T) -> type_to_scode({tuple, T}) end, Cons)};
 type_to_scode({list, Type})    -> {list, type_to_scode(Type)};
 type_to_scode({tuple, Types})  -> {tuple, lists:map(fun type_to_scode/1, Types)};
 type_to_scode({map, Key, Val}) -> {map, type_to_scode(Key), type_to_scode(Val)};
