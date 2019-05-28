@@ -39,6 +39,7 @@
 -define(i(X), {immediate, X}).
 -define(a, {stack, 0}).
 -define(s, {var, -1}).  %% TODO: until we have state support in FATE
+-define(void, {var, 9999}).
 
 -define(IsState(X), (is_tuple(X) andalso tuple_size(X) =:= 2 andalso element(1, X) =:= var andalso element(2, X) < 0)).
 
@@ -1126,15 +1127,15 @@ r_one_shot_var({i, Ann1, I}, [{i, Ann2, J} | Code]) ->
 r_one_shot_var(_, _) -> false.
 
 %% Remove writes to dead variables
+r_write_to_dead_var({i, _, {'STORE', ?void, ?a}}, _) -> false; %% Avoid looping
 r_write_to_dead_var({i, Ann, I}, Code) ->
     case op_view(I) of
         {_Op, R = {var, _}, As} ->
             case live_out(R, Ann) of
                 false ->
                     %% Subtle: we still have to pop the stack if any of the arguments
-                    %% came from there. In this case we pop to R, which we know is
-                    %% unused.
-                    {[{i, Ann, {'POP', R}} || X <- As, X == ?a], Code};
+                    %% came from there.
+                    {[{i, Ann, {'STORE', ?void, ?a}} || X <- As, X == ?a], Code};
                 true -> false
             end;
         _ -> false
