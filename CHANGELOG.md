@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
+- Keyword `indexed` is now optional for word typed (`bool`, `int`, `address`,
+  ...) event arguments.
+- State variable pretty printing now produce `'a, 'b, ...` instead of `'1, '2, ...`.
+- ACI is restructured and improved:
+    - `state` and `event` types (if present) now appear at the top level.
+    - Namespaces and remote interfaces are no longer ignored.
+    - All type definitions are included in the interface rendering.
+    - API functions are renamed, new functions are `contract_interface`
+      and `render_aci_json`.
 ### Removed
 
 ## [3.0.0] - 2019-05-21
