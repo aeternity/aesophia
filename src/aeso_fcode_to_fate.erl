@@ -39,6 +39,7 @@
 -define(i(X), {immediate, X}).
 -define(a, {stack, 0}).
 -define(s, {var, -1}).  %% TODO: until we have state support in FATE
+-define(void, {var, 9999}).
 
 -define(IsState(X), (is_tuple(X) andalso tuple_size(X) =:= 2 andalso element(1, X) =:= var andalso element(2, X) < 0)).
 
@@ -141,7 +142,7 @@ function_to_scode(ContractName, Functions, _Name, Args, Body, ResType, _Options)
     SCode    = to_scode(init_env(ContractName, Functions, Args), Body),
     {{ArgTypes, type_to_scode(ResType)}, SCode}.
 
-type_to_scode({variant, Cons}) -> {variant, lists:map(fun length/1, Cons)};
+type_to_scode({variant, Cons}) -> {variant, lists:map(fun(T) -> type_to_scode({tuple, T}) end, Cons)};
 type_to_scode({list, Type})    -> {list, type_to_scode(Type)};
 type_to_scode({tuple, Types})  -> {tuple, lists:map(fun type_to_scode/1, Types)};
 type_to_scode({map, Key, Val}) -> {map, type_to_scode(Key), type_to_scode(Val)};
@@ -159,7 +160,7 @@ add_default_init_function(SFuns, {tuple, []}) ->
             SFuns;
         error ->
             Sig = {[], {tuple, []}},
-            Body = [aeb_fate_ops:tuple(0)],
+            Body = [tuple(0)],
             SFuns#{ InitName => {Sig, Body} }
     end.
 
@@ -221,7 +222,7 @@ to_scode(Env, {con, Ar, I, As}) ->
 to_scode(Env, {tuple, As}) ->
     N = length(As),
     [[ to_scode(notail(Env), A) || A <- As ],
-     aeb_fate_ops:tuple(N)];
+     tuple(N)];
 
 to_scode(Env, {proj, E, I}) ->
     [to_scode(notail(Env), E),
@@ -396,7 +397,7 @@ builtin_to_scode(_Env, get_state, []) ->
     [push(?s)];
 builtin_to_scode(Env, set_state, [_] = Args) ->
     call_to_scode(Env, [aeb_fate_ops:store(?s, ?a),
-                        aeb_fate_ops:tuple(0)], Args);
+                        tuple(0)], Args);
 builtin_to_scode(_Env, event, [_] = _Args) ->
     ?TODO(fate_event_instruction);
 builtin_to_scode(_Env, map_empty, []) ->
@@ -409,7 +410,7 @@ builtin_to_scode(Env, abort, [_] = Args) ->
     call_to_scode(Env, aeb_fate_ops:abort(?a), Args);
 builtin_to_scode(Env, chain_spend, [_, _] = Args) ->
     call_to_scode(Env, [aeb_fate_ops:spend(?a, ?a),
-                        aeb_fate_ops:tuple(0)], Args);
+                        tuple(0)], Args);
 builtin_to_scode(Env, chain_balance, [_] = Args) ->
     call_to_scode(Env, aeb_fate_ops:balance_other(?a, ?a), Args);
 builtin_to_scode(Env, chain_block_hash, [_] = Args) ->
@@ -516,6 +517,9 @@ op_to_scode(int_to_str)        -> aeb_fate_ops:int_to_str(?a, ?a).
 %% easier, and specialize to PUSH (which is cheaper) at the end.
 push(A) -> aeb_fate_ops:store(?a, A).
 
+tuple(0) -> push(?i({tuple, {}}));
+tuple(N) -> aeb_fate_ops:tuple(?a, N).
+
 %% -- Phase II ---------------------------------------------------------------
 %%  Optimize
 
@@ -585,6 +589,7 @@ pp_ann(_, []) -> [].
 
 pp_arg(?i(I))    -> io_lib:format("~w", [I]);
 pp_arg({arg, N}) -> io_lib:format("arg~p", [N]);
+pp_arg({var, N}) when N < 0 -> io_lib:format("store~p", [-N]);
 pp_arg({var, N}) -> io_lib:format("var~p", [N]);
 pp_arg(?a)       -> "a".
 
@@ -605,7 +610,7 @@ ann_writes([{switch, Arg, Type, Alts, Def} | Code], Writes, Acc) ->
     Writes1 = ordsets:union(Writes, ordsets:intersection([WritesDef | WritesAlts])),
     ann_writes(Code, Writes1, [{switch, Arg, Type, Alts1, Def1} | Acc]);
 ann_writes([I | Code], Writes, Acc) ->
-    Ws = var_writes(I),
+    Ws = [ W || W <- var_writes(I), not ?IsState(W) ],
     Writes1 = ordsets:union(Writes, Ws),
     Ann = #{ writes_in => Writes, writes_out => Writes1 },
     ann_writes(Code, Writes1, [{i, Ann, I} | Acc]);
@@ -662,13 +667,13 @@ attributes(I) ->
         {'SWITCH_V3', A, _, _, _}             -> Impure(pc, A);
         {'SWITCH_VN', A, _}                   -> Impure(pc, A);
         {'PUSH', A}                           -> Pure(?a, A);
-        'DUPA'                                -> Pure(?a, []);
+        'DUPA'                                -> Pure(?a, ?a);
         {'DUP', A}                            -> Pure(?a, A);
         {'POP', A}                            -> Pure(A, ?a);
         {'STORE', A, B}                       -> Pure(A, B);
         'INCA'                                -> Pure(?a, ?a);
         {'INC', A}                            -> Pure(A, A);
-        'DECA'                                -> Pure(?a, []);
+        'DECA'                                -> Pure(?a, ?a);
         {'DEC', A}                            -> Pure(A, A);
         {'ADD', A, B, C}                      -> Pure(A, [B, C]);
         {'SUB', A, B, C}                      -> Pure(A, [B, C]);
@@ -685,7 +690,7 @@ attributes(I) ->
         {'AND', A, B, C}                      -> Pure(A, [B, C]);
         {'OR', A, B, C}                       -> Pure(A, [B, C]);
         {'NOT', A, B}                         -> Pure(A, B);
-        {'TUPLE', _}                          -> Pure(?a, []);
+        {'TUPLE', A, N}                       -> Pure(A, [?a || N > 0]);
         {'ELEMENT', A, B, C}                  -> Pure(A, [B, C]);
         {'SETELEMENT', A, B, C, D}            -> Pure(A, [B, C, D]);
         {'MAP_EMPTY', A}                      -> Pure(A, []);
@@ -870,8 +875,7 @@ merge_rules() ->
 
 rules() ->
     merge_rules() ++
-    [?RULE(r_dup_to_push),
-     ?RULE(r_swap_push),
+    [?RULE(r_swap_push),
      ?RULE(r_swap_write),
      ?RULE(r_constant_propagation),
      ?RULE(r_prune_impossible_branches),
@@ -880,11 +884,6 @@ rules() ->
     ].
 
 %% Removing pushes that are immediately consumed.
-r_push_consume({i, Ann1, {'STORE', ?a, A}}, [{i, Ann2, {'POP', B}} | Code]) ->
-    case live_out(B, Ann2) of
-        true  -> {[{i, merge_ann(Ann1, Ann2), {'STORE', B, A}}], Code};
-        false -> {[], Code}
-    end;
 r_push_consume({i, Ann1, {'STORE', ?a, A}}, Code) ->
     inline_push(Ann1, A, 0, Code, []);
 %% Writing directly to memory instead of going through the accumulator.
@@ -929,14 +928,6 @@ split_stack_arg(N, [A | As], Acc) ->
     N1 = if A == ?a -> N - 1;
             true    -> N end,
     split_stack_arg(N1, As, [A | Acc]).
-
-%% Changing PUSH A, DUPA to PUSH A, PUSH A enables further optimisations
-r_dup_to_push({i, Ann1, Push={'STORE', ?a, _}}, [{i, Ann2, 'DUPA'} | Code]) ->
-    #{ live_in  := LiveIn  } = Ann1,
-    Ann1_ = Ann1#{ live_out => LiveIn },
-    Ann2_ = Ann2#{ live_in  => LiveIn },
-    {[{i, Ann1_, Push}, {i, Ann2_, Push}], Code};
-r_dup_to_push(_, _) -> false.
 
 %% Move PUSH A past non-stack instructions.
 r_swap_push(Push = {i, _, {'STORE', ?a, _}}, [I | Code]) ->
@@ -1137,15 +1128,15 @@ r_one_shot_var({i, Ann1, I}, [{i, Ann2, J} | Code]) ->
 r_one_shot_var(_, _) -> false.
 
 %% Remove writes to dead variables
+r_write_to_dead_var({i, _, {'STORE', ?void, ?a}}, _) -> false; %% Avoid looping
 r_write_to_dead_var({i, Ann, I}, Code) ->
     case op_view(I) of
         {_Op, R = {var, _}, As} ->
             case live_out(R, Ann) of
                 false ->
                     %% Subtle: we still have to pop the stack if any of the arguments
-                    %% came from there. In this case we pop to R, which we know is
-                    %% unused.
-                    {[{i, Ann, {'POP', R}} || X <- As, X == ?a], Code};
+                    %% came from there.
+                    {[{i, Ann, {'STORE', ?void, ?a}} || X <- As, X == ?a], Code};
                 true -> false
             end;
         _ -> false

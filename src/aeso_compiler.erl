@@ -75,23 +75,14 @@ file(File, Options) ->
     end.
 
 -spec from_string(binary() | string(), options()) -> {ok, map()} | {error, binary()}.
-from_string(ContractBin, Options) when is_binary(ContractBin) ->
-    from_string(binary_to_list(ContractBin), Options);
-from_string(ContractString, Options) ->
+from_string(Contract, Options) ->
+    from_string(proplists:get_value(backend, Options, aevm), Contract, Options).
+
+from_string(Backend, ContractBin, Options) when is_binary(ContractBin) ->
+    from_string(Backend, binary_to_list(ContractBin), Options);
+from_string(Backend, ContractString, Options) ->
     try
-        #{icode := Icode} = string_to_icode(ContractString, Options),
-        TypeInfo  = extract_type_info(Icode),
-        Assembler = assemble(Icode, Options),
-        pp_assembler(Assembler, Options),
-        ByteCodeList = to_bytecode(Assembler, Options),
-        ByteCode = << << B:8 >> || B <- ByteCodeList >>,
-        pp_bytecode(ByteCode, Options),
-        {ok, Version} = version(),
-        {ok, #{byte_code => ByteCode,
-               compiler_version => Version,
-               contract_source => ContractString,
-               type_info => TypeInfo
-              }}
+        from_string1(Backend, ContractString, Options)
     catch
         %% The compiler errors.
         error:{parse_errors, Errors} ->
@@ -103,6 +94,26 @@ from_string(ContractString, Options) ->
                                 fun (E) -> io_lib:format("~p", [E]) end)}
         %% General programming errors in the compiler just signal error.
     end.
+
+from_string1(aevm, ContractString, Options) ->
+    #{icode := Icode} = string_to_icode(ContractString, Options),
+    TypeInfo  = extract_type_info(Icode),
+    Assembler = assemble(Icode, Options),
+    pp_assembler(Assembler, Options),
+    ByteCodeList = to_bytecode(Assembler, Options),
+    ByteCode = << << B:8 >> || B <- ByteCodeList >>,
+    pp_bytecode(ByteCode, Options),
+    {ok, Version} = version(),
+    {ok, #{byte_code => ByteCode,
+           compiler_version => Version,
+           contract_source => ContractString,
+           type_info => TypeInfo
+          }};
+from_string1(fate, ContractString, Options) ->
+    Ast       = parse(ContractString, Options),
+    TypedAst  = aeso_ast_infer_types:infer(Ast, Options),
+    FCode     = aeso_ast_to_fcode:ast_to_fcode(TypedAst, Options),
+    {ok, aeso_fcode_to_fate:compile(FCode, Options)}.
 
 -spec string_to_icode(string(), [option()]) -> map().
 string_to_icode(ContractString, Options) ->
