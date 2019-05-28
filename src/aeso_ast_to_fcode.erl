@@ -491,10 +491,16 @@ expr_to_fcode(Env, _Type, {map, _, Map, KVs}) ->
                         case Fld of
                             {field, _, [{map_get, _, K}], V} ->
                                 {op, map_set, [M, expr_to_fcode(Env, K), expr_to_fcode(Env, V)]};
-                            {field_upd, _, [{map_get, _, K}], {typed, _, {lam, _, [{arg, _, {id, _, Z}, _}], V}, _}} ->
+                            {field_upd, _, [MapGet], {typed, _, {lam, _, [{arg, _, {id, _, Z}, _}], V}, _}} when element(1, MapGet) == map_get ->
                                 Y = fresh_name(),
+                                [map_get, _, K | Default] = tuple_to_list(MapGet),
+                                GetExpr =
+                                    case Default of
+                                        []  -> {op, map_get, [Map1, {var, Y}]};
+                                        [D] -> {op, map_get_d, [Map1, {var, Y}, expr_to_fcode(Env, D)]}
+                                    end,
                                 {'let', Y, expr_to_fcode(Env, K),
-                                {'let', Z, {op, map_get, [Map1, {var, Y}]},
+                                {'let', Z, GetExpr,
                                 {op, map_set, [M, {var, Y}, expr_to_fcode(bind_var(Env, Z), V)]}}}
                         end end, Map1, KVs)};
 expr_to_fcode(Env, _Type, {map_get, _, Map, Key}) ->
