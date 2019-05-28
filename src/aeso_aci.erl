@@ -76,29 +76,30 @@ join_errors(Prefix, Errors, Pfun) ->
     list_to_binary(string:join([Prefix|Ess], "\n")).
 
 encode_contract(Contract) ->
-    Cname   = contract_name(Contract),
+    C0 = #{name => encode_name(contract_name(Contract))},
 
-    Tdefs0 = [ encode_typedef(T)
-               || T <- sort_decls(contract_types(Contract)) ],
-    Tdefs  = [ T || T = #{name := N} <- Tdefs0, N /= <<"state">>, N /= <<"event">> ],
-    StateT = case [ T || T = #{name := N} <- Tdefs0, N == <<"state">> ] of
-                 [#{typedef := ST}] -> ST;
-                 []                 -> #{tuple => []}
-             end,
-    EventT = case [ T || T = #{name := N} <- Tdefs0, N == <<"event">> ] of
-                 [#{typedef := ET}] -> ET;
-                 []                 -> #{variant => [#{<<"NoEventsDefined">> => []}]}
-             end,
+    Tdefs0 = [ encode_typedef(T) || T <- sort_decls(contract_types(Contract)) ],
+    FilterT = fun(N) -> fun(#{name := N1}) -> N == N1 end end,
+    {Es, Tdefs1} = lists:partition(FilterT(<<"event">>), Tdefs0),
+    {Ss, Tdefs}  = lists:partition(FilterT(<<"state">>), Tdefs1),
+
+    C1 = C0#{type_defs => Tdefs},
+
+    C2 = case Es of
+             []                 -> C1;
+             [#{typedef := ET}] -> C1#{event => ET}
+         end,
+
+    C3 = case Ss of
+             []                 -> C2;
+             [#{typedef := ST}] -> C2#{state => ST}
+         end,
 
     Fdefs  = [ encode_function(F)
                || F <- sort_decls(contract_funcs(Contract)),
                  not is_private(F) ],
 
-    #{contract => #{name      => encode_name(Cname),
-                    type_defs => Tdefs,
-                    state     => StateT,
-                    event     => EventT,
-                    functions => Fdefs}}.
+    #{contract => C3#{functions => Fdefs}}.
 
 %%  Encode a function definition. Currently we are only interested in
 %%  the interface and type.
@@ -215,14 +216,13 @@ do_render_aci_json(Json) ->
     {ok, list_to_binary(string:join(DecodedContracts, "\n"))}.
 
 decode_contract(#{name := Name,
-                  type_defs := Ts,
-                  event     := E,
-                  state     := S,
-                  functions := Fs}) ->
+                  type_defs := Ts0,
+                  functions := Fs} = C) ->
     MkTDef = fun(N, T) -> #{name => N, vars => [], typedef => T} end,
+    Ts = [ MkTDef(<<"state">>, maps:get(state, C)) || maps:is_key(state, C) ] ++
+         [ MkTDef(<<"event">>, maps:get(event, C)) || maps:is_key(event, C) ] ++ Ts0,
     ["contract"," ",io_lib:format("~s", [Name])," =\n",
-     decode_tdefs([MkTDef(state, S), MkTDef(event, E) | Ts]),
-     decode_funcs(Fs)].
+     decode_tdefs(Ts), decode_funcs(Fs)].
 
 decode_funcs(Fs) -> [ decode_func(F) || F <- Fs ].
 

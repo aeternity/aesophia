@@ -19,8 +19,6 @@ test_cases(1) ->
     MapACI = #{contract =>
 		   #{name => <<"C">>,
 		     type_defs => [],
-                     event => #{variant => [#{<<"NoEventsDefined">> => []}]},
-                     state => #{tuple => []},
 		     functions =>
 			 [#{name => <<"a">>,
 			    arguments =>
@@ -29,8 +27,6 @@ test_cases(1) ->
 			    returns => <<"int">>,
 			    stateful => false}]}},
     DecACI = <<"contract C =\n"
-               "  type state = ()\n"
-               "  datatype event = NoEventsDefined\n"
 	       "  function a : (int) => int\n">>,
     {Contract,MapACI,DecACI};
 
@@ -44,8 +40,6 @@ test_cases(2) ->
                              [#{name => <<"allan">>,
                                 typedef => <<"int">>,
                                 vars => []}],
-                         event => #{variant => [#{<<"NoEventsDefined">> => []}]},
-                         state => #{tuple => []},
 			 functions =>
                              [#{arguments =>
                                     [#{name => <<"i">>,
@@ -54,8 +48,6 @@ test_cases(2) ->
                                 returns => <<"int">>,
                                 stateful => false}]}},
     DecACI = <<"contract C =\n"
-               "  type state = ()\n"
-               "  datatype event = NoEventsDefined\n"
                "  type allan = int\n"
                "  function a : (C.allan) => int\n">>,
     {Contract,MapACI,DecACI};
