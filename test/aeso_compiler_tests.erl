@@ -16,20 +16,24 @@
 %%  are made on the output, just that it is a binary which indicates
 %%  that the compilation worked.
 simple_compile_test_() ->
-     [ {"Testing the " ++ ContractName ++ " contract",
+     [ {"Testing the " ++ ContractName ++ " contract with the " ++ atom_to_list(Backend) ++ " backend",
         fun() ->
-            case compile(ContractName) of
+            case compile(Backend, ContractName) of
                 #{byte_code := ByteCode,
                   contract_source := _,
-                  type_info := _} -> ?assertMatch(Code when is_binary(Code), ByteCode);
+                  type_info := _} when Backend == aevm ->
+                    ?assertMatch(Code when is_binary(Code), ByteCode);
+                Code when Backend == fate, is_tuple(Code) ->
+                    ?assertMatch(#{}, aeb_fate_code:functions(Code));
                 ErrBin ->
                     io:format("\n~s", [ErrBin]),
                     error(ErrBin)
             end
-        end} || ContractName <- compilable_contracts() ] ++
+        end} || ContractName <- compilable_contracts(), Backend <- [aevm, fate],
+                not lists:member(ContractName, not_yet_compilable(Backend))] ++
      [ {"Testing error messages of " ++ ContractName,
         fun() ->
-            case compile(ContractName) of
+            case compile(aevm, ContractName) of
                 <<"Type errors\n", ErrorString/binary>> ->
                     check_errors(lists:sort(ExpectedErrors), ErrorString);
                 <<"Parse errors\n", ErrorString/binary>> ->
@@ -44,14 +48,14 @@ simple_compile_test_() ->
                     {ok, Bin} = file:read_file(filename:join([aeso_test_utils:contract_path(), File])),
                     {File, Bin}
                   end || File <- ["included.aes", "../contracts/included2.aes"] ]),
-            #{byte_code := Code1} = compile("include", [{include, {explicit_files, FileSystem}}]),
-            #{byte_code := Code2} = compile("include"),
+            #{byte_code := Code1} = compile(aevm, "include", [{include, {explicit_files, FileSystem}}]),
+            #{byte_code := Code2} = compile(aevm, "include"),
             ?assertMatch(true, Code1 == Code2)
         end} ] ++
      [ {"Testing deadcode elimination",
         fun() ->
-            #{ byte_code := NoDeadCode } = compile("nodeadcode"),
-            #{ byte_code := DeadCode   } = compile("deadcode"),
+            #{ byte_code := NoDeadCode } = compile(aevm, "nodeadcode"),
+            #{ byte_code := DeadCode   } = compile(aevm, "deadcode"),
             SizeNoDeadCode = byte_size(NoDeadCode),
             SizeDeadCode   = byte_size(DeadCode),
             ?assertMatch({_, _, true}, {SizeDeadCode, SizeNoDeadCode, SizeDeadCode + 40 < SizeNoDeadCode}),
@@ -67,12 +71,12 @@ check_errors(Expect, ErrorString) ->
         {Missing, Extra} -> ?assertEqual(Missing, Extra)
     end.
 
-compile(Name) ->
-    compile(Name, [{include, {file_system, [aeso_test_utils:contract_path()]}}]).
+compile(Backend, Name) ->
+    compile(Backend, Name, [{include, {file_system, [aeso_test_utils:contract_path()]}}]).
 
-compile(Name, Options) ->
+compile(Backend, Name, Options) ->
     String = aeso_test_utils:read_contract(Name),
-    case aeso_compiler:from_string(String, [{src_file, Name} | Options]) of
+    case aeso_compiler:from_string(String, [{src_file, Name}, {backend, Backend} | Options]) of
         {ok, Map}            -> Map;
         {error, ErrorString} -> ErrorString
     end.
@@ -111,6 +115,16 @@ compilable_contracts() ->
      "bytes_equality",
      "address_chain"
     ].
+
+not_yet_compilable(fate) ->
+    ["oracles",             %% Oracle.register
+     "events",              %% events
+     "basic_auth",          %% auth_tx_hash instruction
+     "bitcoin_auth",        %% auth_tx_hash instruction
+     "address_literals",    %% oracle_query_id literals
+     "address_chain"        %% Oracle.check_query
+    ];
+not_yet_compilable(aevm) -> [].
 
 %% Contracts that should produce type errors
 
