@@ -50,14 +50,29 @@ join_errors(Prefix, Errors, Pfun) ->
     list_to_binary(string:join([Prefix|Ess], "\n")).
 
 encode_contract(Contract) ->
-    Cname = contract_name(Contract),
-    Tdefs = [ encode_typedef(T) ||
-                T <- sort_decls(contract_types(Contract)) ],
-    Fdefs = [ encode_function(F)
-              || F <- sort_decls(contract_funcs(Contract)),
+    Cname   = contract_name(Contract),
+
+    Tdefs0 = [ encode_typedef(T)
+               || T <- sort_decls(contract_types(Contract)) ],
+    Tdefs  = [ T || T = #{<<"name">> := N} <- Tdefs0,
+                    N /= <<"state">>, N /= <<"event">> ],
+    StateT = case [ T || T = #{<<"name">> := N} <- Tdefs0, N == <<"state">> ] of
+                 [#{<<"typedef">> := ST}] -> ST;
+                 []                       -> #{<<"tuple">> => []}
+             end,
+    EventT = case [ T || T = #{<<"name">> := N} <- Tdefs0, N == <<"event">> ] of
+                 [#{<<"typedef">> := ET}] -> ET;
+                 []                       -> #{<<"variant">> => [#{<<"NoEventsDefined">> => []}]}
+             end,
+
+    Fdefs  = [ encode_function(F)
+               || F <- sort_decls(contract_funcs(Contract)),
                  not is_private(F) ],
+
     #{<<"contract">> => #{<<"name">>      => encode_name(Cname),
                           <<"type_defs">> => Tdefs,
+                          <<"state">>     => StateT,
+                          <<"event">>     => EventT,
                           <<"functions">> => Fdefs}}.
 
 %%  Encode a function definition. Currently we are only interested in
@@ -177,9 +192,12 @@ decode(Json) ->
 
 decode_contract(#{<<"name">> := Name,
                   <<"type_defs">> := Ts,
+                  <<"event">>     := E,
+                  <<"state">>     := S,
                   <<"functions">> := Fs}) ->
+    MkTDef = fun(N, T) -> #{<<"name">> => N, <<"vars">> => [], <<"typedef">> => T} end,
     ["contract"," ",io_lib:format("~s", [Name])," =\n",
-     decode_tdefs(Ts),
+     decode_tdefs([MkTDef(<<"state">>, S), MkTDef(<<"event">>, E) | Ts]),
      decode_funcs(Fs)].
 
 decode_funcs(Fs) -> [ decode_func(F) || F <- Fs ].
@@ -219,9 +237,12 @@ decode_type(#{<<"function">> := #{<<"arguments">> := Args, <<"returns">> := R}})
     [decode_type(#{<<"tuple">> => Args}), " => ", decode_type(R)];
 decode_type(Econs) when is_map(Econs) ->	%General constructor
     [{Ec,Ets}] = maps:to_list(Econs),
-    C = decode_name(Ec),
-    Ts = decode_types(Ets),
-    [C,$(,lists:join(",", Ts),$)];
+    AppName = decode_name(Ec),
+    AppArgs = decode_types(Ets),
+    case AppArgs of
+        [] -> [AppName];
+        _  -> [AppName,$(,lists:join(", ", AppArgs),$)]
+    end;
 decode_type(T) ->				%Just raw names.
     decode_name(T).
 

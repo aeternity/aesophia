@@ -19,6 +19,8 @@ test_cases(1) ->
     MapACI = #{<<"contract">> =>
 		   #{<<"name">> => <<"C">>,
 		     <<"type_defs">> => [],
+                     <<"event">> => #{<<"variant">> => [#{<<"NoEventsDefined">> => []}]},
+                     <<"state">> => #{<<"tuple">> => []},
 		     <<"functions">> =>
 			 [#{<<"name">> => <<"a">>,
 			    <<"arguments">> =>
@@ -27,6 +29,8 @@ test_cases(1) ->
 			    <<"returns">> => <<"int">>,
 			    <<"stateful">> => false}]}},
     DecACI = <<"contract C =\n"
+               "  type state = ()\n"
+               "  datatype event = NoEventsDefined\n"
 	       "  function a : (int) => int\n">>,
     {Contract,MapACI,DecACI};
 
@@ -40,6 +44,8 @@ test_cases(2) ->
                              [#{<<"name">> => <<"allan">>,
                                 <<"typedef">> => <<"int">>,
                                 <<"vars">> => []}],
+                         <<"event">> => #{<<"variant">> => [#{<<"NoEventsDefined">> => []}]},
+                         <<"state">> => #{<<"tuple">> => []},
 			 <<"functions">> =>
                              [#{<<"arguments">> =>
                                     [#{<<"name">> => <<"i">>,
@@ -47,10 +53,16 @@ test_cases(2) ->
                                 <<"name">> => <<"a">>,
                                 <<"returns">> => <<"int">>,
                                 <<"stateful">> => false}]}},
-    DecACI = <<"contract C =\n  type allan = int\n  function a : (C.allan) => int\n">>,
+    DecACI = <<"contract C =\n"
+               "  type state = ()\n"
+               "  datatype event = NoEventsDefined\n"
+               "  type allan = int\n"
+               "  function a : (C.allan) => int\n">>,
     {Contract,MapACI,DecACI};
 test_cases(3) ->
     Contract = <<"contract C =\n"
+                 "  type state = ()\n"
+                 "  datatype event = NoEventsDefined\n"
 		 "  datatype bert('a) = Bin('a)\n"
 		 "  function a(i : bert(string)) = 1\n">>,
     MapACI = #{<<"contract">> =>
@@ -62,6 +74,8 @@ test_cases(3) ->
 			    <<"name">> => <<"a">>,<<"returns">> => <<"int">>,
 			    <<"stateful">> => false}],
 		     <<"name">> => <<"C">>,
+                     <<"event">> => #{<<"variant">> => [#{<<"NoEventsDefined">> => []}]},
+                     <<"state">> => #{<<"tuple">> => []},
 		     <<"type_defs">> =>
 			 [#{<<"name">> => <<"bert">>,
 			    <<"typedef">> =>
@@ -69,6 +83,8 @@ test_cases(3) ->
 				      [#{<<"Bin">> => [<<"'a">>]}]},
 			    <<"vars">> => [#{<<"name">> => <<"'a">>}]}]}},
     DecACI = <<"contract C =\n"
+               "  type state = ()\n"
+               "  datatype event = NoEventsDefined\n"
 	       "  datatype bert('a) = Bin('a)\n"
 	       "  function a : (C.bert(string)) => int\n">>,
     {Contract,MapACI,DecACI}.
@@ -85,10 +101,10 @@ aci_test_contract(Name) ->
     String = aeso_test_utils:read_contract(Name),
     {ok, JSON} = aeso_aci:encode(String, [{include, {file_system, [aeso_test_utils:contract_path()]}}]),
 
-    %% io:format("JSON:\n~s\n", [JSON]),
+    io:format("JSON:\n~s\n", [JSON]),
     ContractStub = aeso_aci:decode(JSON),
 
-    %% io:format("STUB:\n~s\n", [ContractStub]),
+    io:format("STUB:\n~s\n", [ContractStub]),
     check_stub(ContractStub, [{src_file, Name}]),
 
     ok.
