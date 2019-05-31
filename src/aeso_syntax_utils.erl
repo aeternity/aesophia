@@ -6,7 +6,7 @@
 %%%-------------------------------------------------------------------
 -module(aeso_syntax_utils).
 
--export([used_ids/1, used_types/1, used/1]).
+-export([used_ids/1, used_types/2, used/1]).
 
 -record(alg, {zero, plus, scoped}).
 
@@ -100,8 +100,12 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
 used_ids(E) ->
     [ X || {{term, [X]}, _} <- used(E) ].
 
-used_types(T) ->
-    [ X || {{type, [X]}, _} <- used(T) ].
+used_types([Top] = _CurrentNS, T) ->
+    F = fun({{type, [X]}, _}) -> [X];
+           ({{type, [Top1, X]}, _}) when Top1 == Top -> [X];
+           (_) -> []
+        end,
+    lists:flatmap(F, used(T)).
 
 -type entity() :: {term, [string()]}
                 | {type, [string()]}

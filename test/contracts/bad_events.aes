@@ -6,10 +6,8 @@ contract Events =
   datatype event =
       Event1(indexed alias_int, indexed int, string)
     | Event2(alias_string, indexed alias_address)
-    | BadEvent1(indexed string, string)
-    | BadEvent2(indexed int, int)
-    | BadEvent3(indexed alias_string, string)
-    | BadEvent4(indexed int, alias_address)
+    | BadEvent1(indexed string)
+    | BadEvent2(indexed alias_string)
 
   function f1(x : int, y : string) =
     Chain.event(Event1(x, x+1, y))

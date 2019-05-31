@@ -514,7 +514,7 @@ map_t(As, K, V) -> {app_t, As, {id, As, "map"}, [K, V]}.
 infer(Contracts) ->
     infer(Contracts, []).
 
--type option() :: return_env.
+-type option() :: return_env | dont_unfold.
 
 -spec init_env(list(option())) -> env().
 init_env(_Options) -> global_env().
@@ -526,7 +526,7 @@ infer(Contracts, Options) ->
         Env = init_env(Options),
         create_options(Options),
         ets_new(type_vars, [set]),
-        {Env1, Decls} = infer1(Env, Contracts, []),
+        {Env1, Decls} = infer1(Env, Contracts, [], Options),
         case proplists:get_value(return_env, Options, false) of
             false -> Decls;
             true  -> {Env1, Decls}
@@ -535,21 +535,22 @@ infer(Contracts, Options) ->
         clean_up_ets()
     end.
 
--spec infer1(env(), [aeso_syntax:decl()], [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
-infer1(Env, [], Acc) -> {Env, lists:reverse(Acc)};
-infer1(Env, [{contract, Ann, ConName, Code} | Rest], Acc) ->
+-spec infer1(env(), [aeso_syntax:decl()], [aeso_syntax:decl()], list(option())) ->
+    {env(), [aeso_syntax:decl()]}.
+infer1(Env, [], Acc, _Options) -> {Env, lists:reverse(Acc)};
+infer1(Env, [{contract, Ann, ConName, Code} | Rest], Acc, Options) ->
     %% do type inference on each contract independently.
     check_scope_name_clash(Env, contract, ConName),
-    {Env1, Code1} = infer_contract_top(push_scope(contract, ConName, Env), contract, Code),
+    {Env1, Code1} = infer_contract_top(push_scope(contract, ConName, Env), contract, Code, Options),
     Contract1 = {contract, Ann, ConName, Code1},
     Env2 = pop_scope(Env1),
     Env3 = bind_contract(Contract1, Env2),
-    infer1(Env3, Rest, [Contract1 | Acc]);
-infer1(Env, [{namespace, Ann, Name, Code} | Rest], Acc) ->
+    infer1(Env3, Rest, [Contract1 | Acc], Options);
+infer1(Env, [{namespace, Ann, Name, Code} | Rest], Acc, Options) ->
     check_scope_name_clash(Env, namespace, Name),
-    {Env1, Code1} = infer_contract_top(push_scope(namespace, Name, Env), namespace, Code),
+    {Env1, Code1} = infer_contract_top(push_scope(namespace, Name, Env), namespace, Code, Options),
     Namespace1 = {namespace, Ann, Name, Code1},
-    infer1(pop_scope(Env1), Rest, [Namespace1 | Acc]).
+    infer1(pop_scope(Env1), Rest, [Namespace1 | Acc], Options).
 
 check_scope_name_clash(Env, Kind, Name) ->
     case get_scope(Env, qname(Name)) of
@@ -560,13 +561,16 @@ check_scope_name_clash(Env, Kind, Name) ->
             destroy_and_report_type_errors(Env)
     end.
 
--spec infer_contract_top(env(), contract | namespace, [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
-infer_contract_top(Env, Kind, Defs0) ->
+-spec infer_contract_top(env(), contract | namespace, [aeso_syntax:decl()], list(option())) ->
+    {env(), [aeso_syntax:decl()]}.
+infer_contract_top(Env, Kind, Defs0, Options) ->
     Defs = desugar(Defs0),
     {Env1, Defs1} = infer_contract(Env, Kind, Defs),
-    Env2  = on_current_scope(Env1, fun(Scope) -> unfold_record_types(Env1, Scope) end),
-    Defs2 = unfold_record_types(Env2, Defs1),
-    {Env2, Defs2}.
+    case proplists:get_value(dont_unfold, Options, false) of
+        true  -> {Env1, Defs1};
+        false -> Env2 = on_current_scope(Env1, fun(Scope) -> unfold_record_types(Env1, Scope) end),
+                 {Env2, unfold_record_types(Env2, Defs1)}
+    end.
 
 %% TODO: revisit
 infer_constant({letval, Attrs,_Pattern, Type, E}) ->
@@ -611,11 +615,11 @@ infer_contract(Env, What, Defs) ->
     {Env4, TypeDefs ++ Decls ++ Defs1}.
 
 -spec check_typedefs(env(), [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
-check_typedefs(Env, Defs) ->
+check_typedefs(Env = #env{ namespace = Ns }, Defs) ->
     create_type_errors(),
     GetName  = fun({type_def, _, {id, _, Name}, _, _}) -> Name end,
     TypeMap  = maps:from_list([ {GetName(Def), Def} || Def <- Defs ]),
-    DepGraph = maps:map(fun(_, Def) -> aeso_syntax_utils:used_types(Def) end, TypeMap),
+    DepGraph = maps:map(fun(_, Def) -> aeso_syntax_utils:used_types(Ns, Def) end, TypeMap),
     SCCs     = aeso_utils:scc(DepGraph),
     {Env1, Defs1} = check_typedef_sccs(Env, TypeMap, SCCs, []),
     destroy_and_report_type_errors(Env),
@@ -738,24 +742,22 @@ check_event(Env, "event", Ann, Def) ->
 check_event(_Env, _Name, _Ann, Def) -> Def.
 
 check_event_con(Env, {constr_t, Ann, Con, Args}) ->
-    IsIndexed  = fun(T) -> case aeso_syntax:get_ann(indexed, T, false) of
-                               true  -> indexed;
-                               false -> notindexed
-                           end end,
+    IsIndexed  = fun(T) ->
+                     T1 = unfold_types_in_type(Env, T),
+                     %% `indexed` is optional but if used it has to be correctly used
+                     case {is_word_type(T1), is_string_type(T1), aeso_syntax:get_ann(indexed, T, false)} of
+                         {true, _, _}        -> indexed;
+                         {false, true, true} -> type_error({indexed_type_must_be_word, T, T1});
+                         {false, true, _}    -> notindexed;
+                         {false, false, _}   -> type_error({event_arg_type_word_or_string, T, T1}), error
+                     end
+                 end,
     Indices    = lists:map(IsIndexed, Args),
     Indexed    = [ T || T <- Args, IsIndexed(T) == indexed ],
     NonIndexed = Args -- Indexed,
-    [ check_event_arg_type(Env, Ix, Type) || {Ix, Type} <- lists:zip(Indices, Args) ],
     [ type_error({event_0_to_3_indexed_values, Con}) || length(Indexed) > 3 ],
     [ type_error({event_0_to_1_string_values, Con}) || length(NonIndexed) > 1 ],
     {constr_t, [{indices, Indices} | Ann], Con, Args}.
-
-check_event_arg_type(Env, Ix, Type0) ->
-    Type = unfold_types_in_type(Env, Type0),
-    case Ix of
-        indexed    -> [ type_error({indexed_type_must_be_word, Type0, Type})   || not is_word_type(Type) ];
-        notindexed -> [ type_error({payload_type_must_be_string, Type0, Type}) || not is_string_type(Type) ]
-    end.
 
 %% Not so nice.
 is_word_type({id, _, Name}) ->
@@ -1852,8 +1854,8 @@ instantiate(E) ->
     instantiate1(dereference(E)).
 
 instantiate1({uvar, Attr, R}) ->
-    Next = proplists:get_value(next, ets_lookup(type_vars, next), 1),
-    TVar = {tvar, Attr, "'" ++ integer_to_list(Next)},
+    Next = proplists:get_value(next, ets_lookup(type_vars, next), 0),
+    TVar = {tvar, Attr, "'" ++ integer_to_tvar(Next)},
     ets_insert(type_vars, [{next, Next + 1}, {R, TVar}]),
     TVar;
 instantiate1({fun_t, Ann, Named, Args, Ret}) ->
@@ -1872,6 +1874,12 @@ instantiate1([A|B]) ->
     [instantiate(A)|instantiate(B)];
 instantiate1(X) ->
     X.
+
+integer_to_tvar(X) when X < 26 ->
+    [$a + X];
+integer_to_tvar(X) ->
+    [integer_to_tvar(X div 26)] ++ [$a + (X rem 26)].
+
 
 %% Save unification failures for error messages.
 

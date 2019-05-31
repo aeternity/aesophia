@@ -18,6 +18,7 @@
         , to_sophia_value/4
         , to_sophia_value/5
         , decode_calldata/3
+        , parse/2
         ]).
 
 -include_lib("aebytecode/include/aeb_opcodes.hrl").
