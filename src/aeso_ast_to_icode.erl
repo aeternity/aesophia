@@ -173,8 +173,7 @@ ast_body({qid, _, [Con, "put"]}, #{ contract_name := Con }) ->
 
 %% Abort
 ast_body(?id_app("abort", [String], _, _), Icode) ->
-    #funcall{ function = #var_ref{ name = {builtin, abort} },
-              args     = [ast_body(String, Icode)] };
+    builtin_call(abort, [ast_body(String, Icode)]);
 
 %% Authentication
 ast_body({qid, _, ["Auth", "tx_hash"]}, _Icode) ->
@@ -370,13 +369,11 @@ ast_body(?qid_app(["String", "blake2b"], [String], _, _), Icode) ->
 %% Strings
 %% -- String length
 ast_body(?qid_app(["String", "length"], [String], _, _), Icode) ->
-    #funcall{ function = #var_ref{ name = {builtin, string_length} },
-              args     = [ast_body(String, Icode)] };
+    builtin_call(string_length, [ast_body(String, Icode)]);
 
 %% -- String concat
 ast_body(?qid_app(["String", "concat"], [String1, String2], _, _), Icode) ->
-    #funcall{ function = #var_ref{ name = {builtin, string_concat} },
-              args     = [ast_body(String1, Icode), ast_body(String2, Icode)] };
+    builtin_call(string_concat, [ast_body(String1, Icode), ast_body(String2, Icode)]);
 
 %% -- String hash (sha3)
 ast_body(?qid_app(["String", "sha3"], [String], _, _), Icode) ->
@@ -602,13 +599,11 @@ ast_binop(Op, Ann, {typed, _, A, Type}, B, Icode)
             Builtin =
                 case OtherType of
                     string ->
-                        #funcall{ function = #var_ref{name = {builtin, str_equal}},
-                                  args     = Args };
+                        builtin_call(str_equal, Args);
                     {tuple, Types} ->
                         case lists:usort(Types) of
                             [word] ->
-                                #funcall{ function = #var_ref{name = {builtin, str_equal_p}},
-                                          args = [ #integer{value = 32 * length(Types)} | Args] };
+                                builtin_call(str_equal_p, [ #integer{value = 32 * length(Types)} | Args]);
                             _ -> gen_error({cant_compare, Ann, Op, Type})
                         end;
                     _ ->
@@ -617,8 +612,7 @@ ast_binop(Op, Ann, {typed, _, A, Type}, B, Icode)
             Neg(Builtin)
     end;
 ast_binop('++', _, A, B, Icode) ->
-    #funcall{ function = #var_ref{ name = {builtin, list_concat} },
-              args     = [ast_body(A, Icode), ast_body(B, Icode)] };
+    builtin_call(list_concat, [ast_body(A, Icode), ast_body(B, Icode)]);
 ast_binop(Op, _, A, B, Icode) ->
     #binop{op = Op, left = ast_body(A, Icode), right = ast_body(B, Icode)}.
 
