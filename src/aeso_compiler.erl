@@ -276,7 +276,7 @@ translate_vm_value(word, {id, _, "address"},                     N) -> address_l
 translate_vm_value(word, {app_t, _, {id, _, "oracle"}, _},       N) -> address_literal(oracle_pubkey, N);
 translate_vm_value(word, {app_t, _, {id, _, "oracle_query"}, _}, N) -> address_literal(oracle_query_id, N);
 translate_vm_value(word, {con, _, _Name},                        N) -> address_literal(contract_pubkey, N);
-translate_vm_value(word, {id, _, "int"},     N) -> {int, [], N};
+translate_vm_value(word, {id, _, "int"},     N) -> <<N1:256/signed>> = <<N:256>>, {int, [], N1};
 translate_vm_value(word, {id, _, "bits"},    N) -> error({todo, bits, N});
 translate_vm_value(word, {id, _, "bool"},    N) -> {bool, [], N /= 0};
 translate_vm_value(word, {bytes_t, _, Len}, Val) when Len =< 32 ->
@@ -412,6 +412,7 @@ get_decode_type(FunName, [_ | Contracts]) ->
 %% Translate an icode value (error if not value) to an Erlang term that can be
 %% consumed by aeb_heap:to_binary().
 icode_to_term(word, {integer, N}) -> N;
+icode_to_term(word, {unop, '-', {integer, N}}) -> -N;
 icode_to_term(string, {tuple, [{integer, Len} | Words]}) ->
     <<Str:Len/binary, _/binary>> = << <<W:256>> || {integer, W} <- Words >>,
     Str;

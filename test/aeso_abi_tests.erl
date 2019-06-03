@@ -62,6 +62,7 @@ encode_decode_sophia_test() ->
                                 Other -> Other
                               end end,
     ok = Check("int", "42"),
+    ok = Check("int", "-42"),
     ok = Check("bool", "true"),
     ok = Check("bool", "false"),
     ok = Check("string", "\"Hello\""),
