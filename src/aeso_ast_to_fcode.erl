@@ -876,9 +876,21 @@ optimize_fcode(Code = #{ functions := Funs }) ->
     Code#{ functions := maps:map(fun(Name, Def) -> optimize_fun(Code, Name, Def) end, Funs) }.
 
 -spec optimize_fun(fcode(), fun_name(), fun_def()) -> fun_def().
-optimize_fun(_Fcode, _Fun, Def = #{ body := _Body }) ->
+optimize_fun(Fcode, Fun, Def = #{ body := Body }) ->
     %% io:format("Optimizing ~p =\n~s\n", [_Fun, prettypr:format(pp_fexpr(_Body))]),
-    Def.
+    Def#{ body := inliner(Fcode, Fun, Body) }.
+
+-spec inliner(fcode(), fun_name(), fexpr()) -> fexpr().
+inliner(Fcode, Fun, {def, Fun1, Args} = E) when Fun1 /= Fun ->
+    case should_inline(Fcode, Fun1) of
+        false -> E;
+        true  -> inline(Fcode, Fun1, Args)
+    end;
+inliner(_Fcode, _Fun, E) -> E.
+
+should_inline(_Fcode, _Fun1) -> false.
+
+inline(_Fcode, Fun, Args) -> {def, Fun, Args}. %% TODO
 
 %% -- Helper functions -------------------------------------------------------
 
