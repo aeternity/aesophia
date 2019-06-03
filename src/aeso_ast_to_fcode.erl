@@ -498,13 +498,15 @@ expr_to_fcode(Env, _Type, {map, _, Map, KVs}) ->
                                 [map_get, _, K | Default] = tuple_to_list(MapGet),
                                 ?make_let(Key, expr_to_fcode(Env, K),
                                 begin
+                                    %% Z might shadow Map1 or Key
+                                    Z1 = fresh_name(),
                                     GetExpr =
                                         case Default of
                                             []  -> {op, map_get, [Map1, Key]};
                                             [D] -> {op, map_get_d, [Map1, Key, expr_to_fcode(Env, D)]}
                                         end,
-                                    {'let', Z, GetExpr,
-                                    {op, map_set, [M, Key, expr_to_fcode(bind_var(Env, Z), V)]}}
+                                    {'let', Z1, GetExpr,
+                                    {op, map_set, [M, Key, rename([{Z, Z1}], expr_to_fcode(bind_var(Env, Z), V))]}}
                                 end)
                         end end, Map1, KVs));
 expr_to_fcode(Env, _Type, {map_get, _, Map, Key}) ->
@@ -756,6 +758,8 @@ op_builtins() ->
      bits_set, bits_clear, bits_test, bits_sum, bits_intersection, bits_union,
      bits_difference, int_to_str, address_to_str].
 
+builtin_to_fcode(map_delete, [Key, Map]) ->
+    {op, map_delete, [Map, Key]};
 builtin_to_fcode(map_member, [Key, Map]) ->
     {op, map_member, [Map, Key]};
 builtin_to_fcode(map_lookup, [Key0, Map0]) ->
