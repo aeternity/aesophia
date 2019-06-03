@@ -1361,7 +1361,7 @@ tweak_returns(['RETURN' | Code = [{'ABORT', _} | _]])      -> Code;
 tweak_returns(Code) -> Code.
 
 %% -- Split basic blocks at CALL instructions --
-%%  Calls can only return to a new basic block.
+%%  Calls can only return to a new basic block. Also splits at JUMPIF instructions.
 
 split_calls({Ref, Code}) ->
     split_calls(Ref, Code, [], []).
@@ -1370,7 +1370,8 @@ split_calls(Ref, [], Acc, Blocks) ->
     lists:reverse([{Ref, lists:reverse(Acc)} | Blocks]);
 split_calls(Ref, [I | Code], Acc, Blocks) when element(1, I) == 'CALL';
                                                element(1, I) == 'CALL_R';
-                                               element(1, I) == 'CALL_GR' ->
+                                               element(1, I) == 'CALL_GR';
+                                               element(1, I) == 'jumpif' ->
     split_calls(make_ref(), Code, [], [{Ref, lists:reverse([I | Acc])} | Blocks]);
 split_calls(Ref, [I | Code], Acc, Blocks) ->
     split_calls(Ref, Code, [I | Acc], Blocks).
