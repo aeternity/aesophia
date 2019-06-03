@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
+### Removed
+
+## [3.1.0] - 2019-06-03
+### Added
+### Changed
 - Keyword `indexed` is now optional for word typed (`bool`, `int`, `address`,
   ...) event arguments.
 - State variable pretty printing now produce `'a, 'b, ...` instead of `'1, '2, ...`.
@@ -16,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - All type definitions are included in the interface rendering.
     - API functions are renamed, new functions are `contract_interface`
       and `render_aci_json`.
+- Fixed a bug in `create_calldata`/`to_sophia_value` - it can now handle negative
+  literals.
 ### Removed
 
 ## [3.0.0] - 2019-05-21
@@ -64,7 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/aeternity/aesophia/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/aeternity/aesophia/compare/v2.1.0...v3.0.0
 [2.1.0]: https://github.com/aeternity/aesophia/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/aeternity/aesophia/tag/v2.0.0
