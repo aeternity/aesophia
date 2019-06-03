@@ -95,7 +95,7 @@
                | bits
                | {variant, [[ftype()]]}
                | {function, [ftype()], ftype()}
-               | any.
+               | any | {tvar, var_name()}.
 
 -type fun_def() :: #{ attrs  := [attribute()],
                       args   := [{var_name(), ftype()}],
@@ -318,7 +318,7 @@ type_to_fcode(Env, Sub, {record_t, Fields}) ->
 type_to_fcode(_Env, _Sub, {bytes_t, _, _N}) ->
     string; %% TODO: add bytes type to FATE?
 type_to_fcode(_Env, Sub, {tvar, _, X}) ->
-    maps:get(X, Sub, any);
+    maps:get(X, Sub, {tvar, X});
 type_to_fcode(Env, Sub, {fun_t, _, Named, Args, Res}) ->
     FNamed = [type_to_fcode(Env, Sub, Arg) || {named_arg_t, _, _, Arg, _} <- Named],
     FArgs  = [type_to_fcode(Env, Sub, Arg) || Arg <- Args],
@@ -1298,6 +1298,7 @@ pp_call(Fun, Args) ->
 
 pp_ftype(T) when is_atom(T) -> pp_text(T);
 pp_ftype(any) -> pp_text("_");
+pp_ftype({tvar, X}) -> pp_text(X);
 pp_ftype({tuple, Ts}) ->
     pp_parens(pp_par(pp_punctuate(pp_text(","), [pp_ftype(T) || T <- Ts])));
 pp_ftype({list, T}) ->
