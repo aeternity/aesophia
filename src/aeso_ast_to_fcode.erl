@@ -31,7 +31,7 @@
               map_get | map_get_d | map_set | map_from_list | map_to_list |
               map_delete | map_member | map_size | string_length |
               string_concat | bits_set | bits_clear | bits_test | bits_sum |
-              bits_intersection | bits_union | bits_difference.
+              bits_intersection | bits_union | bits_difference | contract_address.
 
 -type flit() :: {int, integer()}
               | {string, binary()}
@@ -95,7 +95,7 @@
                | bits
                | {variant, [[ftype()]]}
                | {function, [ftype()], ftype()}
-               | any.
+               | any | {tvar, var_name()}.
 
 -type fun_def() :: #{ attrs  := [attribute()],
                       args   := [{var_name(), ftype()}],
@@ -318,7 +318,7 @@ type_to_fcode(Env, Sub, {record_t, Fields}) ->
 type_to_fcode(_Env, _Sub, {bytes_t, _, _N}) ->
     string; %% TODO: add bytes type to FATE?
 type_to_fcode(_Env, Sub, {tvar, _, X}) ->
-    maps:get(X, Sub, any);
+    maps:get(X, Sub, {tvar, X});
 type_to_fcode(Env, Sub, {fun_t, _, Named, Args, Res}) ->
     FNamed = [type_to_fcode(Env, Sub, Arg) || {named_arg_t, _, _, Arg, _} <- Named],
     FArgs  = [type_to_fcode(Env, Sub, Arg) || Arg <- Args],
@@ -385,6 +385,8 @@ expr_to_fcode(Env, _Type, {tuple, _, Es}) ->
 %% Records
 expr_to_fcode(Env, Type, {proj, _Ann, Rec = {typed, _, _, RecType}, {id, _, X}}) ->
     case RecType of
+        {con, _, _} when X == "address" ->
+            {op, contract_address, [expr_to_fcode(Env, Rec)]};
         {con, _, _} ->
             {fun_t, _, Named, Args, _} = Type,
             Arity = length(Named) + length(Args),
@@ -876,9 +878,21 @@ optimize_fcode(Code = #{ functions := Funs }) ->
     Code#{ functions := maps:map(fun(Name, Def) -> optimize_fun(Code, Name, Def) end, Funs) }.
 
 -spec optimize_fun(fcode(), fun_name(), fun_def()) -> fun_def().
-optimize_fun(_Fcode, _Fun, Def = #{ body := _Body }) ->
+optimize_fun(Fcode, Fun, Def = #{ body := Body }) ->
     %% io:format("Optimizing ~p =\n~s\n", [_Fun, prettypr:format(pp_fexpr(_Body))]),
-    Def.
+    Def#{ body := inliner(Fcode, Fun, Body) }.
+
+-spec inliner(fcode(), fun_name(), fexpr()) -> fexpr().
+inliner(Fcode, Fun, {def, Fun1, Args} = E) when Fun1 /= Fun ->
+    case should_inline(Fcode, Fun1) of
+        false -> E;
+        true  -> inline(Fcode, Fun1, Args)
+    end;
+inliner(_Fcode, _Fun, E) -> E.
+
+should_inline(_Fcode, _Fun1) -> false == list_to_atom("true").  %% Dialyzer
+
+inline(_Fcode, Fun, Args) -> {def, Fun, Args}. %% TODO
 
 %% -- Helper functions -------------------------------------------------------
 
@@ -1286,6 +1300,7 @@ pp_call(Fun, Args) ->
 
 pp_ftype(T) when is_atom(T) -> pp_text(T);
 pp_ftype(any) -> pp_text("_");
+pp_ftype({tvar, X}) -> pp_text(X);
 pp_ftype({tuple, Ts}) ->
     pp_parens(pp_par(pp_punctuate(pp_text(","), [pp_ftype(T) || T <- Ts])));
 pp_ftype({list, T}) ->

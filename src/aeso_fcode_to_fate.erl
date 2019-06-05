@@ -138,16 +138,44 @@ functions_to_scode(ContractName, Functions, Options) ->
                     return := Type}} <- maps:to_list(Functions)]).
 
 function_to_scode(ContractName, Functions, _Name, Args, Body, ResType, _Options) ->
-    ArgTypes = [ type_to_scode(T) || {_, T} <- Args ],
+    {ArgTypes, ResType1} = typesig_to_scode(Args, ResType),
     SCode    = to_scode(init_env(ContractName, Functions, Args), Body),
-    {{ArgTypes, type_to_scode(ResType)}, SCode}.
+    {{ArgTypes, ResType1}, SCode}.
 
+-define(tvars, '$tvars').
+
+typesig_to_scode(Args, Res) ->
+    put(?tvars, {0, #{}}),
+    R = {[type_to_scode(T) || {_, T} <- Args], type_to_scode(Res)},
+    erase(?tvars),
+    R.
+
+type_to_scode(integer)         -> integer;
+type_to_scode(boolean)         -> boolean;
+type_to_scode(string)          -> string;
+type_to_scode(address)         -> address;
+type_to_scode(hash)            -> hash;
+type_to_scode(signature)       -> signature;
+type_to_scode(contract)        -> contract;
+type_to_scode(oracle)          -> oracle;
+type_to_scode(oracle_query)    -> oracle_query;
+type_to_scode(name)            -> name;
+type_to_scode(channel)         -> channel;
+type_to_scode(bits)            -> bits;
+type_to_scode(any)             -> any;
 type_to_scode({variant, Cons}) -> {variant, lists:map(fun(T) -> type_to_scode({tuple, T}) end, Cons)};
 type_to_scode({list, Type})    -> {list, type_to_scode(Type)};
 type_to_scode({tuple, Types})  -> {tuple, lists:map(fun type_to_scode/1, Types)};
 type_to_scode({map, Key, Val}) -> {map, type_to_scode(Key), type_to_scode(Val)};
 type_to_scode({function, _Args, _Res}) -> {tuple, [string, any]};
-type_to_scode(T)               -> T.
+type_to_scode({tvar, X}) ->
+    {I, Vars} = get(?tvars),
+    case maps:get(X, Vars, false) of
+        false ->
+            put(?tvars, {I + 1, Vars#{ X => I }}),
+            {tvar, I};
+        J -> {tvar, J}
+    end.
 
 add_default_init_function(SFuns, StateType) when StateType /= {tuple, []} ->
     %% Only add default if the type is unit.
@@ -511,7 +539,8 @@ op_to_scode(bits_intersection) -> aeb_fate_ops:bits_and(?a, ?a, ?a);
 op_to_scode(bits_union)        -> aeb_fate_ops:bits_or(?a, ?a, ?a);
 op_to_scode(bits_difference)   -> aeb_fate_ops:bits_diff(?a, ?a, ?a);
 op_to_scode(address_to_str)    -> aeb_fate_ops:addr_to_str(?a, ?a);
-op_to_scode(int_to_str)        -> aeb_fate_ops:int_to_str(?a, ?a).
+op_to_scode(int_to_str)        -> aeb_fate_ops:int_to_str(?a, ?a);
+op_to_scode(contract_address)  -> ?TODO(fate_contract_to_address_conversion).
 
 %% PUSH and STORE ?a are the same, so we use STORE to make optimizations
 %% easier, and specialize to PUSH (which is cheaper) at the end.
@@ -1352,12 +1381,12 @@ chase_labels([L | Ls], Map, Live) ->
     chase_labels(New ++ Ls, Map, Live#{ L => true }).
 
 %% Replace PUSH, RETURN by RETURNR, drop returns after tail calls.
-tweak_returns(['RETURN', {'PUSH', A} | Code])              -> [{'RETURNR', A} | Code];
-tweak_returns(['RETURN' | Code = [{'CALL_T', _} | _]])     -> Code;
-tweak_returns(['RETURN' | Code = [{'CALL_TR', _, _} | _]]) -> Code;
-tweak_returns(['RETURN' | Code = [{'CALL_GT', _} | _]])    -> Code;
-tweak_returns(['RETURN' | Code = [{'CALL_GTR', _, _} | _]])-> Code;
-tweak_returns(['RETURN' | Code = [{'ABORT', _} | _]])      -> Code;
+tweak_returns(['RETURN', {'PUSH', A} | Code])                     -> [{'RETURNR', A} | Code];
+tweak_returns(['RETURN' | Code = [{'CALL_T', _} | _]])            -> Code;
+tweak_returns(['RETURN' | Code = [{'CALL_TR', _, _, _} | _]])     -> Code;
+tweak_returns(['RETURN' | Code = [{'CALL_GT', _} | _]])           -> Code;
+tweak_returns(['RETURN' | Code = [{'CALL_GTR', _, _, _, _} | _]]) -> Code;
+tweak_returns(['RETURN' | Code = [{'ABORT', _} | _]])             -> Code;
 tweak_returns(Code) -> Code.
 
 %% -- Split basic blocks at CALL instructions --
@@ -1373,6 +1402,8 @@ split_calls(Ref, [I | Code], Acc, Blocks) when element(1, I) == 'CALL';
                                                element(1, I) == 'CALL_GR';
                                                element(1, I) == 'jumpif' ->
     split_calls(make_ref(), Code, [], [{Ref, lists:reverse([I | Acc])} | Blocks]);
+split_calls(Ref, [{'ABORT', _} = I | _Code], Acc, Blocks) ->
+    lists:reverse([{Ref, lists:reverse([I | Acc])} | Blocks]);
 split_calls(Ref, [I | Code], Acc, Blocks) ->
     split_calls(Ref, Code, [I | Acc], Blocks).
 
