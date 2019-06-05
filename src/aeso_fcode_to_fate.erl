@@ -539,7 +539,8 @@ op_to_scode(bits_intersection) -> aeb_fate_ops:bits_and(?a, ?a, ?a);
 op_to_scode(bits_union)        -> aeb_fate_ops:bits_or(?a, ?a, ?a);
 op_to_scode(bits_difference)   -> aeb_fate_ops:bits_diff(?a, ?a, ?a);
 op_to_scode(address_to_str)    -> aeb_fate_ops:addr_to_str(?a, ?a);
-op_to_scode(int_to_str)        -> aeb_fate_ops:int_to_str(?a, ?a).
+op_to_scode(int_to_str)        -> aeb_fate_ops:int_to_str(?a, ?a);
+op_to_scode(contract_address)  -> ?TODO(fate_contract_to_address_conversion).
 
 %% PUSH and STORE ?a are the same, so we use STORE to make optimizations
 %% easier, and specialize to PUSH (which is cheaper) at the end.

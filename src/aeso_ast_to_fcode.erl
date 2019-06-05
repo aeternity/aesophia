@@ -31,7 +31,7 @@
               map_get | map_get_d | map_set | map_from_list | map_to_list |
               map_delete | map_member | map_size | string_length |
               string_concat | bits_set | bits_clear | bits_test | bits_sum |
-              bits_intersection | bits_union | bits_difference.
+              bits_intersection | bits_union | bits_difference | contract_address.
 
 -type flit() :: {int, integer()}
               | {string, binary()}
@@ -385,6 +385,8 @@ expr_to_fcode(Env, _Type, {tuple, _, Es}) ->
 %% Records
 expr_to_fcode(Env, Type, {proj, _Ann, Rec = {typed, _, _, RecType}, {id, _, X}}) ->
     case RecType of
+        {con, _, _} when X == "address" ->
+            {op, contract_address, [expr_to_fcode(Env, Rec)]};
         {con, _, _} ->
             {fun_t, _, Named, Args, _} = Type,
             Arity = length(Named) + length(Args),
