@@ -95,6 +95,11 @@
      Op =:= 'BITS_OR'         orelse
      Op =:= 'BITS_AND'        orelse
      Op =:= 'BITS_DIFF'       orelse
+     Op =:= 'SHA3'            orelse
+     Op =:= 'SHA256'          orelse
+     Op =:= 'BLAKE2B'         orelse
+     Op =:= 'ECVERIFY'        orelse
+     Op =:= 'ECVERIFY_SECP256K1' orelse
      false)).
 
 -record(env, { contract, vars = [], locals = [], tailpos = true }).
@@ -535,7 +540,10 @@ op_to_scode(crypto_ecverify)           -> aeb_fate_ops:ecverify(?a, ?a, ?a, ?a);
 op_to_scode(crypto_ecverify_secp256k1) -> aeb_fate_ops:ecverify_secp256k1(?a, ?a, ?a, ?a);
 op_to_scode(crypto_sha3)               -> aeb_fate_ops:sha3(?a, ?a);
 op_to_scode(crypto_sha256)             -> aeb_fate_ops:sha256(?a, ?a);
-op_to_scode(crypto_blake2b)            -> aeb_fate_ops:blake2b(?a, ?a).
+op_to_scode(crypto_blake2b)            -> aeb_fate_ops:blake2b(?a, ?a);
+op_to_scode(string_sha3)               -> aeb_fate_ops:sha3(?a, ?a);
+op_to_scode(string_sha256)             -> aeb_fate_ops:sha256(?a, ?a);
+op_to_scode(string_blake2b)            -> aeb_fate_ops:blake2b(?a, ?a).
 
 %% PUSH and STORE ?a are the same, so we use STORE to make optimizations
 %% easier, and specialize to PUSH (which is cheaper) at the end.
@@ -754,6 +762,11 @@ attributes(I) ->
         {'BITS_OR', A, B, C}                  -> Pure(A, [B, C]);
         {'BITS_AND', A, B, C}                 -> Pure(A, [B, C]);
         {'BITS_DIFF', A, B, C}                -> Pure(A, [B, C]);
+        {'SHA3', A, B}                        -> Pure(A, [B]);
+        {'SHA256', A, B}                      -> Pure(A, [B]);
+        {'BLAKE2B', A, B}                     -> Pure(A, [B]);
+        {'ECVERIFY', A, B, C, D}              -> Pure(A, [B, C, D]);
+        {'ECVERIFY_SECP256K1', A, B, C, D}    -> Pure(A, [B, C, D]);
         {'ADDRESS', A}                        -> Pure(A, []);
         {'BALANCE', A}                        -> Impure(A, []);
         {'BALANCE_OTHER', A, B}               -> Impure(A, [B]);
