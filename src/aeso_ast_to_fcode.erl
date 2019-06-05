@@ -890,7 +890,7 @@ inliner(Fcode, Fun, {def, Fun1, Args} = E) when Fun1 /= Fun ->
     end;
 inliner(_Fcode, _Fun, E) -> E.
 
-should_inline(_Fcode, _Fun1) -> false.
+should_inline(_Fcode, _Fun1) -> false == list_to_atom("true").  %% Dialyzer
 
 inline(_Fcode, Fun, Args) -> {def, Fun, Args}. %% TODO
 
