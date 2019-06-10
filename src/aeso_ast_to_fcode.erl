@@ -43,7 +43,8 @@
               | {contract_pubkey, binary()}
               | {oracle_pubkey, binary()}
               | {oracle_query_id, binary()}
-              | {bool, false | true}.
+              | {bool, false | true}
+              | {typerep, ftype()}.
 
 -type fexpr() :: {lit, flit()}
                | nil
@@ -92,7 +93,7 @@
                | hash
                | signature
                | contract
-               | oracle
+               | {oracle, ftype(), ftype()} %% Query type, Response type
                | oracle_query
                | name
                | channel
@@ -212,7 +213,7 @@ init_type_env() ->
        ["address"]      => ?type(address),
        ["hash"]         => ?type(hash),
        ["signature"]    => ?type(signature),
-       ["oracle"]       => ?type(_, _, oracle),
+       ["oracle"]       => ?type(Q, R, {oracle, Q, R}),
        ["oracle_query"] => ?type(_, _, oracle_query),    %% TODO: not in Fate
        ["list"]         => ?type(T, {list, T}),
        ["map"]          => ?type(K, V, {map, K, V}),
@@ -472,10 +473,14 @@ expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
     end;
 
 %% Function calls
-expr_to_fcode(Env, _Type, {app, _Ann, Fun = {typed, _, _, {fun_t, _, NamedArgsT, _, _}}, Args}) ->
+expr_to_fcode(Env, Type, {app, _Ann, Fun = {typed, _, _, {fun_t, _, NamedArgsT, _, _}}, Args}) ->
     Args1 = get_named_args(NamedArgsT, Args),
     FArgs = [expr_to_fcode(Env, Arg) || Arg <- Args1],
     case expr_to_fcode(Env, Fun) of
+        {builtin_u, oracle_register = B, _} ->
+            {oracle, QType, RType} = type_to_fcode(Env, Type),
+            TypeArgs = [{lit, {typerep, QType}}, {lit, {typerep, RType}}],
+            builtin_to_fcode(B, FArgs ++ TypeArgs);
         {builtin_u, B, _Ar}       -> builtin_to_fcode(B, FArgs);
         {def_u, F, _Ar}           -> {def, F, FArgs};
         {remote_u, Ct, RFun, _Ar} -> {remote, Ct, RFun, FArgs};
