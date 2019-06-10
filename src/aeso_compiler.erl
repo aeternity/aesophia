@@ -111,10 +111,18 @@ from_string1(aevm, ContractString, Options) ->
            type_info => TypeInfo
           }};
 from_string1(fate, ContractString, Options) ->
-    Ast       = parse(ContractString, Options),
-    TypedAst  = aeso_ast_infer_types:infer(Ast, Options),
-    FCode     = aeso_ast_to_fcode:ast_to_fcode(TypedAst, Options),
-    {ok, aeso_fcode_to_fate:compile(FCode, Options)}.
+    Ast      = parse(ContractString, Options),
+    TypedAst = aeso_ast_infer_types:infer(Ast, Options),
+    FCode    = aeso_ast_to_fcode:ast_to_fcode(TypedAst, Options),
+    FateCode = aeso_fcode_to_fate:compile(FCode, Options),
+    ByteCode = aeb_fate_code:serialize(FateCode, []),
+    {ok, Version} = version(),
+    {ok, #{byte_code => ByteCode,
+           compiler_version => Version,
+           contract_source => ContractString,
+           type_info => [],
+           fate_code => FateCode
+          }}.
 
 -spec string_to_icode(string(), [option()]) -> map().
 string_to_icode(ContractString, Options) ->
