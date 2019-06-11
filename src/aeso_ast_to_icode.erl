@@ -465,7 +465,7 @@ ast_body({app, _, {typed, _, {proj, _, {typed, _, Addr, {con, _, Contract}}, {id
     Gas    = proplists:get_value("gas",   ArgOpts ++ Defaults),
     Value  = proplists:get_value("value", ArgOpts ++ Defaults),
     OutType = ast_typerep(OutT, Icode),
-    <<TypeHash:256>> = aeb_abi:function_type_hash(list_to_binary(FunName), ArgType, OutType),
+    <<TypeHash:256>> = aeb_aevm_abi:function_type_hash(list_to_binary(FunName), ArgType, OutType),
     %% The function is represented by its type hash (which includes the name)
     Fun    = #integer{value = TypeHash},
     #prim_call_contract{
@@ -679,7 +679,7 @@ prim_call(Prim, Amount, Args, ArgTypes, OutType) ->
             true ->
                 PrimBin = binary:encode_unsigned(Prim),
                 ArgType = {tuple, ArgTypes},
-                <<TH:256>> = aeb_abi:function_type_hash(PrimBin, ArgType, OutType),
+                <<TH:256>> = aeb_aevm_abi:function_type_hash(PrimBin, ArgType, OutType),
                 TH;
             false ->
                 0

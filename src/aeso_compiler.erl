@@ -12,7 +12,8 @@
         , file/2
         , from_string/2
         , check_call/4
-        , create_calldata/3
+        , create_calldata/3  %% deprecated
+        , create_calldata/4
         , version/0
         , sophia_type_to_typerep/1
         , to_sophia_value/4
@@ -32,6 +33,7 @@
                 | pp_icode
                 | pp_assembler
                 | pp_bytecode
+                | {backend, aevm | fate}
                 | {include, {file_system, [string()]} |
                             {explicit_files, #{string() => binary()}}}
                 | {src_file, string()}.
@@ -137,6 +139,18 @@ string_to_icode(ContractString, Options) ->
        type_env  => TypeEnv,
        icode     => Icode }.
 
+-spec string_to_fcode(string(), [option()]) -> map().
+string_to_fcode(ContractString, Options) ->
+    Ast = parse(ContractString, Options),
+    pp_sophia_code(Ast, Options),
+    pp_ast(Ast, Options),
+    {TypeEnv, TypedAst} = aeso_ast_infer_types:infer(Ast, [return_env]),
+    pp_typed_ast(TypedAst, Options),
+    Fcode = aeso_ast_to_fcode:ast_to_fcode(TypedAst, Options),
+    #{ typed_ast => TypedAst,
+       type_env  => TypeEnv,
+       fcode     => Fcode }.
+
 join_errors(Prefix, Errors, Pfun) ->
     Ess = [ Pfun(E) || E <- Errors ],
     list_to_binary(string:join([Prefix|Ess], "\n")).
@@ -150,14 +164,15 @@ join_errors(Prefix, Errors, Pfun) ->
 %% terms for the arguments.
 %% NOTE: Special treatment for "init" since it might be implicit and has
 %%       a special return type (typerep, T)
--spec check_call(string(), string(), [string()], options()) -> {ok, string(), {[Type], Type}, [term()]} | {error, term()}
+-spec check_call(string(), string(), [string()], options()) -> {ok, string(), {[Type], Type}, [term()]}
+                                                                   | {ok, string(), [term()]}
+                                                                   | {error, term()}
     when Type :: term().
 check_call(Source, "init" = FunName, Args, Options) ->
-    PatchFun = fun(T) -> {tuple, [typerep, T]} end,
-    case check_call(Source, FunName, Args, Options, PatchFun) of
+    case check_call1(Source, FunName, Args, Options) of
         Err = {error, _} when Args == [] ->
             %% Try with default init-function
-            case check_call(insert_init_function(Source, Options), FunName, Args, Options, PatchFun) of
+            case check_call1(insert_init_function(Source, Options), FunName, Args, Options) of
                 {error, _} -> Err; %% The first error is most likely better...
                 Res        -> Res
             end;
@@ -165,11 +180,12 @@ check_call(Source, "init" = FunName, Args, Options) ->
             Res
     end;
 check_call(Source, FunName, Args, Options) ->
-    PatchFun = fun(T) -> T end,
-    check_call(Source, FunName, Args, Options, PatchFun).
+    check_call1(Source, FunName, Args, Options).
 
-check_call(ContractString0, FunName, Args, Options, PatchFun) ->
+check_call1(ContractString0, FunName, Args, Options) ->
     try
+        case proplists:get_value(backend, Options, aevm) of
+            aevm ->
         %% First check the contract without the __call function
         #{} = string_to_icode(ContractString0, Options),
         ContractString = insert_call_function(ContractString0, FunName, Args, Options),
@@ -185,7 +201,25 @@ check_call(ContractString0, FunName, Args, Options, PatchFun) ->
         ArgIcode = get_arg_icode(Funs),
         ArgTerms = [ icode_to_term(T, Arg) ||
                        {T, Arg} <- lists:zip(ArgVMTypes, ArgIcode) ],
-        {ok, FunName, {ArgVMTypes, PatchFun(RetVMType)}, ArgTerms}
+                RetVMType1 =
+                    case FunName of
+                        "init" -> {tuple, [typerep, RetVMType]};
+                        _ -> RetVMType
+                    end,
+                {ok, FunName, {ArgVMTypes, RetVMType1}, ArgTerms};
+            fate ->
+                %% First check the contract without the __call function
+                #{fcode := OrgFcode} = string_to_fcode(ContractString0, Options),
+                FateCode = aeso_fcode_to_fate:compile(OrgFcode, []),
+                _SymbolHashes = maps:keys(aeb_fate_code:symbols(FateCode)),
+                %% TODO collect all hashes and compute the first name without hash collision to
+                %% be used as __callX
+                %% case aeb_fate_code:symbol_identifier(<<"__call">>) of
+                ContractString = insert_call_function(ContractString0, FunName, Args, Options),
+                #{fcode := Fcode} = string_to_fcode(ContractString, Options),
+                #{args := CallArgs} = maps:get({entrypoint, <<"__call">>}, maps:get(functions, Fcode)),
+                {ok, FunName, CallArgs}
+        end
     catch
         error:{parse_errors, Errors} ->
             {error, join_errors("Parse errors", Errors, fun (E) -> E end)};
@@ -198,6 +232,7 @@ check_call(ContractString0, FunName, Args, Options, PatchFun) ->
             {error, join_errors("Code errors", [Error],
                                 fun (E) -> io_lib:format("~p", [E]) end)}
     end.
+
 
 %% Add the __call function to a contract.
 -spec insert_call_function(string(), string(), [string()], options()) -> string().
@@ -337,10 +372,26 @@ translate_vm_value(_VmType, _Type, _Data) ->
                              {ok, binary(), aeb_aevm_data:type(), aeb_aevm_data:type()}
                              | {error, term()}.
 create_calldata(Code, Fun, Args) ->
-    case check_call(Code, Fun, Args, []) of
+    create_calldata(Code, Fun, Args, [{backend, aevm}]).
+
+-spec create_calldata(string(), string(), [string()], [{atom(), any()}]) ->
+                             {ok, binary(), aeb_aevm_data:type(), aeb_aevm_data:type()}
+                             | {ok, binary()}
+                             | {error, term()}.
+create_calldata(Code, Fun, Args, Options) ->
+    case proplists:get_value(backend, Options, aevm) of
+        aevm ->
+            case check_call(Code, Fun, Args, Options) of
         {ok, FunName, {ArgTypes, RetType}, VMArgs} ->
-            aeb_abi:create_calldata(FunName, VMArgs, ArgTypes, RetType);
+                    aeb_aevm_abi:create_calldata(FunName, VMArgs, ArgTypes, RetType);
         {error, _} = Err -> Err
+            end;
+        fate ->
+            case check_call(Code, Fun, Args, Options) of
+                {ok, FunName, FateArgs} ->
+                    aeb_fate_abi:create_calldata(FunName, FateArgs);
+                {error, _} = Err -> Err
+            end
     end.
 
 -spec decode_calldata(string(), string(), binary()) ->
@@ -467,7 +518,7 @@ to_bytecode([], _) -> [].
 
 extract_type_info(#{functions := Functions} =_Icode) ->
     ArgTypesOnly = fun(As) -> [ T || {_, T} <- As ] end,
-    TypeInfo = [aeb_abi:function_type_info(list_to_binary(lists:last(Name)),
+    TypeInfo = [aeb_aevm_abi:function_type_info(list_to_binary(lists:last(Name)),
                                             ArgTypesOnly(Args), TypeRep)
                 || {Name, Attrs, Args,_Body, TypeRep} <- Functions,
                    not is_tuple(Name),
@@ -537,4 +588,3 @@ pos_error({no_file, Line, Pos}) ->
     pos_error({Line, Pos});
 pos_error({File, Line, Pos}) ->
     io_lib:format("file ~s, line ~p, column ~p", [File, Line, Pos]).
-
