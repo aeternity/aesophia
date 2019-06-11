@@ -105,7 +105,7 @@ make_args(Args) ->
 
 fun_hash({FName, _, Args, _, TypeRep}) ->
     ArgType = {tuple, [T || {_, T} <- Args]},
-    <<Hash:256>> = aeb_abi:function_type_hash(list_to_binary(lists:last(FName)), ArgType, TypeRep),
+    <<Hash:256>> = aeb_aevm_abi:function_type_hash(list_to_binary(lists:last(FName)), ArgType, TypeRep),
     {integer, Hash}.
 
 %% Expects two return addresses below N elements on the stack. Picks the top
