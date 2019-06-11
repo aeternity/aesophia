@@ -23,7 +23,7 @@ simple_compile_test_() ->
                   contract_source := _,
                   type_info := _} when Backend == aevm ->
                     ?assertMatch(Code when is_binary(Code), ByteCode);
-                Code when Backend == fate, is_tuple(Code) ->
+                #{fate_code := Code} when Backend == fate ->
                     Code1 = aeb_fate_code:deserialize(aeb_fate_code:serialize(Code)),
                     ?assertMatch({X, X}, {Code1, Code});
                 ErrBin ->

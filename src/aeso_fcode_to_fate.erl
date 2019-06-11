@@ -95,6 +95,12 @@
      Op =:= 'BITS_OR'         orelse
      Op =:= 'BITS_AND'        orelse
      Op =:= 'BITS_DIFF'       orelse
+     Op =:= 'SHA3'            orelse
+     Op =:= 'SHA256'          orelse
+     Op =:= 'BLAKE2B'         orelse
+     Op =:= 'ECVERIFY'        orelse
+     Op =:= 'ECVERIFY_SECP256K1' orelse
+     Op =:= 'CONTRACT_TO_ADDRESS' orelse
      false)).
 
 -record(env, { contract, vars = [], locals = [], tailpos = true }).
@@ -491,16 +497,6 @@ builtin_to_scode(_Env, aens_transfer, [_, _, _, _] = _Args) ->
     ?TODO(fate_aens_transfer_instruction);
 builtin_to_scode(_Env, aens_revoke, [_, _, _] = _Args) ->
     ?TODO(fate_aens_revoke_instruction);
-builtin_to_scode(_Env, crypto_ecverify, [_, _, _] = _Args) ->
-    ?TODO(fate_crypto_ecverify_instruction);
-builtin_to_scode(_Env, crypto_ecverify_secp256k1, [_, _, _] = _Args) ->
-    ?TODO(fate_crypto_ecverify_secp256k1_instruction);
-builtin_to_scode(_Env, crypto_sha3, [_] = _Args) ->
-    ?TODO(fate_crypto_sha3_instruction);
-builtin_to_scode(_Env, crypto_sha256, [_] = _Args) ->
-    ?TODO(fate_crypto_sha256_instruction);
-builtin_to_scode(_Env, crypto_blake2b, [_] = _Args) ->
-    ?TODO(fate_crypto_blake2b_instruction);
 builtin_to_scode(_Env, auth_tx_hash, []) ->
     ?TODO(fate_auth_tx_hash_instruction).
 
@@ -540,7 +536,15 @@ op_to_scode(bits_union)        -> aeb_fate_ops:bits_or(?a, ?a, ?a);
 op_to_scode(bits_difference)   -> aeb_fate_ops:bits_diff(?a, ?a, ?a);
 op_to_scode(address_to_str)    -> aeb_fate_ops:addr_to_str(?a, ?a);
 op_to_scode(int_to_str)        -> aeb_fate_ops:int_to_str(?a, ?a);
-op_to_scode(contract_address)  -> ?TODO(fate_contract_to_address_conversion).
+op_to_scode(contract_to_address)       -> aeb_fate_ops:contract_to_address(?a, ?a);
+op_to_scode(crypto_ecverify)           -> aeb_fate_ops:ecverify(?a, ?a, ?a, ?a);
+op_to_scode(crypto_ecverify_secp256k1) -> aeb_fate_ops:ecverify_secp256k1(?a, ?a, ?a, ?a);
+op_to_scode(crypto_sha3)               -> aeb_fate_ops:sha3(?a, ?a);
+op_to_scode(crypto_sha256)             -> aeb_fate_ops:sha256(?a, ?a);
+op_to_scode(crypto_blake2b)            -> aeb_fate_ops:blake2b(?a, ?a);
+op_to_scode(string_sha3)               -> aeb_fate_ops:sha3(?a, ?a);
+op_to_scode(string_sha256)             -> aeb_fate_ops:sha256(?a, ?a);
+op_to_scode(string_blake2b)            -> aeb_fate_ops:blake2b(?a, ?a).
 
 %% PUSH and STORE ?a are the same, so we use STORE to make optimizations
 %% easier, and specialize to PUSH (which is cheaper) at the end.
@@ -759,6 +763,12 @@ attributes(I) ->
         {'BITS_OR', A, B, C}                  -> Pure(A, [B, C]);
         {'BITS_AND', A, B, C}                 -> Pure(A, [B, C]);
         {'BITS_DIFF', A, B, C}                -> Pure(A, [B, C]);
+        {'SHA3', A, B}                        -> Pure(A, [B]);
+        {'SHA256', A, B}                      -> Pure(A, [B]);
+        {'BLAKE2B', A, B}                     -> Pure(A, [B]);
+        {'ECVERIFY', A, B, C, D}              -> Pure(A, [B, C, D]);
+        {'ECVERIFY_SECP256K1', A, B, C, D}    -> Pure(A, [B, C, D]);
+        {'CONTRACT_TO_ADDRESS', A, B}         -> Pure(A, [B]);
         {'ADDRESS', A}                        -> Pure(A, []);
         {'BALANCE', A}                        -> Impure(A, []);
         {'BALANCE_OTHER', A, B}               -> Impure(A, [B]);

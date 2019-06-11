@@ -31,7 +31,9 @@
               map_get | map_get_d | map_set | map_from_list | map_to_list |
               map_delete | map_member | map_size | string_length |
               string_concat | bits_set | bits_clear | bits_test | bits_sum |
-              bits_intersection | bits_union | bits_difference | contract_address.
+              bits_intersection | bits_union | bits_difference |
+              contract_to_address | crypto_ecverify | crypto_ecverify_secp256k1 |
+              crypto_sha3 | crypto_sha256 | crypto_blake2b.
 
 -type flit() :: {int, integer()}
               | {string, binary()}
@@ -315,8 +317,10 @@ type_to_fcode(Env, Sub, {tuple_t, _, Types}) ->
 type_to_fcode(Env, Sub, {record_t, Fields}) ->
     FieldType = fun({field_t, _, _, Ty}) -> Ty end,
     type_to_fcode(Env, Sub, {tuple_t, [], lists:map(FieldType, Fields)});
+type_to_fcode(_Env, _Sub, {bytes_t, _, 32}) -> hash;
+type_to_fcode(_Env, _Sub, {bytes_t, _, 64}) -> signature;
 type_to_fcode(_Env, _Sub, {bytes_t, _, _N}) ->
-    string; %% TODO: add bytes type to FATE?
+    string; %% TODO: add bytes type to FATE
 type_to_fcode(_Env, Sub, {tvar, _, X}) ->
     maps:get(X, Sub, {tvar, X});
 type_to_fcode(Env, Sub, {fun_t, _, Named, Args, Res}) ->
@@ -386,7 +390,7 @@ expr_to_fcode(Env, _Type, {tuple, _, Es}) ->
 expr_to_fcode(Env, Type, {proj, _Ann, Rec = {typed, _, _, RecType}, {id, _, X}}) ->
     case RecType of
         {con, _, _} when X == "address" ->
-            {op, contract_address, [expr_to_fcode(Env, Rec)]};
+            {op, contract_to_address, [expr_to_fcode(Env, Rec)]};
         {con, _, _} ->
             {fun_t, _, Named, Args, _} = Type,
             Arity = length(Named) + length(Args),
@@ -758,7 +762,8 @@ op_builtins() ->
     [map_from_list, map_to_list, map_delete, map_member, map_size,
      string_length, string_concat, string_sha3, string_sha256, string_blake2b,
      bits_set, bits_clear, bits_test, bits_sum, bits_intersection, bits_union,
-     bits_difference, int_to_str, address_to_str].
+     bits_difference, int_to_str, address_to_str, crypto_ecverify,
+     crypto_ecverify_secp256k1, crypto_sha3, crypto_sha256, crypto_blake2b].
 
 builtin_to_fcode(map_delete, [Key, Map]) ->
     {op, map_delete, [Map, Key]};
