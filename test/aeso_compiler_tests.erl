@@ -120,8 +120,6 @@ compilable_contracts() ->
 not_yet_compilable(fate) ->
     ["oracles",             %% Oracle.register
      "events",              %% events
-     "basic_auth",          %% auth_tx_hash instruction
-     "bitcoin_auth",        %% auth_tx_hash instruction
      "address_literals",    %% oracle_query_id literals
      "address_chain"        %% Oracle.check_query
     ];

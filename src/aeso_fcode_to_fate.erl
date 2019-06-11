@@ -101,6 +101,7 @@
      Op =:= 'ECVERIFY'        orelse
      Op =:= 'ECVERIFY_SECP256K1' orelse
      Op =:= 'CONTRACT_TO_ADDRESS' orelse
+     Op =:= 'AUTH_TX_HASH'    orelse
      false)).
 
 -record(env, { contract, vars = [], locals = [], tailpos = true }).
@@ -518,7 +519,7 @@ builtin_to_scode(_Env, aens_transfer, [_, _, _, _] = _Args) ->
 builtin_to_scode(_Env, aens_revoke, [_, _, _] = _Args) ->
     ?TODO(fate_aens_revoke_instruction);
 builtin_to_scode(_Env, auth_tx_hash, []) ->
-    ?TODO(fate_auth_tx_hash_instruction).
+    [aeb_fate_ops:auth_tx_hash(?a)].
 
 %% -- Operators --
 
@@ -789,6 +790,7 @@ attributes(I) ->
         {'ECVERIFY', A, B, C, D}              -> Pure(A, [B, C, D]);
         {'ECVERIFY_SECP256K1', A, B, C, D}    -> Pure(A, [B, C, D]);
         {'CONTRACT_TO_ADDRESS', A, B}         -> Pure(A, [B]);
+        {'AUTH_TX_HASH', A}                   -> Pure(A, []);
         {'ADDRESS', A}                        -> Pure(A, []);
         {'BALANCE', A}                        -> Impure(A, []);
         {'BALANCE_OTHER', A, B}               -> Impure(A, [B]);
@@ -824,10 +826,6 @@ attributes(I) ->
         'AENS_UPDATE'                         -> Impure(?a, []);  %% TODO
         'AENS_TRANSFER'                       -> Impure(?a, []);  %% TODO
         'AENS_REVOKE'                         -> Impure(?a, []);  %% TODO
-        'ECVERIFY'                            -> Pure(?a, []);  %% TODO
-        'SHA3'                                -> Pure(?a, []);  %% TODO
-        'SHA256'                              -> Pure(?a, []);  %% TODO
-        'BLAKE2B'                             -> Pure(?a, []);  %% TODO
         {'ABORT', A}                          -> Impure(pc, A);
         {'EXIT', A}                           -> Impure(pc, A);
         'NOP'                                 -> Pure(none, [])
