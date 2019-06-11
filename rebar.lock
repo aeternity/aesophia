@@ -1,7 +1,7 @@
 {"1.1.0",
 [{<<"aebytecode">>,
   {git,"https://github.com/aeternity/aebytecode.git",
-       {ref,"876e8504c84ca8c2be787f203db1c742ebd746a0"}},
+       {ref,"29b5ee3e68086e0f0170d3c70e92bbfa210cbae6"}},
   0},
  {<<"aeserialization">>,
   {git,"https://github.com/aeternity/aeserialization.git",

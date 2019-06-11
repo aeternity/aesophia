@@ -100,6 +100,7 @@
      Op =:= 'BLAKE2B'         orelse
      Op =:= 'ECVERIFY'        orelse
      Op =:= 'ECVERIFY_SECP256K1' orelse
+     Op =:= 'CONTRACT_TO_ADDRESS' orelse
      false)).
 
 -record(env, { contract, vars = [], locals = [], tailpos = true }).
@@ -535,7 +536,7 @@ op_to_scode(bits_union)        -> aeb_fate_ops:bits_or(?a, ?a, ?a);
 op_to_scode(bits_difference)   -> aeb_fate_ops:bits_diff(?a, ?a, ?a);
 op_to_scode(address_to_str)    -> aeb_fate_ops:addr_to_str(?a, ?a);
 op_to_scode(int_to_str)        -> aeb_fate_ops:int_to_str(?a, ?a);
-op_to_scode(contract_address)          -> ?TODO(fate_contract_to_address_conversion);
+op_to_scode(contract_to_address)       -> aeb_fate_ops:contract_to_address(?a, ?a);
 op_to_scode(crypto_ecverify)           -> aeb_fate_ops:ecverify(?a, ?a, ?a, ?a);
 op_to_scode(crypto_ecverify_secp256k1) -> aeb_fate_ops:ecverify_secp256k1(?a, ?a, ?a, ?a);
 op_to_scode(crypto_sha3)               -> aeb_fate_ops:sha3(?a, ?a);
@@ -767,6 +768,7 @@ attributes(I) ->
         {'BLAKE2B', A, B}                     -> Pure(A, [B]);
         {'ECVERIFY', A, B, C, D}              -> Pure(A, [B, C, D]);
         {'ECVERIFY_SECP256K1', A, B, C, D}    -> Pure(A, [B, C, D]);
+        {'CONTRACT_TO_ADDRESS', A, B}         -> Pure(A, [B]);
         {'ADDRESS', A}                        -> Pure(A, []);
         {'BALANCE', A}                        -> Impure(A, []);
         {'BALANCE_OTHER', A, B}               -> Impure(A, [B]);

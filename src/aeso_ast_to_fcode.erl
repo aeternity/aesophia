@@ -32,7 +32,7 @@
               map_delete | map_member | map_size | string_length |
               string_concat | bits_set | bits_clear | bits_test | bits_sum |
               bits_intersection | bits_union | bits_difference |
-              contract_address | crypto_ecverify | crypto_ecverify_secp256k1 |
+              contract_to_address | crypto_ecverify | crypto_ecverify_secp256k1 |
               crypto_sha3 | crypto_sha256 | crypto_blake2b.
 
 -type flit() :: {int, integer()}
@@ -390,7 +390,7 @@ expr_to_fcode(Env, _Type, {tuple, _, Es}) ->
 expr_to_fcode(Env, Type, {proj, _Ann, Rec = {typed, _, _, RecType}, {id, _, X}}) ->
     case RecType of
         {con, _, _} when X == "address" ->
-            {op, contract_address, [expr_to_fcode(Env, Rec)]};
+            {op, contract_to_address, [expr_to_fcode(Env, Rec)]};
         {con, _, _} ->
             {fun_t, _, Named, Args, _} = Type,
             Arity = length(Named) + length(Args),
