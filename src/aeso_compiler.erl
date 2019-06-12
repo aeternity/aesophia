@@ -186,21 +186,21 @@ check_call1(ContractString0, FunName, Args, Options) ->
     try
         case proplists:get_value(backend, Options, aevm) of
             aevm ->
-        %% First check the contract without the __call function
-        #{} = string_to_icode(ContractString0, Options),
-        ContractString = insert_call_function(ContractString0, FunName, Args, Options),
-        #{typed_ast := TypedAst,
-          icode     := Icode} = string_to_icode(ContractString, Options),
-        {ok, {FunName, {fun_t, _, _, ArgTypes, RetType}}} = get_call_type(TypedAst),
-        ArgVMTypes = [ aeso_ast_to_icode:ast_typerep(T, Icode) || T <- ArgTypes ],
-        RetVMType  = case RetType of
-                         {id, _, "_"} -> any;
-                         _            -> aeso_ast_to_icode:ast_typerep(RetType, Icode)
-                     end,
-        #{ functions := Funs } = Icode,
-        ArgIcode = get_arg_icode(Funs),
-        ArgTerms = [ icode_to_term(T, Arg) ||
-                       {T, Arg} <- lists:zip(ArgVMTypes, ArgIcode) ],
+                %% First check the contract without the __call function
+                #{} = string_to_icode(ContractString0, Options),
+                ContractString = insert_call_function(ContractString0, ?CALL_NAME, FunName, Args, Options),
+                #{typed_ast := TypedAst,
+                  icode     := Icode} = string_to_icode(ContractString, Options),
+                {ok, {FunName, {fun_t, _, _, ArgTypes, RetType}}} = get_call_type(TypedAst),
+                ArgVMTypes = [ aeso_ast_to_icode:ast_typerep(T, Icode) || T <- ArgTypes ],
+                RetVMType  = case RetType of
+                                 {id, _, "_"} -> any;
+                                 _            -> aeso_ast_to_icode:ast_typerep(RetType, Icode)
+                             end,
+                #{ functions := Funs } = Icode,
+                ArgIcode = get_arg_icode(Funs),
+                ArgTerms = [ icode_to_term(T, Arg) ||
+                               {T, Arg} <- lists:zip(ArgVMTypes, ArgIcode) ],
                 RetVMType1 =
                     case FunName of
                         "init" -> {tuple, [typerep, RetVMType]};
@@ -211,13 +211,13 @@ check_call1(ContractString0, FunName, Args, Options) ->
                 %% First check the contract without the __call function
                 #{fcode := OrgFcode} = string_to_fcode(ContractString0, Options),
                 FateCode = aeso_fcode_to_fate:compile(OrgFcode, []),
-                _SymbolHashes = maps:keys(aeb_fate_code:symbols(FateCode)),
-                %% TODO collect all hashes and compute the first name without hash collision to
-                %% be used as __callX
-                %% case aeb_fate_code:symbol_identifier(<<"__call">>) of
-                ContractString = insert_call_function(ContractString0, FunName, Args, Options),
+                %% collect all hashes and compute the first name without hash collision to
+                SymbolHashes = maps:keys(aeb_fate_code:symbols(FateCode)),
+                CallName = first_none_match(?CALL_NAME, SymbolHashes,
+                                            lists:seq($1, $9) ++ lists:seq($A, $Z) ++ lists:seq($a, $z)),
+                ContractString = insert_call_function(ContractString0, CallName, FunName, Args, Options),
                 #{fcode := Fcode} = string_to_fcode(ContractString, Options),
-                #{args := CallArgs} = maps:get({entrypoint, <<"__call">>}, maps:get(functions, Fcode)),
+                #{args := CallArgs} = maps:get({entrypoint, list_to_binary(CallName)}, maps:get(functions, Fcode)),
                 {ok, FunName, CallArgs}
         end
     catch
@@ -233,17 +233,26 @@ check_call1(ContractString0, FunName, Args, Options) ->
                                 fun (E) -> io_lib:format("~p", [E]) end)}
     end.
 
+first_none_match(CallName, Hashes, []) ->
+    error(unable_to_find_unique_call_name);
+first_none_match(CallName, Hashes, [Char|Chars]) ->
+    case not lists:member(aeb_fate_code:symbol_identifier(list_to_binary(CallName)), Hashes) of
+        true ->
+            CallName;
+        false ->
+            first_none_match(?CALL_NAME++[Char], Hashes, Chars)
+    end.
 
 %% Add the __call function to a contract.
--spec insert_call_function(string(), string(), [string()], options()) -> string().
-insert_call_function(Code, FunName, Args, Options) ->
+-spec insert_call_function(string(), string(), string(), [string()], options()) -> string().
+insert_call_function(Code, Call, FunName, Args, Options) ->
     Ast = parse(Code, Options),
     Ind = last_contract_indent(Ast),
     lists:flatten(
         [ Code,
           "\n\n",
           lists:duplicate(Ind, " "),
-          "stateful function __call() = ", FunName, "(", string:join(Args, ","), ")\n"
+          "stateful function ", Call,"() = ", FunName, "(", string:join(Args, ","), ")\n"
         ]).
 
 -spec insert_init_function(string(), options()) -> string().
