@@ -217,7 +217,7 @@ check_call1(ContractString0, FunName, Args, Options) ->
                                             lists:seq($1, $9) ++ lists:seq($A, $Z) ++ lists:seq($a, $z)),
                 ContractString = insert_call_function(ContractString0, CallName, FunName, Args, Options),
                 #{fcode := Fcode} = string_to_fcode(ContractString, Options),
-                #{args := CallArgs} = maps:get({entrypoint, list_to_binary(CallName)}, maps:get(functions, Fcode)),
+                CallArgs = arguments_of_body(CallName, FunName, Fcode),
                 {ok, FunName, CallArgs}
         end
     catch
@@ -233,7 +233,13 @@ check_call1(ContractString0, FunName, Args, Options) ->
                                 fun (E) -> io_lib:format("~p", [E]) end)}
     end.
 
-first_none_match(CallName, Hashes, []) ->
+arguments_of_body(CallName, _FunName, Fcode) ->
+    #{body := Body} = maps:get({entrypoint, list_to_binary(CallName)}, maps:get(functions, Fcode)),
+    {def, _FName, Args} = Body,
+    %% FName is either {entrypoint, list_to_binary(FunName)} or 'init'
+    [ aeso_fcode_to_fate:term_to_fate(A) || A <- Args ].
+
+first_none_match(_CallName, _Hashes, []) ->
     error(unable_to_find_unique_call_name);
 first_none_match(CallName, Hashes, [Char|Chars]) ->
     case not lists:member(aeb_fate_code:symbol_identifier(list_to_binary(CallName)), Hashes) of

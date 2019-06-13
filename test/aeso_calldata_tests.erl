@@ -19,14 +19,14 @@ calldata_test_() ->
      [ {"Testing the " ++ ContractName ++ " contract with the " ++ atom_to_list(Backend) ++ " backend",
         fun() ->
             ContractString = aeso_test_utils:read_contract(ContractName),
-            Res = aeso_compiler:create_calldata(ContractString, "init", [], [{backend, Backend}]),
+            Res = aeso_compiler:create_calldata(ContractString, Fun, Args, [{backend, Backend}]),
             case Backend of
                 aevm ->
                     ?assertMatch({ok, _, _, _}, Res);
                 fate ->
                     ?assertMatch({ok, _}, Res)
             end
-        end} || ContractName <- compilable_contracts(), Backend <- [aevm, fate],
+        end} || {ContractName, Fun, Args} <- compilable_contracts(), Backend <- [aevm, fate],
                 not lists:member(ContractName, not_yet_compilable(Backend))].
 
 check_errors(Expect, ErrorString) ->
@@ -43,31 +43,34 @@ check_errors(Expect, ErrorString) ->
 
 compilable_contracts() ->
     [
-     "functions",
-     "identity",
-     "maps",
-     "oracles",
-     "remote_call",
-     "simple",
-     "spend_test",
-     "test",
-     "builtin_bug",
-     "builtin_map_get_bug",
-     "nodeadcode",
-     "deadcode",
-     "variant_types",
-     "events",
-     "basic_auth",
-     "address_literals",
-     "bytes_equality",
-     "address_chain",
-     "__call"
+     {"identity", "init", []},
+     {"maps", "init", []},
+     {"oracles", "init", []},
+     {"variant_types", "init", []},
+     {"basic_auth", "init", []},
+     {"address_literals", "init", []},
+     {"bytes_equality", "init", []},
+     {"address_chain", "init", []},
+     {"counter", "init",
+      ["-3334353637383940202122232425262728293031323334353637"]},
+     {"dutch_auction", "init",
+      ["ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt", "200000", "1000"]},
+     {"maps", "fromlist_i",
+      ["[(1, {x = 1, y = 2}), (2, {x = 3, y = 4}), (3, {x = 4, y = 4})]"]},
+     {"strings", "str_concat", ["\"test\"","\"me\""]},
+     {"complex_types", "filter_some", ["[Some(1), Some(2), None]"]},
+     {"complex_types", "init", ["ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ"]},
+     {"__call" "init", []},
+     {"bitcoin_auth", "init",
+      ["#0102030405060708090a0b0c0d0e0f1017181920212223242526272829303132"
+       "33343536373839401a1b1c1d1e1f202122232425262728293031323334353637"]}
     ].
 
 not_yet_compilable(fate) ->
     ["oracles",             %% Oracle.register
      "events",
      "basic_auth",          %% auth_tx_hash instruction
+     "bitcoin_auth",        %% fate_auth_tx_hash_instruction
      "address_literals",    %% oracle_query_id literals
      "address_chain"        %% Oracle.check_query
     ];

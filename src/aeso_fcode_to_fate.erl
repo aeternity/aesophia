@@ -9,7 +9,7 @@
 %%%-------------------------------------------------------------------
 -module(aeso_fcode_to_fate).
 
--export([compile/2]).
+-export([compile/2, term_to_fate/1]).
 
 %% -- Preamble ---------------------------------------------------------------
 
@@ -231,7 +231,32 @@ lookup_var(#env{vars = Vars}, X) ->
 
 %% -- The compiler --
 
+term_to_fate({lit, L}) ->
+     case L of
+        {int, N}             -> aeb_fate_data:make_integer(N);
+        {string, S}          -> aeb_fate_data:make_string(S);
+        {bool, B}            -> aeb_fate_data:make_boolean(B);
+        {account_pubkey, K}  -> aeb_fate_data:make_address(K);
+        {contract_pubkey, K} -> aeb_fate_data:make_contract(K);
+        {oracle_pubkey, K}   -> aeb_fate_data:make_oracle(K);
+        {oracle_query_id, _} -> ?TODO(fate_oracle_query_id_value)
+     end;
+%% negative literals are parsed as 0 - N
+term_to_fate({op, '-', [{lit, {int, 0}}, {lit, {int, N}}]}) ->
+    aeb_fate_data:make_integer(-N);
+term_to_fate(nil) ->
+    aeb_fate_data:make_list([]);
+term_to_fate({op, '::', [Hd | Tl]}) ->
+    aeb_fate_data:make_list([term_to_fate(Hd) | [ term_to_fate(E) || E<-Tl]]);
+term_to_fate({tuple, As}) ->
+    aeb_fate_data:make_tuple(list_to_tuple([ term_to_fate(A) || A<-As]));
+term_to_fate({con, Ar, I, As}) ->
+    FateAs = [ term_to_fate(A) || A <- As ],
+    aeb_fate_data:make_variant(Ar, I, list_to_tuple(FateAs)).
+
+
 to_scode(_Env, {lit, L}) ->
+    %% use term_to_fate here
     case L of
         {int, N}             -> [push(?i(N))];
         {string, S}          -> [push(?i(aeb_fate_data:make_string(S)))];
