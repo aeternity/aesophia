@@ -170,7 +170,7 @@ builtins() ->
     MkName = fun(NS, Fun) ->
                 list_to_atom(string:to_lower(string:join(NS ++ [Fun], "_")))
              end,
-    Scopes = [{[],           [{"abort", 1}]},
+    Scopes = [{[],           [{"abort", 1}, {"require", 2}]},
               {["Chain"],    [{"spend", 2}, {"balance", 1}, {"block_hash", 1}, {"coinbase", none},
                               {"timestamp", none}, {"block_height", none}, {"difficulty", none},
                               {"gas_limit", none}]},
@@ -765,6 +765,8 @@ op_builtins() ->
      bits_difference, int_to_str, address_to_str, crypto_ecverify,
      crypto_ecverify_secp256k1, crypto_sha3, crypto_sha256, crypto_blake2b].
 
+builtin_to_fcode(require, [Cond, Msg]) ->
+    make_if(Cond, {tuple, []}, {builtin, abort, [Msg]});
 builtin_to_fcode(map_delete, [Key, Map]) ->
     {op, map_delete, [Map, Key]};
 builtin_to_fcode(map_member, [Key, Map]) ->

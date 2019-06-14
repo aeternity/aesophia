@@ -45,6 +45,7 @@ builtin_deps1({baseX_int, X})             -> [{baseX_int_pad, X}];
 builtin_deps1({baseX_int_pad, X})         -> [{baseX_int_encode, X}];
 builtin_deps1({baseX_int_encode, X})      -> [{baseX_int_encode_, X}, {baseX_tab, X}, {baseX_digits, X}];
 builtin_deps1(string_reverse)             -> [string_reverse_];
+builtin_deps1(require)                    -> [abort];
 builtin_deps1(_)                          -> [].
 
 dep_closure(Deps) ->
@@ -131,6 +132,7 @@ builtin_function(BF) ->
     case BF of
         {event, EventT}            -> bfun(BF, builtin_event(EventT));
         abort                      -> bfun(BF, builtin_abort());
+        require                    -> bfun(BF, builtin_require());
         {map_lookup, Type}         -> bfun(BF, builtin_map_lookup(Type));
         map_put                    -> bfun(BF, builtin_map_put());
         map_delete                 -> bfun(BF, builtin_map_delete());
@@ -200,6 +202,11 @@ builtin_abort() ->
      {inline_asm, [A(?PUSH1),0,  %% Push a dummy 0 for the first arg
                    A(?REVERT)]}, %% Stack: 0,Ptr
      {tuple,[]}}.
+
+builtin_require() ->
+    {[{"c", word}, {"msg", string}],
+     {ifte, ?V(c), {tuple, []}, ?call(abort, [?V(msg)])},
+     {tuple, []}}.
 
 %% Map primitives
 builtin_map_lookup(Type) ->

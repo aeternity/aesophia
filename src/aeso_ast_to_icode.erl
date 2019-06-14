@@ -174,6 +174,8 @@ ast_body({qid, _, [Con, "put"]}, #{ contract_name := Con }) ->
 %% Abort
 ast_body(?id_app("abort", [String], _, _), Icode) ->
     builtin_call(abort, [ast_body(String, Icode)]);
+ast_body(?id_app("require", [Bool, String], _, _), Icode) ->
+    builtin_call(require, [ast_body(Bool, Icode), ast_body(String, Icode)]);
 
 %% Authentication
 ast_body({qid, _, ["Auth", "tx_hash"]}, _Icode) ->
