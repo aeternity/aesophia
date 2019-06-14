@@ -57,20 +57,22 @@ compilable_contracts() ->
       ["ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt", "200000", "1000"]},
      {"maps", "fromlist_i",
       ["[(1, {x = 1, y = 2}), (2, {x = 3, y = 4}), (3, {x = 4, y = 4})]"]},
+     {"maps", "get_i", ["1", "{}"]},
+     {"maps", "get_i", ["1", "{[1] = {x = 3, y = 4}}"]},
+     {"maps", "get_i", ["1", "{[1] = {x = 3, y = 4}, [2] = {x = 4, y = 5}}"]},
+     {"maps", "get_i", ["1", "{[1] = {x = 3, y = 4}, [2] = {x = 4, y = 5}, [3] = {x = 5, y = 6}}"]},
      {"strings", "str_concat", ["\"test\"","\"me\""]},
      {"complex_types", "filter_some", ["[Some(1), Some(2), None]"]},
      {"complex_types", "init", ["ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ"]},
      {"__call" "init", []},
-     {"bitcoin_auth", "init",
-      ["#0102030405060708090a0b0c0d0e0f1017181920212223242526272829303132"
-       "33343536373839401a1b1c1d1e1f202122232425262728293031323334353637"]}
+     {"bitcoin_auth", "authorize", ["1", "#0102030405060708090a0b0c0d0e0f101718192021222324252627282930313233343536373839401a1b1c1d1e1f202122232425262728293031323334353637"]},
+     {"bitcoin_auth", "to_sign", ["#0102030405060708090a0b0c0d0e0f1017181920212223242526272829303132", "2"]}
+
     ].
 
 not_yet_compilable(fate) ->
     ["oracles",             %% Oracle.register
      "events",
-     "basic_auth",          %% auth_tx_hash instruction
-     "bitcoin_auth",        %% fate_auth_tx_hash_instruction
      "address_literals",    %% oracle_query_id literals
      "address_chain"        %% Oracle.check_query
     ];

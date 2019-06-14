@@ -233,9 +233,11 @@ lookup_var(#env{vars = Vars}, X) ->
 %% -- The compiler --
 
 lit_to_fate(L) ->
-     case L of
+    case L of
         {int, N}             -> aeb_fate_data:make_integer(N);
         {string, S}          -> aeb_fate_data:make_string(S);
+        {hash, H}            -> aeb_fate_data:make_hash(H);
+        {signature, S}       -> aeb_fate_data:make_signature(S);
         {bool, B}            -> aeb_fate_data:make_boolean(B);
         {account_pubkey, K}  -> aeb_fate_data:make_address(K);
         {contract_pubkey, K} -> aeb_fate_data:make_contract(K);
@@ -257,8 +259,16 @@ term_to_fate({tuple, As}) ->
     aeb_fate_data:make_tuple(list_to_tuple([ term_to_fate(A) || A<-As]));
 term_to_fate({con, Ar, I, As}) ->
     FateAs = [ term_to_fate(A) || A <- As ],
-    aeb_fate_data:make_variant(Ar, I, list_to_tuple(FateAs)).
+    aeb_fate_data:make_variant(Ar, I, list_to_tuple(FateAs));
+term_to_fate({builtin, map_empty, []}) ->
+    aeb_fate_data:make_map(#{});
+term_to_fate({'let', _, {builtin, map_empty, []}, Set}) ->
+    aeb_fate_data:make_map(map_to_fate(Set)).
 
+map_to_fate({op, map_set, [{var, _}, K, V]}) ->
+    #{term_to_fate(K) => term_to_fate(V)};
+map_to_fate({op, map_set, [Set, K, V]}) ->
+    Map = map_to_fate(Set), Map#{term_to_fate(K) => term_to_fate(V)}.
 
 to_scode(_Env, {lit, L}) ->
     [push(?i(lit_to_fate(L)))];
