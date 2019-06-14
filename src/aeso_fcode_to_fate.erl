@@ -231,7 +231,7 @@ lookup_var(#env{vars = Vars}, X) ->
 
 %% -- The compiler --
 
-term_to_fate({lit, L}) ->
+lit_to_fate(L) ->
      case L of
         {int, N}             -> aeb_fate_data:make_integer(N);
         {string, S}          -> aeb_fate_data:make_string(S);
@@ -240,14 +240,18 @@ term_to_fate({lit, L}) ->
         {contract_pubkey, K} -> aeb_fate_data:make_contract(K);
         {oracle_pubkey, K}   -> aeb_fate_data:make_oracle(K);
         {oracle_query_id, _} -> ?TODO(fate_oracle_query_id_value)
-     end;
+     end.
+
+term_to_fate({lit, L}) ->
+    lit_to_fate(L);
 %% negative literals are parsed as 0 - N
 term_to_fate({op, '-', [{lit, {int, 0}}, {lit, {int, N}}]}) ->
     aeb_fate_data:make_integer(-N);
 term_to_fate(nil) ->
     aeb_fate_data:make_list([]);
-term_to_fate({op, '::', [Hd | Tl]}) ->
-    aeb_fate_data:make_list([term_to_fate(Hd) | [ term_to_fate(E) || E<-Tl]]);
+term_to_fate({op, '::', [Hd, Tl]}) ->
+    %% The Tl will translate into a list, because FATE lists are just lists
+    [term_to_fate(Hd) | term_to_fate(Tl)];
 term_to_fate({tuple, As}) ->
     aeb_fate_data:make_tuple(list_to_tuple([ term_to_fate(A) || A<-As]));
 term_to_fate({con, Ar, I, As}) ->
@@ -256,16 +260,7 @@ term_to_fate({con, Ar, I, As}) ->
 
 
 to_scode(_Env, {lit, L}) ->
-    %% use term_to_fate here
-    case L of
-        {int, N}             -> [push(?i(N))];
-        {string, S}          -> [push(?i(aeb_fate_data:make_string(S)))];
-        {bool, B}            -> [push(?i(B))];
-        {account_pubkey, K}  -> [push(?i(aeb_fate_data:make_address(K)))];
-        {contract_pubkey, K} -> [push(?i(aeb_fate_data:make_contract(K)))];
-        {oracle_pubkey, K}   -> [push(?i(aeb_fate_data:make_oracle(K)))];
-        {oracle_query_id, _} -> ?TODO(fate_oracle_query_id_value)
-    end;
+    [push(?i(lit_to_fate(L)))];
 
 to_scode(_Env, nil) ->
     [aeb_fate_ops:nil(?a)];
