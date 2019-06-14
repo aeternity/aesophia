@@ -33,5 +33,3 @@ contract Oracles =
                      q : query_id) : option(answer_t) =
     Oracle.get_answer(o, q)
 
-  private function require(b : bool, err : string) =
-    if(!b) abort(err)

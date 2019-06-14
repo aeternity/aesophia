@@ -15,5 +15,3 @@ contract BasicAuth =
   function to_sign(h : hash, n : int) =
     Crypto.blake2b((h, n))
 
-  private function require(b : bool, err : string) =
-    if(!b) abort(err)

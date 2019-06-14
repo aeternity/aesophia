@@ -108,5 +108,3 @@ contract Oracles =
     Oracle.respond(o, q, Answer(question, "magic", 1337), signature = sig)
     Oracle.get_answer(o, q)
 
-  private function require(b : bool, err : string) =
-    if(!b) abort(err)
