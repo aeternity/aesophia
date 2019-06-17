@@ -397,9 +397,9 @@ create_calldata(Code, Fun, Args, Options) ->
     case proplists:get_value(backend, Options, aevm) of
         aevm ->
             case check_call(Code, Fun, Args, Options) of
-        {ok, FunName, {ArgTypes, RetType}, VMArgs} ->
+                {ok, FunName, {ArgTypes, RetType}, VMArgs} ->
                     aeb_aevm_abi:create_calldata(FunName, VMArgs, ArgTypes, RetType);
-        {error, _} = Err -> Err
+                {error, _} = Err -> Err
             end;
         fate ->
             case check_call(Code, Fun, Args, Options) of
