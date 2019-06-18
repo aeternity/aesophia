@@ -118,8 +118,7 @@ compilable_contracts() ->
     ].
 
 not_yet_compilable(fate) ->
-    ["oracles",             %% Oracle.register
-     "events",              %% events
+    ["events",              %% events
      "address_literals",    %% oracle_query_id literals
      "address_chain"        %% Oracle.check_query
     ];
