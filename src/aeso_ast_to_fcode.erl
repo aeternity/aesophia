@@ -37,6 +37,8 @@
 
 -type flit() :: {int, integer()}
               | {string, binary()}
+              | {hash, binary()}
+              | {signature, binary()}
               | {account_pubkey, binary()}
               | {contract_pubkey, binary()}
               | {oracle_pubkey, binary()}
@@ -365,6 +367,8 @@ expr_to_fcode(_Env, _Type, {contract_pubkey, _, K}) -> {lit, {contract_pubkey, K
 expr_to_fcode(_Env, _Type, {oracle_pubkey,   _, K}) -> {lit, {oracle_pubkey, K}};
 expr_to_fcode(_Env, _Type, {oracle_query_id, _, K}) -> {lit, {oracle_query_id, K}};
 
+expr_to_fcode(_Env, _Type, {bytes, _, Bin = <<_:32/binary>>}) -> {lit, {hash, Bin}};
+expr_to_fcode(_Env, _Type, {bytes, _, Bin = <<_:64/binary>>}) -> {lit, {signature, Bin}};
 expr_to_fcode(_Env, _Type, {bytes, _, Bin}) -> {lit, {string, Bin}};
 
 %% Variables

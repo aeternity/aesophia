@@ -101,6 +101,7 @@
      Op =:= 'ECVERIFY'        orelse
      Op =:= 'ECVERIFY_SECP256K1' orelse
      Op =:= 'CONTRACT_TO_ADDRESS' orelse
+     Op =:= 'AUTH_TX_HASH'    orelse
      false)).
 
 -record(env, { contract, vars = [], locals = [], tailpos = true }).
@@ -232,9 +233,11 @@ lookup_var(#env{vars = Vars}, X) ->
 %% -- The compiler --
 
 lit_to_fate(L) ->
-     case L of
+    case L of
         {int, N}             -> aeb_fate_data:make_integer(N);
         {string, S}          -> aeb_fate_data:make_string(S);
+        {hash, H}            -> aeb_fate_data:make_hash(H);
+        {signature, S}       -> aeb_fate_data:make_signature(S);
         {bool, B}            -> aeb_fate_data:make_boolean(B);
         {account_pubkey, K}  -> aeb_fate_data:make_address(K);
         {contract_pubkey, K} -> aeb_fate_data:make_contract(K);
@@ -256,8 +259,16 @@ term_to_fate({tuple, As}) ->
     aeb_fate_data:make_tuple(list_to_tuple([ term_to_fate(A) || A<-As]));
 term_to_fate({con, Ar, I, As}) ->
     FateAs = [ term_to_fate(A) || A <- As ],
-    aeb_fate_data:make_variant(Ar, I, list_to_tuple(FateAs)).
+    aeb_fate_data:make_variant(Ar, I, list_to_tuple(FateAs));
+term_to_fate({builtin, map_empty, []}) ->
+    aeb_fate_data:make_map(#{});
+term_to_fate({'let', _, {builtin, map_empty, []}, Set}) ->
+    aeb_fate_data:make_map(map_to_fate(Set)).
 
+map_to_fate({op, map_set, [{var, _}, K, V]}) ->
+    #{term_to_fate(K) => term_to_fate(V)};
+map_to_fate({op, map_set, [Set, K, V]}) ->
+    Map = map_to_fate(Set), Map#{term_to_fate(K) => term_to_fate(V)}.
 
 to_scode(_Env, {lit, L}) ->
     [push(?i(lit_to_fate(L)))];
@@ -518,7 +529,7 @@ builtin_to_scode(_Env, aens_transfer, [_, _, _, _] = _Args) ->
 builtin_to_scode(_Env, aens_revoke, [_, _, _] = _Args) ->
     ?TODO(fate_aens_revoke_instruction);
 builtin_to_scode(_Env, auth_tx_hash, []) ->
-    ?TODO(fate_auth_tx_hash_instruction).
+    [aeb_fate_ops:auth_tx_hash(?a)].
 
 %% -- Operators --
 
@@ -789,6 +800,7 @@ attributes(I) ->
         {'ECVERIFY', A, B, C, D}              -> Pure(A, [B, C, D]);
         {'ECVERIFY_SECP256K1', A, B, C, D}    -> Pure(A, [B, C, D]);
         {'CONTRACT_TO_ADDRESS', A, B}         -> Pure(A, [B]);
+        {'AUTH_TX_HASH', A}                   -> Pure(A, []);
         {'ADDRESS', A}                        -> Pure(A, []);
         {'BALANCE', A}                        -> Impure(A, []);
         {'BALANCE_OTHER', A, B}               -> Impure(A, [B]);
@@ -824,10 +836,6 @@ attributes(I) ->
         'AENS_UPDATE'                         -> Impure(?a, []);  %% TODO
         'AENS_TRANSFER'                       -> Impure(?a, []);  %% TODO
         'AENS_REVOKE'                         -> Impure(?a, []);  %% TODO
-        'ECVERIFY'                            -> Pure(?a, []);  %% TODO
-        'SHA3'                                -> Pure(?a, []);  %% TODO
-        'SHA256'                              -> Pure(?a, []);  %% TODO
-        'BLAKE2B'                             -> Pure(?a, []);  %% TODO
         {'ABORT', A}                          -> Impure(pc, A);
         {'EXIT', A}                           -> Impure(pc, A);
         'NOP'                                 -> Pure(none, [])
