@@ -99,7 +99,7 @@ from_string(Backend, ContractString, Options) ->
     end.
 
 from_string1(aevm, ContractString, Options) ->
-    #{icode := Icode} = string_to_icode(ContractString, Options),
+    #{icode := Icode} = string_to_code(ContractString, Options),
     TypeInfo  = extract_type_info(Icode),
     Assembler = assemble(Icode, Options),
     pp_assembler(Assembler, Options),
@@ -113,9 +113,7 @@ from_string1(aevm, ContractString, Options) ->
            type_info => TypeInfo
           }};
 from_string1(fate, ContractString, Options) ->
-    Ast      = parse(ContractString, Options),
-    TypedAst = aeso_ast_infer_types:infer(Ast, Options),
-    FCode    = aeso_ast_to_fcode:ast_to_fcode(TypedAst, Options),
+    #{fcode := FCode} = string_to_code(ContractString, Options),
     FateCode = aeso_fcode_to_fate:compile(FCode, Options),
     ByteCode = aeb_fate_code:serialize(FateCode, []),
     {ok, Version} = version(),
@@ -126,30 +124,26 @@ from_string1(fate, ContractString, Options) ->
            fate_code => FateCode
           }}.
 
--spec string_to_icode(string(), [option()]) -> map().
-string_to_icode(ContractString, Options) ->
+-spec string_to_code(string(), [option()]) -> map().
+string_to_code(ContractString, Options) ->
     Ast = parse(ContractString, Options),
     pp_sophia_code(Ast, Options),
     pp_ast(Ast, Options),
     {TypeEnv, TypedAst} = aeso_ast_infer_types:infer(Ast, [return_env]),
     pp_typed_ast(TypedAst, Options),
-    Icode = ast_to_icode(TypedAst, Options),
-    pp_icode(Icode, Options),
-    #{ typed_ast => TypedAst,
-       type_env  => TypeEnv,
-       icode     => Icode }.
-
--spec string_to_fcode(string(), [option()]) -> map().
-string_to_fcode(ContractString, Options) ->
-    Ast = parse(ContractString, Options),
-    pp_sophia_code(Ast, Options),
-    pp_ast(Ast, Options),
-    {TypeEnv, TypedAst} = aeso_ast_infer_types:infer(Ast, [return_env]),
-    pp_typed_ast(TypedAst, Options),
-    Fcode = aeso_ast_to_fcode:ast_to_fcode(TypedAst, Options),
-    #{ typed_ast => TypedAst,
-       type_env  => TypeEnv,
-       fcode     => Fcode }.
+    case proplists:get_value(backend, Options, aevm) of
+        aevm ->
+            Icode = ast_to_icode(TypedAst, Options),
+            pp_icode(Icode, Options),
+            #{ icode => Icode,
+               typed_ast => TypedAst,
+               type_env  => TypeEnv};
+        fate ->
+            Fcode = aeso_ast_to_fcode:ast_to_fcode(TypedAst, Options),
+            #{ fcode => Fcode,
+               typed_ast => TypedAst,
+               type_env  => TypeEnv}
+    end.
 
 join_errors(Prefix, Errors, Pfun) ->
     Ess = [ Pfun(E) || E <- Errors ],
@@ -187,10 +181,10 @@ check_call1(ContractString0, FunName, Args, Options) ->
         case proplists:get_value(backend, Options, aevm) of
             aevm ->
                 %% First check the contract without the __call function
-                #{} = string_to_icode(ContractString0, Options),
+                #{} = string_to_code(ContractString0, Options),
                 ContractString = insert_call_function(ContractString0, ?CALL_NAME, FunName, Args, Options),
                 #{typed_ast := TypedAst,
-                  icode     := Icode} = string_to_icode(ContractString, Options),
+                  icode     := Icode} = string_to_code(ContractString, Options),
                 {ok, {FunName, {fun_t, _, _, ArgTypes, RetType}}} = get_call_type(TypedAst),
                 ArgVMTypes = [ aeso_ast_to_icode:ast_typerep(T, Icode) || T <- ArgTypes ],
                 RetVMType  = case RetType of
@@ -209,14 +203,14 @@ check_call1(ContractString0, FunName, Args, Options) ->
                 {ok, FunName, {ArgVMTypes, RetVMType1}, ArgTerms};
             fate ->
                 %% First check the contract without the __call function
-                #{fcode := OrgFcode} = string_to_fcode(ContractString0, Options),
+                #{fcode := OrgFcode} = string_to_code(ContractString0, Options),
                 FateCode = aeso_fcode_to_fate:compile(OrgFcode, []),
                 %% collect all hashes and compute the first name without hash collision to
                 SymbolHashes = maps:keys(aeb_fate_code:symbols(FateCode)),
                 CallName = first_none_match(?CALL_NAME, SymbolHashes,
                                             lists:seq($1, $9) ++ lists:seq($A, $Z) ++ lists:seq($a, $z)),
                 ContractString = insert_call_function(ContractString0, CallName, FunName, Args, Options),
-                #{fcode := Fcode} = string_to_fcode(ContractString, Options),
+                #{fcode := Fcode} = string_to_code(ContractString, Options),
                 CallArgs = arguments_of_body(CallName, FunName, Fcode),
                 {ok, FunName, CallArgs}
         end
@@ -295,7 +289,7 @@ to_sophia_value(ContractString, FunName, ok, Data, Options) ->
     try
         #{ typed_ast := TypedAst,
            type_env  := TypeEnv,
-           icode     := Icode } = string_to_icode(ContractString, Options),
+           icode     := Icode } = string_to_code(ContractString, Options),
         {ok, _, Type0} = get_decode_type(FunName, TypedAst),
         Type   = aeso_ast_infer_types:unfold_types_in_type(TypeEnv, Type0, [unfold_record_types, unfold_variant_types]),
         VmType = aeso_ast_to_icode:ast_typerep(Type, Icode),
