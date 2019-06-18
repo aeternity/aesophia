@@ -242,8 +242,8 @@ lit_to_fate(L) ->
         {account_pubkey, K}  -> aeb_fate_data:make_address(K);
         {contract_pubkey, K} -> aeb_fate_data:make_contract(K);
         {oracle_pubkey, K}   -> aeb_fate_data:make_oracle(K);
-        {typerep, T}         -> aeb_fate_data:make_typerep(type_to_scode(T));
-        {oracle_query_id, H} -> aeb_fate_data:make_oracle_query(H)
+        {oracle_query_id, H} -> aeb_fate_data:make_oracle_query(H);
+        {typerep, T}         -> aeb_fate_data:make_typerep(type_to_scode(T))
      end.
 
 term_to_fate({lit, L}) ->
