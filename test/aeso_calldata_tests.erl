@@ -16,18 +16,32 @@
 %%  are made on the output, just that it is a binary which indicates
 %%  that the compilation worked.
 calldata_test_() ->
-     [ {"Testing the " ++ ContractName ++ " contract with the " ++ atom_to_list(Backend) ++ " backend",
+     [ {"Testing " ++ ContractName ++ " contract ",
         fun() ->
-            ContractString = aeso_test_utils:read_contract(ContractName),
-            Res = aeso_compiler:create_calldata(ContractString, Fun, Args, [{backend, Backend}]),
-            case Backend of
-                aevm ->
-                    ?assertMatch({ok, _, _, _}, Res);
-                fate ->
-                    ?assertMatch({ok, _}, Res)
-            end
-        end} || {ContractName, Fun, Args} <- compilable_contracts(), Backend <- [aevm, fate],
-                not lists:member(ContractName, not_yet_compilable(Backend))].
+           ContractString = aeso_test_utils:read_contract(ContractName),
+           AevmExprs =
+              case not lists:member(ContractName, not_yet_compilable(aevm)) of
+                  true -> ast_exprs(ContractString, Fun, Args, [{backend, aevm}]);
+                  false -> undefined
+              end,
+           FateExprs =
+              case not lists:member(ContractName, not_yet_compilable(fate)) of
+                  true -> ast_exprs(ContractString, Fun, Args, [{backend, fate}]);
+                  false -> undefined
+              end,
+           case FateExprs == undefined orelse AevmExprs == undefined of
+               true -> ok;
+               false ->
+                   ?assertEqual(FateExprs, AevmExprs)
+           end
+        end} || {ContractName, Fun, Args} <- compilable_contracts()].
+
+
+ast_exprs(ContractString, Fun, Args, Opts) ->
+    {ok, Data} = aeso_compiler:create_calldata(ContractString, Fun, Args, Opts),
+    {ok, Types, Exprs} = aeso_compiler:decode_calldata(ContractString, Fun, Data, Opts),
+    ?assert(is_list(Exprs)),
+    Exprs.
 
 check_errors(Expect, ErrorString) ->
     %% This removes the final single \n as well.
@@ -62,7 +76,7 @@ compilable_contracts() ->
      {"maps", "get_i", ["1", "{[1] = {x = 3, y = 4}, [2] = {x = 4, y = 5}}"]},
      {"maps", "get_i", ["1", "{[1] = {x = 3, y = 4}, [2] = {x = 4, y = 5}, [3] = {x = 5, y = 6}}"]},
      {"strings", "str_concat", ["\"test\"","\"me\""]},
-     {"complex_types", "filter_some", ["[Some(1), Some(2), None]"]},
+     {"complex_types", "filter_some", ["[Some(11), Some(12), None]"]},
      {"complex_types", "init", ["ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ"]},
      {"__call" "init", []},
      {"bitcoin_auth", "authorize", ["1", "#0102030405060708090a0b0c0d0e0f101718192021222324252627282930313233343536373839401a1b1c1d1e1f202122232425262728293031323334353637"]},
