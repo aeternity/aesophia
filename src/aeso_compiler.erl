@@ -445,7 +445,7 @@ get_decode_type(FunName, [{contract, _, _, Defs}]) ->
         [{Args, Ret}] -> {ok, Args, Ret};
         []            ->
             case FunName of
-                "init" -> {ok, [], {id,[],"bool"}};
+                "init" -> {ok, [], {tuple_t, [], []}};
                  _ -> {error, missing_function}
             end
     end;
