@@ -329,8 +329,7 @@ create_calldata(Code, Fun, Args) ->
     create_calldata(Code, Fun, Args, [{backend, aevm}]).
 
 -spec create_calldata(string(), string(), [string()], [{atom(), any()}]) ->
-                             {ok, binary(), aeb_aevm_data:type(), aeb_aevm_data:type()}
-                             | {ok, binary()}
+                             {ok, binary()}
                              | {error, term()}.
 create_calldata(Code, Fun, Args, Options) ->
     case proplists:get_value(backend, Options, aevm) of
