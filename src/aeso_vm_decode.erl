@@ -104,7 +104,7 @@ from_fate({variant_t, Cons}, {variant, Ar, Tag, Args})
     Arity = lists:nth(Tag + 1, Ar),
     case tuple_to_list(Args) of
         ArgList when length(ArgList) == Arity ->
-            from_fate(ConType, tuple_to_list(Args));
+            from_fate(ConType, ArgList);
         _ -> throw(cannot_translate_to_sophia)
     end;
 from_fate({constr_t, _, Con, Types}, Args)
