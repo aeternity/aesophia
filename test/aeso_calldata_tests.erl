@@ -16,18 +16,32 @@
 %%  are made on the output, just that it is a binary which indicates
 %%  that the compilation worked.
 calldata_test_() ->
-     [ {"Testing the " ++ ContractName ++ " contract with the " ++ atom_to_list(Backend) ++ " backend",
+     [ {"Testing " ++ ContractName ++ " contract calling " ++ Fun,
         fun() ->
-            ContractString = aeso_test_utils:read_contract(ContractName),
-            Res = aeso_compiler:create_calldata(ContractString, Fun, Args, [{backend, Backend}]),
-            case Backend of
-                aevm ->
-                    ?assertMatch({ok, _, _, _}, Res);
-                fate ->
-                    ?assertMatch({ok, _}, Res)
-            end
-        end} || {ContractName, Fun, Args} <- compilable_contracts(), Backend <- [aevm, fate],
-                not lists:member(ContractName, not_yet_compilable(Backend))].
+           ContractString = aeso_test_utils:read_contract(ContractName),
+           AevmExprs =
+              case not lists:member(ContractName, not_yet_compilable(aevm)) of
+                  true -> ast_exprs(ContractString, Fun, Args, [{backend, aevm}]);
+                  false -> undefined
+              end,
+           FateExprs =
+              case not lists:member(ContractName, not_yet_compilable(fate)) of
+                  true -> ast_exprs(ContractString, Fun, Args, [{backend, fate}]);
+                  false -> undefined
+              end,
+           case FateExprs == undefined orelse AevmExprs == undefined of
+               true -> ok;
+               false ->
+                   ?assertEqual(FateExprs, AevmExprs)
+           end
+        end} || {ContractName, Fun, Args} <- compilable_contracts()].
+
+
+ast_exprs(ContractString, Fun, Args, Opts) ->
+    {ok, Data} = aeso_compiler:create_calldata(ContractString, Fun, Args, Opts),
+    {ok, _Types, Exprs} = aeso_compiler:decode_calldata(ContractString, Fun, Data, Opts),
+    ?assert(is_list(Exprs)),
+    Exprs.
 
 check_errors(Expect, ErrorString) ->
     %% This removes the final single \n as well.
@@ -45,7 +59,20 @@ compilable_contracts() ->
     [
      {"identity", "init", []},
      {"maps", "init", []},
-     {"oracles", "init", []},
+     {"funargs", "menot", ["false"]},
+     {"funargs", "append", ["[\"false\", \" is\", \" not\", \" true\"]"]},
+     %% TODO {"funargs", "bitsum", ["Bits.all"]},
+     {"funargs", "read", ["{label = \"question 1\", result = 4}"]},
+     {"funargs", "sjutton", ["#0011012003100011012003100011012003"]},
+     {"funargs", "sextiosju", ["#01020304050607080910111213141516171819202122232425262728293031323334353637383940"
+                               "414243444546474849505152535455565758596061626364656667"]},
+     {"funargs", "trettiotva", ["#0102030405060708091011121314151617181920212223242526272829303132"]},
+     {"funargs", "find_oracle", ["ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5"]},
+     {"funargs", "find_query", ["oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY"]},
+     {"funargs", "traffic_light", ["Green"]},
+     {"funargs", "traffic_light", ["Pantone(12)"]},
+     {"funargs", "tuples", ["()"]},
+     %% TODO {"funargs", "due", ["FixedTTL(1020)"]},
      {"variant_types", "init", []},
      {"basic_auth", "init", []},
      {"address_literals", "init", []},
@@ -62,19 +89,14 @@ compilable_contracts() ->
      {"maps", "get_i", ["1", "{[1] = {x = 3, y = 4}, [2] = {x = 4, y = 5}}"]},
      {"maps", "get_i", ["1", "{[1] = {x = 3, y = 4}, [2] = {x = 4, y = 5}, [3] = {x = 5, y = 6}}"]},
      {"strings", "str_concat", ["\"test\"","\"me\""]},
-     {"complex_types", "filter_some", ["[Some(1), Some(2), None]"]},
+     {"complex_types", "filter_some", ["[Some(11), Some(12), None]"]},
      {"complex_types", "init", ["ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ"]},
      {"__call" "init", []},
      {"bitcoin_auth", "authorize", ["1", "#0102030405060708090a0b0c0d0e0f101718192021222324252627282930313233343536373839401a1b1c1d1e1f202122232425262728293031323334353637"]},
      {"bitcoin_auth", "to_sign", ["#0102030405060708090a0b0c0d0e0f1017181920212223242526272829303132", "2"]}
-
     ].
 
 not_yet_compilable(fate) ->
-    ["oracles",             %% Oracle.register
-     "events",
-     "address_literals",    %% oracle_query_id literals
-     "address_chain"        %% Oracle.check_query
-    ];
+    ["address_chain"];
 not_yet_compilable(aevm) ->
     ["__call"].

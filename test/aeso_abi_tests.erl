@@ -175,8 +175,10 @@ encode_decode_calldata(FunName, Types, Args, RetType) ->
     encode_decode_calldata_(Code, FunName, Args, RetType).
 
 encode_decode_calldata_(Code, FunName, Args, RetVMType) ->
-    {ok, Calldata, CalldataType, RetVMType1} = aeso_compiler:create_calldata(Code, FunName, Args),
-    ?assertEqual(RetVMType1, RetVMType),
+    {ok, Calldata} = aeso_compiler:create_calldata(Code, FunName, Args),
+    {ok, _, {ArgTypes, RetType}, _} = aeso_compiler:check_call(Code, FunName, Args, [{backend, aevm}]),
+    ?assertEqual(RetType, RetVMType),
+    CalldataType = {tuple, [word, {tuple, ArgTypes}]},
     {ok, {_Hash, ArgTuple}} = aeb_heap:from_binary(CalldataType, Calldata),
     case FunName of
         "init" ->

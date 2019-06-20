@@ -69,11 +69,11 @@
 -type constant()
     :: {int, ann(), integer()}
      | {bool, ann(), true | false}
-     | {hash, ann(), binary()}
-     | {account_pubkey, binary()}
-     | {contract_pubkey, binary()}
-     | {oracle_pubkey, binary()}
-     | {oracle_query_id, binary()}
+     | {bytes, ann(), binary()}
+     | {account_pubkey, ann(), binary()}
+     | {contract_pubkey, ann(), binary()}
+     | {oracle_pubkey, ann(), binary()}
+     | {oracle_query_id, ann(), binary()}
      | {string, ann(), binary()}
      | {char, ann(), integer()}.
 
@@ -148,4 +148,3 @@ get_ann(Key, Node, Default) ->
 qualify({con, Ann, N}, X)             -> qualify({qcon, Ann, [N]}, X);
 qualify({qcon, _, NS}, {con, Ann, C}) -> {qcon, Ann, NS ++ [C]};
 qualify({qcon, _, NS}, {id, Ann, X})  -> {qid, Ann, NS ++ [X]}.
-
