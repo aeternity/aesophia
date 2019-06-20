@@ -505,22 +505,22 @@ builtin_to_scode(_Env, call_gas_price, []) ->
     [aeb_fate_ops:gasprice(?a)];
 builtin_to_scode(_Env, call_gas_left, []) ->
     [aeb_fate_ops:gas(?a)];
-builtin_to_scode(Env, oracle_register, [_Sign,_Account,_QFee,_TTL,_QType,_RTYpe] = Args) ->
+builtin_to_scode(Env, oracle_register, [_Sign,_Account,_QFee,_TTL,_QType,_RType] = Args) ->
     call_to_scode(Env, aeb_fate_ops:oracle_register(?a, ?a, ?a, ?a, ?a, ?a, ?a), Args);
 builtin_to_scode(Env, oracle_query_fee, [_Oracle] = Args) ->
     call_to_scode(Env, aeb_fate_ops:oracle_query_fee(?a, ?a), Args);
-builtin_to_scode(Env, oracle_query, [_Oracle, _Question, _QFee, _QTTL, _RTTL] = Args) ->
-    call_to_scode(Env, aeb_fate_ops:oracle_query(?a, ?a, ?a, ?a, ?a, ?a), Args);
-builtin_to_scode(Env, oracle_get_question, [_Oracle, _QueryId] = Args) ->
-    call_to_scode(Env, aeb_fate_ops:oracle_get_question(?a, ?a, ?a), Args);
-builtin_to_scode(Env, oracle_respond, [_Sign, _Oracle, _QueryId, _Response] = Args) ->
-    call_to_scode(Env, [aeb_fate_ops:oracle_respond(?a, ?a, ?a, ?a),
+builtin_to_scode(Env, oracle_query, [_Oracle, _Question, _QFee, _QTTL, _RTTL, _QType, _RType] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:oracle_query(?a, ?a, ?a, ?a, ?a, ?a, ?a, ?a), Args);
+builtin_to_scode(Env, oracle_get_question, [_Oracle, _QueryId, _QType, _RType] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:oracle_get_question(?a, ?a, ?a, ?a, ?a), Args);
+builtin_to_scode(Env, oracle_respond, [_Sign, _Oracle, _QueryId, _Response, _QType, _RType] = Args) ->
+    call_to_scode(Env, [aeb_fate_ops:oracle_respond(?a, ?a, ?a, ?a, ?a, ?a),
                         tuple(0)], Args);
 builtin_to_scode(Env, oracle_extend, [_Sign, _Oracle, _TTL] = Args) ->
     call_to_scode(Env, [aeb_fate_ops:oracle_extend(?a, ?a, ?a),
                         tuple(0)], Args);
-builtin_to_scode(Env, oracle_get_answer, [_Oracle, _QueryId] = Args) ->
-    call_to_scode(Env, aeb_fate_ops:oracle_get_answer(?a, ?a, ?a), Args);
+builtin_to_scode(Env, oracle_get_answer, [_Oracle, _QueryId, _QType, _RType] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:oracle_get_answer(?a, ?a, ?a, ?a, ?a), Args);
 builtin_to_scode(_Env, aens_resolve, [_, _] = _Args) ->
     ?TODO(fate_aens_resolve_instruction);
 builtin_to_scode(_Env, aens_preclaim, [_, _, _] = _Args) ->
@@ -827,11 +827,11 @@ attributes(I) ->
         {'SPEND', A, B}                       -> Impure(none, [A, B]);
 
         {'ORACLE_REGISTER', A, B, C, D, E, F, G} -> Impure(A, [B, C, D, E, F, G]);
-        {'ORACLE_QUERY', A, B, C, D, E, F}    -> Impure(A, [B, C, D, E, F]);
-        {'ORACLE_RESPOND', A, B, C, D}        -> Impure(none, [A, B, C, D]);
+        {'ORACLE_QUERY', A, B, C, D, E, F, G, H} -> Impure(A, [B, C, D, E, F, G, H]);
+        {'ORACLE_RESPOND', A, B, C, D, E, F}  -> Impure(none, [A, B, C, D, E, F]);
         {'ORACLE_EXTEND', A, B, C}            -> Impure(none, [A, B, C]);
-        {'ORACLE_GET_ANSWER', A, B, C}        -> Impure(A, [B, C]);
-        {'ORACLE_GET_QUESTION', A, B, C}      -> Impure(A, [B, C]);
+        {'ORACLE_GET_ANSWER', A, B, C, D, E}  -> Impure(A, [B, C, D, E]);
+        {'ORACLE_GET_QUESTION', A, B, C, D, E}-> Impure(A, [B, C, D, E]);
         {'ORACLE_QUERY_FEE', A, B}            -> Impure(A, [B]);
         'AENS_RESOLVE'                        -> Impure(?a, []);  %% TODO
         'AENS_PRECLAIM'                       -> Impure(?a, []);  %% TODO

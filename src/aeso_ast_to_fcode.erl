@@ -477,8 +477,14 @@ expr_to_fcode(Env, Type, {app, _Ann, Fun = {typed, _, _, {fun_t, _, NamedArgsT, 
     Args1 = get_named_args(NamedArgsT, Args),
     FArgs = [expr_to_fcode(Env, Arg) || Arg <- Args1],
     case expr_to_fcode(Env, Fun) of
-        {builtin_u, oracle_register = B, _} ->
-            {oracle, QType, RType} = type_to_fcode(Env, Type),
+        {builtin_u, B, _} when B =:= oracle_query;
+                               B =:= oracle_get_question;
+                               B =:= oracle_get_answer;
+                               B =:= oracle_respond;
+                               B =:= oracle_register ->
+            %% Get the type of the oracle from the args or the expression itself
+            OType = get_oracle_type(B, Type, Args1),
+            {oracle, QType, RType} = type_to_fcode(Env, OType),
             TypeArgs = [{lit, {typerep, QType}}, {lit, {typerep, RType}}],
             builtin_to_fcode(B, FArgs ++ TypeArgs);
         {builtin_u, B, _Ar}       -> builtin_to_fcode(B, FArgs);
@@ -544,6 +550,13 @@ make_if({var, X}, Then, Else) ->
 make_if(Cond, Then, Else) ->
     X = fresh_name(),
     {'let', X, Cond, make_if({var, X}, Then, Else)}.
+
+
+get_oracle_type(oracle_register,     OType, _Args) -> OType;
+get_oracle_type(oracle_query,        _Type, [{typed, _,_Expr, OType}|_]) -> OType;
+get_oracle_type(oracle_get_question, _Type, [{typed, _,_Expr, OType}|_]) -> OType;
+get_oracle_type(oracle_get_answer,   _Type, [{typed, _,_Expr, OType}|_]) -> OType;
+get_oracle_type(oracle_respond,      _Type, [_,{typed, _,_Expr, OType}|_]) -> OType.
 
 %% -- Pattern matching --
 
