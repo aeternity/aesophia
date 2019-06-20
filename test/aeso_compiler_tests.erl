@@ -114,7 +114,8 @@ compilable_contracts() ->
      "bitcoin_auth",
      "address_literals",
      "bytes_equality",
-     "address_chain"
+     "address_chain",
+     "namespace_bug"
     ].
 
 not_yet_compilable(fate) ->

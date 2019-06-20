@@ -1814,6 +1814,10 @@ occurs_check1(R, {tuple_t, _, Ts}) ->
     occurs_check(R, Ts);
 occurs_check1(R, {named_arg_t, _, _, T, _}) ->
     occurs_check(R, T);
+occurs_check1(R, {record_t, Fields}) ->
+    occurs_check(R, Fields);
+occurs_check1(R, {field_t, _, _, T}) ->
+    occurs_check(R, T);
 occurs_check1(R, [H | T]) ->
     occurs_check(R, H) orelse occurs_check(R, T);
 occurs_check1(_, []) -> false.
