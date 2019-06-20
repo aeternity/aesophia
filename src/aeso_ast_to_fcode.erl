@@ -37,8 +37,7 @@
 
 -type flit() :: {int, integer()}
               | {string, binary()}
-              | {hash, binary()}
-              | {signature, binary()}
+              | {bytes, binary()}
               | {account_pubkey, binary()}
               | {contract_pubkey, binary()}
               | {oracle_pubkey, binary()}
@@ -90,8 +89,7 @@
                | {map, ftype(), ftype()}
                | {tuple, [ftype()]}
                | address
-               | hash
-               | signature
+               | {bytes, non_neg_integer()}
                | contract
                | {oracle, ftype(), ftype()} %% Query type, Response type
                | oracle_query
@@ -320,10 +318,8 @@ type_to_fcode(Env, Sub, {tuple_t, _, Types}) ->
 type_to_fcode(Env, Sub, {record_t, Fields}) ->
     FieldType = fun({field_t, _, _, Ty}) -> Ty end,
     type_to_fcode(Env, Sub, {tuple_t, [], lists:map(FieldType, Fields)});
-type_to_fcode(_Env, _Sub, {bytes_t, _, 32}) -> hash;
-type_to_fcode(_Env, _Sub, {bytes_t, _, 64}) -> signature;
-type_to_fcode(_Env, _Sub, {bytes_t, _, _N}) ->
-    string; %% TODO: add bytes type to FATE
+type_to_fcode(_Env, _Sub, {bytes_t, _, N}) ->
+    {bytes, N};
 type_to_fcode(_Env, Sub, {tvar, _, X}) ->
     maps:get(X, Sub, {tvar, X});
 type_to_fcode(Env, Sub, {fun_t, _, Named, Args, Res}) ->
@@ -367,10 +363,7 @@ expr_to_fcode(_Env, _Type, {account_pubkey,  _, K}) -> {lit, {account_pubkey, K}
 expr_to_fcode(_Env, _Type, {contract_pubkey, _, K}) -> {lit, {contract_pubkey, K}};
 expr_to_fcode(_Env, _Type, {oracle_pubkey,   _, K}) -> {lit, {oracle_pubkey, K}};
 expr_to_fcode(_Env, _Type, {oracle_query_id, _, K}) -> {lit, {oracle_query_id, K}};
-
-expr_to_fcode(_Env, _Type, {bytes, _, Bin = <<_:32/binary>>}) -> {lit, {hash, Bin}};
-expr_to_fcode(_Env, _Type, {bytes, _, Bin = <<_:64/binary>>}) -> {lit, {signature, Bin}};
-expr_to_fcode(_Env, _Type, {bytes, _, Bin}) -> {lit, {string, Bin}};
+expr_to_fcode(_Env, _Type, {bytes,           _, B}) -> {lit, {bytes, B}};
 
 %% Variables
 expr_to_fcode(Env, _Type, {id, _, X})  -> resolve_var(Env, [X]);
