@@ -1134,7 +1134,13 @@ infer_expr(Env, {lam, Attrs, Args, Body}) ->
     {'case', _, {typed, _, {tuple, _, NewArgPatterns}, _}, NewBody} =
         infer_case(Env, Attrs, {tuple, Attrs, ArgPatterns}, {tuple_t, Attrs, ArgTypes}, Body, ResultType),
     NewArgs = [{arg, As, NewPat, NewT} || {typed, As, NewPat, NewT} <- NewArgPatterns],
-    {typed, Attrs, {lam, Attrs, NewArgs, NewBody}, {fun_t, Attrs, [], ArgTypes, ResultType}}.
+    {typed, Attrs, {lam, Attrs, NewArgs, NewBody}, {fun_t, Attrs, [], ArgTypes, ResultType}};
+infer_expr(Env, Let = {letval, Attrs, _, _, _}) ->
+    type_error({missing_body_for_let, Attrs}),
+    infer_expr(Env, {block, Attrs, [Let, abort_expr(Attrs, "missing body")]});
+infer_expr(Env, Let = {letfun, Attrs, _, _, _, _}) ->
+    type_error({missing_body_for_let, Attrs}),
+    infer_expr(Env, {block, Attrs, [Let, abort_expr(Attrs, "missing body")]}).
 
 infer_named_arg(Env, NamedArgs, {named_arg, Ann, Id, E}) ->
     CheckedExpr = {typed, _, _, ArgType} = infer_expr(Env, E),
@@ -1208,6 +1214,8 @@ infer_case(Env, Attrs, Pattern, ExprType, Branch, SwitchType) ->
 %% NewStmts = infer_block(Env, Attrs, Stmts, BlockType)
 infer_block(_Env, Attrs, [], BlockType) ->
     error({impossible, empty_block, Attrs, BlockType});
+infer_block(Env, _, [E], BlockType) ->
+    [check_expr(Env, E, BlockType)];
 infer_block(Env, Attrs, [Def={letfun, Ann, _, _, _, _}|Rest], BlockType) ->
     {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
     FunT = freshen_type(typesig_to_fun_t(TypeSig)),
@@ -1218,8 +1226,6 @@ infer_block(Env, _, [{letval, Attrs, Pattern, Type, E}|Rest], BlockType) ->
     {'case', _, NewPattern, {typed, _, {block, _, NewRest}, _}} =
         infer_case(Env, Attrs, Pattern, PatType, {block, Attrs, Rest}, BlockType),
     [{letval, Attrs, NewPattern, Type, NewE}|NewRest];
-infer_block(Env, _, [E], BlockType) ->
-    [check_expr(Env, E, BlockType)];
 infer_block(Env, Attrs, [E|Rest], BlockType) ->
     [infer_expr(Env, E)|infer_block(Env, Attrs, Rest, BlockType)].
 
@@ -1254,6 +1260,9 @@ infer_prefix({'!',As}) ->
 infer_prefix({IntOp,As}) when IntOp =:= '-' ->
     Int = {id, As, "int"},
     {fun_t, As, [], [Int], Int}.
+
+abort_expr(Ann, Str) ->
+    {app, Ann, {id, Ann, "abort"}, [{string, Ann, Str}]}.
 
 free_vars({int, _, _}) ->
     [];
@@ -2029,6 +2038,8 @@ pp_error({init_depends_on_state, Which, [_Init | Chain]}) ->
                   [if Which == put -> "write"; true -> "read" end,
                    [ io_lib:format("  - ~s (at ~s)~s\n", [Fun, pp_loc(Ann), WhichCalls(Fun)])
                      || {[_, Fun], Ann} <- Chain]]);
+pp_error({missing_body_for_let, Ann}) ->
+    io_lib:format("Let binding at ~s must be followed by an expression\n", [pp_loc(Ann)]);
 pp_error(Err) ->
     io_lib:format("Unknown error: ~p\n", [Err]).
 

@@ -42,3 +42,18 @@ contract Test =
     set_x(set_x(x, r), x)
 
   function repeated_arg(x : int, y, x : string, y : bool) : string = x
+
+  function missing1() =
+    let x = 0
+
+  function missing_fun1() =
+    let f(x) = x
+
+  function missing2() =
+    let x = 0
+    let y = 0
+
+  function missing_fun2() =
+    let f() = 0
+    let g() = f()
+
