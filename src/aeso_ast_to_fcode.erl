@@ -1324,7 +1324,7 @@ pp_call(Fun, Args) ->
 pp_ftype(T) when is_atom(T) -> pp_text(T);
 pp_ftype(any) -> pp_text("_");
 pp_ftype({tvar, X}) -> pp_text(X);
-pp_ftype({bytes, N}) -> pp_text(["bytes(", integer_to_list(N), ")"]);
+pp_ftype({bytes, N}) -> pp_text("bytes(" ++ integer_to_list(N) ++ ")");
 pp_ftype({tuple, Ts}) ->
     pp_parens(pp_par(pp_punctuate(pp_text(","), [pp_ftype(T) || T <- Ts])));
 pp_ftype({list, T}) ->

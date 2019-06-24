@@ -1434,7 +1434,7 @@ create_bytes_constraints() ->
 get_bytes_constraints() ->
     ets_tab2list(bytes_constraints).
 
--spec add_bytes_constraint(byte_constraint()) -> ok.
+-spec add_bytes_constraint(byte_constraint()) -> true.
 add_bytes_constraint(Constraint) ->
     ets_insert(bytes_constraints, Constraint).
 
