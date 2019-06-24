@@ -486,6 +486,12 @@ global_env() ->
                       {"none",         Bits},
                       {"all",          Bits}]) },
 
+    %% Bytes
+    BytesScope = #scope
+        { funs = MkDefs(
+                   [{"to_int", Fun1(Bytes(any), Int)},
+                    {"to_str", Fun1(Bytes(any), String)}]) },
+
     %% Conversion
     IntScope     = #scope{ funs = MkDefs([{"to_str", Fun1(Int,     String)}]) },
     AddressScope = #scope{ funs = MkDefs([{"to_str", Fun1(Address, String)},
@@ -504,6 +510,7 @@ global_env() ->
              , ["Crypto"]   => CryptoScope
              , ["String"]   => StringScope
              , ["Bits"]     => BitsScope
+             , ["Bytes"]    => BytesScope
              , ["Int"]      => IntScope
              , ["Address"]  => AddressScope
              } }.
@@ -916,8 +923,8 @@ lookup_name(Env, As, Id, Options) ->
             Freshen = proplists:get_value(freshen, Options, false),
             check_stateful(Env, Id, Ty),
             Ty1 = case Ty of
-                    {type_sig, _, _, _, _} -> freshen_type(typesig_to_fun_t(Ty));
-                    _ when Freshen         -> freshen_type(Ty);
+                    {type_sig, _, _, _, _} -> freshen_type(As, typesig_to_fun_t(Ty));
+                    _ when Freshen         -> freshen_type(As, Ty);
                     _                      -> Ty
                   end,
             {set_qname(QId, Id), Ty1}
@@ -1218,7 +1225,7 @@ infer_block(Env, _, [E], BlockType) ->
     [check_expr(Env, E, BlockType)];
 infer_block(Env, Attrs, [Def={letfun, Ann, _, _, _, _}|Rest], BlockType) ->
     {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
-    FunT = freshen_type(typesig_to_fun_t(TypeSig)),
+    FunT = freshen_type(Ann, typesig_to_fun_t(TypeSig)),
     NewE = bind_var({id, Ann, Name}, FunT, Env),
     [LetFun|infer_block(NewE, Attrs, Rest, BlockType)];
 infer_block(Env, _, [{letval, Attrs, Pattern, Type, E}|Rest], BlockType) ->
@@ -1358,14 +1365,17 @@ when_option(Opt, Do) ->
 
 create_constraints() ->
     create_named_argument_constraints(),
+    create_bytes_constraints(),
     create_field_constraints().
 
 solve_constraints(Env) ->
     solve_named_argument_constraints(Env),
+    solve_bytes_constraints(Env),
     solve_field_constraints(Env).
 
 destroy_and_report_unsolved_constraints(Env) ->
     destroy_and_report_unsolved_field_constraints(Env),
+    destroy_and_report_unsolved_bytes_constraints(Env),
     destroy_and_report_unsolved_named_argument_constraints(Env).
 
 %% -- Named argument constraints --
@@ -1413,6 +1423,37 @@ destroy_and_report_unsolved_named_argument_constraints(Env) ->
     [ type_error({unsolved_named_argument_constraint, C}) || C <- Unsolved ],
     destroy_named_argument_constraints(),
     ok.
+
+%% -- Bytes constraints --
+
+-type byte_constraint() :: {is_bytes, utype()}.
+
+create_bytes_constraints() ->
+    ets_new(bytes_constraints, [bag]).
+
+get_bytes_constraints() ->
+    ets_tab2list(bytes_constraints).
+
+-spec add_bytes_constraint(byte_constraint()) -> ok.
+add_bytes_constraint(Constraint) ->
+    ets_insert(bytes_constraints, Constraint).
+
+solve_bytes_constraints(_Env) ->
+    ok.
+
+destroy_bytes_constraints() ->
+    ets_delete(bytes_constraints).
+
+destroy_and_report_unsolved_bytes_constraints(Env) ->
+    [ check_bytes_constraint(Env, C) || C <- get_bytes_constraints() ],
+    destroy_bytes_constraints().
+
+check_bytes_constraint(Env, {is_bytes, Type}) ->
+    Type1 = unfold_types_in_type(Env, instantiate(Type)),
+    case Type1 of
+        {bytes_t, _, _} -> ok;
+        _               -> type_error({cannot_unify, Type1, {bytes_t, [], any}, {at, Type}})
+    end.
 
 %% -- Field constraints --
 
@@ -1840,26 +1881,31 @@ create_freshen_tvars() ->
 destroy_freshen_tvars() ->
     ets_delete(freshen_tvars).
 
-freshen_type(Type) ->
+freshen_type(Ann, Type) ->
     create_freshen_tvars(),
-    Type1 = freshen(Type),
+    Type1 = freshen(Ann, Type),
     destroy_freshen_tvars(),
     Type1.
 
-freshen({tvar, As, Name}) ->
+freshen(Type) ->
+    freshen(aeso_syntax:get_ann(Type), Type).
+
+freshen(Ann, {tvar, _, Name}) ->
     NewT = case ets_lookup(freshen_tvars, Name) of
-               [] ->
-                   fresh_uvar(As);
-               [{Name, T}] ->
-                   T
+               []          -> fresh_uvar(Ann);
+               [{Name, T}] -> T
            end,
     ets_insert(freshen_tvars, {Name, NewT}),
     NewT;
-freshen(T) when is_tuple(T) ->
-    list_to_tuple(freshen(tuple_to_list(T)));
-freshen([A|B]) ->
-    [freshen(A)|freshen(B)];
-freshen(X) ->
+freshen(Ann, {bytes_t, _, any}) ->
+    X = fresh_uvar(Ann),
+    add_bytes_constraint({is_bytes, X}),
+    X;
+freshen(Ann, T) when is_tuple(T) ->
+    list_to_tuple(freshen(Ann, tuple_to_list(T)));
+freshen(Ann, [A | B]) ->
+    [freshen(Ann, A) | freshen(Ann, B)];
+freshen(_, X) ->
     X.
 
 %% Dereferences all uvars and replaces the uninstantiated ones with a
@@ -2044,6 +2090,7 @@ pp_error(Err) ->
     io_lib:format("Unknown error: ~p\n", [Err]).
 
 pp_when({todo, What}) -> io_lib:format("[TODO] ~p\n", [What]);
+pp_when({at, Ann}) -> io_lib:format("at ~s\n", [pp_loc(Ann)]);
 pp_when({check_typesig, Name, Inferred, Given}) ->
     io_lib:format("when checking the definition of ~s\n"
                   "  inferred type: ~s\n"
@@ -2196,6 +2243,7 @@ pp({tvar, _, Name}) ->
     Name;
 pp({tuple_t, _, Cpts}) ->
     ["(", pp(Cpts), ")"];
+pp({bytes_t, _, any}) -> "bytes(_)";
 pp({bytes_t, _, Len}) ->
     ["bytes(", integer_to_list(Len), ")"];
 pp({app_t, _, T, []}) ->

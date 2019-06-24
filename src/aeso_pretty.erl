@@ -233,6 +233,7 @@ type({app_t, _, Type, Args}) ->
     beside(type(Type), tuple_type(Args));
 type({tuple_t, _, Args}) ->
     tuple_type(Args);
+type({bytes_t, _, any}) -> text("bytes(_)");
 type({bytes_t, _, Len}) ->
     text(lists:concat(["bytes(", Len, ")"]));
 type({named_arg_t, _, Name, Type, _Default}) ->

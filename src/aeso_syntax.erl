@@ -59,7 +59,7 @@
 -type type() :: {fun_t, ann(), [named_arg_t()], [type()], type()}
               | {app_t, ann(), type(), [type()]}
               | {tuple_t, ann(), [type()]}
-              | {bytes_t, ann(), integer()}
+              | {bytes_t, ann(), integer() | any}
               | id()  | qid()
               | con() | qcon()  %% contracts
               | tvar().
