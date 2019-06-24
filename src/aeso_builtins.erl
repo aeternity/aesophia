@@ -44,6 +44,7 @@ builtin_deps1(addr_to_str)                -> [{baseX_int, 58}];
 builtin_deps1({baseX_int, X})             -> [{baseX_int_pad, X}];
 builtin_deps1({baseX_int_pad, X})         -> [{baseX_int_encode, X}];
 builtin_deps1({baseX_int_encode, X})      -> [{baseX_int_encode_, X}, {baseX_tab, X}, {baseX_digits, X}];
+builtin_deps1({bytes_to_str, _})          -> [bytes_to_str_worker];
 builtin_deps1(string_reverse)             -> [string_reverse_];
 builtin_deps1(require)                    -> [abort];
 builtin_deps1(_)                          -> [].
@@ -66,7 +67,7 @@ option_some(X) -> {tuple, [{integer, 1}, X]}.
 -define(V(X), v(X)).
 -define(A(Op), aeb_opcodes:mnemonic(Op)).
 -define(LET(Var, Expr, Body), {switch, Expr, [{v(Var), Body}]}).
--define(DEREF(Var, Ptr, Body), {switch, v(Ptr), [{{tuple, [v(Var)]}, Body}]}).
+-define(DEREF(Var, Ptr, Body), {switch, operand(Ptr), [{{tuple, [v(Var)]}, Body}]}).
 -define(NXT(Ptr), op('+', Ptr, 32)).
 -define(NEG(A), op('/', A, {unop, '-', {integer, 1}})).
 -define(BYTE(Ix, Word), op('byte', Ix, Word)).
@@ -160,6 +161,9 @@ builtin_function(BF) ->
         {baseX_int_pad, X}         -> bfun(BF, builtin_baseX_int_pad(X));
         {baseX_int_encode, X}      -> bfun(BF, builtin_baseX_int_encode(X));
         {baseX_int_encode_, X}     -> bfun(BF, builtin_baseX_int_encode_(X));
+        {bytes_to_int, N}          -> bfun(BF, builtin_bytes_to_int(N));
+        {bytes_to_str, N}          -> bfun(BF, builtin_bytes_to_str(N));
+        bytes_to_str_worker        -> bfun(BF, builtin_bytes_to_str_worker());
         string_reverse             -> bfun(BF, builtin_string_reverse());
         string_reverse_            -> bfun(BF, builtin_string_reverse_())
     end.
@@ -444,6 +448,10 @@ builtin_baseX_int_pad(X = 10) ->
         ?call({baseX_int_encode, X}, [?NEG(src), ?I(1), ?BSL($-, 31)]),
         ?call({baseX_int_encode, X}, [?V(src), ?V(ix), ?V(dst)])},
      word};
+builtin_baseX_int_pad(X = 16) ->
+    {[{"src", word}, {"ix", word}, {"dst", word}],
+        ?call({baseX_int_encode, X}, [?V(src), ?V(ix), ?V(dst)]),
+     word};
 builtin_baseX_int_pad(X = 58) ->
     {[{"src", word}, {"ix", word}, {"dst", word}],
      {ifte, ?GT(?ADD(?DIV(ix, 31), ?BYTE(ix, src)), 0),
@@ -477,6 +485,57 @@ builtin_baseX_digits(X) ->
      ?LET(x1, ?DIV(x0, X),
         {ifte, ?EQ(x1, 0), ?V(dgts), ?call({baseX_digits, X}, [?V(x1), ?ADD(dgts, 1)])}),
      word}.
+
+builtin_bytes_to_int(32) ->
+    {[{"w", word}], ?V(w), word};
+builtin_bytes_to_int(N) when N < 32 ->
+    {[{"w", word}], ?BSR(w, 32 - N), word};
+builtin_bytes_to_int(N) when N > 32 ->
+    LastFullWord = N div 32 - 1,
+    Body = case N rem 32 of
+                0 -> ?DEREF(n, ?ADD(b, LastFullWord * 32), ?V(n));
+                R ->
+                    ?DEREF(hi, ?ADD(b, LastFullWord * 32),
+                    ?DEREF(lo, ?ADD(b, (LastFullWord + 1) * 32),
+                    ?ADD(?BSR(lo, 32 - R), ?BSL(hi, R))))
+           end,
+    {[{"b", pointer}], Body, word}.
+
+builtin_bytes_to_str_worker() ->
+    <<Tab:256>> = <<"0123456789ABCDEF________________">>,
+    {[{"w", word}, {"offs", word}, {"acc", word}],
+     {seq, [{ifte, ?AND(?GT(offs, 0), ?EQ(0, ?MOD(offs, 16))),
+                    {seq, [?V(acc), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]}]},
+                    {inline_asm, []}},
+            {ifte, ?EQ(offs, 32), {inline_asm, [?A(?MSIZE)]},
+                ?LET(b,  ?BYTE(offs, w),
+                ?LET(lo, ?BYTE(?MOD(b, 16), Tab),
+                ?LET(hi, ?BYTE(op('bsr', 4 , b), Tab),
+                ?call(bytes_to_str_worker,
+                      [?V(w), ?ADD(offs, 1), ?ADD(?BSL(acc, 2), ?ADD(?BSL(hi, 1), lo))]))))
+            }
+           ]},
+     word}.
+
+builtin_bytes_to_str(N) when N =< 32 ->
+    {[{"w", word}],
+     ?LET(ret, {inline_asm, [?A(?MSIZE)]},
+     {seq, [?I(N * 2), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
+            ?call(bytes_to_str_worker, [?V(w), ?I(0), ?I(0)]),
+            {inline_asm, [?A(?POP)]},
+            ?V(ret)]}),
+     string};
+builtin_bytes_to_str(N) when N > 32 ->
+    Work = fun(I) ->
+            [?DEREF(w, ?ADD(p, 32 * I), ?call(bytes_to_str_worker, [?V(w), ?I(0), ?I(0)])),
+             {inline_asm, [?A(?POP)]}]
+           end,
+    {[{"p", pointer}],
+     ?LET(ret, {inline_asm, [?A(?MSIZE)]},
+     {seq, [?I(N * 2), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]}] ++
+           lists:append([ Work(I) || I <- lists:seq(0, (N + 31) div 32 - 1) ]) ++
+           [?V(ret)]}),
+     string}.
 
 builtin_string_reverse() ->
     {[{"s", string}],
