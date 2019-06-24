@@ -114,7 +114,8 @@ compilable_contracts() ->
      "bitcoin_auth",
      "address_literals",
      "bytes_equality",
-     "address_chain"
+     "address_chain",
+     "namespace_bug"
     ].
 
 not_yet_compilable(fate) ->
@@ -207,7 +208,11 @@ failing_contracts() ->
         <<"Repeated argument y to function repeated_arg (at line 44, column 12).">>,
         <<"No record type with fields y, z (at line 14, column 22)">>,
         <<"The field z is missing when constructing an element of type r2 (at line 15, column 24)">>,
-        <<"Record type r2 does not have field y (at line 15, column 22)">>]}
+        <<"Record type r2 does not have field y (at line 15, column 22)">>,
+        <<"Let binding at line 47, column 5 must be followed by an expression">>,
+        <<"Let binding at line 50, column 5 must be followed by an expression">>,
+        <<"Let binding at line 54, column 5 must be followed by an expression">>,
+        <<"Let binding at line 58, column 5 must be followed by an expression">>]}
     , {"init_type_error",
        [<<"Cannot unify string\n"
           "         and map(int, int)\n"

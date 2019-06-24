@@ -161,8 +161,7 @@ type_to_scode(integer)         -> integer;
 type_to_scode(boolean)         -> boolean;
 type_to_scode(string)          -> string;
 type_to_scode(address)         -> address;
-type_to_scode(hash)            -> hash;
-type_to_scode(signature)       -> signature;
+type_to_scode({bytes, N})      -> {bytes, N};
 type_to_scode(contract)        -> contract;
 type_to_scode({oracle, _, _})  -> oracle;
 type_to_scode(oracle_query)    -> oracle_query;
@@ -236,8 +235,7 @@ lit_to_fate(L) ->
     case L of
         {int, N}             -> aeb_fate_data:make_integer(N);
         {string, S}          -> aeb_fate_data:make_string(S);
-        {hash, H}            -> aeb_fate_data:make_hash(H);
-        {signature, S}       -> aeb_fate_data:make_signature(S);
+        {bytes, B}           -> aeb_fate_data:make_bytes(B);
         {bool, B}            -> aeb_fate_data:make_boolean(B);
         {account_pubkey, K}  -> aeb_fate_data:make_address(K);
         {contract_pubkey, K} -> aeb_fate_data:make_contract(K);
