@@ -102,6 +102,8 @@
      Op =:= 'ECVERIFY_SECP256K1' orelse
      Op =:= 'CONTRACT_TO_ADDRESS' orelse
      Op =:= 'AUTH_TX_HASH'    orelse
+     Op =:= 'BYTES_TO_INT'    orelse
+     Op =:= 'BYTES_TO_STR'    orelse
      false)).
 
 -record(env, { contract, vars = [], locals = [], tailpos = true }).
@@ -470,6 +472,10 @@ builtin_to_scode(_Env, bits_none, []) ->
     [aeb_fate_ops:bits_none(?a)];
 builtin_to_scode(_Env, bits_all, []) ->
     [aeb_fate_ops:bits_all(?a)];
+builtin_to_scode(Env, bytes_to_int, [_] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:bytes_to_int(?a, ?a), Args);
+builtin_to_scode(Env, bytes_to_str, [_] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:bytes_to_str(?a, ?a), Args);
 builtin_to_scode(Env, abort, [_] = Args) ->
     call_to_scode(Env, aeb_fate_ops:abort(?a), Args);
 builtin_to_scode(Env, chain_spend, [_, _] = Args) ->
@@ -802,6 +808,8 @@ attributes(I) ->
         {'ECVERIFY_SECP256K1', A, B, C, D}    -> Pure(A, [B, C, D]);
         {'CONTRACT_TO_ADDRESS', A, B}         -> Pure(A, [B]);
         {'AUTH_TX_HASH', A}                   -> Pure(A, []);
+        {'BYTES_TO_INT', A, B}                -> Pure(A, [B]);
+        {'BYTES_TO_STR', A, B}                -> Pure(A, [B]);
         {'ADDRESS', A}                        -> Pure(A, []);
         {'BALANCE', A}                        -> Impure(A, []);
         {'BALANCE_OTHER', A, B}               -> Impure(A, [B]);
