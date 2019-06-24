@@ -190,6 +190,7 @@ builtins() ->
               {["String"],   [{"length", 1}, {"concat", 2}, {"sha3", 1}, {"sha256", 1}, {"blake2b", 1}]},
               {["Bits"],     [{"set", 2}, {"clear", 2}, {"test", 2}, {"sum", 1}, {"intersection", 2},
                               {"union", 2}, {"difference", 2}, {"none", none}, {"all", none}]},
+              {["Bytes"],    [{"to_int", 1}, {"to_str", 1}]},
               {["Int"],      [{"to_str", 1}]},
               {["Address"],  [{"to_str", 1}]}
              ],
@@ -1323,6 +1324,7 @@ pp_call(Fun, Args) ->
 pp_ftype(T) when is_atom(T) -> pp_text(T);
 pp_ftype(any) -> pp_text("_");
 pp_ftype({tvar, X}) -> pp_text(X);
+pp_ftype({bytes, N}) -> pp_text(["bytes(", integer_to_list(N), ")"]);
 pp_ftype({tuple, Ts}) ->
     pp_parens(pp_par(pp_punctuate(pp_text(","), [pp_ftype(T) || T <- Ts])));
 pp_ftype({list, T}) ->
