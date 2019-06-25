@@ -130,7 +130,7 @@
 -type env() :: #{ type_env   := type_env(),
                   fun_env    := fun_env(),
                   con_env    := con_env(),
-                  event_type := aeso_syntax:typedef(),
+                  event_type => aeso_syntax:typedef(),
                   builtins   := builtins(),
                   options    := [option()],
                   context    => context(),
@@ -823,7 +823,6 @@ event_function(_Env = #{event_type := {variant_t, EventCons}}, EventType = {vari
     Cons = [ {Name, I - 1, proplists:get_value(indices, Ann)}
              || {I, {constr_t, Ann, {con, _, Name}, _}} <- indexed(EventCons) ],
     Arities = [length(Ts) || Ts <- FCons],
-    io:format("Cons = ~p\nEventFType = ~p\n", [Cons, EventType]),
     Case = fun({Name, Tag, Ixs}) ->
                 %% TODO: precompute (needs dependency)
                 Hash = {op, crypto_sha3, [{lit, {string, list_to_binary(Name)}}]},
@@ -838,7 +837,7 @@ event_function(_Env = #{event_type := {variant_t, EventCons}}, EventType = {vari
                 Body = {builtin, chain_event, [Payload, Hash | Indices]},
                 {'case', {con, Arities, Tag, Vars}, {nosplit, Body}}
            end,
-    #{ attrs  => [stateful, private],
+    #{ attrs  => [private],
        args   => [{"e", EventType}],
        return => {tuple, []},
        body   => {switch, {split, EventType, "e", lists:map(Case, Cons)}} }.
@@ -1369,7 +1368,7 @@ pp_call(Fun, Args) ->
 pp_call_t(Fun, Args) ->
     pp_beside(pp_text(Fun), pp_ftype({tuple, Args})).
 
--spec pp_ftype(ftype()) -> prettypr:doc().
+-spec pp_ftype(ftype()) -> any().
 pp_ftype(T) when is_atom(T) -> pp_text(T);
 pp_ftype(any) -> pp_text("_");
 pp_ftype({tvar, X}) -> pp_text(X);

@@ -119,8 +119,7 @@ compilable_contracts() ->
      "bytes_to_x"
     ].
 
-not_yet_compilable(fate) ->
-    ["events"];
+not_yet_compilable(fate) -> [];
 not_yet_compilable(aevm) -> [].
 
 %% Contracts that should produce type errors
