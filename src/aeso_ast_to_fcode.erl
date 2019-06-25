@@ -175,11 +175,12 @@ builtins() ->
               {["Chain"],    [{"spend", 2}, {"balance", 1}, {"block_hash", 1}, {"coinbase", none},
                               {"timestamp", none}, {"block_height", none}, {"difficulty", none},
                               {"gas_limit", none}]},
-              {["Contract"], [{"address", none}, {"balance", none}]},
+              {["Contract"], [{"address", none}, {"balance", none}, {"creator", none}]},
               {["Call"],     [{"origin", none}, {"caller", none}, {"value", none}, {"gas_price", none},
                               {"gas_left", 0}]},
               {["Oracle"],   [{"register", 4}, {"query_fee", 1}, {"query", 5}, {"get_question", 2},
-                              {"respond", 4}, {"extend", 3}, {"get_answer", 2}]},
+                              {"respond", 4}, {"extend", 3}, {"get_answer", 2},
+                              {"check", 1}, {"check_query", 2}]},
               {["AENS"],     [{"resolve", 2}, {"preclaim", 3}, {"claim", 4}, {"transfer", 4},
                               {"revoke", 3}]},
               {["Map"],      [{"from_list", 1}, {"to_list", 1}, {"lookup", 2},
@@ -192,7 +193,7 @@ builtins() ->
                               {"union", 2}, {"difference", 2}, {"none", none}, {"all", none}]},
               {["Bytes"],    [{"to_int", 1}, {"to_str", 1}]},
               {["Int"],      [{"to_str", 1}]},
-              {["Address"],  [{"to_str", 1}]}
+              {["Address"],  [{"to_str", 1}, {"is_oracle", 1}, {"is_contract", 1}]}
              ],
     maps:from_list([ {NS ++ [Fun], {MkName(NS, Fun), Arity}}
                      || {NS, Funs} <- Scopes,
@@ -475,7 +476,9 @@ expr_to_fcode(Env, Type, {app, _Ann, Fun = {typed, _, _, {fun_t, _, NamedArgsT, 
                                B =:= oracle_get_question;
                                B =:= oracle_get_answer;
                                B =:= oracle_respond;
-                               B =:= oracle_register ->
+                               B =:= oracle_register;
+                               B =:= oracle_check;
+                               B =:= oracle_check_query ->
             %% Get the type of the oracle from the args or the expression itself
             OType = get_oracle_type(B, Type, Args1),
             {oracle, QType, RType} = type_to_fcode(Env, OType),
@@ -547,10 +550,12 @@ make_if(Cond, Then, Else) ->
 
 
 get_oracle_type(oracle_register,     OType, _Args) -> OType;
-get_oracle_type(oracle_query,        _Type, [{typed, _,_Expr, OType}|_]) -> OType;
-get_oracle_type(oracle_get_question, _Type, [{typed, _,_Expr, OType}|_]) -> OType;
-get_oracle_type(oracle_get_answer,   _Type, [{typed, _,_Expr, OType}|_]) -> OType;
-get_oracle_type(oracle_respond,      _Type, [_,{typed, _,_Expr, OType}|_]) -> OType.
+get_oracle_type(oracle_query,        _Type, [{typed, _, _Expr, OType} | _])   -> OType;
+get_oracle_type(oracle_get_question, _Type, [{typed, _, _Expr, OType} | _])   -> OType;
+get_oracle_type(oracle_get_answer,   _Type, [{typed, _, _Expr, OType} | _])   -> OType;
+get_oracle_type(oracle_check,        _Type, [{typed, _, _Expr, OType}])       -> OType;
+get_oracle_type(oracle_check_query,  _Type, [{typed, _, _Expr, OType} | _])   -> OType;
+get_oracle_type(oracle_respond,      _Type, [_, {typed, _,_Expr, OType} | _]) -> OType.
 
 %% -- Pattern matching --
 
@@ -1261,6 +1266,8 @@ pp_punctuate(Sep, [X | Xs]) -> [pp_beside(X, Sep) | pp_punctuate(Sep, Xs)].
 
 pp_par([]) -> prettypr:empty();
 pp_par(Xs) -> prettypr:par(Xs).
+pp_fexpr({lit, {typerep, T}}) ->
+    pp_ftype(T);
 pp_fexpr({lit, {Tag, Lit}}) ->
     aeso_pretty:expr({Tag, [], Lit});
 pp_fexpr(nil) ->
@@ -1321,18 +1328,23 @@ pp_fexpr({switch, Split}) -> pp_split(Split).
 pp_call(Fun, Args) ->
     pp_beside(Fun, pp_fexpr({tuple, Args})).
 
+pp_call_t(Fun, Args) ->
+    pp_beside(pp_text(Fun), pp_ftype({tuple, Args})).
+
+-spec pp_ftype(ftype()) -> prettypr:doc().
 pp_ftype(T) when is_atom(T) -> pp_text(T);
 pp_ftype(any) -> pp_text("_");
 pp_ftype({tvar, X}) -> pp_text(X);
-pp_ftype({bytes, N}) -> pp_text("bytes(" ++ integer_to_list(N) ++ ")");
+pp_ftype({bytes, N}) -> pp_call(pp_text("bytes"), [{lit, {int, N}}]);
+pp_ftype({oracle, Q, R}) -> pp_call_t("oracle", [Q, R]);
 pp_ftype({tuple, Ts}) ->
     pp_parens(pp_par(pp_punctuate(pp_text(","), [pp_ftype(T) || T <- Ts])));
 pp_ftype({list, T}) ->
-    pp_beside([pp_text("list("), pp_ftype(T), pp_text(")")]);
+    pp_call_t("list", [T]);
 pp_ftype({function, Args, Res}) ->
     pp_par([pp_ftype({tuple, Args}), pp_text("=>"), pp_ftype(Res)]);
 pp_ftype({map, Key, Val}) ->
-    pp_beside([pp_text("map"), pp_ftype({tuple, [Key, Val]})]);
+    pp_call_t("map", [Key, Val]);
 pp_ftype({variant, Cons}) ->
     pp_par(
     pp_punctuate(pp_text(" |"),

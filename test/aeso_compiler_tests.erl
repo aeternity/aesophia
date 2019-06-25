@@ -120,10 +120,7 @@ compilable_contracts() ->
     ].
 
 not_yet_compilable(fate) ->
-    ["events",              %% events
-     "address_literals",    %% oracle_query_id literals
-     "address_chain"        %% Oracle.check_query
-    ];
+    ["events"];
 not_yet_compilable(aevm) -> [].
 
 %% Contracts that should produce type errors
