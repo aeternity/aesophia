@@ -330,6 +330,7 @@ expr_p(_, {Type, _, Bin})
          Type == oracle_pubkey;
          Type == oracle_query_id ->
     text(binary_to_list(aeser_api_encoder:encode(Type, Bin)));
+expr_p(_, {string, _, <<>>}) -> text("\"\"");
 expr_p(_, {string, _, S}) -> term(binary_to_list(S));
 expr_p(_, {char, _, C}) ->
     case C of

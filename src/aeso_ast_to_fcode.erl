@@ -16,11 +16,11 @@
 
 -type option() :: term().
 
--type attribute() :: stateful | pure.
+-type attribute() :: stateful | pure | private.
 
 -type fun_name() :: {entrypoint, binary()}
                   | {local_fun, [string()]}
-                  | init.
+                  | init | event.
 -type var_name() :: string().
 -type sophia_name() :: [string()].
 
@@ -127,14 +127,15 @@
                  | {namespace, string()}
                  | {abstract_contract, string()}.
 
--type env() :: #{ type_env  := type_env(),
-                  fun_env   := fun_env(),
-                  con_env   := con_env(),
-                  builtins  := builtins(),
-                  options   := [option()],
-                  context   => context(),
-                  vars      => [var_name()],
-                  functions := #{ fun_name() => fun_def() } }.
+-type env() :: #{ type_env   := type_env(),
+                  fun_env    := fun_env(),
+                  con_env    := con_env(),
+                  event_type := aeso_syntax:typedef(),
+                  builtins   := builtins(),
+                  options    := [option()],
+                  context    => context(),
+                  vars       => [var_name()],
+                  functions  := #{ fun_name() => fun_def() } }.
 
 %% -- Entrypoint -------------------------------------------------------------
 
@@ -229,7 +230,7 @@ to_fcode(Env, [{contract, _, {con, _, Main}, Decls}]) ->
     MainEnv = Env#{ context  => {main_contract, Main},
                     builtins => Builtins#{[Main, "state"]          => {get_state, none},
                                           [Main, "put"]            => {set_state, 1},
-                                          [Main, "Chain", "event"] => {event, 1}} },
+                                          [Main, "Chain", "event"] => {chain_event, 1}} },
     #{ functions := Funs } = Env1 =
         decls_to_fcode(MainEnv, Decls),
     StateType = lookup_type(Env1, [Main, "state"], [], {tuple, []}),
@@ -237,7 +238,7 @@ to_fcode(Env, [{contract, _, {con, _, Main}, Decls}]) ->
     #{ contract_name => Main,
        state_type    => StateType,
        event_type    => EventType,
-       functions     => Funs };
+       functions     => add_event_function(Env1, EventType, Funs) };
 to_fcode(Env, [{contract, _, {con, _, Con}, Decls} | Code]) ->
     Env1 = decls_to_fcode(Env#{ context => {abstract_contract, Con} }, Decls),
     to_fcode(Env1, Code);
@@ -303,7 +304,11 @@ typedef_to_fcode(Env, {id, _, Name}, Xs, Def) ->
             _ -> #{}
         end,
     Env1 = bind_constructors(Env, Constructors),
-    bind_type(Env1, Q, FDef).
+    Env2 = case Name of
+             "event" -> Env1#{ event_type => Def };
+             _       -> Env1
+           end,
+    bind_type(Env2, Q, FDef).
 
 -spec type_to_fcode(env(), aeso_syntax:type()) -> ftype().
 type_to_fcode(Env, Type) ->
@@ -788,6 +793,8 @@ op_builtins() ->
 
 builtin_to_fcode(require, [Cond, Msg]) ->
     make_if(Cond, {tuple, []}, {builtin, abort, [Msg]});
+builtin_to_fcode(chain_event, [Event]) ->
+    {def, event, [Event]};
 builtin_to_fcode(map_delete, [Key, Map]) ->
     {op, map_delete, [Map, Key]};
 builtin_to_fcode(map_member, [Key, Map]) ->
@@ -805,6 +812,36 @@ builtin_to_fcode(Builtin, Args) ->
         true  -> {op, Builtin, Args};
         false -> {builtin, Builtin, Args}
     end.
+
+%% -- Event function --
+
+add_event_function(_Env, none, Funs) -> Funs;
+add_event_function(Env, EventFType, Funs) ->
+    Funs#{ event => event_function(Env, EventFType) }.
+
+event_function(_Env = #{event_type := {variant_t, EventCons}}, EventType = {variant, FCons}) ->
+    Cons = [ {Name, I - 1, proplists:get_value(indices, Ann)}
+             || {I, {constr_t, Ann, {con, _, Name}, _}} <- indexed(EventCons) ],
+    Arities = [length(Ts) || Ts <- FCons],
+    io:format("Cons = ~p\nEventFType = ~p\n", [Cons, EventType]),
+    Case = fun({Name, Tag, Ixs}) ->
+                %% TODO: precompute (needs dependency)
+                Hash = {op, crypto_sha3, [{lit, {string, list_to_binary(Name)}}]},
+                Vars = [ "arg" ++ integer_to_list(I) || I <- lists:seq(1, length(Ixs)) ],
+                IVars = lists:zip(Ixs, Vars),
+                Payload =
+                    case [ V || {notindexed, V} <- IVars ] of
+                        []  -> {lit, {string, <<>>}};
+                        [V] -> {var, V}
+                    end,
+                Indices = [ {var, V} || {indexed, V} <- IVars ],
+                Body = {builtin, chain_event, [Payload, Hash | Indices]},
+                {'case', {con, Arities, Tag, Vars}, {nosplit, Body}}
+           end,
+    #{ attrs  => [stateful, private],
+       args   => [{"e", EventType}],
+       return => {tuple, []},
+       body   => {switch, {split, EventType, "e", lists:map(Case, Cons)}} }.
 
 %% -- Lambda lifting ---------------------------------------------------------
 %% The expr_to_fcode compiler lambda expressions to {lam, Xs, Body}, but in
@@ -1237,7 +1274,8 @@ pp_fun(Name, #{ args := Args, return := Return, body := Body }) ->
                pp_text(" : "), pp_ftype(Return), pp_text(" =")]),
              prettypr:nest(2, pp_fexpr(Body))).
 
-pp_fun_name(init)            -> pp_text("init");
+pp_fun_name(init)            -> pp_text(init);
+pp_fun_name(event)           -> pp_text(event);
 pp_fun_name({entrypoint, E}) -> pp_text(binary_to_list(E));
 pp_fun_name({local_fun, Q})  -> pp_text(string:join(Q, ".")).
 

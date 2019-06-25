@@ -772,11 +772,13 @@ is_word_type({id, _, Name}) ->
     lists:member(Name, ["int", "address", "hash", "bits", "bool"]);
 is_word_type({app_t, _, {id, _, Name}, [_, _]}) ->
     lists:member(Name, ["oracle", "oracle_query"]);
+is_word_type({bytes_t, _, [N]}) -> N =< 32;
 is_word_type({con, _, _}) -> true;
 is_word_type({qcon, _, _}) -> true;
 is_word_type(_) -> false.
 
 is_string_type({id, _, "string"}) -> true;
+is_string_type({bytes_t, _, _}) -> true;
 is_string_type(_) -> false.
 
 -spec check_constructor_overlap(env(), aeso_syntax:con(), type()) -> ok | no_return().

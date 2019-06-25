@@ -140,6 +140,7 @@ make_function_id(X) ->
     aeb_fate_code:symbol_identifier(make_function_name(X)).
 
 make_function_name(init)               -> <<"init">>;
+make_function_name(event)              -> <<"Chain.event">>;
 make_function_name({entrypoint, Name}) -> Name;
 make_function_name({local_fun, Xs})    -> list_to_binary("." ++ string:join(Xs, ".")).
 
@@ -469,8 +470,9 @@ builtin_to_scode(_Env, get_state, []) ->
 builtin_to_scode(Env, set_state, [_] = Args) ->
     call_to_scode(Env, [aeb_fate_ops:store(?s, ?a),
                         tuple(0)], Args);
-builtin_to_scode(_Env, event, [_] = _Args) ->
-    ?TODO(fate_event_instruction);
+builtin_to_scode(Env, chain_event, Args) ->
+    call_to_scode(Env, [erlang:apply(aeb_fate_ops, log, lists:duplicate(length(Args), ?a)),
+                        tuple(0)], Args);
 builtin_to_scode(_Env, map_empty, []) ->
     [aeb_fate_ops:map_empty(?a)];
 builtin_to_scode(_Env, bits_none, []) ->
@@ -844,11 +846,11 @@ attributes(I) ->
         {'DIFFICULTY', A}                     -> Pure(A, []);
         {'GASLIMIT', A}                       -> Pure(A, []);
         {'GAS', A}                            -> Impure(?a, A);
-        {'LOG0', A, B}                        -> Impure(none, [A, B]);
-        {'LOG1', A, B, C}                     -> Impure(none, [A, B, C]);
-        {'LOG2', A, B, C, D}                  -> Impure(none, [A, B, C, D]);
-        {'LOG3', A, B, C, D, E}               -> Impure(none, [A, B, C, D, E]);
-        {'LOG4', A, B, C, D, E, F}            -> Impure(none, [A, B, C, D, E, F]);
+        {'LOG0', A}                           -> Impure(none, [A]);
+        {'LOG1', A, B}                        -> Impure(none, [A, B]);
+        {'LOG2', A, B, C}                     -> Impure(none, [A, B, C]);
+        {'LOG3', A, B, C, D}                  -> Impure(none, [A, B, C, D]);
+        {'LOG4', A, B, C, D, E}               -> Impure(none, [A, B, C, D, E]);
         'DEACTIVATE'                          -> Impure(none, []);
         {'SPEND', A, B}                       -> Impure(none, [A, B]);
 
