@@ -137,6 +137,7 @@
                   vars       => [var_name()],
                   functions  := #{ fun_name() => fun_def() } }.
 
+-define(HASH_BYTES, 32).
 %% -- Entrypoint -------------------------------------------------------------
 
 %% Main entrypoint. Takes typed syntax produced by aeso_ast_infer_types:infer/1,2
@@ -829,8 +830,8 @@ event_function(_Env = #{event_type := {variant_t, EventCons}}, EventType = {vari
              || {I, {constr_t, Ann, {con, _, Name}, _}} <- indexed(EventCons) ],
     Arities = [length(Ts) || Ts <- FCons],
     Case = fun({Name, Tag, Ixs}) ->
-                %% TODO: precompute (needs dependency)
-                Hash = {op, crypto_sha3, [{lit, {string, list_to_binary(Name)}}]},
+                {ok, HashValue} = eblake2:blake2b(?HASH_BYTES, list_to_binary(Name)),
+                Hash = {lit, {bytes, HashValue}},
                 Vars = [ "arg" ++ integer_to_list(I) || I <- lists:seq(1, length(Ixs)) ],
                 IVars = lists:zip(Ixs, Vars),
                 Payload =
