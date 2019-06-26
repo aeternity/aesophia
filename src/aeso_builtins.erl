@@ -62,6 +62,8 @@ v(X) when is_list(X) -> #var_ref{name = X}.
 option_none()  -> {tuple, [{integer, 0}]}.
 option_some(X) -> {tuple, [{integer, 1}, X]}.
 
+-define(HASH_BYTES, 32).
+
 -define(call(Fun, Args), #funcall{ function = #var_ref{ name = {builtin, Fun} }, args = Args }).
 -define(I(X), {integer, X}).
 -define(V(X), v(X)).
@@ -92,12 +94,6 @@ op(Op, A, B) -> {binop, Op, operand(A), operand(B)}.
 operand(A) when is_atom(A) -> v(A);
 operand(I) when is_integer(I) -> {integer, I};
 operand(T) -> T.
-
-str_to_icode(String) when is_list(String) ->
-    str_to_icode(list_to_binary(String));
-str_to_icode(BinStr) ->
-    Cpts = [size(BinStr) | aeb_memory:binary_to_words(BinStr)],
-    #tuple{ cpts = [ #integer{value = X} || X <- Cpts ] }.
 
 check_event_type(Icode) ->
     case maps:get(event_type, Icode) of
@@ -192,7 +188,8 @@ builtin_event(EventT) ->
             Types     = [ T || {_Ix, T} <- IxTypes ],
             Indexed   = [ Ix(Type, Var) || {Var, {indexed, Type}} <- lists:zip(ArgPats(Types), IxTypes) ],
             Data      = [ {Type, Var} || {Var, {notindexed, Type}} <- lists:zip(ArgPats(Types), IxTypes) ],
-            EvtIndex  = {unop, 'sha3', str_to_icode(Con)},
+            {ok, <<EvtIndexN:256>>} = eblake2:blake2b(?HASH_BYTES, list_to_binary(Con)),
+            EvtIndex  = {integer, EvtIndexN},
             {event, lists:reverse(Indexed) ++ [EvtIndex], Payload(Data)}
         end,
     Pat = fun(Tag, Types) -> {tuple, [{integer, Tag} | ArgPats(Types)]} end,

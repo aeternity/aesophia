@@ -8,7 +8,8 @@
     jsx,
     syntax_tools,
     getopt,
-    aebytecode
+    aebytecode,
+    eblake2
    ]},
   {env,[]},
   {modules, []},
