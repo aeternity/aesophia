@@ -116,7 +116,8 @@ compilable_contracts() ->
      "bytes_equality",
      "address_chain",
      "namespace_bug",
-     "bytes_to_x"
+     "bytes_to_x",
+     "aens"
     ].
 
 not_yet_compilable(fate) -> [];

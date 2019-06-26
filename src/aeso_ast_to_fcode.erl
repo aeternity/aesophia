@@ -489,6 +489,11 @@ expr_to_fcode(Env, Type, {app, _Ann, Fun = {typed, _, _, {fun_t, _, NamedArgsT, 
             {oracle, QType, RType} = type_to_fcode(Env, OType),
             TypeArgs = [{lit, {typerep, QType}}, {lit, {typerep, RType}}],
             builtin_to_fcode(B, FArgs ++ TypeArgs);
+        {builtin_u, B, _} when B =:= aens_resolve ->
+            %% Get the type we are assuming the name resolves to
+            AensType = type_to_fcode(Env, Type),
+            TypeArgs = [{lit, {typerep, AensType}}],
+            builtin_to_fcode(B, FArgs ++ TypeArgs);
         {builtin_u, B, _Ar}       -> builtin_to_fcode(B, FArgs);
         {def_u, F, _Ar}           -> {def, F, FArgs};
         {remote_u, Ct, RFun, _Ar} -> {remote, Ct, RFun, FArgs};
