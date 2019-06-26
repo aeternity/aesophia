@@ -542,16 +542,20 @@ builtin_to_scode(Env, address_is_oracle, [_] = Args) ->
     call_to_scode(Env, aeb_fate_ops:is_oracle(?a, ?a), Args);
 builtin_to_scode(Env, address_is_contract, [_] = Args) ->
     call_to_scode(Env, aeb_fate_ops:is_contract(?a, ?a), Args);
-builtin_to_scode(_Env, aens_resolve, [_, _] = _Args) ->
-    ?TODO(fate_aens_resolve_instruction);
-builtin_to_scode(_Env, aens_preclaim, [_, _, _] = _Args) ->
-    ?TODO(fate_aens_preclaim_instruction);
-builtin_to_scode(_Env, aens_claim, [_, _, _, _] = _Args) ->
-    ?TODO(fate_aens_claim_instruction);
-builtin_to_scode(_Env, aens_transfer, [_, _, _, _] = _Args) ->
-    ?TODO(fate_aens_transfer_instruction);
-builtin_to_scode(_Env, aens_revoke, [_, _, _] = _Args) ->
-    ?TODO(fate_aens_revoke_instruction);
+builtin_to_scode(Env, aens_resolve, [_Name, _Key, _Type] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:aens_resolve(?a, ?a, ?a, ?a), Args);
+builtin_to_scode(Env, aens_preclaim, [_Sign, _Account, _Hash] = Args) ->
+    call_to_scode(Env, [aeb_fate_ops:aens_preclaim(?a, ?a, ?a),
+                        tuple(0)], Args);
+builtin_to_scode(Env, aens_claim, [_Sign, _Account, _NameString, _Salt] = Args) ->
+    call_to_scode(Env, [aeb_fate_ops:aens_claim(?a, ?a, ?a, ?a),
+                        tuple(0)], Args);
+builtin_to_scode(Env, aens_transfer, [_Sign, _From, _To, _Name] = Args) ->
+    call_to_scode(Env, [aeb_fate_ops:aens_transfer(?a, ?a, ?a, ?a),
+                        tuple(0)], Args);
+builtin_to_scode(Env, aens_revoke, [_Sign, _Account, _Name] = Args) ->
+    call_to_scode(Env, [aeb_fate_ops:aens_revoke(?a, ?a, ?a),
+                        tuple(0)], Args);
 builtin_to_scode(_Env, auth_tx_hash, []) ->
     [aeb_fate_ops:auth_tx_hash(?a)].
 
@@ -853,7 +857,6 @@ attributes(I) ->
         {'LOG4', A, B, C, D, E}               -> Impure(none, [A, B, C, D, E]);
         'DEACTIVATE'                          -> Impure(none, []);
         {'SPEND', A, B}                       -> Impure(none, [A, B]);
-
         {'ORACLE_REGISTER', A, B, C, D, E, F, G} -> Impure(A, [B, C, D, E, F, G]);
         {'ORACLE_QUERY', A, B, C, D, E, F, G, H} -> Impure(A, [B, C, D, E, F, G, H]);
         {'ORACLE_RESPOND', A, B, C, D, E, F}  -> Impure(none, [A, B, C, D, E, F]);
@@ -861,12 +864,12 @@ attributes(I) ->
         {'ORACLE_GET_ANSWER', A, B, C, D, E}  -> Impure(A, [B, C, D, E]);
         {'ORACLE_GET_QUESTION', A, B, C, D, E}-> Impure(A, [B, C, D, E]);
         {'ORACLE_QUERY_FEE', A, B}            -> Impure(A, [B]);
-        'AENS_RESOLVE'                        -> Impure(?a, []);  %% TODO
-        'AENS_PRECLAIM'                       -> Impure(?a, []);  %% TODO
-        'AENS_CLAIM'                          -> Impure(?a, []);  %% TODO
-        'AENS_UPDATE'                         -> Impure(?a, []);  %% TODO
-        'AENS_TRANSFER'                       -> Impure(?a, []);  %% TODO
-        'AENS_REVOKE'                         -> Impure(?a, []);  %% TODO
+        {'AENS_RESOLVE', A, B, C, D}          -> Impure(A, [B, C, D]);
+        {'AENS_PRECLAIM', A, B, C}            -> Impure(none, [A, B, C]);
+        {'AENS_CLAIM', A, B, C, D}            -> Impure(none, [A, B, C, D]);
+        'AENS_UPDATE'                         -> Impure(none, []);%% TODO
+        {'AENS_TRANSFER', A, B, C, D}         -> Impure(none, [A, B, C, D]);
+        {'AENS_REVOKE', A, B, C}              -> Impure(none, [A, B, C]);
         {'ABORT', A}                          -> Impure(pc, A);
         {'EXIT', A}                           -> Impure(pc, A);
         'NOP'                                 -> Pure(none, [])
