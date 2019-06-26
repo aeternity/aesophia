@@ -119,11 +119,12 @@ check_event_type(EvtName, Ix, Type, Icode) ->
         catch _:_ ->
             error({EvtName, could_not_resolve_type, Type})
         end,
-    case {Ix, VMType} of
-        {indexed, word}      -> ok;
-        {notindexed, string} -> ok;
-        {indexed, _}         -> error({EvtName, indexed_field_should_be_word, is, VMType});
-        {notindexed, _}      -> error({EvtName, payload_should_be_string, is, VMType})
+    case {Ix, VMType, Type} of
+        {indexed, word, _}      -> ok;
+        {notindexed, string, _} -> ok;
+        {notindexed, _, {bytes_t, _, N}} when N > 32 -> ok;
+        {indexed, _, _}         -> error({EvtName, indexed_field_should_be_word, is, VMType});
+        {notindexed, _, _}      -> error({EvtName, payload_should_be_string, is, VMType})
     end.
 
 bfun(B, {IArgs, IExpr, IRet}) ->
@@ -177,16 +178,22 @@ builtin_event(EventT) ->
     VIx       = fun(Ix) -> v(lists:concat(["v", Ix])) end,
     ArgPats   = fun(Ts) -> [ VIx(Ix) || Ix <- lists:seq(0, length(Ts) - 1) ] end,
     Payload = %% Should put data ptr, length on stack.
-        fun([]) ->  {inline_asm, [A(?PUSH1), 0, A(?PUSH1), 0]};
-           ([V]) -> {seq, [V, {inline_asm, [A(?DUP1), A(?MLOAD),                  %% length, ptr
-                                            A(?SWAP1), A(?PUSH1), 32, A(?ADD)]}]} %% ptr+32, length
+        fun([])            -> {inline_asm, [A(?PUSH1), 0, A(?PUSH1), 0]};
+           ([{{id, _, "string"}, V}]) ->
+                {seq, [V, {inline_asm, [A(?DUP1), A(?MLOAD),  %% length, ptr
+                       A(?SWAP1), A(?PUSH1), 32, A(?ADD)]}]}; %% ptr+32, length
+           ([{{bytes_t, _, N}, V}]) -> {seq, [V, {integer, N}, {inline_asm, A(?SWAP1)}]}
         end,
+    Ix =
+        fun({bytes_t, _, N}, V) when N < 32 -> ?BSR(V, 32 - N);
+           (_, V) -> V end,
     Clause =
         fun(_Tag, {con, _, Con}, IxTypes) ->
             Types     = [ T || {_Ix, T} <- IxTypes ],
-            Indexed   = [ Var || {Var, {indexed, _Type}} <- lists:zip(ArgPats(Types), IxTypes) ],
+            Indexed   = [ Ix(Type, Var) || {Var, {indexed, Type}} <- lists:zip(ArgPats(Types), IxTypes) ],
+            Data      = [ {Type, Var} || {Var, {notindexed, Type}} <- lists:zip(ArgPats(Types), IxTypes) ],
             EvtIndex  = {unop, 'sha3', str_to_icode(Con)},
-            {event, lists:reverse(Indexed) ++ [EvtIndex], Payload(ArgPats(Types) -- Indexed)}
+            {event, lists:reverse(Indexed) ++ [EvtIndex], Payload(Data)}
         end,
     Pat = fun(Tag, Types) -> {tuple, [{integer, Tag} | ArgPats(Types)]} end,
 

@@ -16,11 +16,11 @@
 
 -type option() :: term().
 
--type attribute() :: stateful | pure.
+-type attribute() :: stateful | pure | private.
 
 -type fun_name() :: {entrypoint, binary()}
                   | {local_fun, [string()]}
-                  | init.
+                  | init | event.
 -type var_name() :: string().
 -type sophia_name() :: [string()].
 
@@ -127,14 +127,15 @@
                  | {namespace, string()}
                  | {abstract_contract, string()}.
 
--type env() :: #{ type_env  := type_env(),
-                  fun_env   := fun_env(),
-                  con_env   := con_env(),
-                  builtins  := builtins(),
-                  options   := [option()],
-                  context   => context(),
-                  vars      => [var_name()],
-                  functions := #{ fun_name() => fun_def() } }.
+-type env() :: #{ type_env   := type_env(),
+                  fun_env    := fun_env(),
+                  con_env    := con_env(),
+                  event_type => aeso_syntax:typedef(),
+                  builtins   := builtins(),
+                  options    := [option()],
+                  context    => context(),
+                  vars       => [var_name()],
+                  functions  := #{ fun_name() => fun_def() } }.
 
 %% -- Entrypoint -------------------------------------------------------------
 
@@ -175,11 +176,12 @@ builtins() ->
               {["Chain"],    [{"spend", 2}, {"balance", 1}, {"block_hash", 1}, {"coinbase", none},
                               {"timestamp", none}, {"block_height", none}, {"difficulty", none},
                               {"gas_limit", none}]},
-              {["Contract"], [{"address", none}, {"balance", none}]},
+              {["Contract"], [{"address", none}, {"balance", none}, {"creator", none}]},
               {["Call"],     [{"origin", none}, {"caller", none}, {"value", none}, {"gas_price", none},
                               {"gas_left", 0}]},
               {["Oracle"],   [{"register", 4}, {"query_fee", 1}, {"query", 5}, {"get_question", 2},
-                              {"respond", 4}, {"extend", 3}, {"get_answer", 2}]},
+                              {"respond", 4}, {"extend", 3}, {"get_answer", 2},
+                              {"check", 1}, {"check_query", 2}]},
               {["AENS"],     [{"resolve", 2}, {"preclaim", 3}, {"claim", 4}, {"transfer", 4},
                               {"revoke", 3}]},
               {["Map"],      [{"from_list", 1}, {"to_list", 1}, {"lookup", 2},
@@ -192,7 +194,7 @@ builtins() ->
                               {"union", 2}, {"difference", 2}, {"none", none}, {"all", none}]},
               {["Bytes"],    [{"to_int", 1}, {"to_str", 1}]},
               {["Int"],      [{"to_str", 1}]},
-              {["Address"],  [{"to_str", 1}]}
+              {["Address"],  [{"to_str", 1}, {"is_oracle", 1}, {"is_contract", 1}]}
              ],
     maps:from_list([ {NS ++ [Fun], {MkName(NS, Fun), Arity}}
                      || {NS, Funs} <- Scopes,
@@ -228,7 +230,7 @@ to_fcode(Env, [{contract, _, {con, _, Main}, Decls}]) ->
     MainEnv = Env#{ context  => {main_contract, Main},
                     builtins => Builtins#{[Main, "state"]          => {get_state, none},
                                           [Main, "put"]            => {set_state, 1},
-                                          [Main, "Chain", "event"] => {event, 1}} },
+                                          [Main, "Chain", "event"] => {chain_event, 1}} },
     #{ functions := Funs } = Env1 =
         decls_to_fcode(MainEnv, Decls),
     StateType = lookup_type(Env1, [Main, "state"], [], {tuple, []}),
@@ -236,7 +238,7 @@ to_fcode(Env, [{contract, _, {con, _, Main}, Decls}]) ->
     #{ contract_name => Main,
        state_type    => StateType,
        event_type    => EventType,
-       functions     => Funs };
+       functions     => add_event_function(Env1, EventType, Funs) };
 to_fcode(Env, [{contract, _, {con, _, Con}, Decls} | Code]) ->
     Env1 = decls_to_fcode(Env#{ context => {abstract_contract, Con} }, Decls),
     to_fcode(Env1, Code);
@@ -302,7 +304,11 @@ typedef_to_fcode(Env, {id, _, Name}, Xs, Def) ->
             _ -> #{}
         end,
     Env1 = bind_constructors(Env, Constructors),
-    bind_type(Env1, Q, FDef).
+    Env2 = case Name of
+             "event" -> Env1#{ event_type => Def };
+             _       -> Env1
+           end,
+    bind_type(Env2, Q, FDef).
 
 -spec type_to_fcode(env(), aeso_syntax:type()) -> ftype().
 type_to_fcode(Env, Type) ->
@@ -475,7 +481,9 @@ expr_to_fcode(Env, Type, {app, _Ann, Fun = {typed, _, _, {fun_t, _, NamedArgsT, 
                                B =:= oracle_get_question;
                                B =:= oracle_get_answer;
                                B =:= oracle_respond;
-                               B =:= oracle_register ->
+                               B =:= oracle_register;
+                               B =:= oracle_check;
+                               B =:= oracle_check_query ->
             %% Get the type of the oracle from the args or the expression itself
             OType = get_oracle_type(B, Type, Args1),
             {oracle, QType, RType} = type_to_fcode(Env, OType),
@@ -547,10 +555,12 @@ make_if(Cond, Then, Else) ->
 
 
 get_oracle_type(oracle_register,     OType, _Args) -> OType;
-get_oracle_type(oracle_query,        _Type, [{typed, _,_Expr, OType}|_]) -> OType;
-get_oracle_type(oracle_get_question, _Type, [{typed, _,_Expr, OType}|_]) -> OType;
-get_oracle_type(oracle_get_answer,   _Type, [{typed, _,_Expr, OType}|_]) -> OType;
-get_oracle_type(oracle_respond,      _Type, [_,{typed, _,_Expr, OType}|_]) -> OType.
+get_oracle_type(oracle_query,        _Type, [{typed, _, _Expr, OType} | _])   -> OType;
+get_oracle_type(oracle_get_question, _Type, [{typed, _, _Expr, OType} | _])   -> OType;
+get_oracle_type(oracle_get_answer,   _Type, [{typed, _, _Expr, OType} | _])   -> OType;
+get_oracle_type(oracle_check,        _Type, [{typed, _, _Expr, OType}])       -> OType;
+get_oracle_type(oracle_check_query,  _Type, [{typed, _, _Expr, OType} | _])   -> OType;
+get_oracle_type(oracle_respond,      _Type, [_, {typed, _,_Expr, OType} | _]) -> OType.
 
 %% -- Pattern matching --
 
@@ -783,6 +793,8 @@ op_builtins() ->
 
 builtin_to_fcode(require, [Cond, Msg]) ->
     make_if(Cond, {tuple, []}, {builtin, abort, [Msg]});
+builtin_to_fcode(chain_event, [Event]) ->
+    {def, event, [Event]};
 builtin_to_fcode(map_delete, [Key, Map]) ->
     {op, map_delete, [Map, Key]};
 builtin_to_fcode(map_member, [Key, Map]) ->
@@ -800,6 +812,35 @@ builtin_to_fcode(Builtin, Args) ->
         true  -> {op, Builtin, Args};
         false -> {builtin, Builtin, Args}
     end.
+
+%% -- Event function --
+
+add_event_function(_Env, none, Funs) -> Funs;
+add_event_function(Env, EventFType, Funs) ->
+    Funs#{ event => event_function(Env, EventFType) }.
+
+event_function(_Env = #{event_type := {variant_t, EventCons}}, EventType = {variant, FCons}) ->
+    Cons = [ {Name, I - 1, proplists:get_value(indices, Ann)}
+             || {I, {constr_t, Ann, {con, _, Name}, _}} <- indexed(EventCons) ],
+    Arities = [length(Ts) || Ts <- FCons],
+    Case = fun({Name, Tag, Ixs}) ->
+                %% TODO: precompute (needs dependency)
+                Hash = {op, crypto_sha3, [{lit, {string, list_to_binary(Name)}}]},
+                Vars = [ "arg" ++ integer_to_list(I) || I <- lists:seq(1, length(Ixs)) ],
+                IVars = lists:zip(Ixs, Vars),
+                Payload =
+                    case [ V || {notindexed, V} <- IVars ] of
+                        []  -> {lit, {string, <<>>}};
+                        [V] -> {var, V}
+                    end,
+                Indices = [ {var, V} || {indexed, V} <- IVars ],
+                Body = {builtin, chain_event, [Payload, Hash | Indices]},
+                {'case', {con, Arities, Tag, Vars}, {nosplit, Body}}
+           end,
+    #{ attrs  => [private],
+       args   => [{"e", EventType}],
+       return => {tuple, []},
+       body   => {switch, {split, EventType, "e", lists:map(Case, Cons)}} }.
 
 %% -- Lambda lifting ---------------------------------------------------------
 %% The expr_to_fcode compiler lambda expressions to {lam, Xs, Body}, but in
@@ -1232,7 +1273,8 @@ pp_fun(Name, #{ args := Args, return := Return, body := Body }) ->
                pp_text(" : "), pp_ftype(Return), pp_text(" =")]),
              prettypr:nest(2, pp_fexpr(Body))).
 
-pp_fun_name(init)            -> pp_text("init");
+pp_fun_name(init)            -> pp_text(init);
+pp_fun_name(event)           -> pp_text(event);
 pp_fun_name({entrypoint, E}) -> pp_text(binary_to_list(E));
 pp_fun_name({local_fun, Q})  -> pp_text(string:join(Q, ".")).
 
@@ -1261,6 +1303,8 @@ pp_punctuate(Sep, [X | Xs]) -> [pp_beside(X, Sep) | pp_punctuate(Sep, Xs)].
 
 pp_par([]) -> prettypr:empty();
 pp_par(Xs) -> prettypr:par(Xs).
+pp_fexpr({lit, {typerep, T}}) ->
+    pp_ftype(T);
 pp_fexpr({lit, {Tag, Lit}}) ->
     aeso_pretty:expr({Tag, [], Lit});
 pp_fexpr(nil) ->
@@ -1321,18 +1365,23 @@ pp_fexpr({switch, Split}) -> pp_split(Split).
 pp_call(Fun, Args) ->
     pp_beside(Fun, pp_fexpr({tuple, Args})).
 
+pp_call_t(Fun, Args) ->
+    pp_beside(pp_text(Fun), pp_ftype({tuple, Args})).
+
+-spec pp_ftype(ftype()) -> any().
 pp_ftype(T) when is_atom(T) -> pp_text(T);
 pp_ftype(any) -> pp_text("_");
 pp_ftype({tvar, X}) -> pp_text(X);
-pp_ftype({bytes, N}) -> pp_text("bytes(" ++ integer_to_list(N) ++ ")");
+pp_ftype({bytes, N}) -> pp_call(pp_text("bytes"), [{lit, {int, N}}]);
+pp_ftype({oracle, Q, R}) -> pp_call_t("oracle", [Q, R]);
 pp_ftype({tuple, Ts}) ->
     pp_parens(pp_par(pp_punctuate(pp_text(","), [pp_ftype(T) || T <- Ts])));
 pp_ftype({list, T}) ->
-    pp_beside([pp_text("list("), pp_ftype(T), pp_text(")")]);
+    pp_call_t("list", [T]);
 pp_ftype({function, Args, Res}) ->
     pp_par([pp_ftype({tuple, Args}), pp_text("=>"), pp_ftype(Res)]);
 pp_ftype({map, Key, Val}) ->
-    pp_beside([pp_text("map"), pp_ftype({tuple, [Key, Val]})]);
+    pp_call_t("map", [Key, Val]);
 pp_ftype({variant, Cons}) ->
     pp_par(
     pp_punctuate(pp_text(" |"),

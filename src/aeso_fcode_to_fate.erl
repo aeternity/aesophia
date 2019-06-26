@@ -104,6 +104,11 @@
      Op =:= 'AUTH_TX_HASH'    orelse
      Op =:= 'BYTES_TO_INT'    orelse
      Op =:= 'BYTES_TO_STR'    orelse
+     Op =:= 'ORACLE_CHECK'    orelse
+     Op =:= 'ORACLE_CHECK_QUERY' orelse
+     Op =:= 'IS_ORACLE'       orelse
+     Op =:= 'IS_CONTRACT'     orelse
+     Op =:= 'CREATOR'         orelse
      false)).
 
 -record(env, { contract, vars = [], locals = [], tailpos = true }).
@@ -135,6 +140,7 @@ make_function_id(X) ->
     aeb_fate_code:symbol_identifier(make_function_name(X)).
 
 make_function_name(init)               -> <<"init">>;
+make_function_name(event)              -> <<"Chain.event">>;
 make_function_name({entrypoint, Name}) -> Name;
 make_function_name({local_fun, Xs})    -> list_to_binary("." ++ string:join(Xs, ".")).
 
@@ -464,8 +470,9 @@ builtin_to_scode(_Env, get_state, []) ->
 builtin_to_scode(Env, set_state, [_] = Args) ->
     call_to_scode(Env, [aeb_fate_ops:store(?s, ?a),
                         tuple(0)], Args);
-builtin_to_scode(_Env, event, [_] = _Args) ->
-    ?TODO(fate_event_instruction);
+builtin_to_scode(Env, chain_event, Args) ->
+    call_to_scode(Env, [erlang:apply(aeb_fate_ops, log, lists:duplicate(length(Args), ?a)),
+                        tuple(0)], Args);
 builtin_to_scode(_Env, map_empty, []) ->
     [aeb_fate_ops:map_empty(?a)];
 builtin_to_scode(_Env, bits_none, []) ->
@@ -499,6 +506,8 @@ builtin_to_scode(_Env, contract_balance, []) ->
     [aeb_fate_ops:balance(?a)];
 builtin_to_scode(_Env, contract_address, []) ->
     [aeb_fate_ops:address(?a)];
+builtin_to_scode(_Env, contract_creator, []) ->
+    [aeb_fate_ops:contract_creator(?a)];
 builtin_to_scode(_Env, call_origin, []) ->
     [aeb_fate_ops:origin(?a)];
 builtin_to_scode(_Env, call_caller, []) ->
@@ -525,6 +534,14 @@ builtin_to_scode(Env, oracle_extend, [_Sign, _Oracle, _TTL] = Args) ->
                         tuple(0)], Args);
 builtin_to_scode(Env, oracle_get_answer, [_Oracle, _QueryId, _QType, _RType] = Args) ->
     call_to_scode(Env, aeb_fate_ops:oracle_get_answer(?a, ?a, ?a, ?a, ?a), Args);
+builtin_to_scode(Env, oracle_check, [_Oracle, _QType, _RType] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:oracle_check(?a, ?a, ?a, ?a), Args);
+builtin_to_scode(Env, oracle_check_query, [_Oracle, _Query, _QType, _RType] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:oracle_check_query(?a, ?a, ?a, ?a, ?a), Args);
+builtin_to_scode(Env, address_is_oracle, [_] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:is_oracle(?a, ?a), Args);
+builtin_to_scode(Env, address_is_contract, [_] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:is_contract(?a, ?a), Args);
 builtin_to_scode(_Env, aens_resolve, [_, _] = _Args) ->
     ?TODO(fate_aens_resolve_instruction);
 builtin_to_scode(_Env, aens_preclaim, [_, _, _] = _Args) ->
@@ -810,6 +827,11 @@ attributes(I) ->
         {'AUTH_TX_HASH', A}                   -> Pure(A, []);
         {'BYTES_TO_INT', A, B}                -> Pure(A, [B]);
         {'BYTES_TO_STR', A, B}                -> Pure(A, [B]);
+        {'ORACLE_CHECK', A, B, C, D}          -> Impure(A, [B, C, D]);
+        {'ORACLE_CHECK_QUERY', A, B, C, D, E} -> Impure(A, [B, C, D, E]);
+        {'IS_ORACLE', A, B}                   -> Impure(A, [B]);
+        {'IS_CONTRACT', A, B}                 -> Impure(A, [B]);
+        {'CREATOR', A}                        -> Pure(A, []);
         {'ADDRESS', A}                        -> Pure(A, []);
         {'BALANCE', A}                        -> Impure(A, []);
         {'BALANCE_OTHER', A, B}               -> Impure(A, [B]);
@@ -824,11 +846,11 @@ attributes(I) ->
         {'DIFFICULTY', A}                     -> Pure(A, []);
         {'GASLIMIT', A}                       -> Pure(A, []);
         {'GAS', A}                            -> Impure(?a, A);
-        {'LOG0', A, B}                        -> Impure(none, [A, B]);
-        {'LOG1', A, B, C}                     -> Impure(none, [A, B, C]);
-        {'LOG2', A, B, C, D}                  -> Impure(none, [A, B, C, D]);
-        {'LOG3', A, B, C, D, E}               -> Impure(none, [A, B, C, D, E]);
-        {'LOG4', A, B, C, D, E, F}            -> Impure(none, [A, B, C, D, E, F]);
+        {'LOG0', A}                           -> Impure(none, [A]);
+        {'LOG1', A, B}                        -> Impure(none, [A, B]);
+        {'LOG2', A, B, C}                     -> Impure(none, [A, B, C]);
+        {'LOG3', A, B, C, D}                  -> Impure(none, [A, B, C, D]);
+        {'LOG4', A, B, C, D, E}               -> Impure(none, [A, B, C, D, E]);
         'DEACTIVATE'                          -> Impure(none, []);
         {'SPEND', A, B}                       -> Impure(none, [A, B]);
 
