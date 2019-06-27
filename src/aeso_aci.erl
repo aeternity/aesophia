@@ -75,8 +75,8 @@ join_errors(Prefix, Errors, Pfun) ->
     Ess = [ Pfun(E) || E <- Errors ],
     list_to_binary(string:join([Prefix|Ess], "\n")).
 
-encode_contract(Contract) ->
-    C0 = #{name => encode_name(contract_name(Contract))},
+encode_contract(Contract = {contract, _, {con, _, Name}, _}) ->
+    C0 = #{name => encode_name(Name)},
 
     Tdefs0 = [ encode_typedef(T) || T <- sort_decls(contract_types(Contract)) ],
     FilterT = fun(N) -> fun(#{name := N1}) -> N == N1 end end,
@@ -97,9 +97,13 @@ encode_contract(Contract) ->
 
     Fdefs  = [ encode_function(F)
                || F <- sort_decls(contract_funcs(Contract)),
-                 not is_private(F) ],
+                  is_entrypoint(F) ],
 
-    #{contract => C3#{functions => Fdefs}}.
+    #{contract => C3#{functions => Fdefs}};
+encode_contract(Namespace = {namespace, _, {con, _, Name}, _}) ->
+    Tdefs = [ encode_typedef(T) || T <- sort_decls(contract_types(Namespace)) ],
+    #{namespace => #{name => encode_name(Name),
+                     type_defs => Tdefs}}.
 
 %%  Encode a function definition. Currently we are only interested in
 %%  the interface and type.
@@ -212,23 +216,27 @@ do_render_aci_json(Json) ->
                     _                            -> error(bad_aci_json)
                 end
         end,
-    DecodedContracts = [ decode_contract(C) || #{contract := C} <- Contracts ],
+    DecodedContracts = [ decode_contract(C) || C <- Contracts ],
     {ok, list_to_binary(string:join(DecodedContracts, "\n"))}.
 
-decode_contract(#{name := Name,
-                  type_defs := Ts0,
-                  functions := Fs} = C) ->
+decode_contract(#{contract := #{name := Name,
+                                type_defs := Ts0,
+                                functions := Fs} = C}) ->
     MkTDef = fun(N, T) -> #{name => N, vars => [], typedef => T} end,
     Ts = [ MkTDef(<<"state">>, maps:get(state, C)) || maps:is_key(state, C) ] ++
          [ MkTDef(<<"event">>, maps:get(event, C)) || maps:is_key(event, C) ] ++ Ts0,
-    ["contract"," ",io_lib:format("~s", [Name])," =\n",
-     decode_tdefs(Ts), decode_funcs(Fs)].
+    ["contract ", io_lib:format("~s", [Name])," =\n",
+     decode_tdefs(Ts), decode_funcs(Fs)];
+decode_contract(#{namespace := #{name := Name, type_defs := Ts}}) when Ts /= [] ->
+    ["namespace ", io_lib:format("~s", [Name])," =\n",
+     decode_tdefs(Ts)];
+decode_contract(_) -> [].
 
 decode_funcs(Fs) -> [ decode_func(F) || F <- Fs ].
 
 %% decode_func(#{name := init}) -> [];
 decode_func(#{name := Name, arguments := As, returns := T}) ->
-    ["  function", " ", io_lib:format("~s", [Name]), " : ",
+    ["  entrypoint", " ", io_lib:format("~s", [Name]), " : ",
      decode_args(As), " => ", decode_type(T), $\n].
 
 decode_args(As) ->
@@ -305,9 +313,6 @@ decode_tvar(#{name := N}) -> io_lib:format("~s", [N]).
 
 %% #contract{Ann, Con, [Declarations]}.
 
-contract_name({contract, _, {con, _, Name}, _})  -> Name;
-contract_name({namespace, _, {con, _, Name}, _}) -> Name.
-
 contract_funcs({C, _, _, Decls}) when C == contract; C == namespace ->
     [ D || D <- Decls, is_fun(D)].
 
@@ -328,8 +333,7 @@ sort_decls(Ds) ->
            end,
     lists:sort(Sort, Ds).
 
-
-is_private(Node) -> aeso_syntax:get_ann(private, Node, false).
+is_entrypoint(Node) -> aeso_syntax:get_ann(entrypoint, Node, false).
 is_stateful(Node) -> aeso_syntax:get_ann(stateful, Node, false).
 
 typedef_name({type_def, _, {id, _, Name}, _, _}) -> Name.
