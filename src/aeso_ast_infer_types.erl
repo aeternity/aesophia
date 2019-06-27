@@ -135,6 +135,10 @@ on_current_scope(Env = #env{ namespace = NS, scopes = Scopes }, Fun) ->
     Scope = maps:get(NS, Scopes),
     Env#env{ scopes = Scopes#{ NS => Fun(Scope) } }.
 
+-spec on_scopes(env(), fun((scope()) -> scope())) -> env().
+on_scopes(Env = #env{ namespace = NS, scopes = Scopes }, Fun) ->
+    Env#env{ scopes = maps:map(fun(_, Scope) -> Fun(Scope) end, Scopes) }.
+
 -spec bind_var(aeso_syntax:id(), type(), env()) -> env().
 bind_var({id, Ann, X}, T, Env) ->
     Env#env{ vars = [{X, {Ann, T}} | Env#env.vars] }.
@@ -535,9 +539,15 @@ infer(Contracts, Options) ->
         create_options(Options),
         ets_new(type_vars, [set]),
         {Env1, Decls} = infer1(Env, Contracts, [], Options),
+        {Env2, Decls2} =
+            case proplists:get_value(dont_unfold, Options, false) of
+                true  -> {Env1, Decls};
+                false -> E = on_scopes(Env1, fun(Scope) -> unfold_record_types(Env1, Scope) end),
+                         {E, unfold_record_types(E, Decls)}
+            end,
         case proplists:get_value(return_env, Options, false) of
-            false -> Decls;
-            true  -> {Env1, Decls}
+            false -> Decls2;
+            true  -> {Env2, Decls2}
         end
     after
         clean_up_ets()
@@ -571,14 +581,9 @@ check_scope_name_clash(Env, Kind, Name) ->
 
 -spec infer_contract_top(env(), contract | namespace, [aeso_syntax:decl()], list(option())) ->
     {env(), [aeso_syntax:decl()]}.
-infer_contract_top(Env, Kind, Defs0, Options) ->
+infer_contract_top(Env, Kind, Defs0, _Options) ->
     Defs = desugar(Defs0),
-    {Env1, Defs1} = infer_contract(Env, Kind, Defs),
-    case proplists:get_value(dont_unfold, Options, false) of
-        true  -> {Env1, Defs1};
-        false -> Env2 = on_current_scope(Env1, fun(Scope) -> unfold_record_types(Env1, Scope) end),
-                 {Env2, unfold_record_types(Env2, Defs1)}
-    end.
+    infer_contract(Env, Kind, Defs).
 
 %% TODO: revisit
 infer_constant({letval, Attrs,_Pattern, Type, E}) ->
@@ -2257,7 +2262,9 @@ pp({named_arg_t, _, Name, Type, Default}) ->
 pp({fun_t, _, Named = {uvar, _, _}, As, B}) ->
     ["(", pp(Named), " | ", pp(As), ") => ", pp(B)];
 pp({fun_t, _, Named, As, B}) when is_list(Named) ->
-    ["(", pp(Named ++ As), ") => ", pp(B)].
+    ["(", pp(Named ++ As), ") => ", pp(B)];
+pp(Other) ->
+    io_lib:format("~p", [Other]).
 
 %% -- Pre-type checking desugaring -------------------------------------------
 
