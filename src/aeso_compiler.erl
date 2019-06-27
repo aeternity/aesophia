@@ -253,7 +253,7 @@ insert_call_function(Code, Call, FunName, Args, Options) ->
         [ Code,
           "\n\n",
           lists:duplicate(Ind, " "),
-          "stateful function ", Call,"() = ", FunName, "(", string:join(Args, ","), ")\n"
+          "stateful entrypoint ", Call, "() = ", FunName, "(", string:join(Args, ","), ")\n"
         ]).
 
 -spec insert_init_function(string(), options()) -> string().
@@ -263,7 +263,7 @@ insert_init_function(Code, Options) ->
     lists:flatten(
         [ Code,
           "\n\n",
-          lists:duplicate(Ind, " "), "function init() = ()\n"
+          lists:duplicate(Ind, " "), "entrypoint init() = ()\n"
         ]).
 
 last_contract_indent(Decls) ->

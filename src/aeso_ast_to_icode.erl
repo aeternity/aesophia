@@ -817,13 +817,11 @@ has_maps({list, T})     -> has_maps(T);
 has_maps({tuple, Ts})   -> lists:any(fun has_maps/1, Ts);
 has_maps({variant, Cs}) -> lists:any(fun has_maps/1, lists:append(Cs)).
 
-%% A function is private if marked 'private' or 'internal', or if it's not
-%% defined in the main contract name space. (NOTE: changes when we introduce
-%% inheritance).
+%% A function is private if not an 'entrypoint', or if it's not defined in the
+%% main contract name space. (NOTE: changes when we introduce inheritance).
 is_private(Ann, #{ contract_name := MainContract } = Icode) ->
     {_, _, CurrentNamespace} = aeso_icode:get_namespace(Icode),
-    proplists:get_value(private,  Ann, false) orelse
-    proplists:get_value(internal, Ann, false) orelse
+    not proplists:get_value(entrypoint, Ann, false) orelse
     MainContract /= CurrentNamespace.
 
 %% -------------------------------------------------------------------

@@ -47,7 +47,7 @@ decl() ->
       %% Contract declaration
     [ ?RULE(keyword(contract),  con(), tok('='), maybe_block(decl()), {contract, _1, _2, _4})
     , ?RULE(keyword(namespace), con(), tok('='), maybe_block(decl()), {namespace, _1, _2, _4})
-    , ?RULE(keyword(include),   str(), {include, _2})
+    , ?RULE(keyword(include),   str(), {include, get_ann(_1), _2})
 
       %% Type declarations  TODO: format annotation for "type bla" vs "type bla()"
     , ?RULE(keyword(type),     id(),                                          {type_decl, _1, _2, []})
@@ -60,13 +60,22 @@ decl() ->
     , ?RULE(keyword(datatype), id(), type_vars(), tok('='), typedef(variant), {type_def, _1, _2, _3, _5})
 
       %% Function declarations
-    , ?RULE(modifiers(), keyword(function), id(), tok(':'), type(), add_modifiers(_1, {fun_decl, _2, _3, _5}))
-    , ?RULE(modifiers(), keyword(function), fundef(),               add_modifiers(_1, set_pos(get_pos(_2), _3)))
-    , ?RULE(keyword('let'),    valdef(),                            set_pos(get_pos(_1), _2))
+    , ?RULE(modifiers(), fun_or_entry(), id(), tok(':'), type(), add_modifiers(_1, _2, {fun_decl, get_ann(_2), _3, _5}))
+    , ?RULE(modifiers(), fun_or_entry(), fundef(),               add_modifiers(_1, _2, set_pos(get_pos(get_ann(_2)), _3)))
+    , ?RULE(keyword('let'),    valdef(),                         set_pos(get_pos(_1), _2))
     ])).
 
+fun_or_entry() ->
+    choice([?RULE(keyword(function), {function, _1}),
+            ?RULE(keyword(entrypoint), {entrypoint, _1})]).
+
 modifiers() ->
-    many(choice([token(stateful), token(public), token(private), token(internal)])).
+    many(choice([token(stateful), token(private), token(public)])).
+
+add_modifiers(Mods, Entry = {entrypoint, _}, Node) ->
+    add_modifiers(Mods ++ [Entry], Node);
+add_modifiers(Mods, {function, _}, Node) ->
+    add_modifiers(Mods, Node).
 
 add_modifiers([], Node) -> Node;
 add_modifiers(Mods = [Tok | _], Node) ->
@@ -513,7 +522,7 @@ expand_includes(AST, Opts) ->
 
 expand_includes([], Acc, _Opts) ->
     {ok, lists:reverse(Acc)};
-expand_includes([{include, S = {string, _, File}} | AST], Acc, Opts) ->
+expand_includes([{include, _, S = {string, _, File}} | AST], Acc, Opts) ->
     case read_file(File, Opts) of
         {ok, Bin} ->
             Opts1 = lists:keystore(src_file, 1, Opts, {src_file, File}),
