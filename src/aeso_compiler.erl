@@ -288,25 +288,40 @@ to_sophia_value(_, _, revert, Data, _Options) ->
     end;
 to_sophia_value(ContractString, FunName, ok, Data, Options) ->
     try
-        #{ typed_ast := TypedAst,
-           type_env  := TypeEnv,
-           icode     := Icode } = string_to_code(ContractString, Options),
+        Code = string_to_code(ContractString, Options),
+        #{ typed_ast := TypedAst, type_env  := TypeEnv} = Code,
         {ok, _, Type0} = get_decode_type(FunName, TypedAst),
         Type   = aeso_ast_infer_types:unfold_types_in_type(TypeEnv, Type0, [unfold_record_types, unfold_variant_types]),
-        VmType = aeso_ast_to_icode:ast_typerep(Type, Icode),
-        case aeb_heap:from_binary(VmType, Data) of
-            {ok, VmValue} ->
-                try
-                    {ok, aeso_vm_decode:from_aevm(VmType, Type, VmValue)}
-                catch throw:cannot_translate_to_sophia ->
-                    Type0Str = prettypr:format(aeso_pretty:type(Type0)),
-                    {error, join_errors("Translation error", [lists:flatten(io_lib:format("Cannot translate VM value ~p\n  of type ~p\n  to Sophia type ~s\n",
-                                                                            [Data, VmType, Type0Str]))],
-                                        fun (E) -> E end)}
+
+        case proplists:get_value(backend, Options, aevm) of
+            aevm ->
+                Icode  = maps:get(icode, Code),
+                VmType = aeso_ast_to_icode:ast_typerep(Type, Icode),
+                case aeb_heap:from_binary(VmType, Data) of
+                    {ok, VmValue} ->
+                        try
+                            {ok, aeso_vm_decode:from_aevm(VmType, Type, VmValue)}
+                        catch throw:cannot_translate_to_sophia ->
+                            Type0Str = prettypr:format(aeso_pretty:type(Type0)),
+                            {error, join_errors("Translation error", [lists:flatten(io_lib:format("Cannot translate VM value ~p\n  of type ~p\n  to Sophia type ~s\n",
+                                                                                    [Data, VmType, Type0Str]))],
+                                                fun (E) -> E end)}
+                        end;
+                    {error, _Err} ->
+                        {error, join_errors("Decode errors", [lists:flatten(io_lib:format("Failed to decode binary at type ~p", [VmType]))],
+                                            fun(E) -> E end)}
                 end;
-            {error, _Err} ->
-                {error, join_errors("Decode errors", [lists:flatten(io_lib:format("Failed to decode binary at type ~p", [VmType]))],
-                                    fun(E) -> E end)}
+            fate ->
+               try
+                   {ok, aeso_vm_decode:from_fate(Type, aeb_fate_encoding:deserialize(Data))}
+               catch throw:cannot_translate_to_sophia ->
+                   {error, join_errors("Translation error",
+                                       [lists:flatten(io_lib:format("Cannot translate fate value ~p\n of Sophia type ~s\n",
+                                                                    [aeb_fate_encoding:deserialize(Data), Type]))],
+                                       fun (E) -> E end)};
+                     _:R ->
+                   {error, iolist_to_binary(io_lib:format("Decode error ~p: ~p\n", [R, erlang:get_stacktrace()]))}
+               end
         end
     catch
         error:{parse_errors, Errors} ->
