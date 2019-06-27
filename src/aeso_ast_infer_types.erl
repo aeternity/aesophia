@@ -136,7 +136,7 @@ on_current_scope(Env = #env{ namespace = NS, scopes = Scopes }, Fun) ->
     Env#env{ scopes = Scopes#{ NS => Fun(Scope) } }.
 
 -spec on_scopes(env(), fun((scope()) -> scope())) -> env().
-on_scopes(Env = #env{ namespace = NS, scopes = Scopes }, Fun) ->
+on_scopes(Env = #env{ scopes = Scopes }, Fun) ->
     Env#env{ scopes = maps:map(fun(_, Scope) -> Fun(Scope) end, Scopes) }.
 
 -spec bind_var(aeso_syntax:id(), type(), env()) -> env().
@@ -401,7 +401,7 @@ global_env() ->
                     [{"spend",        StateFun([Address, Int], Unit)},
                      %% Chain environment
                      {"balance",      Fun1(Address, Int)},
-                     {"block_hash",   Fun1(Int, Int)},
+                     {"block_hash",   Fun1(Int, Option(Hash))},
                      {"coinbase",     Address},
                      {"timestamp",    Int},
                      {"block_height", Int},

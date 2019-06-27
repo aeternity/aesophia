@@ -141,7 +141,7 @@ ast_body(?qid_app([Con, "Chain", "event"], [Event], _, _), Icode = #{ contract_n
 ast_body(?qid_app(["Chain", "balance"], [Address], _, _), Icode) ->
     #prim_balance{ address = ast_body(Address, Icode) };
 ast_body(?qid_app(["Chain", "block_hash"], [Height], _, _), Icode) ->
-    #prim_block_hash{ height = ast_body(Height, Icode) };
+    builtin_call(block_hash, [ast_body(Height, Icode)]);
 ast_body(?qid_app(["Call", "gas_left"], [], _, _), _Icode) ->
     prim_gas_left;
 ast_body({qid, _, ["Contract", "address"]}, _Icode)      -> prim_contract_address;
