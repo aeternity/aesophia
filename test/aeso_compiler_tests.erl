@@ -130,6 +130,9 @@ failing_contracts() ->
        [<<"Duplicate definitions of abort at\n"
           "  - (builtin location)\n"
           "  - line 14, column 3">>,
+        <<"Duplicate definitions of require at\n"
+          "  - (builtin location)\n"
+          "  - line 15, column 3">>,
         <<"Duplicate definitions of double_def at\n"
           "  - line 10, column 3\n"
           "  - line 11, column 3">>,
@@ -141,12 +144,12 @@ failing_contracts() ->
           "  - line 8, column 3">>,
         <<"Duplicate definitions of put at\n"
           "  - (builtin location)\n"
-          "  - line 15, column 3">>,
+          "  - line 16, column 3">>,
         <<"Duplicate definitions of state at\n"
           "  - (builtin location)\n"
-          "  - line 16, column 3">>]}
+          "  - line 17, column 3">>]}
     , {"type_errors",
-       [<<"Unbound variable zz at line 17, column 21">>,
+       [<<"Unbound variable zz at line 17, column 23">>,
         <<"Cannot unify int\n"
           "         and list(int)\n"
           "when checking the application at line 26, column 9 of\n"
@@ -157,18 +160,18 @@ failing_contracts() ->
         <<"Cannot unify string\n"
           "         and int\n"
           "when checking the assignment of the field\n"
-          "  x : map(string, string) (at line 9, column 46)\n"
+          "  x : map(string, string) (at line 9, column 48)\n"
           "to the old value __x and the new value\n"
           "  __x {[\"foo\"] @ x = x + 1} : map(string, int)">>,
         <<"Cannot unify int\n"
           "         and string\n"
-          "when checking the type of the expression at line 34, column 45\n"
+          "when checking the type of the expression at line 34, column 47\n"
           "  1 : int\n"
           "against the expected type\n"
           "  string">>,
         <<"Cannot unify string\n"
           "         and int\n"
-          "when checking the type of the expression at line 34, column 50\n"
+          "when checking the type of the expression at line 34, column 52\n"
           "  \"bla\" : string\n"
           "against the expected type\n"
           "  int">>,
@@ -180,7 +183,7 @@ failing_contracts() ->
           "  int">>,
         <<"Cannot unify string\n"
           "         and int\n"
-          "when checking the type of the expression at line 11, column 56\n"
+          "when checking the type of the expression at line 11, column 58\n"
           "  \"foo\" : string\n"
           "against the expected type\n"
           "  int">>,
@@ -190,23 +193,23 @@ failing_contracts() ->
           "  - w : int (at line 38, column 13)\n"
           "  - z : string (at line 39, column 10)">>,
         <<"Not a record type: string\n"
-          "arising from the projection of the field y (at line 22, column 38)">>,
+          "arising from the projection of the field y (at line 22, column 40)">>,
         <<"Not a record type: string\n"
-          "arising from an assignment of the field y (at line 21, column 42)">>,
+          "arising from an assignment of the field y (at line 21, column 44)">>,
         <<"Not a record type: string\n"
-          "arising from an assignment of the field y (at line 20, column 38)">>,
+          "arising from an assignment of the field y (at line 20, column 40)">>,
         <<"Not a record type: string\n"
-          "arising from an assignment of the field y (at line 19, column 35)">>,
-        <<"Ambiguous record type with field y (at line 13, column 25) could be one of\n"
+          "arising from an assignment of the field y (at line 19, column 37)">>,
+        <<"Ambiguous record type with field y (at line 13, column 27) could be one of\n"
           "  - r (at line 4, column 10)\n"
           "  - r' (at line 5, column 10)">>,
         <<"Repeated name x in pattern\n"
           "  x :: x (at line 26, column 7)">>,
-        <<"Repeated argument x to function repeated_arg (at line 44, column 12).">>,
-        <<"Repeated argument y to function repeated_arg (at line 44, column 12).">>,
-        <<"No record type with fields y, z (at line 14, column 22)">>,
-        <<"The field z is missing when constructing an element of type r2 (at line 15, column 24)">>,
-        <<"Record type r2 does not have field y (at line 15, column 22)">>,
+        <<"Repeated argument x to function repeated_arg (at line 44, column 14).">>,
+        <<"Repeated argument y to function repeated_arg (at line 44, column 14).">>,
+        <<"No record type with fields y, z (at line 14, column 24)">>,
+        <<"The field z is missing when constructing an element of type r2 (at line 15, column 26)">>,
+        <<"Record type r2 does not have field y (at line 15, column 24)">>,
         <<"Let binding at line 47, column 5 must be followed by an expression">>,
         <<"Let binding at line 50, column 5 must be followed by an expression">>,
         <<"Let binding at line 54, column 5 must be followed by an expression">>,
@@ -220,9 +223,9 @@ failing_contracts() ->
           "         and ()\n"
           "when checking that 'init' returns a value of type 'state' at line 5, column 3">>]}
     , {"missing_fields_in_record_expression",
-       [<<"The field x is missing when constructing an element of type r('a) (at line 7, column 40)">>,
-        <<"The field y is missing when constructing an element of type r(int) (at line 8, column 40)">>,
-        <<"The fields y, z are missing when constructing an element of type r('a) (at line 6, column 40)">>]}
+       [<<"The field x is missing when constructing an element of type r('a) (at line 7, column 42)">>,
+        <<"The field y is missing when constructing an element of type r(int) (at line 8, column 42)">>,
+        <<"The fields y, z are missing when constructing an element of type r('a) (at line 6, column 42)">>]}
     , {"namespace_clash",
        [<<"The contract Call (at line 4, column 10) has the same name as a namespace at (builtin location)">>]}
     , {"bad_events",
@@ -234,7 +237,7 @@ failing_contracts() ->
     , {"type_clash",
         [<<"Cannot unify int\n"
            "         and string\n"
-           "when checking the record projection at line 12, column 40\n"
+           "when checking the record projection at line 12, column 42\n"
            "  r.foo : (gas : int, value : int) => Remote.themap\n"
            "against the expected type\n"
            "  (gas : int, value : int) => map(string, int)">>]}
@@ -318,28 +321,36 @@ failing_contracts() ->
            "against the expected type\n"
            "  bytes(32)">>]}
     , {"stateful",
-       [<<"Cannot reference stateful function Chain.spend (at line 13, column 33)\nin the definition of non-stateful function fail1.">>,
-        <<"Cannot reference stateful function local_spend (at line 14, column 33)\nin the definition of non-stateful function fail2.">>,
+       [<<"Cannot reference stateful function Chain.spend (at line 13, column 35)\nin the definition of non-stateful function fail1.">>,
+        <<"Cannot reference stateful function local_spend (at line 14, column 35)\nin the definition of non-stateful function fail2.">>,
         <<"Cannot reference stateful function Chain.spend (at line 16, column 15)\nin the definition of non-stateful function fail3.">>,
         <<"Cannot reference stateful function Chain.spend (at line 20, column 31)\nin the definition of non-stateful function fail4.">>,
-        <<"Cannot reference stateful function Chain.spend (at line 35, column 53)\nin the definition of non-stateful function fail5.">>,
-        <<"Cannot pass non-zero value argument 1000 (at line 48, column 55)\nin the definition of non-stateful function fail6.">>,
-        <<"Cannot pass non-zero value argument 1000 (at line 49, column 54)\nin the definition of non-stateful function fail7.">>,
+        <<"Cannot reference stateful function Chain.spend (at line 35, column 45)\nin the definition of non-stateful function fail5.">>,
+        <<"Cannot pass non-zero value argument 1000 (at line 48, column 57)\nin the definition of non-stateful function fail6.">>,
+        <<"Cannot pass non-zero value argument 1000 (at line 49, column 56)\nin the definition of non-stateful function fail7.">>,
         <<"Cannot pass non-zero value argument 1000 (at line 52, column 17)\nin the definition of non-stateful function fail8.">>]}
     , {"bad_init_state_access",
        [<<"The init function should return the initial state as its result and cannot write the state,\n"
           "but it calls\n"
           "  - set_state (at line 11, column 5), which calls\n"
-          "  - roundabout (at line 8, column 36), which calls\n"
-          "  - put (at line 7, column 37)">>,
+          "  - roundabout (at line 8, column 38), which calls\n"
+          "  - put (at line 7, column 39)">>,
         <<"The init function should return the initial state as its result and cannot read the state,\n"
           "but it calls\n"
           "  - new_state (at line 12, column 5), which calls\n"
-          "  - state (at line 5, column 27)">>,
+          "  - state (at line 5, column 29)">>,
         <<"The init function should return the initial state as its result and cannot read the state,\n"
           "but it calls\n"
           "  - state (at line 13, column 13)">>]}
     , {"field_parse_error",
        [<<"line 6, column 1: In field_parse_error at 5:26:\n"
           "Cannot use nested fields or keys in record construction: p.x\n">>]}
+    , {"modifier_checks",
+       [<<"The function all_the_things (at line 11, column 3) cannot be both public and private.">>,
+        <<"Namespaces cannot contain entrypoints (at line 3, column 3). Use 'function' instead.">>,
+        <<"The contract Remote (at line 5, column 10) has no entrypoints. Since Sophia version 3.2, public\ncontract functions must be declared with the 'entrypoint' keyword instead of\n'function'.">>,
+        <<"The entrypoint wha (at line 12, column 3) cannot be private. Use 'function' instead.">>,
+        <<"Use 'entrypoint' for declaration of foo (at line 6, column 3):\n  entrypoint foo : () => ()">>,
+        <<"Use 'entrypoint' instead of 'function' for public function foo (at line 10, column 3):\n  entrypoint foo() = ()">>,
+        <<"Use 'entrypoint' instead of 'function' for public function foo (at line 6, column 3):\n  entrypoint foo : () => ()">>]}
     ].

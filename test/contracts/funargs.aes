@@ -1,47 +1,47 @@
 
 contract FunctionArguments =
 
-  function sum(n : int, m: int) =
+  entrypoint sum(n : int, m: int) =
     n + m
 
-  function append(xs : list(string)) =
+  entrypoint append(xs : list(string)) =
      switch(xs)
       []      => ""
       y :: ys => String.concat(y, append(ys))
 
-  function menot(b) =
+  entrypoint menot(b) =
     !b
 
-  function bitsum(b : bits) =
+  entrypoint bitsum(b : bits) =
     Bits.sum(b)
 
   record answer('a) = {label : string, result : 'a}
 
-  function read(a : answer(int)) =
+  entrypoint read(a : answer(int)) =
      a.result
 
-  function sjutton(b : bytes(17)) =
+  entrypoint sjutton(b : bytes(17)) =
      b
 
-  function sextiosju(b : bytes(67)) =
+  entrypoint sextiosju(b : bytes(67)) =
      b
 
-  function trettiotva(b : bytes(32)) =
+  entrypoint trettiotva(b : bytes(32)) =
      b
 
-  function find_oracle(o : oracle(int, bool)) =
+  entrypoint find_oracle(o : oracle(int, bool)) =
      true
 
-  function find_query(q : oracle_query(int, bool)) =
+  entrypoint find_query(q : oracle_query(int, bool)) =
      true
 
   datatype colour() = Green | Yellow | Red | Pantone(int)
 
-  function traffic_light(c : colour) =
+  entrypoint traffic_light(c : colour) =
      Red
 
-  function tuples(t : ()) =
+  entrypoint tuples(t : ()) =
      t
 
-  function due(t : Chain.ttl) =
+  entrypoint due(t : Chain.ttl) =
      true

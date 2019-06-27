@@ -8,11 +8,11 @@ namespace Foo =
 contract Bug =
 
   // Crashed the type checker
-  function foo() = Foo.bar()
+  entrypoint foo() = Foo.bar()
 
   // Also crashed the type checker
   type t = Foo.bla
 
-  function test() =
+  entrypoint test() =
     let x : t = Foo.bar()
     x

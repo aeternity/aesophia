@@ -2,8 +2,8 @@ include "included.aes"
 include "../contracts/included2.aes"
 
 contract Include =
-  function foo() =
+  entrypoint foo() =
     Included.foo() < Included2a.bar()
 
-  function bar() =
+  entrypoint bar() =
     Included2b.foo() > Included.foo()
