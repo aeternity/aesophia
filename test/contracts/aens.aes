@@ -35,21 +35,21 @@ contract AENSTest =
 
   stateful entrypoint transfer(owner     : address,
                              new_owner : address,
-                             name_hash : hash) : () =
-    AENS.transfer(owner, new_owner, name_hash)
+                             name      : string) : () =
+    AENS.transfer(owner, new_owner, name)
 
   stateful entrypoint signedTransfer(owner     : address,
-                                   new_owner : address,
-                                   name_hash : hash,
-                                   sign      : signature) : () =
-    AENS.transfer(owner, new_owner, name_hash, signature = sign)
+                                     new_owner : address,
+                                     name      : string,
+                                     sign      : signature) : () =
+    AENS.transfer(owner, new_owner, name, signature = sign)
 
   stateful entrypoint revoke(owner     : address,
-                           name_hash : hash) : () =
-    AENS.revoke(owner, name_hash)
+                           name      : string) : () =
+    AENS.revoke(owner, name)
 
   stateful entrypoint signedRevoke(owner     : address,
-                                 name_hash : hash,
-                                 sign      : signature) : () =
-    AENS.revoke(owner, name_hash, signature = sign)
+                                   name      : string,
+                                   sign      : signature) : () =
+    AENS.revoke(owner, name, signature = sign)
 
