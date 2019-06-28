@@ -130,6 +130,7 @@ builtin_function(BF) ->
     case BF of
         {event, EventT}            -> bfun(BF, builtin_event(EventT));
         abort                      -> bfun(BF, builtin_abort());
+        block_hash                 -> bfun(BF, builtin_block_hash());
         require                    -> bfun(BF, builtin_require());
         {map_lookup, Type}         -> bfun(BF, builtin_map_lookup(Type));
         map_put                    -> bfun(BF, builtin_map_put());
@@ -210,6 +211,12 @@ builtin_abort() ->
      {inline_asm, [A(?PUSH1),0,  %% Push a dummy 0 for the first arg
                    A(?REVERT)]}, %% Stack: 0,Ptr
      {tuple,[]}}.
+
+builtin_block_hash() ->
+    {[{"height", word}],
+     ?LET(hash, #prim_block_hash{ height = ?V(height)},
+          {ifte, ?EQ(hash, 0), option_none(), option_some(?V(hash))}),
+     aeso_icode:option_typerep(word)}.
 
 builtin_require() ->
     {[{"c", word}, {"msg", string}],

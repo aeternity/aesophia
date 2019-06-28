@@ -11,7 +11,7 @@
   {git,"https://github.com/aeternity/erl-base58.git",
        {ref,"60a335668a60328a29f9731b67c4a0e9e3d50ab6"}},
   2},
- {<<"eblake2">>,{pkg,<<"eblake2">>,<<"1.0.0">>},1},
+ {<<"eblake2">>,{pkg,<<"eblake2">>,<<"1.0.0">>},0},
  {<<"getopt">>,{pkg,<<"getopt">>,<<"1.0.1">>},0},
  {<<"jsx">>,
   {git,"https://github.com/talentdeficit/jsx.git",
