@@ -21,6 +21,7 @@
         , decode_calldata/3  %% deprecated
         , decode_calldata/4
         , parse/2
+        , add_include_path/2
         ]).
 
 -include_lib("aebytecode/include/aeb_opcodes.hrl").
@@ -65,17 +66,25 @@ version() ->
 
 -spec file(string()) -> {ok, map()} | {error, binary()}.
 file(Filename) ->
-    Dir = filename:dirname(Filename),
-    {ok, Cwd} = file:get_cwd(),
-    file(Filename, [{include, {file_system, [Cwd, Dir]}}]).
+    file(Filename, []).
 
 -spec file(string(), options()) -> {ok, map()} | {error, binary()}.
-file(File, Options) ->
+file(File, Options0) ->
+    Options = add_include_path(File, Options0),
     case read_contract(File) of
         {ok, Bin} -> from_string(Bin, [{src_file, File} | Options]);
         {error, Error} ->
 	    ErrorString = [File,": ",file:format_error(Error)],
 	    {error, join_errors("File errors", [ErrorString], fun(E) -> E end)}
+    end.
+
+add_include_path(File, Options) ->
+    case lists:keymember(include, 1, Options) of
+        true  -> Options;
+        false ->
+            Dir = filename:dirname(File),
+            {ok, Cwd} = file:get_cwd(),
+            [{include, {file_system, [Cwd, Dir]}} | Options]
     end.
 
 -spec from_string(binary() | string(), options()) -> {ok, map()} | {error, binary()}.

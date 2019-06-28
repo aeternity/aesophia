@@ -9,7 +9,9 @@
 
 -module(aeso_aci).
 
--export([ contract_interface/2
+-export([ file/2
+        , file/3
+        , contract_interface/2
         , contract_interface/3
 
         , render_aci_json/1
@@ -22,6 +24,18 @@
 -type json_text() :: binary().
 
 %% External API
+-spec file(aci_type(), string()) -> {ok, json() | string()} | {error, term()}.
+file(Type, File) ->
+    file(Type, File, []).
+
+file(Type, File, Options0) ->
+    Options = aeso_compiler:add_include_path(File, Options0),
+    case file:read_file(File) of
+        {ok, BinCode} ->
+            do_contract_interface(Type, binary_to_list(BinCode), Options);
+        {error, _} = Err -> Err
+    end.
+
 -spec contract_interface(aci_type(), string()) ->
     {ok, json() | string()} | {error, term()}.
 contract_interface(Type, ContractString) ->
