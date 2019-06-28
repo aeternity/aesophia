@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+### Changed
+### Removed
+
+## [3.2.0] - 2019-06-28
+### Added
 - New builtin function `require : (bool, string) => ()`. Defined as
     ```
     function require(b, err) = if(!b) abort(err)
@@ -98,7 +103,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v3.1.0...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v3.2.0...HEAD
+[3.2.0]: https://github.com/aeternity/aesophia/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/aeternity/aesophia/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/aeternity/aesophia/compare/v2.1.0...v3.0.0
 [2.1.0]: https://github.com/aeternity/aesophia/compare/v2.0.0...v2.1.0
