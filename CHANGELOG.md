@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 ### Removed
 
+## [3.2.0] - 2019-06-28
+### Added
+- New builtin function `require : (bool, string) => ()`. Defined as
+    ```
+    function require(b, err) = if(!b) abort(err)
+    ```
+- New builtin functions
+    ```
+    Bytes.to_str : bytes(_) => string
+    Bytes.to_int : bytes(_) => int
+    ```
+  for converting a byte array to a hex string and interpreting it as a
+  big-endian encoded integer respectively.
+### Changed
+- Public contract functions must now be declared as *entrypoints*:
+  ```
+  contract Example =
+    // Exported
+    entrypoint exported_fun(x) = local_fun(x)
+    // Not exported
+    function local_fun(x) = x
+  ```
+  Functions in namespaces still use `function` (and `private function` for
+  private functions).
+- The return type of `Chain.block_hash(height)` has changed, it used to
+  be `int`, where `0` denoted an incorrect height. New return type is
+  `option(hash)`, where `None` represents an incorrect height.
+- Event name hashes now use BLAKE2b instead of Keccak256.
+- Fixed bugs when defining record types in namespaces.
+- Fixed a bug in include path handling when passing options to the compiler.
+### Removed
+
 ## [3.1.0] - 2019-06-03
 ### Added
 ### Changed
@@ -71,7 +103,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v3.1.0...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v3.2.0...HEAD
+[3.2.0]: https://github.com/aeternity/aesophia/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/aeternity/aesophia/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/aeternity/aesophia/compare/v2.1.0...v3.0.0
 [2.1.0]: https://github.com/aeternity/aesophia/compare/v2.0.0...v2.1.0
