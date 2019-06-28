@@ -538,6 +538,7 @@ infer(Contracts, Options) ->
         Env = init_env(Options),
         create_options(Options),
         ets_new(type_vars, [set]),
+        check_modifiers(Env, Contracts),
         {Env1, Decls} = infer1(Env, Contracts, [], Options),
         {Env2, Decls2} =
             case proplists:get_value(dont_unfold, Options, false) of
@@ -684,6 +685,40 @@ check_typedef(Env, {variant_t, Cons}) ->
 
 check_unexpected(Xs) ->
     [ type_error(X) || X <- Xs ].
+
+check_modifiers(Env, Contracts) ->
+    create_type_errors(),
+    [ case C of
+          {contract, _, Con, Decls}  ->
+              check_modifiers1(contract, Decls),
+              case {lists:keymember(letfun, 1, Decls),
+                    [ D || D <- Decls, aeso_syntax:get_ann(entrypoint, D, false) ]} of
+                  {true, []} -> type_error({contract_has_no_entrypoints, Con});
+                  _          -> ok
+              end;
+          {namespace, _, _, Decls} -> check_modifiers1(namespace, Decls)
+      end || C <- Contracts ],
+    destroy_and_report_type_errors(Env).
+
+-spec check_modifiers1(contract | namespace, [aeso_syntax:decl()] | aeso_syntax:decl()) -> ok.
+check_modifiers1(What, Decls) when is_list(Decls) ->
+    _ = [ check_modifiers1(What, Decl) || Decl <- Decls ],
+    ok;
+check_modifiers1(What, Decl) when element(1, Decl) == letfun; element(1, Decl) == fun_decl ->
+    Public     = aeso_syntax:get_ann(public,     Decl, false),
+    Private    = aeso_syntax:get_ann(private,    Decl, false),
+    Entrypoint = aeso_syntax:get_ann(entrypoint, Decl, false),
+    FunDecl    = element(1, Decl) == fun_decl,
+    {id, _, Name} = element(3, Decl),
+    _ = [ type_error({proto_must_be_entrypoint, Decl})    || FunDecl, Private orelse not Entrypoint, What == contract ],
+    _ = [ type_error({proto_in_namespace, Decl})          || FunDecl, What == namespace ],
+    _ = [ type_error({init_must_be_an_entrypoint, Decl})  || not Entrypoint, Name == "init", What == contract ],
+    _ = [ type_error({public_modifier_in_contract, Decl}) || Public, not Private, not Entrypoint, What == contract ],
+    _ = [ type_error({entrypoint_in_namespace, Decl})     || Entrypoint, What == namespace ],
+    _ = [ type_error({private_entrypoint, Decl})          || Private, Entrypoint ],
+    _ = [ type_error({private_and_public, Decl})          || Private, Public ],
+    ok;
+check_modifiers1(_, _) -> ok.
 
 -spec check_type(env(), aeso_syntax:type()) -> aeso_syntax:type().
 check_type(Env, T) ->
@@ -2070,7 +2105,7 @@ pp_error({duplicate_definition, Name, Locs}) ->
 pp_error({duplicate_scope, Kind, Name, OtherKind, L}) ->
     io_lib:format("The ~p ~s (at ~s) has the same name as a ~p at ~s\n",
                   [Kind, pp(Name), pp_loc(Name), OtherKind, pp_loc(L)]);
-pp_error({include, {string, Pos, Name}}) ->
+pp_error({include, _, {string, Pos, Name}}) ->
     io_lib:format("Include of '~s' at ~s\nnot allowed, include only allowed at top level.\n",
                   [binary_to_list(Name), pp_loc(Pos)]);
 pp_error({namespace, _Pos, {con, Pos, Name}, _Def}) ->
@@ -2093,8 +2128,45 @@ pp_error({init_depends_on_state, Which, [_Init | Chain]}) ->
                      || {[_, Fun], Ann} <- Chain]]);
 pp_error({missing_body_for_let, Ann}) ->
     io_lib:format("Let binding at ~s must be followed by an expression\n", [pp_loc(Ann)]);
+pp_error({public_modifier_in_contract, Decl}) ->
+    Decl1 = mk_entrypoint(Decl),
+    io_lib:format("Use 'entrypoint' instead of 'function' for public function ~s (at ~s):\n~s\n",
+                  [pp_expr("", element(3, Decl)), pp_loc(Decl),
+                   prettypr:format(prettypr:nest(2, aeso_pretty:decl(Decl1)))]);
+pp_error({init_must_be_an_entrypoint, Decl}) ->
+    Decl1 = mk_entrypoint(Decl),
+    io_lib:format("The init function (at ~s) must be an entrypoint:\n~s\n",
+                  [pp_loc(Decl),
+                   prettypr:format(prettypr:nest(2, aeso_pretty:decl(Decl1)))]);
+pp_error({proto_must_be_entrypoint, Decl}) ->
+    Decl1 = mk_entrypoint(Decl),
+    io_lib:format("Use 'entrypoint' for declaration of ~s (at ~s):\n~s\n",
+                  [pp_expr("", element(3, Decl)), pp_loc(Decl),
+                   prettypr:format(prettypr:nest(2, aeso_pretty:decl(Decl1)))]);
+pp_error({proto_in_namespace, Decl}) ->
+    io_lib:format("Namespaces cannot contain function prototypes (at ~s).\n",
+                  [pp_loc(Decl)]);
+pp_error({entrypoint_in_namespace, Decl}) ->
+    io_lib:format("Namespaces cannot contain entrypoints (at ~s). Use 'function' instead.\n",
+                  [pp_loc(Decl)]);
+pp_error({private_entrypoint, Decl}) ->
+    io_lib:format("The entrypoint ~s (at ~s) cannot be private. Use 'function' instead.\n",
+                  [pp_expr("", element(3, Decl)), pp_loc(Decl)]);
+pp_error({private_and_public, Decl}) ->
+    io_lib:format("The function ~s (at ~s) cannot be both public and private.\n",
+                  [pp_expr("", element(3, Decl)), pp_loc(Decl)]);
+pp_error({contract_has_no_entrypoints, Con}) ->
+    io_lib:format("The contract ~s (at ~s) has no entrypoints. Since Sophia version 3.2, public\n"
+                  "contract functions must be declared with the 'entrypoint' keyword instead of\n"
+                  "'function'.\n", [pp_expr("", Con), pp_loc(Con)]);
 pp_error(Err) ->
     io_lib:format("Unknown error: ~p\n", [Err]).
+
+mk_entrypoint(Decl) ->
+    Ann   = [entrypoint | lists:keydelete(public, 1,
+                          lists:keydelete(private, 1,
+                            aeso_syntax:get_ann(Decl))) -- [public, private]],
+    aeso_syntax:set_ann(Ann, Decl).
 
 pp_when({todo, What}) -> io_lib:format("[TODO] ~p\n", [What]);
 pp_when({at, Ann}) -> io_lib:format("at ~s\n", [pp_loc(Ann)]);

@@ -9,15 +9,15 @@ contract Events =
     | BadEvent1(indexed string)
     | BadEvent2(indexed alias_string)
 
-  function f1(x : int, y : string) =
+  entrypoint f1(x : int, y : string) =
     Chain.event(Event1(x, x+1, y))
 
-  function f2(s : string) =
+  entrypoint f2(s : string) =
     Chain.event(Event2(s, Call.caller))
 
-  function f3(x : int) =
+  entrypoint f3(x : int) =
     Chain.event(Event1(x, x + 2, Int.to_str(x + 7)))
 
-  function i2s(i : int) = Int.to_str(i)
-  function a2s(a : address) = Address.to_str(a)
+  entrypoint i2s(i : int) = Int.to_str(i)
+  entrypoint a2s(a : address) = Address.to_str(a)
 

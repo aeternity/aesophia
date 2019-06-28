@@ -2,4 +2,4 @@
 // You can't shadow existing contracts or namespaces.
 
 contract Call =
-  function whatever() = ()
+  entrypoint whatever() = ()

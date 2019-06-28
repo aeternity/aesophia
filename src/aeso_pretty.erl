@@ -153,13 +153,21 @@ decl({type_decl, _, T, Vars}) -> typedecl(alias_t, T, Vars);
 decl({type_def, _, T, Vars, Def}) ->
     Kind = element(1, Def),
     equals(typedecl(Kind, T, Vars), typedef(Def));
-decl({fun_decl, _, F, T}) ->
-    hsep(text("function"), typed(name(F), T));
+decl({fun_decl, Ann, F, T}) ->
+    Fun = case aeso_syntax:get_ann(entrypoint, Ann, false) of
+            true  -> text("entrypoint");
+            false -> text("function")
+          end,
+    hsep(Fun, typed(name(F), T));
 decl(D = {letfun, Attrs, _, _, _, _}) ->
-    Mod = fun({Mod, true}) when Mod == private; Mod == internal; Mod == public; Mod == stateful ->
+    Mod = fun({Mod, true}) when Mod == private; Mod == stateful ->
                             text(atom_to_list(Mod));
              (_) -> empty() end,
-    hsep(lists:map(Mod, Attrs) ++ [letdecl("function", D)]);
+    Fun = case aeso_syntax:get_ann(entrypoint, Attrs, false) of
+              true  -> "entrypoint";
+              false -> "function"
+          end,
+    hsep(lists:map(Mod, Attrs) ++ [letdecl(Fun, D)]);
 decl(D = {letval, _, _, _, _}) -> letdecl("let", D).
 
 -spec expr(aeso_syntax:expr(), options()) -> doc().

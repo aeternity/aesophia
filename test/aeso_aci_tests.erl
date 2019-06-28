@@ -15,7 +15,7 @@ test_contract(N) ->
 
 test_cases(1) ->
     Contract = <<"contract C =\n"
-		 "  function a(i : int) = i+1\n">>,
+		 "  entrypoint a(i : int) = i+1\n">>,
     MapACI = #{contract =>
 		   #{name => <<"C">>,
 		     type_defs => [],
@@ -27,13 +27,13 @@ test_cases(1) ->
 			    returns => <<"int">>,
 			    stateful => false}]}},
     DecACI = <<"contract C =\n"
-	       "  function a : (int) => int\n">>,
+	       "  entrypoint a : (int) => int\n">>,
     {Contract,MapACI,DecACI};
 
 test_cases(2) ->
     Contract = <<"contract C =\n"
 		 "  type allan = int\n"
-		 "  function a(i : allan) = i+1\n">>,
+		 "  entrypoint a(i : allan) = i+1\n">>,
     MapACI = #{contract =>
                        #{name => <<"C">>,
                          type_defs =>
@@ -49,14 +49,14 @@ test_cases(2) ->
                                 stateful => false}]}},
     DecACI = <<"contract C =\n"
                "  type allan = int\n"
-               "  function a : (C.allan) => int\n">>,
+               "  entrypoint a : (C.allan) => int\n">>,
     {Contract,MapACI,DecACI};
 test_cases(3) ->
     Contract = <<"contract C =\n"
                  "  type state = ()\n"
                  "  datatype event = SingleEventDefined\n"
 		 "  datatype bert('a) = Bin('a)\n"
-		 "  function a(i : bert(string)) = 1\n">>,
+		 "  entrypoint a(i : bert(string)) = 1\n">>,
     MapACI = #{contract =>
 		   #{functions =>
 			 [#{arguments =>
@@ -78,7 +78,7 @@ test_cases(3) ->
                "  type state = ()\n"
                "  datatype event = SingleEventDefined\n"
 	       "  datatype bert('a) = Bin('a)\n"
-	       "  function a : (C.bert(string)) => int\n">>,
+	       "  entrypoint a : (C.bert(string)) => int\n">>,
     {Contract,MapACI,DecACI}.
 
 %% Rounttrip

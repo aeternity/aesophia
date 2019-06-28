@@ -79,7 +79,7 @@ encode_decode_sophia_string(SophiaType, String) ->
            , "  type an_alias('a) = (string, 'a)\n"
            , "  record r = {x : an_alias(int), y : variant}\n"
            , "  datatype variant = Red | Blue(map(string, int))\n"
-           , "  function foo : arg_type => arg_type\n" ],
+           , "  entrypoint foo : arg_type => arg_type\n" ],
     case aeso_compiler:check_call(lists:flatten(Code), "foo", [String], []) of
         {ok, _, {[Type], _}, [Arg]} ->
             io:format("Type ~p~n", [Type]),
@@ -120,16 +120,14 @@ calldata_init_test() ->
 
 calldata_indent_test() ->
     Test = fun(Extra) ->
-            encode_decode_calldata_(
-                parameterized_contract(Extra, "foo", ["int"]),
-                "foo", ["42"], word)
+            Code = parameterized_contract(Extra, "foo", ["int"]),
+            encode_decode_calldata_(Code, "foo", ["42"], word)
            end,
-    Test("  stateful function bla() = ()"),
+    Test("  stateful entrypoint bla() = ()"),
     Test("  type x = int"),
-    Test("  private function bla : int => int"),
-    Test("  public stateful function bla(x : int) =\n"
+    Test("  stateful entrypoint bla(x : int) =\n"
          "    x + 1"),
-    Test("  stateful private function bla(x : int) : int =\n"
+    Test("  stateful entrypoint bla(x : int) : int =\n"
          "    x + 1"),
     ok.
 
@@ -139,18 +137,18 @@ parameterized_contract(FunName, Types) ->
 parameterized_contract(ExtraCode, FunName, Types) ->
     lists:flatten(
         ["contract Remote =\n"
-         "  function bla : () => ()\n\n"
+         "  entrypoint bla : () => ()\n\n"
          "contract Dummy =\n",
          ExtraCode, "\n",
          "  type an_alias('a) = (string, 'a)\n"
          "  record r = {x : an_alias(int), y : variant}\n"
          "  datatype variant = Red | Blue(map(string, int))\n"
-         "  function ", FunName, " : (", string:join(Types, ", "), ") => int\n" ]).
+         "  entrypoint ", FunName, " : (", string:join(Types, ", "), ") => int\n" ]).
 
 oracle_test() ->
     Contract =
         "contract OracleTest =\n"
-        "  function question(o, q : oracle_query(list(string), option(int))) =\n"
+        "  entrypoint question(o, q : oracle_query(list(string), option(int))) =\n"
         "    Oracle.get_question(o, q)\n",
     {ok, _, {[word, word], {list, string}}, [16#123, 16#456]} =
         aeso_compiler:check_call(Contract, "question", ["ok_111111111111111111111111111111ZrdqRz9",
@@ -161,7 +159,7 @@ oracle_test() ->
 permissive_literals_fail_test() ->
     Contract =
         "contract OracleTest =\n"
-        "  stateful function haxx(o : oracle(list(string), option(int))) =\n"
+        "  stateful entrypoint haxx(o : oracle(list(string), option(int))) =\n"
         "    Chain.spend(o, 1000000)\n",
         {error, <<"Type errors\nCannot unify", _/binary>>} =
             aeso_compiler:check_call(Contract, "haxx", ["#123"], []),

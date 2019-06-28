@@ -1006,13 +1006,12 @@ add_fun_env(Env = #{ fun_env := FunEnv }, Decls) ->
     Env#{ fun_env := maps:merge(FunEnv, FunEnv1) }.
 
 make_fun_name(#{ context := Context }, Ann, Name) ->
-    Private = proplists:get_value(private, Ann, false) orelse
-              proplists:get_value(internal, Ann, false),
+    Entrypoint = proplists:get_value(entrypoint, Ann, false),
     case Context of
         {main_contract, Main} ->
-            if Private        -> {local_fun, [Main, Name]};
-               Name == "init" -> init;
-               true           -> {entrypoint, list_to_binary(Name)}
+            if Name == "init" -> init;
+               Entrypoint     -> {entrypoint, list_to_binary(Name)};
+               true           -> {local_fun, [Main, Name]}
             end;
         {namespace, Lib} ->
             {local_fun, [Lib, Name]}

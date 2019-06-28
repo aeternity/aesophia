@@ -3,4 +3,4 @@ contract Bad =
   namespace Foo =
     function foo() = 42
 
-  function foo() = 43
+  entrypoint foo() = 43

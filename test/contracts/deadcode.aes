@@ -13,9 +13,9 @@ namespace List =
 
 contract Deadcode =
 
-  function inc1(xs : list(int)) : list(int) =
+  entrypoint inc1(xs : list(int)) : list(int) =
     List.map1((x) => x + 1, xs)
 
-  function inc2(xs : list(int)) : list(int) =
+  entrypoint inc2(xs : list(int)) : list(int) =
     List.map1((x) => x + 1, xs)
 
