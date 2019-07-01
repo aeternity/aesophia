@@ -266,15 +266,15 @@ ast_body(?qid_app(["AENS", "claim"], Args, _, _), Icode) ->
               [word, string, word, sign_t()], {tuple, []});
 
 ast_body(?qid_app(["AENS", "transfer"], Args, _, _), Icode) ->
-    {Sign, [FromAddr, ToAddr, NameHash]} = get_signature_arg(Args),
+    {Sign, [FromAddr, ToAddr, Name]} = get_signature_arg(Args),
     prim_call(?PRIM_CALL_AENS_TRANSFER, #integer{value = 0},
-              [ast_body(FromAddr, Icode), ast_body(ToAddr, Icode), ast_body(NameHash, Icode), ast_body(Sign, Icode)],
+              [ast_body(FromAddr, Icode), ast_body(ToAddr, Icode), ast_body(Name, Icode), ast_body(Sign, Icode)],
               [word, word, word, sign_t()], {tuple, []});
 
 ast_body(?qid_app(["AENS", "revoke"], Args, _, _), Icode) ->
-    {Sign, [Addr, NameHash]} = get_signature_arg(Args),
+    {Sign, [Addr, Name]} = get_signature_arg(Args),
     prim_call(?PRIM_CALL_AENS_REVOKE, #integer{value = 0},
-              [ast_body(Addr, Icode), ast_body(NameHash, Icode), ast_body(Sign, Icode)],
+              [ast_body(Addr, Icode), ast_body(Name, Icode), ast_body(Sign, Icode)],
               [word, word, sign_t()], {tuple, []});
 
 ast_body({qid, _, ["AENS", "resolve"]}, _Icode)  -> gen_error({underapplied_primitive, 'AENS.resolve'});
