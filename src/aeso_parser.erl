@@ -505,7 +505,7 @@ parse_pattern(E = {bool, _, _})   -> E;
 parse_pattern(E = {bytes, _, _})  -> E;
 parse_pattern(E = {string, _, _}) -> E;
 parse_pattern(E = {char, _, _})   -> E;
-parse_pattern(E) -> bad_expr_err("Not a valid pattern", E).
+parse_pattern(E) -> bad_expr_err("Not a valid patxstern", E).
 
 -spec parse_field_pattern(aeso_syntax:field(aeso_syntax:expr())) -> aeso_parse_lib:parser(aeso_syntax:field(aeso_syntax:pat())).
 parse_field_pattern({field, Ann, F, E}) ->
@@ -532,8 +532,10 @@ expand_includes(AST, Opts) ->
 
 expand_includes([], Acc, _Opts) ->
     {ok, lists:reverse(Acc)};
-expand_includes([{include, _, S = {string, _, File}} | AST], Acc, Opts) ->
+expand_includes([{include, Ann, S = {string, _, File}} | AST], Acc, Opts) ->
     case {read_file(File, Opts), maps:find(File, aeso_stdlib:stdlib())} of
+        {{ok, _}, {ok,_ }} ->
+            return_error(ann_pos(Ann), "Illegal redefinition of standard library " ++ File);
         {_, {ok, Lib}} ->
             case string(Lib) of
                 {ok, AST1} ->
