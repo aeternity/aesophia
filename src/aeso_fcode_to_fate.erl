@@ -1340,7 +1340,7 @@ block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
     {DefRef, DefBlk} =
         case Default of
             missing when Catchall == none ->
-                FreshBlk([aeb_fate_ops:abort(?i(<<"Incomplete patterns">>))], none);
+                FreshBlk([aeb_fate_ops:exit(?i(<<"Incomplete patterns">>))], none);
             missing -> {Catchall, []};
             _       -> FreshBlk(Default ++ [{jump, RestRef}], Catchall)
                        %% ^ fall-through to the outer catchall
@@ -1415,6 +1415,7 @@ reorder_blocks(Ref, Code, Blocks, Acc) ->
         [{'CALL_T', _}|_]     -> reorder_blocks(Blocks, Acc1);
         [{'CALL_TR', _, _, _}|_] -> reorder_blocks(Blocks, Acc1);
         [{'CALL_GTR', _, _, _}|_] -> reorder_blocks(Blocks, Acc1);
+        [{'EXIT', _}|_]       -> reorder_blocks(Blocks, Acc1);
         [{'ABORT', _}|_]      -> reorder_blocks(Blocks, Acc1);
         [{switch, _, _}|_]    -> reorder_blocks(Blocks, Acc1);
         [{jump, L}|_]         ->
@@ -1459,6 +1460,7 @@ tweak_returns(['RETURN' | Code = [{'CALL_TR', _, _, _} | _]])     -> Code;
 tweak_returns(['RETURN' | Code = [{'CALL_GT', _} | _]])           -> Code;
 tweak_returns(['RETURN' | Code = [{'CALL_GTR', _, _, _, _} | _]]) -> Code;
 tweak_returns(['RETURN' | Code = [{'ABORT', _} | _]])             -> Code;
+tweak_returns(['RETURN' | Code = [{'EXIT', _} | _]])              -> Code;
 tweak_returns(Code) -> Code.
 
 %% -- Split basic blocks at CALL instructions --
@@ -1475,6 +1477,8 @@ split_calls(Ref, [I | Code], Acc, Blocks) when element(1, I) == 'CALL';
                                                element(1, I) == 'jumpif' ->
     split_calls(make_ref(), Code, [], [{Ref, lists:reverse([I | Acc])} | Blocks]);
 split_calls(Ref, [{'ABORT', _} = I | _Code], Acc, Blocks) ->
+    lists:reverse([{Ref, lists:reverse([I | Acc])} | Blocks]);
+split_calls(Ref, [{'EXIT', _} = I | _Code], Acc, Blocks) ->
     lists:reverse([{Ref, lists:reverse([I | Acc])} | Blocks]);
 split_calls(Ref, [I | Code], Acc, Blocks) ->
     split_calls(Ref, Code, [I | Acc], Blocks).
