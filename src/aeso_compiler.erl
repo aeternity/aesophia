@@ -290,10 +290,16 @@ to_sophia_value(ContractString, Fun, ResType, Data) ->
         {ok, aeso_syntax:expr()} | {error, term()}.
 to_sophia_value(_, _, error, Err, _Options) ->
     {ok, {app, [], {id, [], "error"}, [{string, [], Err}]}};
-to_sophia_value(_, _, revert, Data, _Options) ->
-    case aeb_heap:from_binary(string, Data) of
-        {ok, Err} -> {ok, {app, [], {id, [], "abort"}, [{string, [], Err}]}};
-        {error, _} = Err -> Err
+to_sophia_value(_, _, revert, Data, Options) ->
+    case proplists:get_value(backend, Options, aevm) of
+        aevm ->
+            case aeb_heap:from_binary(string, Data) of
+                {ok, Err} -> {ok, {app, [], {id, [], "abort"}, [{string, [], Err}]}};
+                {error, _} = Err -> Err
+            end;
+        fate ->
+            Err = aeb_fate_encoding:deserialize(Data),
+            {ok, {app, [], {id, [], "abort"}, [{string, [], Err}]}}
     end;
 to_sophia_value(ContractString, FunName, ok, Data, Options) ->
     try
