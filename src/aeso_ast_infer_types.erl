@@ -364,7 +364,7 @@ global_env() ->
     Fun     = fun(Ts, T) -> {type_sig, Ann, [], Ts, T} end,
     Fun1    = fun(S, T) -> Fun([S], T) end,
     %% Lambda    = fun(Ts, T) -> {fun_t, Ann, [], Ts, T} end,
-    %% Lambda1   = fun(S, T) -> ArgFun([S], T) end,
+    %% Lambda1   = fun(S, T) -> Lambda([S], T) end,
     StateFun  = fun(Ts, T) -> {type_sig, [stateful|Ann], [], Ts, T} end,
     TVar      = fun(X) -> {tvar, Ann, "'" ++ X} end,
     SignId    = {id, Ann, "signature"},
