@@ -53,15 +53,17 @@ simple_compile_test_() ->
             #{byte_code := Code2} = compile(aevm, "include"),
             ?assertMatch(true, Code1 == Code2)
         end} ] ++
-     [ {"Testing deadcode elimination",
+     [ {"Testing deadcode elimination for " ++ atom_to_list(Backend),
         fun() ->
-            #{ byte_code := NoDeadCode } = compile(aevm, "nodeadcode"),
-            #{ byte_code := DeadCode   } = compile(aevm, "deadcode"),
+            #{ byte_code := NoDeadCode } = compile(Backend, "nodeadcode"),
+            #{ byte_code := DeadCode   } = compile(Backend, "deadcode"),
             SizeNoDeadCode = byte_size(NoDeadCode),
             SizeDeadCode   = byte_size(DeadCode),
-            ?assertMatch({_, _, true}, {SizeDeadCode, SizeNoDeadCode, SizeDeadCode + 40 < SizeNoDeadCode}),
+            Delta          = if Backend == aevm -> 40;
+                                Backend == fate -> 20 end,
+            ?assertMatch({_, _, true}, {SizeDeadCode, SizeNoDeadCode, SizeDeadCode + Delta < SizeNoDeadCode}),
             ok
-        end} ].
+        end} || Backend <- [aevm, fate] ].
 
 check_errors(Expect, ErrorString) ->
     %% This removes the final single \n as well.
