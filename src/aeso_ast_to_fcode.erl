@@ -681,7 +681,7 @@ split_pat({con, As, I, Pats}) ->
     Xs = [fresh_name() || _ <- Pats],
     {{con, As, I, Xs}, Pats};
 split_pat({tuple, Pats}) ->
-    Xs = [fresh_name() || _ <- Pats],
+    Xs = [{var, fresh_name()} || _ <- Pats],
     {{tuple, Xs}, Pats}.
 
 -spec split_vars(fsplit_pat(), ftype()) -> [{var_name(), ftype()}].
