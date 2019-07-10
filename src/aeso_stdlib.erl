@@ -43,8 +43,8 @@ namespace Func =
 
   function tuplify2(f) = (t) => switch(t)
     (x, y) => f(x, y)
-//  function tuplify3(f) = (t) => switch(t)
-//    (x, y, z) => f(x, y, z)
+  function tuplify3(f) = (t) => switch(t)
+    (x, y, z) => f(x, y, z)
 
   function untuplify2(f) = (x, y) => f((x, y))
   function untuplify3(f) = (x, y, z) => f((x, y, z))
@@ -76,6 +76,16 @@ namespace List =
     [] => None
     h::t => if(p(h)) Some(h) else find(p, t)
 
+  function find_all(p, l) = find_all_(p, l, [])
+  private function find_all_(p, l, acc) = switch(l)
+    [] => reverse(acc)
+    h::t => find_all_(p, t, if(p(h)) h::acc else acc)
+
+  function find_indices(p, l) = find_indices_(p, l, 0, [])
+  private function find_indices_(p, l, n, acc) = switch(l)
+    [] => reverse(acc)
+    h::t => find_indices_(p, t, n+1, if(p(h)) n::acc else acc)
+
   function nth(n, l) = switch(l)
     h::t => if(n == 0) Some(h) else nth(n-1, t)
     [] => None
@@ -90,6 +100,25 @@ namespace List =
     [] => acc
     _::t => length_(t, acc + 1)
 
+
+  /* Unsafe. Makes `e` be `n`th element of `l`. Crashes on over/underflow */
+  function insert_at(n, e, l) = if(n<0) abort(\"insert_at underflow\") else insert_at_(n, e, l, [])
+  private function insert_at_(n, e, l, acc) = 
+   if (n == 0) reverse(e::acc) ++ l
+   else switch(l)
+     [] => abort(\"insert_at overflow\")
+     h::t => insert_at_(n-1, e, t, h::acc)
+
+  function insert_by(f: (('a, 'a) => bool), x : 'a, l : list('a)) : list('a) =
+    switch(l)
+      [] => [x]
+      (e :: l') =>
+        if(f(x, e))
+          e :: insert_by(f, x, l')
+        else
+          x :: l
+
+
   function foldr(cons, nil, l) = switch(l)
     [] => nil
     h::t => cons(h, foldr(cons, nil, t))
@@ -97,6 +126,13 @@ namespace List =
   function foldl(rcons, acc, l) = switch(l)
     [] => acc
     h::t => foldl(rcons, rcons(acc, h), t)
+
+  function foreach(f : 'a => 'b, l : list('a)) =
+    switch(l)
+     [] => []
+     e :: l' =>
+       f(e)
+       foreach(f, l')
 
 
   function reverse(l) = foldl((lst, el) => el :: lst, [], l)
