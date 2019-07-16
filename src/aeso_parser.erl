@@ -521,7 +521,7 @@ parse_pattern(E = {bool, _, _})   -> E;
 parse_pattern(E = {bytes, _, _})  -> E;
 parse_pattern(E = {string, _, _}) -> E;
 parse_pattern(E = {char, _, _})   -> E;
-parse_pattern(E) -> bad_expr_err("Not a valid patxstern", E).
+parse_pattern(E) -> bad_expr_err("Not a valid pattern", E).
 
 -spec parse_field_pattern(aeso_syntax:field(aeso_syntax:expr())) -> aeso_parse_lib:parser(aeso_syntax:field(aeso_syntax:pat())).
 parse_field_pattern({field, Ann, F, E}) ->
