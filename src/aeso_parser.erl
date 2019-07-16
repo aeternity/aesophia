@@ -6,6 +6,7 @@
 
 -export([string/1,
          string/2,
+         string/3,
          type/1]).
 
 -include("aeso_parse_lib.hrl").
@@ -16,13 +17,25 @@
 
 -spec string(string()) -> parse_result().
 string(String) ->
-    string(String, []).
+    string(String, sets:new(), []).
 
--spec string(string(), aeso_compiler:options()) -> parse_result().
+
+-spec string(string(), compiler:options()) -> parse_result().
 string(String, Opts) ->
+    string(String, sets:new(), Opts).
+
+-spec string(string(), sets:set(string()), aeso_compiler:options()) -> parse_result().
+string(String, Included, Opts) ->
     case parse_and_scan(file(), String, Opts) of
         {ok, AST} ->
-            expand_includes(AST, Opts);
+            STD = case lists:member(no_implicit_stdlib, Opts) of
+                      false -> [{ include, [{src_file, File}, {origin, system}]
+                                , {string, [{src_file, File}, {origin, system}], File}}
+                                || {File, _} <- aeso_stdlib:stdlib_list()
+                               ];
+                      true -> []
+                  end,
+            expand_includes(STD ++ AST, Included, Opts);
         Err = {error, _} ->
             Err
     end.
@@ -230,7 +243,7 @@ exprAtom() ->
         , {bool, keyword(false), false}
         , ?LET_P(Fs, brace_list(?LAZY_P(field_assignment())), record(Fs))
         , {list, [], bracket_list(Expr)}
-        , ?RULE(keyword('['), Expr, tok('|'), comma_sep(?LAZY_P(comprehension_bind())), tok(']'), list_comp_e(_1, _2, _4))
+        , ?RULE(keyword('['), Expr, token('|'), comma_sep(?LAZY_P(comprehension_bind())), tok(']'), list_comp_e(_1, _2, _4))
         , ?RULE(tok('['), Expr, binop('..'), Expr, tok(']'), _3(_2, _4))
         , ?RULE(keyword('('), comma_sep(Expr), tok(')'), tuple_e(_1, _2))
         ])
@@ -527,35 +540,40 @@ bad_expr_err(Reason, E) ->
                             prettypr:nest(2, aeso_pretty:expr(E))])).
 
 %% -- Helper functions -------------------------------------------------------
-expand_includes(AST, Opts) ->
-    expand_includes(AST, [], Opts).
+expand_includes(AST, Included, Opts) ->
+    expand_includes(AST, Included, [], Opts).
 
-expand_includes([], Acc, _Opts) ->
+expand_includes([], _Included, Acc, _Opts) ->
     {ok, lists:reverse(Acc)};
-expand_includes([{include, Ann, S = {string, _, File}} | AST], Acc, Opts) ->
-    case {read_file(File, Opts), maps:find(File, aeso_stdlib:stdlib())} of
-        {{ok, _}, {ok,_ }} ->
-            return_error(ann_pos(Ann), "Illegal redefinition of standard library " ++ File);
-        {_, {ok, Lib}} ->
-            case string(Lib) of
-                {ok, AST1} ->
-                    expand_includes(AST1 ++ AST, Acc, Opts);
-                Err = {error, _} ->
-                    Err
-            end;
-        {{ok, Bin}, _} ->
+expand_includes([{include, Ann, S = {string, _, File}} | AST], Included, Acc, Opts) ->
+    case sets:is_element(File, Included) of
+        false ->
             Opts1 = lists:keystore(src_file, 1, Opts, {src_file, File}),
-            case string(binary_to_list(Bin), Opts1) of
-                {ok, AST1} ->
-                    expand_includes(AST1 ++ AST, Acc, Opts);
-                Err = {error, _} ->
-                    Err
+            Included1 = sets:add_element(File, Included),
+            case {read_file(File, Opts), maps:find(File, aeso_stdlib:stdlib())} of
+                {{ok, _}, {ok,_ }} ->
+                    return_error(ann_pos(Ann), "Illegal redefinition of standard library " ++ File);
+                     {_, {ok, Lib}} ->
+                    case string(Lib, Included1, Opts1) of
+                        {ok, AST1} ->
+                            expand_includes(AST1 ++ AST, Included1, Acc, Opts);
+                        Err = {error, _} ->
+                            Err
+                    end;
+                {{ok, Bin}, _} ->
+                    case string(binary_to_list(Bin), Included1, Opts1) of
+                        {ok, AST1} ->
+                            expand_includes(AST1 ++ AST, Included1, Acc, Opts);
+                        Err = {error, _} ->
+                            Err
+                    end;
+                {_, _} ->
+                    {error, {get_pos(S), include_error, File}}
             end;
-        {{error, _}, _} ->
-            {error, {get_pos(S), include_error, File}}
+        true -> expand_includes(AST, Included, Acc, Opts)
     end;
-expand_includes([E | AST], Acc, Opts) ->
-    expand_includes(AST, [E | Acc], Opts).
+expand_includes([E | AST], Included, Acc, Opts) ->
+    expand_includes(AST, Included, [E | Acc], Opts).
 
 read_file(File, Opts) ->
     case proplists:get_value(include, Opts, {explicit_files, #{}}) of

@@ -9,7 +9,7 @@ simple_aci_test_() ->
 
 test_contract(N) ->
     {Contract,MapACI,DecACI} = test_cases(N),
-    {ok,JSON} = aeso_aci:contract_interface(json, Contract),
+    {ok,JSON} = aeso_aci:contract_interface(json, Contract, [no_implicit_stdlib]),
     ?assertEqual([MapACI], JSON),
     ?assertEqual({ok, DecACI}, aeso_aci:render_aci_json(JSON)).
 
@@ -98,7 +98,7 @@ aci_test_contract(Name) ->
     {ok, ContractStub} = aeso_aci:render_aci_json(JSON),
 
     io:format("STUB:\n~s\n", [ContractStub]),
-    check_stub(ContractStub, [{src_file, Name}]),
+    check_stub(ContractStub, [{src_file, Name}, no_implicit_stdlib]),
 
     ok.
 

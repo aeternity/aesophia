@@ -10,14 +10,15 @@
 
 -module(aeso_stdlib).
 
--export([stdlib/0]).
+-export([stdlib/0, stdlib_list/0]).
 
 stdlib() ->
-    maps:from_list(
-      [ {<<"List.aes">>, std_list()}
-     %% , {<<"Func.aes">>, std_function()}
-      ]
-     ).
+    maps:from_list(stdlib_list()).
+
+stdlib_list() ->
+    [ {<<"List.aes">>, std_list()}
+      %% , {<<"Func.aes">>, std_function()}
+    ].
 
 std_function() ->
 "
@@ -51,7 +52,8 @@ namespace Func =
 ".
 
 std_list() ->
-"
+"namespace List =\n  function flat_map() = 3\n".
+x() ->"
 namespace List =
 
   function empty(l) = switch(l)

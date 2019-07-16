@@ -36,6 +36,7 @@
                 | pp_assembler
                 | pp_bytecode
                 | no_code
+                | no_implicit_stdlib
                 | {backend, aevm | fate}
                 | {include, {file_system, [string()]} |
                             {explicit_files, #{string() => binary()}}}
