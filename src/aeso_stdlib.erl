@@ -38,7 +38,7 @@ namespace Func =
   private function iter_(n : int, f : 'a => 'a, acc : 'a => 'a) : 'a => 'a =
     if(n == 0) acc
     elif(n == 1) comp(f, acc)
-    else  else iter_(n / 2, comp(f, f), if(n mod 2 == 0) acc else comp(f, acc))
+    else iter_(n / 2, comp(f, f), if(n mod 2 == 0) acc else comp(f, acc))
 
   function curry2(f : ('a, 'b) => 'c) : 'a => ('b => 'c) =
     (x) => (y) => f(x, y)
@@ -50,19 +50,18 @@ namespace Func =
   function uncurry3(f : 'a => ('b => ('c => 'd))) : ('a, 'b, 'c) => 'd =
     (x, y, z) => f(x)(y)(z)
 
-/* TODO : parser fails here, probably a bug
-  function tuplify2(f : ('a, 'b) => 'c) : (('a, 'b)) => 'c =
-    (t) => switch(t)
-      (x, y) => f(x, y)
-  function tuplify3(f : ('a, 'b, 'c) => 'd) : (('a, 'b, 'c)) => 'd =
-    (t) => switch(t)
-      (x, y, z) => f(x, y, z)
+// TODO : parser fails here, probably a bug. Uncomment when resolved.
+//  function tuplify2(f : ('a, 'b) => 'c) : (('a, 'b)) => 'c =
+//    (t) => switch(t)
+//      (x, y) => f(x, y)
+//  function tuplify3(f : ('a, 'b, 'c) => 'd) : (('a, 'b, 'c)) => 'd =
+//    (t) => switch(t)
+//      (x, y, z) => f(x, y, z)
 
-  function untuplify2(f : (('a, 'b)) => 'c) : ('a, 'b) => 'c =
-    (x, y) => f((x, y))
-  function untuplify3(f : (('a, 'b, 'c)) => 'd) : ('a, 'b, 'c) => 'd =
-    (x, y, z) => f((x, y, z))
- */
+//  function untuplify2(f : (('a, 'b)) => 'c) : ('a, 'b) => 'c =
+//    (x, y) => f((x, y))
+//  function untuplify3(f : (('a, 'b, 'c)) => 'd) : ('a, 'b, 'c) => 'd =
+//    (x, y, z) => f((x, y, z))
 ".
 
 std_list() ->"

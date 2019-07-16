@@ -21,7 +21,7 @@ string(String) ->
 
 
 -spec string(string(), compiler:options()) -> parse_result().
-string(String, Opts) -> io:format("STRING WITH OPTS: ~p\n", [Opts]),
+string(String, Opts) ->
     case lists:keyfind(src_file, 1, Opts) of
         {src_file, File} -> string(String, sets:add_element(File, sets:new()), Opts);
         false -> string(String, sets:new(), Opts)
