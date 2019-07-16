@@ -38,9 +38,7 @@ namespace Func =
   private function iter_(n : int, f : 'a => 'a, acc : 'a => 'a) : 'a => 'a =
     if(n == 0) acc
     elif(n == 1) comp(f, acc)
-    else iter_(n / 2, f, if(n mod 2 == 0) comp(acc, acc) else comp(f, comp(acc, acc)))
-
-  function z(f : ('a => 'a, 'a) => 'a) : 'a => 'a = (x) => f(z(f), x)
+    else  else iter_(n / 2, comp(f, f), if(n mod 2 == 0) acc else comp(f, acc))
 
   function curry2(f : ('a, 'b) => 'c) : 'a => ('b => 'c) =
     (x) => (y) => f(x, y)
