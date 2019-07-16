@@ -17,101 +17,129 @@ stdlib() ->
 
 stdlib_list() ->
     [ {<<"List.aes">>, std_list()}
-      %% , {<<"Func.aes">>, std_function()}
+    , {<<"Func.aes">>, std_func()}
     ].
 
-std_function() ->
+std_func() ->
 "
 namespace Func =
 
-  function id(x) = x
+  function id(x : 'a) : 'a = x
 
-  function const(x) = (y) => x
+  function const(x : 'a) : 'b => 'a = (y) => x
 
-  function comp(f, g) = (x) => f(g(x))
+  function flip(f : ('a, 'b) => 'c) : ('b, 'a) => 'c = (b, a) => f(a, b)
 
-  function iter(n, f) = iter_(n, f, (x) => x)
-  private function iter_(n, f, acc) =
+  function comp(f : 'b => 'c, g : 'a => 'b) : 'a => 'c = (x) => f(g(x))
+
+  function pipe(f : 'a => 'b, g : 'b => 'c) : 'a => 'c = (x) => g(f(x))
+
+  function iter(n : int, f : 'a => 'a) : 'a => 'a = iter_(n, f, (x) => x)
+  private function iter_(n : int, f : 'a => 'a, acc : 'a => 'a) : 'a => 'a =
     if(n == 0) acc
     elif(n == 1) comp(f, acc)
     else iter_(n / 2, f, if(n mod 2 == 0) comp(acc, acc) else comp(f, comp(acc, acc)))
 
-  function curry2(f) = (x) => (y) => f(x, y)
-  function curry3(f) = (x) => (y) => (z) => f(x, y, z)
+  function z(f : ('a => 'a, 'a) => 'a) : 'a => 'a = (x) => f(z(f), x)
 
-  function uncurry2(f) = (x, y) => f(x)(y)
-  function uncurry3(f) = (x, y, z) => f(x)(y)(z)
+  function curry2(f : ('a, 'b) => 'c) : 'a => ('b => 'c) =
+    (x) => (y) => f(x, y)
+  function curry3(f : ('a, 'b, 'c) => 'd) : 'a => ('b => ('c => 'd)) =
+    (x) => (y) => (z) => f(x, y, z)
 
-  function tuplify2(f) = (t) => switch(t)
-    (x, y) => f(x, y)
-  function tuplify3(f) = (t) => switch(t)
-    (x, y, z) => f(x, y, z)
+  function uncurry2(f : 'a => ('b => 'c)) : ('a, 'b) => 'c =
+    (x, y) => f(x)(y)
+  function uncurry3(f : 'a => ('b => ('c => 'd))) : ('a, 'b, 'c) => 'd =
+    (x, y, z) => f(x)(y)(z)
 
-  function untuplify2(f) = (x, y) => f((x, y))
-  function untuplify3(f) = (x, y, z) => f((x, y, z))
+/* TODO : parser fails here, probably a bug
+  function tuplify2(f : ('a, 'b) => 'c) : (('a, 'b)) => 'c =
+    (t) => switch(t)
+      (x, y) => f(x, y)
+  function tuplify3(f : ('a, 'b, 'c) => 'd) : (('a, 'b, 'c)) => 'd =
+    (t) => switch(t)
+      (x, y, z) => f(x, y, z)
+
+  function untuplify2(f : (('a, 'b)) => 'c) : ('a, 'b) => 'c =
+    (x, y) => f((x, y))
+  function untuplify3(f : (('a, 'b, 'c)) => 'd) : ('a, 'b, 'c) => 'd =
+    (x, y, z) => f((x, y, z))
+ */
 ".
 
-std_list() ->
-"namespace List =\n  function flat_map() = 3\n".
-x() ->"
+std_list() ->"
 namespace List =
 
-  function empty(l) = switch(l)
+  function empty(l : list('a)) : bool = switch(l)
     [] => true
     _  => false
 
-
-  function first(l) = switch(l)
+  function first(l : list('a)) : option('a) = switch(l)
     [] => None
     h::_ => Some(h)
 
-  function tail(l) = switch(l)
+  function tail(l : list('a)) : option(list('a)) = switch(l)
     [] => None
     _::t => Some(t)
 
-  function last(l) = switch(l)
+  function last(l : list('a)) : option('a) = switch(l)
     [] => None
     [x] => Some(x)
     _::t => last(t)
 
-  function find(p, l) = switch(l)
+  function find(p : 'a => bool, l : list('a)) : option('a) = switch(l)
     [] => None
     h::t => if(p(h)) Some(h) else find(p, t)
 
-  function find_all(p, l) = find_all_(p, l, [])
-  private function find_all_(p, l, acc) = switch(l)
+  function find_all(p : 'a => bool, l : list('a)) : list('a) = find_all_(p, l, [])
+  private function find_all_(p : 'a => bool, l : list('a), acc : list('a)) : list('a) = switch(l)
     [] => reverse(acc)
     h::t => find_all_(p, t, if(p(h)) h::acc else acc)
 
-  function find_indices(p, l) = find_indices_(p, l, 0, [])
-  private function find_indices_(p, l, n, acc) = switch(l)
+  function find_indices(p : 'a => bool, l : list('a)) : list(int) = find_indices_(p, l, 0, [])
+  private function find_indices_( p : 'a => bool
+                                , l : list('a)
+                                , n : int
+                                , acc : list(int)
+                                ) : list(int) = switch(l)
     [] => reverse(acc)
     h::t => find_indices_(p, t, n+1, if(p(h)) n::acc else acc)
 
-  function nth(n, l) = switch(l)
+  function nth(n : int, l : list('a)) : option('a) = switch(l)
     h::t => if(n == 0) Some(h) else nth(n-1, t)
     [] => None
 
-  function get(n, l) = switch(l)
+  /* Unsafe version of `nth` */
+  function get(n : int, l : list('a)) : 'a = switch(l)
     [] => abort(\"Out of index get\")
     h::t => if(n == 0) h else get(n-1, t)
 
 
-  function length(l) = length_(l, 0)
-  private function length_(l, acc) = switch(l)
+  function length(l : list('a)) : int = length_(l, 0)
+  private function length_(l : list('a), acc : int) : int = switch(l)
     [] => acc
     _::t => length_(t, acc + 1)
 
 
-  /* Unsafe. Makes `e` be `n`th element of `l`. Crashes on over/underflow */
-  function insert_at(n, e, l) = if(n<0) abort(\"insert_at underflow\") else insert_at_(n, e, l, [])
-  private function insert_at_(n, e, l, acc) = 
+  /* Unsafe. Replaces `n`th element of `l` with `e`. Crashes on over/underflow */
+  function replace_at(n : int, e : 'a, l : list('a)) : list('a) =
+    if(n<0) abort(\"insert_at underflow\") else replace_at_(n, e, l, [])
+  private function replace_at_(n : int, e : 'a, l : list('a), acc : list('a)) : list('a) =
+   switch(l)
+     [] => abort(\"replace_at overflow\")
+     h::t => if (n == 0) reverse(e::acc) ++ t
+             else replace_at_(n-1, e, t, h::acc)
+
+  /* Unsafe. Adds `e` to `l` to be its `n`th element. Crashes on over/underflow */
+  function insert_at(n : int, e : 'a, l : list('a)) : list('a) =
+    if(n<0) abort(\"insert_at underflow\") else insert_at_(n, e, l, [])
+  private function insert_at_(n : int, e : 'a, l : list('a), acc : list('a)) : list('a) =
    if (n == 0) reverse(e::acc) ++ l
    else switch(l)
      [] => abort(\"insert_at overflow\")
      h::t => insert_at_(n-1, e, t, h::acc)
 
-  function insert_by(f: (('a, 'a) => bool), x : 'a, l : list('a)) : list('a) =
+  function insert_by(f : (('a, 'a) => bool), x : 'a, l : list('a)) : list('a) =
     switch(l)
       [] => [x]
       (e :: l') =>
@@ -120,51 +148,51 @@ namespace List =
         else
           x :: l
 
-
-  function foldr(cons, nil, l) = switch(l)
+  function foldr(cons : ('a, 'b) => 'b, nil : 'b, l : list('a)) : 'b = switch(l)
     [] => nil
     h::t => cons(h, foldr(cons, nil, t))
 
-  function foldl(rcons, acc, l) = switch(l)
+  function foldl(rcons : ('b, 'a) => 'b, acc : 'b, l : list('a)) : 'b = switch(l)
     [] => acc
     h::t => foldl(rcons, rcons(acc, h), t)
 
-  function foreach(f : 'a => 'b, l : list('a)) =
+  function foreach(f : 'a => 'b, l : list('a)) : () =
     switch(l)
-     [] => []
+     [] => ()
      e :: l' =>
        f(e)
        foreach(f, l')
 
 
-  function reverse(l) = foldl((lst, el) => el :: lst, [], l)
+  function reverse(l : list('a)) : list('a) = foldl((lst, el) => el :: lst, [], l)
 
 
-  function map(f, l) = map_(f, l, [])
-  private function map_(f, l, acc) = switch(l)
+  function map(f : 'a => 'b, l : list('a)) : list('b) = map_(f, l, [])
+  private function map_(f : 'a => 'b, l : list('a), acc : list('b)) : list('b) = switch(l)
     [] => reverse(acc)
     h::t => map_(f, t, f(h)::acc)
 
-  function flat_map(f, l) = switch(l)
-    [] => []
-    h::t => f(h) ++ flat_map(f, t)
+  function flat_map(f : 'a => list('b), l : list('a)) : list('b) = flat_map_(f, l, [])
+  private function flat_map_(f : 'a => list('b), l : list('a), acc : list('b)) : list('b) = switch(l)
+    [] => reverse(acc)
+    h::t => flat_map_(f, t, reverse(f(h)) ++ acc)
 
-
-  function filter(p, l) = filter_(p, l, [])
-  private function filter_(p, l, acc) = switch(l)
+  function filter(p : 'a => bool, l : list('a)) : list('a) = filter_(p, l, [])
+  private function filter_(p : 'a => bool, l : list('a), acc : list('a)) : list('a) = switch(l)
     [] => reverse(acc)
     h::t => filter_(p, t, if(p(h)) h::acc else acc)
 
   /* Take `n` first elements */
-  function take(n, l) = if(n < 0) abort(\"Take negative number of elements\") else take_(n, l, [])
-  private function take_(n, l, acc) =
+  function take(n : int, l : list('a)) : list('a) =
+    if(n < 0) abort(\"Take negative number of elements\") else take_(n, l, [])
+  private function take_(n : int, l : list('a), acc : list('a)) : list('a) =
     if(n == 0) reverse(acc)
     else switch(l)
       [] => reverse(acc)
       h::t => take_(n-1, t, h::acc)
 
   /* Drop `n` first elements */
-  function drop(n, l) =
+  function drop(n : int, l : list('a)) : list('a) =
    if(n < 0) abort(\"Drop negative number of elements\")
    elif (n == 0) l
    else switch(l)
@@ -172,66 +200,77 @@ namespace List =
       h::t => drop(n-1, t)
 
   /* Get the longest prefix of a list in which every element matches predicate `p` */
-  function take_while(p, l) = take_while_(p, l, [])
-  private function take_while_(p, l, acc) = switch(l)
+  function take_while(p : 'a => bool, l : list('a)) : list('a) = take_while_(p, l, [])
+  private function take_while_(p : 'a => bool, l : list('a), acc : list('a)) : list('a) = switch(l)
     [] => reverse(acc)
     h::t => if(p(h)) take_while_(p, t, h::acc) else reverse(acc)
 
   /* Drop elements from `l` until `p` holds */
-  function drop_while(p, l) = switch(l)
+  function drop_while(p : 'a => bool, l : list('a)) : list('a) = switch(l)
     [] => []
     h::t => if(p(h)) drop_while(p, t) else l
 
   /* Splits list into two lists of elements that respectively match and don't match predicate `p` */
-  function partition(p, l) = partition_(p, l, [], [])
-  private function partition_(p, l, acc_t, acc_f) = switch(l)
+  function partition(p : 'a => bool, l : list('a)) : (list('a), list('a)) = partition_(p, l, [], [])
+  private function partition_( p : 'a => bool
+                             , l : list('a)
+                             , acc_t : list('a)
+                             , acc_f : list('a)
+                             ) : (list('a), list('a)) = switch(l)
     [] => (reverse(acc_t), reverse(acc_f))
     h::t => if(p(h)) partition_(p, t, h::acc_t, acc_f) else partition_(p, t, acc_t, h::acc_f)
 
 
-  function concats(ll) = foldr((l1, l2) => l1 ++ l2, [], ll)
+  function concats(ll : list(list('a))) : list('a) = foldr((l1, l2) => l1 ++ l2, [], ll)
 
-  function all(p, l) = foldl((prev, next) => prev && p(next), true, l)
+  function all(p : 'a => bool, l : list('a)) : bool = foldl((prev, next) => prev && p(next), true, l)
 
-  function any(p, l) = foldl((prev, next) => prev || p(next), false, l)
+  function any(p : 'a => bool, l : list('a)) : bool = foldl((prev, next) => prev || p(next), false, l)
 
-  function sum(l) = foldl ((a, b) => a + b, 0, l)
+  function sum(l : list(int)) : int = foldl ((a, b) => a + b, 0, l)
 
-  function product(l) = foldl((a, b) => a * b, 1, l)
+  function product(l : list(int)) : int = foldl((a, b) => a * b, 1, l)
 
 
   /* Zips two list by applying bimapping function on respective elements. Drops longer tail. */
-  function zip_with(f, l1, l2) = zip_with_(f, l1, l2, [])
-  private function zip_with_(f, l1, l2, acc) = switch ((l1, l2))
+  function zip_with(f : ('a, 'b) => 'c, l1 : list('a), l2 : list('b)) : list('c) = zip_with_(f, l1, l2, [])
+  private function zip_with_( f : ('a, 'b) => 'c
+                            , l1 : list('a)
+                            , l2 : list('b)
+                            , acc : list('c)
+                            ) : list('c) = switch ((l1, l2))
     (h1::t1, h2::t2) => zip_with_(f, t1, t2, f(h1, h2)::acc)
     _ => reverse(acc)
 
   /* Zips two lists into list of pairs. Drops longer tail. */
-  function zip(l1, l2) = zip_with((a, b) => (a, b), l1, l2)
+  function zip(l1 : list('a), l2 : list('b)) : list(('a, 'b)) = zip_with((a, b) => (a, b), l1, l2)
 
-  function unzip(l) = unzip_(l, [], [])
-  private function unzip_(l, acc_l, acc_r) = switch(l)
+  function unzip(l : list(('a, 'b))) : (list('a), list('b)) = unzip_(l, [], [])
+  private function unzip_( l : list(('a, 'b))
+                         , acc_l : list('a)
+                         , acc_r : list('b)
+                         ) : (list('a), list('b)) = switch(l)
     [] => (reverse(acc_l), reverse(acc_r))
     (left, right)::t => unzip_(t, left::acc_l, right::acc_r)
 
 
   // TODO: Improve?
-  function sort(lesser_cmp, l) = switch(l)
+  function sort(lesser_cmp : ('a, 'a) => bool, l : list('a)) : list('a) = switch(l)
     [] => []
     h::t => switch (partition((x) => lesser_cmp(x, h), t))
       (lesser, bigger) => sort(lesser_cmp, lesser) ++ h::sort(lesser_cmp, bigger)
 
 
-  function intersperse(delim, l) = intersperse_(delim, l, [])
-  private function intersperse_(delim, l, acc) = switch(l)
+  function intersperse(delim : 'a, l : list('a)) : list('a) = intersperse_(delim, l, [])
+  private function intersperse_(delim : 'a, l : list('a), acc : list('a)) : list('a) = switch(l)
     [] => reverse(acc)
     [e] => reverse(e::acc)
     h::t => intersperse_(delim, t, h::delim::acc)
 
 
-  function index(l) = index_(l, 0, [])
-  private function index_(l, n, acc) = switch(l)
+  function enumerate(l : list('a)) : list((int, 'a)) = enumerate_(l, 0, [])
+  private function enumerate_(l : list('a), n : int, acc : list((int, 'a))) : list((int, 'a)) = switch(l)
     [] => reverse(acc)
-    h::t => index_(t, n + 1, (n, h)::acc)
+    h::t => enumerate_(t, n + 1, (n, h)::acc)
 
 ".

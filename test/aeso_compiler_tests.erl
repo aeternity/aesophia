@@ -119,7 +119,8 @@ compilable_contracts() ->
      "bytes_to_x",
      "aens",
      "tuple_match",
-     "list_comp"
+     "cyclic_include",
+     "stdlib_include"
     ].
 
 not_yet_compilable(fate) -> [];

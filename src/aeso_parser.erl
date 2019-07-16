@@ -21,8 +21,11 @@ string(String) ->
 
 
 -spec string(string(), compiler:options()) -> parse_result().
-string(String, Opts) ->
-    string(String, sets:new(), Opts).
+string(String, Opts) -> io:format("STRING WITH OPTS: ~p\n", [Opts]),
+    case lists:keyfind(src_file, 1, Opts) of
+        {src_file, File} -> string(String, sets:add_element(File, sets:new()), Opts);
+        false -> string(String, sets:new(), Opts)
+    end.
 
 -spec string(string(), sets:set(string()), aeso_compiler:options()) -> parse_result().
 string(String, Included, Opts) ->
@@ -553,8 +556,8 @@ expand_includes([{include, Ann, S = {string, _, File}} | AST], Included, Acc, Op
             case {read_file(File, Opts), maps:find(File, aeso_stdlib:stdlib())} of
                 {{ok, _}, {ok,_ }} ->
                     return_error(ann_pos(Ann), "Illegal redefinition of standard library " ++ File);
-                     {_, {ok, Lib}} ->
-                    case string(Lib, Included1, Opts1) of
+                {_, {ok, Lib}} ->
+                    case string(Lib, Included1, [no_implicit_stdlib, Opts1]) of
                         {ok, AST1} ->
                             expand_includes(AST1 ++ AST, Included1, Acc, Opts);
                         Err = {error, _} ->
