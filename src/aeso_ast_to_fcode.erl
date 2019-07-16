@@ -360,6 +360,7 @@ make_let(Expr, Body) ->
             {'let', X, Expr, Body({var, X})}
     end.
 
+-spec expr_to_fcode(env(), aeso_syntax:expr()) -> fexpr().
 expr_to_fcode(Env, {typed, _, Expr, Type}) ->
     expr_to_fcode(Env, Type, Expr);
 expr_to_fcode(Env, Expr) ->
