@@ -246,11 +246,21 @@ exprAtom() ->
         , {bool, keyword(false), false}
         , ?LET_P(Fs, brace_list(?LAZY_P(field_assignment())), record(Fs))
         , {list, [], bracket_list(Expr)}
-        , ?RULE(keyword('['), Expr, token('|'), comma_sep(?LAZY_P(comprehension_bind())), tok(']'), list_comp_e(_1, _2, _4))
+        , ?RULE(keyword('['), Expr, token('|'), comma_sep(comprehension_exp()), tok(']'), list_comp_e(_1, _2, _4))
         , ?RULE(tok('['), Expr, binop('..'), Expr, tok(']'), _3(_2, _4))
         , ?RULE(keyword('('), comma_sep(Expr), tok(')'), tuple_e(_1, _2))
         ])
     end).
+
+comprehension_exp() ->
+    ?LAZY_P(choice(
+      [ comprehension_bind()
+      , letdecl()
+      , comprehension_if()
+      ])).
+
+comprehension_if() ->
+    ?RULE(keyword('if'), parens(expr()), {comprehension_if, _1, _2}).
 
 comprehension_bind() ->
     ?RULE(id(), tok('<-'), expr(), {comprehension_bind, _1, _3}).

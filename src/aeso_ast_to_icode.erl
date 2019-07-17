@@ -531,6 +531,12 @@ ast_body({list_comp, As, Yield, [{comprehension_bind, {typed, Arg, ArgType}, Bin
               , ast_body(BindExpr, Icode)
               ]
         };
+ast_body({list_comp, As, Yield, [{comprehension_if, AsIF, Cond}|Rest]}, Icode) ->
+    ast_body({'if', AsIF, Cond, {list_comp, As, Yield, Rest}, {list, As, []}}, Icode);
+ast_body({list_comp, As, Yield, [LV = {letval, _, _, _, _}|Rest]}, Icode) ->
+    ast_body({block, As, [LV, {list_comp, As, Yield, Rest}]}, Icode);
+ast_body({list_comp, As, Yield, [LF = {letfun, _, _, _, _, _}|Rest]}, Icode) ->
+    ast_body({block, As, [LF, {list_comp, As, Yield, Rest}]}, Icode);
 ast_body({'if',_,Dec,Then,Else}, Icode) ->
     #ifte{decision = ast_body(Dec, Icode)
          ,then     = ast_body(Then, Icode)

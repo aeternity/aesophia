@@ -1093,6 +1093,41 @@ infer_expr(Env, {list_comp, As, Yield, [{comprehension_bind, Arg, BExpr}|Rest]})
     , As
     , {list_comp, As, TypedYield, [{comprehension_bind, {typed, Arg, BindVarType}, TypedBind}|TypedRest]}
     , ResType};
+infer_expr(Env, {list_comp, AttrsL, Yield, [{comprehension_if, AttrsIF, Cond}|Rest]}) ->
+    NewCond = check_expr(Env, Cond, {id, AttrsIF, "bool"}),
+    {typed, _, {list_comp, _, TypedYield, TypedRest}, ResType} =
+        infer_expr(Env, {list_comp, AttrsL, Yield, Rest}),
+    { typed
+    , AttrsL
+    , {list_comp, AttrsL, TypedYield, [{comprehension_if, AttrsIF, NewCond}|TypedRest]}
+    , ResType};
+infer_expr(Env, {list_comp, AsLC, Yield, [{letval, AsLV, Pattern, Type, E}|Rest]}) ->
+    NewE = {typed, _, _, PatType} = infer_expr(Env, {typed, AsLV, E, arg_type(Type)}),
+    BlockType = fresh_uvar(AsLV),
+    {'case', _, NewPattern, NewRest} =
+        infer_case( Env
+                  , AsLC
+                  , Pattern
+                  , PatType
+                  , {list_comp, AsLC, Yield, Rest}
+                  , BlockType),
+    {typed, _, {list_comp, _, TypedYield, TypedRest}, ResType} = NewRest,
+    { typed
+    , AsLC
+    , {list_comp, AsLC, TypedYield, [{letval, AsLV, NewPattern, Type, NewE}|TypedRest]}
+    , ResType
+    };
+infer_expr(Env, {list_comp, AsLC, Yield, [Def={letfun, AsLF, _, _, _, _}|Rest]}) ->
+    {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
+    FunT = freshen_type(AsLF, typesig_to_fun_t(TypeSig)),
+    NewE = bind_var({id, AsLF, Name}, FunT, Env),
+    {typed, _, {list_comp, _, TypedYield, TypedRest}, ResType} =
+        infer_expr(NewE, {list_comp, AsLC, Yield, Rest}),
+    { typed
+    , AsLC
+    , {list_comp, AsLC, TypedYield, [LetFun|TypedRest]}
+    , ResType
+    };
 infer_expr(Env, {typed, As, Body, Type}) ->
     Type1 = check_type(Env, Type),
     {typed, _, NewBody, NewType} = check_expr(Env, Body, Type1),

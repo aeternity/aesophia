@@ -451,6 +451,15 @@ expr_to_fcode(Env, _Type, {list_comp, As, Yield, [{comprehension_bind, {typed, {
     Bind = {lam, [Arg], expr_to_fcode(Env1, {list_comp, As, Yield, Rest})},
     {def_u, FlatMap, _} = resolve_fun(Env, ["List", "flat_map"]),
     {def, FlatMap, [Bind, expr_to_fcode(Env, BindExpr)]};
+expr_to_fcode(Env, Type, {list_comp, As, Yield, [{comprehension_if, _, Cond}|Rest]}) ->
+    make_if(expr_to_fcode(Env, Cond),
+            expr_to_fcode(Env, Type, {list_comp, As, Yield, Rest}),
+            nil
+           );
+expr_to_fcode(Env, Type, {list_comp, As, Yield, [LV = {letval, _, _, _, _}|Rest]}) ->
+    expr_to_fcode(Env, Type, {block, As, [LV, {list_comp, As, Yield, Rest}]});
+expr_to_fcode(Env, Type, {list_comp, As, Yield, [LF = {letfun, _, _, _, _, _}|Rest]}) ->
+    expr_to_fcode(Env, Type, {block, As, [LF, {list_comp, As, Yield, Rest}]});
 
 %% Conditionals
 expr_to_fcode(Env, _Type, {'if', _, Cond, Then, Else}) ->

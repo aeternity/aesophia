@@ -67,7 +67,7 @@ namespace Func =
 std_list() ->"
 namespace List =
 
-  function empty(l : list('a)) : bool = switch(l)
+  function is_empty(l : list('a)) : bool = switch(l)
     [] => true
     _  => false
 
