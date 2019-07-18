@@ -19,6 +19,8 @@ stdlib_list() ->
     [ {<<"List.aes">>, std_list()}
     , {<<"Func.aes">>, std_func()}
     , {<<"Option.aes">>, std_option()}
+    , {<<"Pair.aes">>, std_pair()}
+    , {<<"Triple.aes">>, std_triple()}
     ].
 
 std_func() ->
@@ -350,4 +352,68 @@ namespace Option =
     [] => None
     None::t => choose_first(t)
     Some(x)::_ => Some(x)
+".
+
+std_pair() -> "
+namespace Pair =
+
+  function fst(t : ('a, 'b)) : 'a = switch(t)
+    (x, _) => x
+
+  function snd(t : ('a, 'b)) : 'b = switch(t)
+    (_, y) => y
+
+
+  function map1(f : 'a => 'c, t : ('a, 'b)) : ('c, 'b) = switch(t)
+    (x, y) => (f(x), y)
+
+  function map2(f : 'b => 'c, t : ('a, 'b)) : ('a, 'c) = switch(t)
+    (x, y) => (x, f(y))
+
+  function bimap(f : 'a => 'c, g : 'b => 'd, t : ('a, 'b)) : ('c, 'd) = switch(t)
+    (x, y) => (f(x), g(y))
+
+
+  function swap(t : ('a, 'b)) : ('b, 'a) = switch(t)
+    (x, y) => (y, x)
+".
+
+std_triple() -> "
+namespace Triple =
+
+  function fst(t : ('a, 'b, 'c)) : 'a = switch(t)
+    (x, _, _) => x
+
+  function snd(t : ('a, 'b, 'c)) : 'b = switch(t)
+    (_, y, _) => y
+
+  function thd(t : ('a, 'b, 'c)) : 'c = switch(t)
+    (_, _, z) => z
+
+
+  function map1(f : 'a => 'm, t : ('a, 'b, 'c)) : ('m, 'b, 'c) = switch(t)
+    (x, y, z) => (f(x), y, z)
+
+  function map2(f : 'b => 'm, t : ('a, 'b, 'c)) : ('a, 'm, 'c) = switch(t)
+    (x, y, z) => (x, f(y), z)
+
+  function map3(f : 'c => 'm, t : ('a, 'b, 'c)) : ('a, 'b, 'm) = switch(t)
+    (x, y, z) => (x, y, f(z))
+
+  function trimap( f : 'a => 'x
+                 , g : 'b => 'y
+                 , h : 'c => 'z
+                 , t : ('a, 'b, 'c)
+                 ) : ('x, 'y, 'z) = switch(t)
+    (x, y, z) => (f(x), g(y), h(z))
+
+
+  function swap(t : ('a, 'b, 'c)) : ('c, 'b, 'a) = switch(t)
+    (x, y, z) => (z, y, x)
+
+  function rotr(t : ('a, 'b, 'c)) : ('c, 'a, 'b) = switch(t)
+    (x, y, z) => (z, x, y)
+
+  function rotl(t : ('a, 'b, 'c)) : ('b, 'c, 'a) = switch(t)
+    (x, y, z) => (y, z, x)
 ".
