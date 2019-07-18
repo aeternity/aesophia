@@ -356,7 +356,13 @@ failing_contracts() ->
         <<"Use 'entrypoint' for declaration of foo (at line 6, column 3):\n  entrypoint foo : () => unit">>,
         <<"Use 'entrypoint' instead of 'function' for public function foo (at line 10, column 3):\n  entrypoint foo() = ()">>,
         <<"Use 'entrypoint' instead of 'function' for public function foo (at line 6, column 3):\n  entrypoint foo : () => unit">>]}
-    , {"list_comp_fail",
+    , {"list_comp_not_a_list",
       [<<"Cannot unify int\n         and list('a)\nwhen checking rvalue of list comprehension binding at line 2, column 36\n  1 : int\nagainst type \n  list('a)">>
+      ]}
+    , {"list_comp_if_not_bool",
+      [<<"Cannot unify int\n         and bool\nwhen checking the type of the expression at line 2, column 44\n  3 : int\nagainst the expected type\n  bool">>
+      ]}
+    , {"list_comp_bad_shadow",
+      [<<"Cannot unify int\n         and string\nwhen checking the type of the pattern at line 2, column 53\n  x : int\nagainst the expected type\n  string">>
       ]}
     ].
