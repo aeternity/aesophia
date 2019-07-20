@@ -385,7 +385,7 @@ global_env() ->
                      {"FixedTTL",    Fun1(Int, TTL)},
                      %% Abort
                      {"abort", Fun1(String, A)},
-                     {"require", Fun([Bool, String], A)}])
+                     {"require", Fun([Bool, String], Unit)}])
         , types = MkDefs(
                     [{"int", 0}, {"bool", 0}, {"char", 0}, {"string", 0}, {"address", 0},
                      {"hash", {[], {alias_t, Bytes(32)}}},
