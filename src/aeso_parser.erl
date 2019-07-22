@@ -141,7 +141,7 @@ type200() ->
     ?RULE(many({fun_domain(), keyword('=>')}), type300(), fun_t(_1, _2)).
 
 type300() ->
-    ?RULE(sep1(type400(), tok('*')), tuple_t(get_ann(_1), _1)).
+    ?RULE(sep1(type400(), tok('*')), tuple_t(get_ann(lists:nth(1, _1)), _1)).
 
 type400() ->
     choice(
@@ -156,12 +156,17 @@ type400() ->
 
 typeAtom() ->
     ?LAZY_P(choice(
-    [ id(), token(con), token(qcon), token(qid), tvar()
+    [ parens(type())
+    , id(), token(con), token(qcon), token(qid), tvar()
     ])).
 
 fun_domain() -> ?LAZY_P(choice(
-    [ paren_list(type())
-    , type300()
+    [ ?RULE(tok('('), tok(')'), [])
+      %% Note avoidance of ambiguity: `(int)` can be treated as:
+      %% - literally `int`
+      %% - list of arguments with just one element – int. This approach is dropped.
+    , ?RULE(tok('('), type(), tok(','), sep1(type(), tok(',')), tok(')'), [_2|_4])
+    , ?RULE(type300(), [_1])
     ])).
 
 %% -- Statements -------------------------------------------------------------

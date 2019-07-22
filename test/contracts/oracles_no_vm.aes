@@ -21,7 +21,7 @@ contract Oracles =
   function respond(o    : oracle_id,
                    q    : query_id,
                    sign : signature,
-                   r    : answer_t) : () =
+                   r    : answer_t) : unit =
     Oracle.respond(o, q, signature = sign, r)
 
 

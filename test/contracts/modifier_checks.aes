@@ -3,7 +3,7 @@ namespace Lib =
   entrypoint foo() = ()
 
 contract Remote =
-  public function foo : () => ()
+  public function foo : () => unit
   function bla() = ()
 
 contract Contract =

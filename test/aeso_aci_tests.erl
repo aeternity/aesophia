@@ -53,7 +53,7 @@ test_cases(2) ->
     {Contract,MapACI,DecACI};
 test_cases(3) ->
     Contract = <<"contract C =\n"
-                 "  type state = ()\n"
+                 "  type state = unit\n"
                  "  datatype event = SingleEventDefined\n"
 		 "  datatype bert('a) = Bin('a)\n"
 		 "  entrypoint a(i : bert(string)) = 1\n">>,
@@ -67,7 +67,7 @@ test_cases(3) ->
 			    stateful => false}],
 		     name => <<"C">>,
                      event => #{variant => [#{<<"SingleEventDefined">> => []}]},
-                     state => #{tuple => []},
+                     state => <<"unit">>,
 		     type_defs =>
 			 [#{name => <<"bert">>,
 			    typedef =>
@@ -75,7 +75,7 @@ test_cases(3) ->
 				      [#{<<"Bin">> => [<<"'a">>]}]},
 			    vars => [#{name => <<"'a">>}]}]}},
     DecACI = <<"contract C =\n"
-               "  type state = ()\n"
+               "  type state = unit\n"
                "  datatype event = SingleEventDefined\n"
 	       "  datatype bert('a) = Bin('a)\n"
 	       "  entrypoint a : (C.bert(string)) => int\n">>,

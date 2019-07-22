@@ -1,5 +1,5 @@
 contract Remote =
-  entrypoint dummy : () => ()
+  entrypoint dummy : () => unit
 
 contract Events =
 

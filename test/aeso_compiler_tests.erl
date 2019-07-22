@@ -220,7 +220,7 @@ failing_contracts() ->
           "when checking that 'init' returns a value of type 'state' at line 7, column 3">>]}
     , {"missing_state_type",
        [<<"Cannot unify string\n"
-          "         and ()\n"
+          "         and unit\n"
           "when checking that 'init' returns a value of type 'state' at line 5, column 3">>]}
     , {"missing_fields_in_record_expression",
        [<<"The field x is missing when constructing an element of type r('a) (at line 7, column 42)">>,
@@ -325,7 +325,7 @@ failing_contracts() ->
         <<"Cannot reference stateful function local_spend (at line 14, column 35)\nin the definition of non-stateful function fail2.">>,
         <<"Cannot reference stateful function Chain.spend (at line 16, column 15)\nin the definition of non-stateful function fail3.">>,
         <<"Cannot reference stateful function Chain.spend (at line 20, column 31)\nin the definition of non-stateful function fail4.">>,
-        <<"Cannot reference stateful function Chain.spend (at line 35, column 45)\nin the definition of non-stateful function fail5.">>,
+        <<"Cannot reference stateful function Chain.spend (at line 35, column 47)\nin the definition of non-stateful function fail5.">>,
         <<"Cannot pass non-zero value argument 1000 (at line 48, column 57)\nin the definition of non-stateful function fail6.">>,
         <<"Cannot pass non-zero value argument 1000 (at line 49, column 56)\nin the definition of non-stateful function fail7.">>,
         <<"Cannot pass non-zero value argument 1000 (at line 52, column 17)\nin the definition of non-stateful function fail8.">>]}
@@ -350,7 +350,7 @@ failing_contracts() ->
         <<"Namespaces cannot contain entrypoints (at line 3, column 3). Use 'function' instead.">>,
         <<"The contract Remote (at line 5, column 10) has no entrypoints. Since Sophia version 3.2, public\ncontract functions must be declared with the 'entrypoint' keyword instead of\n'function'.">>,
         <<"The entrypoint wha (at line 12, column 3) cannot be private. Use 'function' instead.">>,
-        <<"Use 'entrypoint' for declaration of foo (at line 6, column 3):\n  entrypoint foo : () => ()">>,
+        <<"Use 'entrypoint' for declaration of foo (at line 6, column 3):\n  entrypoint foo : () => unit">>,
         <<"Use 'entrypoint' instead of 'function' for public function foo (at line 10, column 3):\n  entrypoint foo() = ()">>,
-        <<"Use 'entrypoint' instead of 'function' for public function foo (at line 6, column 3):\n  entrypoint foo : () => ()">>]}
+        <<"Use 'entrypoint' instead of 'function' for public function foo (at line 6, column 3):\n  entrypoint foo : () => unit">>]}
     ].

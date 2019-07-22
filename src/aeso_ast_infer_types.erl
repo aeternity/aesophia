@@ -388,6 +388,7 @@ global_env() ->
                      {"require", Fun([Bool, String], Unit)}])
         , types = MkDefs(
                     [{"int", 0}, {"bool", 0}, {"char", 0}, {"string", 0}, {"address", 0},
+                     {"unit", {[], {alias_t, Unit}}},
                      {"hash", {[], {alias_t, Bytes(32)}}},
                      {"signature", {[], {alias_t, Bytes(64)}}},
                      {"bits", 0},
@@ -2320,8 +2321,10 @@ pp({uvar, _, Ref}) ->
     ["?u" | integer_to_list(erlang:phash2(Ref, 16384)) ];
 pp({tvar, _, Name}) ->
     Name;
+pp({tuple_t, _, []}) ->
+    "unit";
 pp({tuple_t, _, Cpts}) ->
-    ["(", pp(Cpts), ")"];
+    ["(", string:join(lists:map(fun pp/1, Cpts), " * "), ")"];
 pp({bytes_t, _, any}) -> "bytes(_)";
 pp({bytes_t, _, Len}) ->
     ["bytes(", integer_to_list(Len), ")"];
