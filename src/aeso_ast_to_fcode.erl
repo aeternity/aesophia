@@ -1373,7 +1373,7 @@ pp_fexpr({builtin_u, B, N}) ->
 pp_fexpr({builtin, B, As}) ->
     pp_call(pp_text(B), As);
 pp_fexpr({remote_u, Ct, Fun, Ar}) ->
-    pp_beside([pp_fexpr(Ct), pp_text("."), pp_fun_name(Fun), pp_text("/"), pp_text(Ar)]);
+    pp_beside([pp_fexpr(Ct), pp_text("."), pp_fun_name(Fun), pp_text("/"), pp_int(Ar)]);
 pp_fexpr({remote, Ct, Fun, As}) ->
     pp_call(pp_beside([pp_fexpr(Ct), pp_text("."), pp_fun_name(Fun)]), As);
 pp_fexpr({funcall, Fun, As}) ->
