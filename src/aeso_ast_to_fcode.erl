@@ -681,7 +681,7 @@ split_pat({con, As, I, Pats}) ->
     Xs = [fresh_name() || _ <- Pats],
     {{con, As, I, Xs}, Pats};
 split_pat({tuple, Pats}) ->
-    Xs = [{var, fresh_name()} || _ <- Pats],
+    Xs = [fresh_name() || _ <- Pats],
     {{tuple, Xs}, Pats}.
 
 -spec split_vars(fsplit_pat(), ftype()) -> [{var_name(), ftype()}].
@@ -1094,6 +1094,16 @@ pat_vars({tuple, Ps})         -> pat_vars(Ps);
 pat_vars({con, _, _, Ps})     -> pat_vars(Ps);
 pat_vars(Ps) when is_list(Ps) -> [X || P <- Ps, X <- pat_vars(P)].
 
+-spec fsplit_pat_vars(fsplit_pat()) -> [var_name()].
+fsplit_pat_vars({var, X})            -> [X || X /= "_"];
+fsplit_pat_vars({bool, _})           -> [];
+fsplit_pat_vars({int, _})            -> [];
+fsplit_pat_vars({string, _})         -> [];
+fsplit_pat_vars(nil)                 -> [];
+fsplit_pat_vars({'::', P, Q})        -> [P, Q];
+fsplit_pat_vars({tuple, Ps})         -> Ps;
+fsplit_pat_vars({con, _, _, Ps})     -> Ps.
+
 free_vars(Xs) when is_list(Xs) ->
     lists:umerge([ free_vars(X) || X <- Xs ]);
 free_vars(Expr) ->
@@ -1119,7 +1129,7 @@ free_vars(Expr) ->
         {switch, A}          -> free_vars(A);
         {split, _, X, As}    -> free_vars([{var, X} | As]);
         {nosplit, A}         -> free_vars(A);
-        {'case', P, A}       -> free_vars(A) -- lists:sort(pat_vars(P))
+        {'case', P, A}       -> free_vars(A) -- lists:sort(fsplit_pat_vars(P))
     end.
 
 get_named_args(NamedArgsT, Args) ->
@@ -1285,7 +1295,10 @@ pp_fun_name({local_fun, Q})  -> pp_text(string:join(Q, ".")).
 
 pp_text(<<>>) -> prettypr:text("\"\"");
 pp_text(Bin) when is_binary(Bin) -> prettypr:text(lists:flatten(io_lib:format("~p", [binary_to_list(Bin)])));
-pp_text(S) -> prettypr:text(lists:concat([S])).
+pp_text(S) when is_list(S) -> prettypr:text(lists:concat([S]));
+pp_text(A) when is_atom(A) -> prettypr:text(atom_to_list(A)).
+
+pp_int(I) -> prettypr:text(integer_to_list(I)).
 
 pp_beside([])       -> prettypr:empty();
 pp_beside([X])      -> X;
@@ -1317,18 +1330,18 @@ pp_fexpr(nil) ->
 pp_fexpr({var, X})   -> pp_text(X);
 pp_fexpr({def, Fun}) -> pp_fun_name(Fun);
 pp_fexpr({def_u, Fun, Ar}) ->
-    pp_beside([pp_fun_name(Fun), pp_text("/"), pp_text(Ar)]);
+    pp_beside([pp_fun_name(Fun), pp_text("/"), pp_int(Ar)]);
 pp_fexpr({def, Fun, Args}) ->
     pp_call(pp_fun_name(Fun), Args);
 pp_fexpr({con, _, I, []}) ->
-    pp_beside(pp_text("C"), pp_text(I));
+    pp_beside(pp_text("C"), pp_int(I));
 pp_fexpr({con, _, I, Es}) ->
     pp_beside(pp_fexpr({con, [], I, []}),
               pp_fexpr({tuple, Es}));
 pp_fexpr({tuple, Es}) ->
     pp_parens(pp_par(pp_punctuate(pp_text(","), [pp_fexpr(E) || E <- Es])));
 pp_fexpr({proj, E, I}) ->
-    pp_beside([pp_fexpr(E), pp_text("."), pp_text(I)]);
+    pp_beside([pp_fexpr(E), pp_text("."), pp_int(I)]);
 pp_fexpr({lam, Xs, A}) ->
     pp_par([pp_fexpr({tuple, [{var, X} || X <- Xs]}), pp_text("=>"),
             prettypr:nest(2, pp_fexpr(A))]);
@@ -1339,7 +1352,7 @@ pp_fexpr({closure, Fun, ClEnv}) ->
           end,
     pp_call(pp_text("__CLOSURE__"), [{def, Fun} | FVs]);
 pp_fexpr({set_proj, E, I, A}) ->
-    pp_beside(pp_fexpr(E), pp_braces(pp_beside([pp_text(I), pp_text(" = "), pp_fexpr(A)])));
+    pp_beside(pp_fexpr(E), pp_braces(pp_beside([pp_int(I), pp_text(" = "), pp_fexpr(A)])));
 pp_fexpr({op, Op, [A, B] = Args}) ->
     case is_infix(Op) of
         false -> pp_call(pp_text(Op), Args);
@@ -1360,7 +1373,7 @@ pp_fexpr({builtin_u, B, N}) ->
 pp_fexpr({builtin, B, As}) ->
     pp_call(pp_text(B), As);
 pp_fexpr({remote_u, Ct, Fun, Ar}) ->
-    pp_beside([pp_fexpr(Ct), pp_text("."), pp_fun_name(Fun), pp_text("/"), pp_text(Ar)]);
+    pp_beside([pp_fexpr(Ct), pp_text("."), pp_fun_name(Fun), pp_text("/"), pp_int(Ar)]);
 pp_fexpr({remote, Ct, Fun, As}) ->
     pp_call(pp_beside([pp_fexpr(Ct), pp_text("."), pp_fun_name(Fun)]), As);
 pp_fexpr({funcall, Fun, As}) ->
