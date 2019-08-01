@@ -38,6 +38,7 @@
                 | pp_assembler
                 | pp_bytecode
                 | no_code
+		| keep_included
                 | {backend, aevm | fate}
                 | {include, {file_system, [string()]} |
                             {explicit_files, #{string() => binary()}}}
@@ -650,8 +651,9 @@ pp_fate_type(T) -> io_lib:format("~w", [T]).
 
 %% -------------------------------------------------------------------
 
+-spec sophia_type_to_typerep(string()) -> {error, bad_type} | {ok, aeb_aevm_data:type()}.
 sophia_type_to_typerep(String) ->
-    {ok, Ast} = aeso_parser:type(String),
+    Ast = aeso_parser:run_parser(aeso_parser:type(), String),
     try aeso_ast_to_icode:ast_typerep(Ast) of
         Type -> {ok, Type}
     catch _:_ -> {error, bad_type}
