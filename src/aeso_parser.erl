@@ -7,15 +7,24 @@
 -export([string/1,
          string/2,
          string/3,
+         auto_imports/1,
          hash_include/2,
+         body/1,
+         letdef/1,
          type/1]).
 
 -include("aeso_parse_lib.hrl").
 -import(aeso_parse_lib, [current_file/0, set_current_file/1]).
 
--type parse_result() :: aeso_syntax:ast() | none().
+-type parse_result() :: aeso_syntax:ast() | {aeso_syntax:ast(), sets:set(include_hash())} | none().
 
 -type include_hash() :: {string(), binary()}.
+
+
+escape_errors({ok, Ok}) ->
+    Ok;
+escape_errors({error, Err}) ->
+    parse_error(Err).
 
 -spec string(string()) -> parse_result().
 string(String) ->
@@ -30,21 +39,20 @@ string(String, Opts) ->
 
 -spec string(string(), sets:set(include_hash()), aeso_compiler:options()) -> parse_result().
 string(String, Included, Opts) ->
-    case parse_and_scan(file(), String, Opts) of
-        {ok, AST} ->
-            case expand_includes(AST, Included, Opts) of
-                {ok, AST1}   -> AST1;
-                {error, Err} -> parse_error(Err)
-            end;
-        {error, Err} ->
-            parse_error(Err)
+    AST = escape_errors(parse_and_scan(file(), String, Opts)),
+    case expand_includes(AST, Included, Opts) of
+        {ok, AST1}   -> AST1;
+        {error, Err} -> parse_error(Err)
     end.
 
 type(String) ->
-    case parse_and_scan(type(), String, []) of
-        {ok, AST}    -> {ok, AST};
-        {error, Err} -> {error, [mk_error(Err)]}
-    end.
+    escape_errors(parse_and_scan(type(), String, [])).
+
+body(String) ->
+    escape_errors(parse_and_scan(body(), String, [])).
+
+letdef(String) ->
+    escape_errors(parse_and_scan(letdef(), String, [])).
 
 parse_and_scan(P, S, Opts) ->
     set_current_file(proplists:get_value(src_file, Opts, no_file)),
@@ -596,8 +604,13 @@ expand_includes(AST, Included, Opts) ->
              || File <- lists:usort(auto_imports(AST)) ] ++ AST,
     expand_includes(AST1, Included, [], Opts).
 
-expand_includes([], _Included, Acc, _Opts) ->
-    {ok, lists:reverse(Acc)};
+expand_includes([], Included, Acc, Opts) ->
+    case lists:member(keep_included, Opts) of
+        false ->
+            {ok, lists:reverse(Acc)};
+        true ->
+            {ok, {lists:reverse(Acc), Included}}
+    end;
 expand_includes([{include, Ann, {string, _SAnn, File}} | AST], Included, Acc, Opts) ->
     case get_include_code(File, Ann, Opts) of
         {ok, Code} ->

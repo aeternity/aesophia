@@ -12,7 +12,11 @@
 
 -module(aeso_ast_infer_types).
 
--export([infer/1, infer/2, unfold_types_in_type/3]).
+-export([ infer/1
+        , infer/2
+        , unfold_types_in_type/3
+        , pp_type/2
+        ]).
 
 -type utype() :: {fun_t, aeso_syntax:ann(), named_args_t(), [utype()], utype()}
                | {app_t, aeso_syntax:ann(), utype(), [utype()]}
