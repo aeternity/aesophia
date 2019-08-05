@@ -120,7 +120,8 @@ compilable_contracts() ->
      "aens",
      "tuple_match",
      "cyclic_include",
-     "stdlib_include"
+     "stdlib_include",
+     "list_comp"
     ].
 
 not_yet_compilable(fate) -> [];
