@@ -139,7 +139,7 @@ compile(FCode, Options) ->
 make_function_id(X) ->
     aeb_fate_code:symbol_identifier(make_function_name(X)).
 
-make_function_name(init)               -> <<"init">>;
+make_function_name(init)               -> <<"INIT">>;
 make_function_name(event)              -> <<"Chain.event">>;
 make_function_name({entrypoint, Name}) -> Name;
 make_function_name({local_fun, Xs})    -> list_to_binary("." ++ string:join(Xs, ".")).
@@ -196,7 +196,7 @@ add_default_init_function(SFuns, StateType) when StateType /= {tuple, []} ->
     SFuns;
 add_default_init_function(SFuns, {tuple, []}) ->
     %% Only add default if the init function is not present
-    InitName = make_function_name(init),
+    InitName = make_function_name({entrypoint, <<"init">>}),
     case maps:find(InitName, SFuns) of
         {ok, _} ->
             SFuns;
