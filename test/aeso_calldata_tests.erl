@@ -36,10 +36,34 @@ calldata_test_() ->
            end
         end} || {ContractName, Fun, Args} <- compilable_contracts()].
 
+calldata_aci_test_() ->
+     [ {"Testing " ++ ContractName ++ " contract calling " ++ Fun,
+        fun() ->
+           ContractString       = aeso_test_utils:read_contract(ContractName),
+           {ok, ContractACIBin} = aeso_aci:contract_interface(string, ContractString),
+           ContractACI = binary_to_list(ContractACIBin),
+           io:format("ACI:\n~s\n", [ContractACIBin]),
+           AevmExprs =
+              case not lists:member(ContractName, not_yet_compilable(aevm)) of
+                  true -> ast_exprs(ContractACI, Fun, Args, [{backend, aevm}]);
+                  false -> undefined
+              end,
+           FateExprs =
+              case not lists:member(ContractName, not_yet_compilable(fate)) of
+                  true -> ast_exprs(ContractACI, Fun, Args, [{backend, fate}]);
+                  false -> undefined
+              end,
+           case FateExprs == undefined orelse AevmExprs == undefined of
+               true -> ok;
+               false ->
+                   ?assertEqual(FateExprs, AevmExprs)
+           end
+        end} || {ContractName, Fun, Args} <- compilable_contracts()].
+
 
 ast_exprs(ContractString, Fun, Args, Opts) ->
-    {ok, Data} = aeso_compiler:create_calldata(ContractString, Fun, Args, Opts),
-    {ok, _Types, Exprs} = aeso_compiler:decode_calldata(ContractString, Fun, Data, Opts),
+    {ok, Data} = (catch aeso_compiler:create_calldata(ContractString, Fun, Args, Opts)),
+    {ok, _Types, Exprs} = (catch aeso_compiler:decode_calldata(ContractString, Fun, Data, Opts)),
     ?assert(is_list(Exprs)),
     Exprs.
 
@@ -93,10 +117,12 @@ compilable_contracts() ->
      {"complex_types", "init", ["ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ"]},
      {"__call" "init", []},
      {"bitcoin_auth", "authorize", ["1", "#0102030405060708090a0b0c0d0e0f101718192021222324252627282930313233343536373839401a1b1c1d1e1f202122232425262728293031323334353637"]},
-     {"bitcoin_auth", "to_sign", ["#0102030405060708090a0b0c0d0e0f1017181920212223242526272829303132", "2"]}
+     {"bitcoin_auth", "to_sign", ["#0102030405060708090a0b0c0d0e0f1017181920212223242526272829303132", "2"]},
+     {"stub", "foo", ["42"]},
+     {"stub", "foo", ["-42"]}
     ].
 
 not_yet_compilable(fate) ->
-    ["address_chain"];
+    [];
 not_yet_compilable(aevm) ->
-    ["__call"].
+    [].
