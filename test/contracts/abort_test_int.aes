@@ -1,9 +1,9 @@
 contract Interface =
-  function do_abort : (int, string) => ()
+  function do_abort : (int, string) => unit
   function get_value : () => int
-  function put_value : (int) => ()
+  function put_value : (int) => unit
   function get_values : () => list(int)
-  function put_values : (int) => ()
+  function put_values : (int) => unit
 
 contract AbortTestInt =
 

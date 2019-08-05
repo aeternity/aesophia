@@ -264,7 +264,10 @@ decode_types(Ets) ->
 
 decode_type(#{tuple := Ets}) ->
     Ts = decode_types(Ets),
-    [$(,lists:join(",", Ts),$)];
+    case Ts of
+        [] -> ["unit"];
+        _ -> [$(,lists:join(" * ", Ts),$)]
+    end;
 decode_type(#{record := Efs}) ->
     Fs = decode_fields(Efs),
     [${,lists:join(",", Fs),$}];

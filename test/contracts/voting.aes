@@ -8,7 +8,7 @@ contract VotingType =
   function delegate        : address => unit
   function vote            : int => unit
   function winnerName      : unit => string
-  function currentTally    : unit => list((string, int))
+  function currentTally    : unit => list(string * int)
 
 /* Contract implementation */
 contract Voting =

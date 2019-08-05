@@ -1,6 +1,6 @@
 
 contract Remote =
-  stateful entrypoint remote_spend : (address, int) => ()
+  stateful entrypoint remote_spend : (address, int) => unit
   entrypoint remote_pure : int => int
 
 contract Stateful =
@@ -32,7 +32,7 @@ contract Stateful =
   entrypoint ok4(a : address) = fail4(a)
 
   // Lamdbas are checked at the construction site
-  function fail5() : address => () = (a) => Chain.spend(a, 1000)
+  function fail5() : address => unit = (a) => Chain.spend(a, 1000)
 
   // .. so you can pass a stateful lambda to a non-stateful higher-order
   // function:

@@ -222,7 +222,7 @@ typedef({variant_t, Constructors}) ->
 
 -spec constructor_t(aeso_syntax:constructor_t()) -> doc().
 constructor_t({constr_t, _, C, []}) -> name(C);
-constructor_t({constr_t, _, C, Args}) -> beside(name(C), tuple_type(Args)).
+constructor_t({constr_t, _, C, Args}) -> beside(name(C), args_type(Args)).
 
 -spec field_t(aeso_syntax:field_t()) -> doc().
 field_t({field_t, _, Name, Type}) ->
@@ -234,11 +234,11 @@ type(Type, Options) ->
 
 -spec type(aeso_syntax:type()) -> doc().
 type({fun_t, _, Named, Args, Ret}) ->
-    follow(hsep(tuple_type(Named ++ Args), text("=>")), type(Ret));
+    follow(hsep(args_type(Named ++ Args), text("=>")), type(Ret));
 type({app_t, _, Type, []}) ->
     type(Type);
 type({app_t, _, Type, Args}) ->
-    beside(type(Type), tuple_type(Args));
+    beside(type(Type), args_type(Args));
 type({tuple_t, _, Args}) ->
     tuple_type(Args);
 type({bytes_t, _, any}) -> text("bytes(_)");
@@ -256,9 +256,19 @@ type(T = {con, _, _})  -> name(T);
 type(T = {qcon, _, _}) -> name(T);
 type(T = {tvar, _, _}) -> name(T).
 
--spec tuple_type([aeso_syntax:type()]) -> doc().
-tuple_type(Args) ->
+-spec args_type([aeso_syntax:type()]) -> doc().
+args_type(Args) ->
     tuple(lists:map(fun type/1, Args)).
+
+-spec tuple_type([aeso_syntax:type()]) -> doc().
+tuple_type([]) ->
+    text("unit");
+tuple_type(Factors) ->
+    beside(
+      [ text("(")
+      , par(punctuate(text(" *"), lists:map(fun type/1, Factors)), 0)
+      , text(")")
+      ]).
 
 -spec arg_expr(aeso_syntax:arg_expr()) -> doc().
 arg_expr({named_arg, _, Name, E}) ->

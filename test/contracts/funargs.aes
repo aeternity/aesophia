@@ -40,7 +40,7 @@ contract FunctionArguments =
   entrypoint traffic_light(c : colour) =
      Red
 
-  entrypoint tuples(t : ()) =
+  entrypoint tuples(t : unit) =
      t
 
   entrypoint due(t : Chain.ttl) =

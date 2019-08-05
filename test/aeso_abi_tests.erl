@@ -66,7 +66,7 @@ encode_decode_sophia_test() ->
     ok = Check("bool", "true"),
     ok = Check("bool", "false"),
     ok = Check("string", "\"Hello\""),
-    ok = Check("(string, list(int), option(bool))",
+    ok = Check("string * list(int) * option(bool)",
                "(\"Hello\", [1, 2, 3], Some(true))"),
     ok = Check("variant", "Blue({[\"x\"] = 1})"),
     ok = Check("r", "{x = (\"foo\", 0), y = Red}"),
@@ -76,7 +76,7 @@ encode_decode_sophia_string(SophiaType, String) ->
     io:format("String ~p~n", [String]),
     Code = [ "contract MakeCall =\n"
            , "  type arg_type = ", SophiaType, "\n"
-           , "  type an_alias('a) = (string, 'a)\n"
+           , "  type an_alias('a) = string * 'a\n"
            , "  record r = {x : an_alias(int), y : variant}\n"
            , "  datatype variant = Red | Blue(map(string, int))\n"
            , "  entrypoint foo : arg_type => arg_type\n" ],
@@ -137,10 +137,10 @@ parameterized_contract(FunName, Types) ->
 parameterized_contract(ExtraCode, FunName, Types) ->
     lists:flatten(
         ["contract Remote =\n"
-         "  entrypoint bla : () => ()\n\n"
+         "  entrypoint bla : () => unit\n\n"
          "contract Dummy =\n",
          ExtraCode, "\n",
-         "  type an_alias('a) = (string, 'a)\n"
+         "  type an_alias('a) = string * 'a\n"
          "  record r = {x : an_alias(int), y : variant}\n"
          "  datatype variant = Red | Blue(map(string, int))\n"
          "  entrypoint ", FunName, " : (", string:join(Types, ", "), ") => int\n" ]).

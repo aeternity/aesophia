@@ -1,6 +1,6 @@
 
 contract Remote =
-  entrypoint foo : () => ()
+  entrypoint foo : () => unit
 
 contract AddressLiterals =
   entrypoint addr1() : bytes(32) =

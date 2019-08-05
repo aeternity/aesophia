@@ -1,5 +1,5 @@
 contract Remote =
-  entrypoint main : (int) => ()
+  entrypoint main : (int) => unit
 
 contract AddrChain =
   type o_type = oracle(string, map(string, int))

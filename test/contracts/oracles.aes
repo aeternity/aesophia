@@ -60,23 +60,23 @@ contract Oracles =
     res
 
   stateful entrypoint extendOracle(o    : oracle_id,
-                        ttl  : ttl) : () =
+                        ttl  : ttl) : unit =
     Oracle.extend(o, ttl)
 
   stateful entrypoint signedExtendOracle(o    : oracle_id,
                               sign : signature,   // Signed oracle address
-                              ttl  : ttl) : () =
+                              ttl  : ttl) : unit =
     Oracle.extend(o, signature = sign, ttl)
 
   stateful entrypoint respond(o    : oracle_id,
                    q    : query_id,
-                   r    : answer_t) : () =
+                   r    : answer_t) : unit =
     Oracle.respond(o, q, r)
 
   stateful entrypoint signedRespond(o    : oracle_id,
                          q    : query_id,
                          sign : signature,
-                         r    : answer_t) : () =
+                         r    : answer_t) : unit =
     Oracle.respond(o, q, signature = sign, r)
 
   entrypoint getQuestion(o : oracle_id,
