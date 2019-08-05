@@ -302,7 +302,8 @@ to_sophia_value(_, _, revert, Data, Options) ->
             Err = aeb_fate_encoding:deserialize(Data),
             {ok, {app, [], {id, [], "abort"}, [{string, [], Err}]}}
     end;
-to_sophia_value(ContractString, FunName, ok, Data, Options) ->
+to_sophia_value(ContractString, FunName, ok, Data, Options0) ->
+    Options = [no_code | Options0],
     try
         Code = string_to_code(ContractString, Options),
         #{ typed_ast := TypedAst, type_env  := TypeEnv} = Code,
