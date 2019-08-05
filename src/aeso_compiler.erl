@@ -35,6 +35,7 @@
                 | pp_icode
                 | pp_assembler
                 | pp_bytecode
+                | no_code
                 | {backend, aevm | fate}
                 | {include, {file_system, [string()]} |
                             {explicit_files, #{string() => binary()}}}
@@ -134,7 +135,7 @@ from_string1(fate, ContractString, Options) ->
            fate_code => FateCode
           }}.
 
--spec string_to_code(string(), [option()]) -> map().
+-spec string_to_code(string(), options()) -> map().
 string_to_code(ContractString, Options) ->
     Ast = parse(ContractString, Options),
     pp_sophia_code(Ast, Options),
@@ -361,7 +362,8 @@ create_calldata(Code, Fun, Args) ->
 -spec create_calldata(string(), string(), [string()], [{atom(), any()}]) ->
                              {ok, binary()}
                              | {error, term()}.
-create_calldata(Code, Fun, Args, Options) ->
+create_calldata(Code, Fun, Args, Options0) ->
+    Options = [no_code | Options0],
     case proplists:get_value(backend, Options, aevm) of
         aevm ->
             case check_call(Code, Fun, Args, Options) of
@@ -383,7 +385,8 @@ create_calldata(Code, Fun, Args, Options) ->
 decode_calldata(ContractString, FunName, Calldata) ->
     decode_calldata(ContractString, FunName, Calldata, [{backend, aevm}]).
 
-decode_calldata(ContractString, FunName, Calldata, Options) ->
+decode_calldata(ContractString, FunName, Calldata, Options0) ->
+    Options = [no_code | Options0],
     try
         Code = string_to_code(ContractString, Options),
         #{ typed_ast := TypedAst, type_env  := TypeEnv} = Code,

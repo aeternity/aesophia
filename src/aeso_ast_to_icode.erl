@@ -21,18 +21,19 @@ convert_typed(TypedTree, Options) ->
                {contract, _, {con, _, Con}, _} -> Con;
                _ -> gen_error(last_declaration_must_be_contract)
            end,
-    Icode = code(TypedTree, aeso_icode:set_name(Name, aeso_icode:new(Options))),
+    NewIcode = aeso_icode:set_name(Name, aeso_icode:new(Options)),
+    Icode    = code(TypedTree, NewIcode, Options),
     deadcode_elimination(Icode).
 
-code([{contract, _Attribs, Con, Code}|Rest], Icode) ->
+code([{contract, _Attribs, Con, Code}|Rest], Icode, Options) ->
     NewIcode = contract_to_icode(Code, aeso_icode:set_namespace(Con, Icode)),
-    code(Rest, NewIcode);
-code([{namespace, _Ann, Name, Code}|Rest], Icode) ->
-                                            %% TODO: nested namespaces
+    code(Rest, NewIcode, Options);
+code([{namespace, _Ann, Name, Code}|Rest], Icode, Options) ->
+    %% TODO: nested namespaces
     NewIcode = contract_to_icode(Code, aeso_icode:set_namespace(Name, Icode)),
-    code(Rest, NewIcode);
-code([], Icode) ->
-    add_default_init_function(add_builtins(Icode)).
+    code(Rest, NewIcode, Options);
+code([], Icode, Options) ->
+    add_default_init_function(add_builtins(Icode), Options).
 
 %% Generate error on correct format.
 
@@ -40,10 +41,12 @@ gen_error(Error) ->
     error({code_errors, [Error]}).
 
 %% Create default init function (only if state is unit).
-add_default_init_function(Icode = #{functions := Funs, state_type := State}) ->
+add_default_init_function(Icode = #{functions := Funs, state_type := State}, Options) ->
+    NoCode        = proplists:get_value(no_code, Options, false),
     {_, _, QInit} = aeso_icode:qualify({id, [], "init"}, Icode),
     case lists:keymember(QInit, 1, Funs) of
         true -> Icode;
+        false when NoCode -> Icode;
         false when State /= {tuple, []} ->
             gen_error(missing_init_function);
         false ->
