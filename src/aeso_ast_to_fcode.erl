@@ -261,6 +261,11 @@ decls_to_fcode(Env, Decls) ->
 
 -spec decl_to_fcode(env(), aeso_syntax:decl()) -> env().
 decl_to_fcode(Env, {type_decl, _, _, _}) -> Env;
+decl_to_fcode(Env = #{context := {main_contract, _}}, {fun_decl, Ann, {id, _, Name}, _}) ->
+    case proplists:get_value(no_code, maps:get(options, Env, []), false) of
+        false -> fcode_error({missing_definition, Name, lists:keydelete(entrypoint, 1, Ann)});
+        true  -> Env
+    end;
 decl_to_fcode(Env, {fun_decl, _, _, _})  -> Env;
 decl_to_fcode(Env, {type_def, _Ann, Name, Args, Def}) ->
     typedef_to_fcode(Env, Name, Args, Def);
@@ -1001,6 +1006,8 @@ add_fun_env(Env = #{ context := {abstract_contract, _} }, _) -> Env;  %% no func
 add_fun_env(Env = #{ fun_env := FunEnv }, Decls) ->
     Entry = fun({letfun, Ann, {id, _, Name}, Args, _, _}) ->
                 [{qname(Env, Name), {make_fun_name(Env, Ann, Name), length(Args)}}];
+               ({fun_decl, Ann, {id, _, Name}, {fun_t, _, _, ArgTypes, _}}) ->
+                [{qname(Env, Name), {make_fun_name(Env, Ann, Name), length(ArgTypes)}}];
                (_) -> [] end,
     FunEnv1 = maps:from_list(lists:flatmap(Entry, Decls)),
     Env#{ fun_env := maps:merge(FunEnv, FunEnv1) }.
