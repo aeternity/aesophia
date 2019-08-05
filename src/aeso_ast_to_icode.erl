@@ -728,7 +728,7 @@ ast_typerep({con, _, _}, _) ->
     word;   %% Contract type
 ast_typerep({bytes_t, _, Len}, _) ->
     bytes_t(Len);
-ast_typerep({app_t, _, {id, _, Name}, Args}, Icode) ->
+ast_typerep({app_t, _, {I, _, Name}, Args}, Icode) when I =:= id; I =:= qid ->
     ArgReps = [ ast_typerep(Arg, Icode) || Arg <- Args ],
     lookup_type_id(Name, ArgReps, Icode);
 ast_typerep({tvar,_,A}, #{ type_vars := TypeVars }) ->
