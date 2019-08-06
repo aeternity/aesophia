@@ -19,3 +19,5 @@ rebar3.crashdump
 *.erl~
 *.aes~
 aesophia
+.qcci
+current_counterexample.eqc
