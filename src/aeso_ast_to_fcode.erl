@@ -239,7 +239,8 @@ to_fcode(Env, [{contract, _, {con, _, Main}, Decls}]) ->
     #{ contract_name => Main,
        state_type    => StateType,
        event_type    => EventType,
-       functions     => add_event_function(Env1, EventType, Funs) };
+       functions     => add_init_function(Env1,
+                        add_event_function(Env1, EventType, Funs)) };
 to_fcode(Env, [{contract, _, {con, _, Con}, Decls} | Code]) ->
     Env1 = decls_to_fcode(Env#{ context => {abstract_contract, Con} }, Decls),
     to_fcode(Env1, Code);
@@ -824,6 +825,19 @@ builtin_to_fcode(Builtin, Args) ->
         false -> {builtin, Builtin, Args}
     end.
 
+%% -- Init function --
+
+add_init_function(_Env, Funs) ->
+    InitName = {entrypoint, <<"init">>},
+    InitFun = #{ args := InitArgs } =
+        case maps:get(InitName, Funs, none) of
+            none -> #{ attrs => [], args => [], return => {tuple, []}, body => {tuple, []} };
+            Info -> Info
+        end,
+    Vars = [ {var, X} || {X, _} <- InitArgs ],
+    Funs#{ init => InitFun#{ return => {tuple, []},
+                             body   => {builtin, set_state, [{def, InitName, Vars}]} } }.
+
 %% -- Event function --
 
 add_event_function(_Env, none, Funs) -> Funs;
@@ -1016,8 +1030,7 @@ make_fun_name(#{ context := Context }, Ann, Name) ->
     Entrypoint = proplists:get_value(entrypoint, Ann, false),
     case Context of
         {main_contract, Main} ->
-            if Name == "init" -> init;
-               Entrypoint     -> {entrypoint, list_to_binary(Name)};
+            if Entrypoint     -> {entrypoint, list_to_binary(Name)};
                true           -> {local_fun, [Main, Name]}
             end;
         {namespace, Lib} ->
@@ -1295,7 +1308,7 @@ pp_fun(Name, #{ args := Args, return := Return, body := Body }) ->
                pp_text(" : "), pp_ftype(Return), pp_text(" =")]),
              prettypr:nest(2, pp_fexpr(Body))).
 
-pp_fun_name(init)            -> pp_text(init);
+pp_fun_name(init)            -> pp_text('INIT');
 pp_fun_name(event)           -> pp_text(event);
 pp_fun_name({entrypoint, E}) -> pp_text(binary_to_list(E));
 pp_fun_name({local_fun, Q})  -> pp_text(string:join(Q, ".")).

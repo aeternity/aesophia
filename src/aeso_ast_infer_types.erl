@@ -156,7 +156,7 @@ bind_tvars(Xs, Env) ->
 check_tvar(#env{ typevars = TVars}, T = {tvar, _, X}) ->
     case TVars == unrestricted orelse lists:member(X, TVars) of
         true  -> ok;
-        false -> type_error({unbound_type_variable, T})
+        false -> type_error({unbound_type, T})
     end,
     T.
 
@@ -2160,6 +2160,8 @@ pp_error({contract_has_no_entrypoints, Con}) ->
     io_lib:format("The contract ~s (at ~s) has no entrypoints. Since Sophia version 3.2, public\n"
                   "contract functions must be declared with the 'entrypoint' keyword instead of\n"
                   "'function'.\n", [pp_expr("", Con), pp_loc(Con)]);
+pp_error({unbound_type, Type}) ->
+    io_lib:format("Unbound type ~s (at ~s).\n", [pp_type("", Type), pp_loc(Type)]);
 pp_error(Err) ->
     io_lib:format("Unknown error: ~p\n", [Err]).
 
