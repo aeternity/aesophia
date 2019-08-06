@@ -121,7 +121,8 @@ from_string1(aevm, ContractString, Options) ->
     {ok, #{byte_code => ByteCode,
            compiler_version => Version,
            contract_source => ContractString,
-           type_info => TypeInfo
+           type_info => TypeInfo,
+           abi_version => aeb_aevm_abi:abi_version()
           }};
 from_string1(fate, ContractString, Options) ->
     #{fcode := FCode} = string_to_code(ContractString, Options),
@@ -132,7 +133,8 @@ from_string1(fate, ContractString, Options) ->
            compiler_version => Version,
            contract_source => ContractString,
            type_info => [],
-           fate_code => FateCode
+           fate_code => FateCode,
+           abi_version => aeb_fate_abi:abi_version()
           }}.
 
 -spec string_to_code(string(), options()) -> map().
