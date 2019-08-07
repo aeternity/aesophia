@@ -16,6 +16,8 @@
                       | {error, {aeso_parse_lib:pos(), atom(), term()}}
                       | {error, {aeso_parse_lib:pos(), atom()}}.
 
+-type include_hash() :: {string(), binary()}.
+
 -spec string(string()) -> parse_result().
 string(String) ->
     string(String, sets:new(), []).
@@ -28,7 +30,7 @@ string(String, Opts) ->
         false -> string(String, sets:new(), Opts)
     end.
 
--spec string(string(), sets:set(binary()), aeso_compiler:options()) -> parse_result().
+-spec string(string(), sets:set(include_hash()), aeso_compiler:options()) -> parse_result().
 string(String, Included, Opts) ->
     case parse_and_scan(file(), String, Opts) of
         {ok, AST} ->
@@ -603,7 +605,7 @@ get_include_code(File, Ann, Opts) ->
             {error, {ann_pos(Ann), include_error, File}}
     end.
 
--spec hash_include(string() | binary(), string()) -> binary().
+-spec hash_include(string() | binary(), string()) -> include_hash().
 hash_include(File, Code) when is_binary(File) ->
     hash_include(binary_to_list(File), Code);
 hash_include(File, Code) when is_list(File) ->
