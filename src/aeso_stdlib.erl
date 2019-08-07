@@ -10,7 +10,7 @@
 
 -module(aeso_stdlib).
 
--export([stdlib/0, stdlib_list/0]).
+-export([stdlib/0, stdlib_list/0, dependencies/1]).
 
 stdlib() ->
     maps:from_list(stdlib_list()).
@@ -22,6 +22,13 @@ stdlib_list() ->
     , {<<"Pair.aes">>, std_pair()}
     , {<<"Triple.aes">>, std_triple()}
     ].
+
+dependencies(Q) ->
+    case Q of
+        <<"Option.aes">> ->
+            [<<"List.aes">>];
+        _ -> []
+    end.
 
 std_func() ->
 "
@@ -286,8 +293,6 @@ namespace List =
 ".
 
 std_option() -> "
-include \"List.aes\"
-
 namespace Option =
 
   function is_none(o : option('a)) : bool = switch(o)

@@ -73,7 +73,9 @@ check_errors(Expect, ErrorString) ->
     end.
 
 compile(Backend, Name) ->
-    compile(Backend, Name, [{include, {file_system, [aeso_test_utils:contract_path()]}}]).
+    compile(Backend, Name,
+            [{include, {file_system, [aeso_test_utils:contract_path()]}}]
+            ++ [no_implicit_stdlib || not wants_stdlib(Name)]).
 
 compile(Backend, Name, Options) ->
     String = aeso_test_utils:read_contract(Name),
@@ -121,6 +123,8 @@ compilable_contracts() ->
      "tuple_match",
      "cyclic_include",
      "stdlib_include",
+     "double_include",
+     "manual_stdlib_include",
      "list_comp"
     ].
 
@@ -367,3 +371,13 @@ failing_contracts() ->
       [<<"Cannot unify int\n         and string\nwhen checking the type of the pattern at line 2, column 53\n  x : int\nagainst the expected type\n  string">>
       ]}
     ].
+
+wants_stdlib(Name) ->
+    lists:member
+      (Name,
+       [ "stdlib_include",
+         "list_comp",
+         "list_comp_not_a_list",
+         "list_comp_if_not_bool",
+         "list_comp_bad_shadow"
+       ]).

@@ -7,6 +7,7 @@
 -export([string/1,
          string/2,
          string/3,
+         hash_include/2,
          type/1]).
 
 -include("aeso_parse_lib.hrl").
@@ -27,18 +28,11 @@ string(String, Opts) ->
         false -> string(String, sets:new(), Opts)
     end.
 
--spec string(string(), sets:set(string()), aeso_compiler:options()) -> parse_result().
+-spec string(string(), sets:set(binary()), aeso_compiler:options()) -> parse_result().
 string(String, Included, Opts) ->
     case parse_and_scan(file(), String, Opts) of
         {ok, AST} ->
-            STD = case lists:member(no_implicit_stdlib, Opts) of
-                      false -> [{ include, [{src_file, File}, {origin, system}]
-                                , {string, [{src_file, File}, {origin, system}], File}}
-                                || {File, _} <- aeso_stdlib:stdlib_list()
-                               ];
-                      true -> []
-                  end,
-            expand_includes(STD ++ AST, Included, Opts);
+            expand_includes(AST, Included, Opts);
         Err = {error, _} ->
             Err
     end.
@@ -558,32 +552,28 @@ expand_includes(AST, Included, Opts) ->
 
 expand_includes([], _Included, Acc, _Opts) ->
     {ok, lists:reverse(Acc)};
-expand_includes([{include, Ann, S = {string, _, File}} | AST], Included, Acc, Opts) ->
-    case sets:is_element(File, Included) of
-        false ->
-            Opts1 = lists:keystore(src_file, 1, Opts, {src_file, File}),
-            Included1 = sets:add_element(File, Included),
-            case {read_file(File, Opts), maps:find(File, aeso_stdlib:stdlib())} of
-                {{ok, _}, {ok,_ }} ->
-                    return_error(ann_pos(Ann), "Illegal redefinition of standard library " ++ File);
-                {_, {ok, Lib}} ->
-                    case string(Lib, Included1, [no_implicit_stdlib, Opts1]) of
+expand_includes([{include, Ann, {string, SAnn, File}} | AST], Included, Acc, Opts) ->
+    case get_include_code(File, Ann, Opts) of
+        {ok, Code} ->
+            Hashed = hash_include(File, Code),
+            case sets:is_element(Hashed, Included) of
+                false ->
+                    Opts1 = lists:keystore(src_file, 1, Opts, {src_file, File}),
+                    Included1 = sets:add_element(Hashed, Included),
+                    case string(Code, Included1, Opts1) of
                         {ok, AST1} ->
-                            expand_includes(AST1 ++ AST, Included1, Acc, Opts);
+                            Dependencies = [ {include, Ann, {string, SAnn, Dep}}
+                                             || Dep <- aeso_stdlib:dependencies(File)
+                                           ],
+                            expand_includes(Dependencies ++ AST1 ++ AST, Included1, Acc, Opts);
                         Err = {error, _} ->
                             Err
                     end;
-                {{ok, Bin}, _} ->
-                    case string(binary_to_list(Bin), Included1, Opts1) of
-                        {ok, AST1} ->
-                            expand_includes(AST1 ++ AST, Included1, Acc, Opts);
-                        Err = {error, _} ->
-                            Err
-                    end;
-                {_, _} ->
-                    {error, {get_pos(S), include_error, File}}
+                true ->
+                    expand_includes(AST, Included, Acc, Opts)
             end;
-        true -> expand_includes(AST, Included, Acc, Opts)
+        Err = {error, _} ->
+            Err
     end;
 expand_includes([E | AST], Included, Acc, Opts) ->
     expand_includes(AST, Included, [E | Acc], Opts).
@@ -601,3 +591,20 @@ read_file(File, Opts) ->
             end
     end.
 
+get_include_code(File, Ann, Opts) ->
+    case {read_file(File, Opts), maps:find(File, aeso_stdlib:stdlib())} of
+        {{ok, _}, {ok,_ }} ->
+            return_error(ann_pos(Ann), "Illegal redefinition of standard library " ++ File);
+        {_, {ok, Lib}} ->
+            {ok, Lib};
+        {{ok, Bin}, _} ->
+            {ok, binary_to_list(Bin)};
+        {_, _} ->
+            {error, {ann_pos(Ann), include_error, File}}
+    end.
+
+-spec hash_include(string() | binary(), string()) -> binary().
+hash_include(File, Code) when is_binary(File) ->
+    hash_include(binary_to_list(File), Code);
+hash_include(File, Code) when is_list(File) ->
+    {filename:basename(File), crypto:hash(sha256, Code)}.

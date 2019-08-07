@@ -87,7 +87,8 @@ aci_test_() ->
       fun() -> aci_test_contract(ContractName) end}
      || ContractName <- all_contracts()].
 
-all_contracts() -> aeso_compiler_tests:compilable_contracts().
+all_contracts() -> [C || C <- aeso_compiler_tests:compilable_contracts()
+                             , not aeso_compiler_tests:wants_stdlib(C)].
 
 aci_test_contract(Name) ->
     String = aeso_test_utils:read_contract(Name),
@@ -98,7 +99,7 @@ aci_test_contract(Name) ->
     {ok, ContractStub} = aeso_aci:render_aci_json(JSON),
 
     io:format("STUB:\n~s\n", [ContractStub]),
-    check_stub(ContractStub, [{src_file, Name}, no_implicit_stdlib]),
+    check_stub(ContractStub, [{src_file, Name}]),
 
     ok.
 
