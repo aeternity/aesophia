@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
+- New syntax for tuple types. Now 0-tuple type is encoded as `unit` instead of `()` and
+  regular tuples are encoded by interspersing inner types with `*`, for instance `int * string`. 
+  Parens are not necessary. Note it only affects the types, values remain as their were before,
+  so `(1, "a") : int * string`
+
 ### Removed
 
 ## [3.2.0] - 2019-06-28
