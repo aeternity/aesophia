@@ -329,18 +329,14 @@ to_scode(Env, {builtin, B, Args}) ->
 
 to_scode(Env, {remote, Ct, Fun, [{builtin, call_gas_left, _}, Value | Args]}) ->
     %% Gas is not limited.
-    Lbl = make_function_id(Fun),
-    Call = if Env#env.tailpos -> aeb_fate_ops:call_tr(?a, Lbl, ?a);
-              true            -> aeb_fate_ops:call_r(?a, Lbl, ?a)
-           end,
+    Lbl  = make_function_id(Fun),
+    Call = aeb_fate_ops:call_r(?a, Lbl, length(Args), ?a),    %% No remote tail calls
     call_to_scode(Env, Call, [Ct, Value | Args]);
 
 to_scode(Env, {remote, Ct, Fun, [Gas, Value | Args]}) ->
     %% Gas is limited.
     Lbl = make_function_id(Fun),
-    Call = if Env#env.tailpos -> aeb_fate_ops:call_gtr(?a, Lbl, ?a, ?a);
-              true            -> aeb_fate_ops:call_gr(?a, Lbl, ?a, ?a)
-           end,
+    Call = aeb_fate_ops:call_gr(?a, Lbl, length(Args), ?a, ?a),   %% No remote tail calls
     call_to_scode(Env, Call, [Ct, Value, Gas | Args]);
 
 to_scode(Env, {closure, Fun, FVs}) ->
@@ -747,11 +743,9 @@ attributes(I) ->
         'RETURN'                              -> Impure(pc, []);
         {'RETURNR', A}                        -> Impure(pc, A);
         {'CALL', _}                           -> Impure(?a, []);
-        {'CALL_R', A, _, B}                   -> Impure(?a, [A, B]);
-        {'CALL_GR', A, _, B, C}               -> Impure(?a, [A, B, C]);
+        {'CALL_R', A, _, _, B}                -> Impure(?a, [A, B]);
+        {'CALL_GR', A, _, _, B, C}            -> Impure(?a, [A, B, C]);
         {'CALL_T', _}                         -> Impure(pc, []);
-        {'CALL_TR', A, _, B}                  -> Impure(pc, [A, B]);
-        {'CALL_GTR', A, _, B, C}              -> Impure(pc, [A, B, C]);
         {'CALL_VALUE', A}                     -> Pure(A, []);
         {'JUMP', _}                           -> Impure(pc, []);
         {'JUMPIF', A, _}                      -> Impure(pc, A);
@@ -1413,8 +1407,6 @@ reorder_blocks(Ref, Code, Blocks, Acc) ->
         ['RETURN'|_]          -> reorder_blocks(Blocks, Acc1);
         [{'RETURNR', _}|_]    -> reorder_blocks(Blocks, Acc1);
         [{'CALL_T', _}|_]     -> reorder_blocks(Blocks, Acc1);
-        [{'CALL_TR', _, _, _}|_] -> reorder_blocks(Blocks, Acc1);
-        [{'CALL_GTR', _, _, _}|_] -> reorder_blocks(Blocks, Acc1);
         [{'EXIT', _}|_]       -> reorder_blocks(Blocks, Acc1);
         [{'ABORT', _}|_]      -> reorder_blocks(Blocks, Acc1);
         [{switch, _, _}|_]    -> reorder_blocks(Blocks, Acc1);
@@ -1454,13 +1446,10 @@ chase_labels([L | Ls], Map, Live) ->
     chase_labels(New ++ Ls, Map, Live#{ L => true }).
 
 %% Replace PUSH, RETURN by RETURNR, drop returns after tail calls.
-tweak_returns(['RETURN', {'PUSH', A} | Code])                     -> [{'RETURNR', A} | Code];
-tweak_returns(['RETURN' | Code = [{'CALL_T', _} | _]])            -> Code;
-tweak_returns(['RETURN' | Code = [{'CALL_TR', _, _, _} | _]])     -> Code;
-tweak_returns(['RETURN' | Code = [{'CALL_GT', _} | _]])           -> Code;
-tweak_returns(['RETURN' | Code = [{'CALL_GTR', _, _, _, _} | _]]) -> Code;
-tweak_returns(['RETURN' | Code = [{'ABORT', _} | _]])             -> Code;
-tweak_returns(['RETURN' | Code = [{'EXIT', _} | _]])              -> Code;
+tweak_returns(['RETURN', {'PUSH', A} | Code])          -> [{'RETURNR', A} | Code];
+tweak_returns(['RETURN' | Code = [{'CALL_T', _} | _]]) -> Code;
+tweak_returns(['RETURN' | Code = [{'ABORT', _} | _]])  -> Code;
+tweak_returns(['RETURN' | Code = [{'EXIT', _} | _]])   -> Code;
 tweak_returns(Code) -> Code.
 
 %% -- Split basic blocks at CALL instructions --
