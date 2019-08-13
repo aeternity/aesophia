@@ -98,17 +98,18 @@
      Op =:= 'SHA3'            orelse
      Op =:= 'SHA256'          orelse
      Op =:= 'BLAKE2B'         orelse
-     Op =:= 'ECVERIFY'        orelse
-     Op =:= 'ECVERIFY_SECP256K1' orelse
+     Op =:= 'ECRECOVER_SECP256K1' orelse
+     Op =:= 'ECVERIFY'            orelse
+     Op =:= 'ECVERIFY_SECP256K1'  orelse
      Op =:= 'CONTRACT_TO_ADDRESS' orelse
-     Op =:= 'AUTH_TX_HASH'    orelse
-     Op =:= 'BYTES_TO_INT'    orelse
-     Op =:= 'BYTES_TO_STR'    orelse
-     Op =:= 'ORACLE_CHECK'    orelse
-     Op =:= 'ORACLE_CHECK_QUERY' orelse
-     Op =:= 'IS_ORACLE'       orelse
-     Op =:= 'IS_CONTRACT'     orelse
-     Op =:= 'CREATOR'         orelse
+     Op =:= 'AUTH_TX_HASH'        orelse
+     Op =:= 'BYTES_TO_INT'        orelse
+     Op =:= 'BYTES_TO_STR'        orelse
+     Op =:= 'ORACLE_CHECK'        orelse
+     Op =:= 'ORACLE_CHECK_QUERY'  orelse
+     Op =:= 'IS_ORACLE'           orelse
+     Op =:= 'IS_CONTRACT'         orelse
+     Op =:= 'CREATOR'             orelse
      false)).
 
 -record(env, { contract, vars = [], locals = [], tailpos = true }).
@@ -591,15 +592,16 @@ op_to_scode(bits_union)        -> aeb_fate_ops:bits_or(?a, ?a, ?a);
 op_to_scode(bits_difference)   -> aeb_fate_ops:bits_diff(?a, ?a, ?a);
 op_to_scode(address_to_str)    -> aeb_fate_ops:addr_to_str(?a, ?a);
 op_to_scode(int_to_str)        -> aeb_fate_ops:int_to_str(?a, ?a);
-op_to_scode(contract_to_address)       -> aeb_fate_ops:contract_to_address(?a, ?a);
-op_to_scode(crypto_ecverify)           -> aeb_fate_ops:ecverify(?a, ?a, ?a, ?a);
-op_to_scode(crypto_ecverify_secp256k1) -> aeb_fate_ops:ecverify_secp256k1(?a, ?a, ?a, ?a);
-op_to_scode(crypto_sha3)               -> aeb_fate_ops:sha3(?a, ?a);
-op_to_scode(crypto_sha256)             -> aeb_fate_ops:sha256(?a, ?a);
-op_to_scode(crypto_blake2b)            -> aeb_fate_ops:blake2b(?a, ?a);
-op_to_scode(string_sha3)               -> aeb_fate_ops:sha3(?a, ?a);
-op_to_scode(string_sha256)             -> aeb_fate_ops:sha256(?a, ?a);
-op_to_scode(string_blake2b)            -> aeb_fate_ops:blake2b(?a, ?a).
+op_to_scode(contract_to_address)        -> aeb_fate_ops:contract_to_address(?a, ?a);
+op_to_scode(crypto_ecrecover_secp256k1) -> aeb_fate_ops:ecrecover_secp256k1(?a, ?a, ?a);
+op_to_scode(crypto_ecverify)            -> aeb_fate_ops:ecverify(?a, ?a, ?a, ?a);
+op_to_scode(crypto_ecverify_secp256k1)  -> aeb_fate_ops:ecverify_secp256k1(?a, ?a, ?a, ?a);
+op_to_scode(crypto_sha3)                -> aeb_fate_ops:sha3(?a, ?a);
+op_to_scode(crypto_sha256)              -> aeb_fate_ops:sha256(?a, ?a);
+op_to_scode(crypto_blake2b)             -> aeb_fate_ops:blake2b(?a, ?a);
+op_to_scode(string_sha3)                -> aeb_fate_ops:sha3(?a, ?a);
+op_to_scode(string_sha256)              -> aeb_fate_ops:sha256(?a, ?a);
+op_to_scode(string_blake2b)             -> aeb_fate_ops:blake2b(?a, ?a).
 
 %% PUSH and STORE ?a are the same, so we use STORE to make optimizations
 %% easier, and specialize to PUSH (which is cheaper) at the end.
@@ -819,6 +821,7 @@ attributes(I) ->
         {'SHA3', A, B}                        -> Pure(A, [B]);
         {'SHA256', A, B}                      -> Pure(A, [B]);
         {'BLAKE2B', A, B}                     -> Pure(A, [B]);
+        {'ECRECOVER_SECP256K1', A, B, C}      -> Pure(A, [B, C]);
         {'ECVERIFY', A, B, C, D}              -> Pure(A, [B, C, D]);
         {'ECVERIFY_SECP256K1', A, B, C, D}    -> Pure(A, [B, C, D]);
         {'CONTRACT_TO_ADDRESS', A, B}         -> Pure(A, [B]);
