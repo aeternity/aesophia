@@ -22,8 +22,7 @@
 string(String) ->
     string(String, sets:new(), []).
 
-
--spec string(string(), compiler:options()) -> parse_result().
+-spec string(string(), aeso_compiler:options()) -> parse_result().
 string(String, Opts) ->
     case lists:keyfind(src_file, 1, Opts) of
         {src_file, File} -> string(String, sets:add_element(File, sets:new()), Opts);

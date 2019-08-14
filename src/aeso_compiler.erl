@@ -578,6 +578,7 @@ pp(Code, Options, Option, PPFun) ->
 %% -------------------------------------------------------------------
 %% TODO: Tempoary parser hook below...
 
+-spec parse_stdlib() -> none() | [aeso_syntax:ast()].
 parse_stdlib() ->
     lists:foldr(
       fun ({Lib, LibCode}, Acc) ->
@@ -593,8 +594,11 @@ sophia_type_to_typerep(String) ->
     catch _:_ -> {error, bad_type}
     end.
 
+-spec parse(string(), aeso_compiler:options()) -> none() | aeso_syntax:ast().
 parse(Text, Options) ->
     parse(Text, sets:new(), Options).
+
+-spec parse(string(), sets:set(), aeso_compiler:options()) -> none() | aeso_syntax:ast().
 parse(Text, Included, Options) ->
     %% Try and return something sensible here!
     case aeso_parser:string(Text, Included, Options) of
@@ -616,6 +620,7 @@ parse(Text, Included, Options) ->
             parse_error(Pos, io_lib:format("could not find include file '~s'", [File]))
     end.
 
+-spec parse_error(aeso_parse_lib:pos(), string()) -> none().
 parse_error(Pos, ErrorString) ->
     Error = io_lib:format("~s: ~s", [pos_error(Pos), ErrorString]),
     error({parse_errors, [Error]}).

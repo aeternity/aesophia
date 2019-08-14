@@ -83,7 +83,7 @@
 
 -type fun_info()  :: {aeso_syntax:ann(), typesig() | type()}.
 -type type_info() :: {aeso_syntax:ann(), typedef()}.
--type var_info()  :: {aeso_syntax:ann(), type()}.
+-type var_info()  :: {aeso_syntax:ann(), utype()}.
 
 -type fun_env()  :: [{name(), fun_info()}].
 -type type_env() :: [{name(), type_info()}].
@@ -139,11 +139,11 @@ on_current_scope(Env = #env{ namespace = NS, scopes = Scopes }, Fun) ->
 on_scopes(Env = #env{ scopes = Scopes }, Fun) ->
     Env#env{ scopes = maps:map(fun(_, Scope) -> Fun(Scope) end, Scopes) }.
 
--spec bind_var(aeso_syntax:id(), type(), env()) -> env().
+-spec bind_var(aeso_syntax:id(), utype(), env()) -> env().
 bind_var({id, Ann, X}, T, Env) ->
     Env#env{ vars = [{X, {Ann, T}} | Env#env.vars] }.
 
--spec bind_vars([{aeso_syntax:id(), type()}], env()) -> env().
+-spec bind_vars([{aeso_syntax:id(), utype()}], env()) -> env().
 bind_vars([], Env) -> Env;
 bind_vars([{X, T} | Vars], Env) ->
     bind_vars(Vars, bind_var(X, T, Env)).
