@@ -125,7 +125,8 @@ compilable_contracts() ->
      "stdlib_include",
      "double_include",
      "manual_stdlib_include",
-     "list_comp"
+     "list_comp",
+     "payable"
     ].
 
 not_yet_compilable(fate) -> [];

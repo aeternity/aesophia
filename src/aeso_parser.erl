@@ -57,6 +57,7 @@ decl() ->
     choice(
       %% Contract declaration
     [ ?RULE(keyword(contract),  con(), tok('='), maybe_block(decl()), {contract, _1, _2, _4})
+    , ?RULE(token(payable),     keyword(contract), con(), tok('='), maybe_block(decl()), add_modifiers([_1], {contract, _2, _3, _5}))
     , ?RULE(keyword(namespace), con(), tok('='), maybe_block(decl()), {namespace, _1, _2, _4})
     , ?RULE(keyword(include),   str(), {include, get_ann(_1), _2})
 
@@ -81,7 +82,7 @@ fun_or_entry() ->
             ?RULE(keyword(entrypoint), {entrypoint, _1})]).
 
 modifiers() ->
-    many(choice([token(stateful), token(private), token(public)])).
+    many(choice([token(stateful), token(payable), token(private), token(public)])).
 
 add_modifiers(Mods, Entry = {entrypoint, _}, Node) ->
     add_modifiers(Mods ++ [Entry], Node);

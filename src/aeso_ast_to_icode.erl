@@ -17,11 +17,15 @@
 
 -spec convert_typed(aeso_syntax:ast(), list()) -> aeso_icode:icode().
 convert_typed(TypedTree, Options) ->
-    Name = case lists:last(TypedTree) of
-               {contract, _, {con, _, Con}, _} -> Con;
-               _ -> gen_error(last_declaration_must_be_contract)
+    {Payable, Name} =
+        case lists:last(TypedTree) of
+            {contract, Attrs, {con, _, Con}, _} ->
+                {proplists:get_value(payable, Attrs, false), Con};
+            _ ->
+                gen_error(last_declaration_must_be_contract)
            end,
-    NewIcode = aeso_icode:set_name(Name, aeso_icode:new(Options)),
+    NewIcode = aeso_icode:set_payable(Payable,
+                   aeso_icode:set_name(Name, aeso_icode:new(Options))),
     Icode    = code(TypedTree, NewIcode, Options),
     deadcode_elimination(Icode).
 
@@ -87,6 +91,7 @@ contract_to_icode([{type_def, _Attrib, Id = {id, _, Name}, Args, Def} | Rest],
     contract_to_icode(Rest, Icode2);
 contract_to_icode([{letfun, Attrib, Name, Args, _What, Body={typed,_,_,T}}|Rest], Icode) ->
     FunAttrs = [ stateful || proplists:get_value(stateful, Attrib, false) ] ++
+               [ payable  || proplists:get_value(payable, Attrib, false) ] ++
                [ private  || is_private(Attrib, Icode) ],
     %% TODO: Handle types
     FunName = ast_id(Name),

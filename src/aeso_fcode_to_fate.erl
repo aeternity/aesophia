@@ -148,15 +148,17 @@ make_function_name({local_fun, Xs})    -> list_to_binary("." ++ string:join(Xs, 
 functions_to_scode(ContractName, Functions, Options) ->
     FunNames = maps:keys(Functions),
     maps:from_list(
-        [ {make_function_name(Name), function_to_scode(ContractName, FunNames, Name, Args, Body, Type, Options)}
+        [ {make_function_name(Name), function_to_scode(ContractName, FunNames, Name, Attrs, Args, Body, Type, Options)}
         || {Name, #{args   := Args,
                     body   := Body,
+                    attrs  := Attrs,
                     return := Type}} <- maps:to_list(Functions)]).
 
-function_to_scode(ContractName, Functions, _Name, Args, Body, ResType, _Options) ->
+function_to_scode(ContractName, Functions, _Name, Attrs0, Args, Body, ResType, _Options) ->
     {ArgTypes, ResType1} = typesig_to_scode(Args, ResType),
-    SCode    = to_scode(init_env(ContractName, Functions, Args), Body),
-    {{ArgTypes, ResType1}, SCode}.
+    Attrs = Attrs0 -- [stateful], %% Only track private and payable from here.
+    SCode = to_scode(init_env(ContractName, Functions, Args), Body),
+    {Attrs, {ArgTypes, ResType1}, SCode}.
 
 -define(tvars, '$tvars').
 
@@ -204,7 +206,7 @@ add_default_init_function(SFuns, {tuple, []}) ->
         error ->
             Sig = {[], {tuple, []}},
             Body = [tuple(0)],
-            SFuns#{ InitName => {Sig, Body} }
+            SFuns#{ InitName => {[], Sig, Body} }
     end.
 
 %% -- Phase I ----------------------------------------------------------------
@@ -628,12 +630,12 @@ flatten_s(I) -> I.
 
 -define(MAX_SIMPL_ITERATIONS, 10).
 
-optimize_fun(_Funs, Name, {{Args, Res}, Code}, Options) ->
+optimize_fun(_Funs, Name, {Attrs, Sig, Code}, Options) ->
     Code0 = flatten(Code),
     debug(opt, Options, "Optimizing ~s\n", [Name]),
     Code1 = simpl_loop(0, Code0, Options),
     Code2 = desugar(Code1),
-    {{Args, Res}, Code2}.
+    {Attrs, Sig, Code2}.
 
 simpl_loop(N, Code, Options) when N >= ?MAX_SIMPL_ITERATIONS ->
     debug(opt, Options, "  No simpl_loop fixed_point after ~p iterations.\n\n", [N]),
@@ -1282,9 +1284,9 @@ desugar(I) -> [I].
 to_basic_blocks(Funs) ->
     to_basic_blocks(maps:to_list(Funs), aeb_fate_code:new()).
 
-to_basic_blocks([{Name, {Sig, Code}}|Left], Acc) ->
+to_basic_blocks([{Name, {Attrs, Sig, Code}}|Left], Acc) ->
     BB = bb(Name, Code ++ [aeb_fate_ops:return()]),
-    to_basic_blocks(Left, aeb_fate_code:insert_fun(Name, Sig, BB, Acc));
+    to_basic_blocks(Left, aeb_fate_code:insert_fun(Name, Attrs, Sig, BB, Acc));
 to_basic_blocks([], Acc) ->
     Acc.
 
