@@ -353,7 +353,7 @@ ast_body({map, Ann, Map, [Upd | Upds]}, Icode) ->
 ast_body(?qid_app(["Crypto", "ecrecover_secp256k1"], [Msg, Sig], _, _), Icode) ->
     prim_call(?PRIM_CALL_CRYPTO_ECRECOVER_SECP256K1, #integer{value = 0},
               [ast_body(Msg, Icode), ast_body(Sig, Icode)],
-              [word, sign_t()], word);
+              [word, bytes_t(65)], word);
 
 ast_body(?qid_app(["Crypto", "ecverify"], [Msg, PK, Sig], _, _), Icode) ->
     prim_call(?PRIM_CALL_CRYPTO_ECVERIFY, #integer{value = 0},
