@@ -574,15 +574,13 @@ pp(Code, Options, Option, PPFun) ->
             ok
     end.
 
-
 %% -------------------------------------------------------------------
-%% TODO: Tempoary parser hook below...
 
--spec parse_stdlib() -> none() | [aeso_syntax:ast()].
+-spec parse_stdlib() -> none() | aeso_syntax:ast().
 parse_stdlib() ->
     lists:foldr(
       fun ({Lib, LibCode}, Acc) ->
-              parse(LibCode, [{src_file, Lib}]) ++ Acc
+              parse(LibCode, [{src_file, binary_to_list(Lib)}]) ++ Acc
       end,
       [],
       aeso_stdlib:stdlib_list()).
