@@ -1,0 +1,7 @@
+// This contract should be compiled with no_implicit_stdlib option.
+// It should include Lists.aes implicitly however, because Option.aes depends on it.
+include "Option.aes"
+
+contract Test =
+  entrypoint i_should_build() =
+    List.is_empty(Option.to_list(None))

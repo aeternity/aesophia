@@ -92,6 +92,7 @@
      | {proj, ann(), expr(), id()}
      | {tuple, ann(), [expr()]}
      | {list, ann(), [expr()]}
+     | {list_comp, ann(), expr(), [comprehension_exp()]}
      | {typed, ann(), expr(), type()}
      | {record, ann(), [field(expr())]}
      | {record, ann(), expr(), [field(expr())]} %% record update
@@ -103,6 +104,10 @@
      | {op(), ann()}
      | id() | qid() | con() | qcon()
      | constant().
+
+-type comprehension_exp() :: [{ comprehension_bind, ann(), id(), expr()}
+                             | {comprehension_if, expr()}
+                             | letbind()].
 
 -type arg_expr() :: expr() | {named_arg, ann(), id(), expr()}.
 

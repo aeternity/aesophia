@@ -73,7 +73,9 @@ check_errors(Expect, ErrorString) ->
     end.
 
 compile(Backend, Name) ->
-    compile(Backend, Name, [{include, {file_system, [aeso_test_utils:contract_path()]}}]).
+    compile(Backend, Name,
+            [{include, {file_system, [aeso_test_utils:contract_path()]}}]
+            ++ [no_implicit_stdlib || not wants_stdlib(Name)]).
 
 compile(Backend, Name, Options) ->
     String = aeso_test_utils:read_contract(Name),
@@ -118,7 +120,12 @@ compilable_contracts() ->
      "namespace_bug",
      "bytes_to_x",
      "aens",
-     "tuple_match"
+     "tuple_match",
+     "cyclic_include",
+     "stdlib_include",
+     "double_include",
+     "manual_stdlib_include",
+     "list_comp"
     ].
 
 not_yet_compilable(fate) -> [];
@@ -354,4 +361,23 @@ failing_contracts() ->
         <<"Use 'entrypoint' for declaration of foo (at line 6, column 3):\n  entrypoint foo : () => unit">>,
         <<"Use 'entrypoint' instead of 'function' for public function foo (at line 10, column 3):\n  entrypoint foo() = ()">>,
         <<"Use 'entrypoint' instead of 'function' for public function foo (at line 6, column 3):\n  entrypoint foo : () => unit">>]}
+    , {"list_comp_not_a_list",
+      [<<"Cannot unify int\n         and list('a)\nwhen checking rvalue of list comprehension binding at line 2, column 36\n  1 : int\nagainst type \n  list('a)">>
+      ]}
+    , {"list_comp_if_not_bool",
+      [<<"Cannot unify int\n         and bool\nwhen checking the type of the expression at line 2, column 44\n  3 : int\nagainst the expected type\n  bool">>
+      ]}
+    , {"list_comp_bad_shadow",
+      [<<"Cannot unify int\n         and string\nwhen checking the type of the pattern at line 2, column 53\n  x : int\nagainst the expected type\n  string">>
+      ]}
     ].
+
+wants_stdlib(Name) ->
+    lists:member
+      (Name,
+       [ "stdlib_include",
+         "list_comp",
+         "list_comp_not_a_list",
+         "list_comp_if_not_bool",
+         "list_comp_bad_shadow"
+       ]).

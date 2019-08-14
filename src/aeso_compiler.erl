@@ -36,6 +36,7 @@
                 | pp_assembler
                 | pp_bytecode
                 | no_code
+                | no_implicit_stdlib
                 | {backend, aevm | fate}
                 | {include, {file_system, [string()]} |
                             {explicit_files, #{string() => binary()}}}
@@ -139,7 +140,16 @@ from_string1(fate, ContractString, Options) ->
 
 -spec string_to_code(string(), options()) -> map().
 string_to_code(ContractString, Options) ->
-    Ast = parse(ContractString, Options),
+    Ast = case lists:member(no_implicit_stdlib, Options) of
+              true -> parse(ContractString, Options);
+              false ->
+                  IncludedSTD = sets:from_list(
+                                  [aeso_parser:hash_include(F, C)
+                                   || {F, C} <- aeso_stdlib:stdlib_list()]),
+                  InitAst = parse(ContractString, IncludedSTD, Options),
+                  STD = parse_stdlib(),
+                  STD ++ InitAst
+          end,
     pp_sophia_code(Ast, Options),
     pp_ast(Ast, Options),
     {TypeEnv, TypedAst} = aeso_ast_infer_types:infer(Ast, [return_env]),
@@ -568,6 +578,14 @@ pp(Code, Options, Option, PPFun) ->
 %% -------------------------------------------------------------------
 %% TODO: Tempoary parser hook below...
 
+parse_stdlib() ->
+    lists:foldr(
+      fun ({Lib, LibCode}, Acc) ->
+              parse(LibCode, [{src_file, Lib}]) ++ Acc
+      end,
+      [],
+      aeso_stdlib:stdlib_list()).
+
 sophia_type_to_typerep(String) ->
     {ok, Ast} = aeso_parser:type(String),
     try aeso_ast_to_icode:ast_typerep(Ast) of
@@ -576,8 +594,10 @@ sophia_type_to_typerep(String) ->
     end.
 
 parse(Text, Options) ->
+    parse(Text, sets:new(), Options).
+parse(Text, Included, Options) ->
     %% Try and return something sensible here!
-    case aeso_parser:string(Text, Options) of
+    case aeso_parser:string(Text, Included, Options) of
         %% Yay, it worked!
         {ok, Contract} -> Contract;
         %% Scan errors.

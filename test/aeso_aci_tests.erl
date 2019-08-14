@@ -9,7 +9,7 @@ simple_aci_test_() ->
 
 test_contract(N) ->
     {Contract,MapACI,DecACI} = test_cases(N),
-    {ok,JSON} = aeso_aci:contract_interface(json, Contract),
+    {ok,JSON} = aeso_aci:contract_interface(json, Contract, [no_implicit_stdlib]),
     ?assertEqual([MapACI], JSON),
     ?assertEqual({ok, DecACI}, aeso_aci:render_aci_json(JSON)).
 
@@ -87,7 +87,8 @@ aci_test_() ->
       fun() -> aci_test_contract(ContractName) end}
      || ContractName <- all_contracts()].
 
-all_contracts() -> aeso_compiler_tests:compilable_contracts().
+all_contracts() -> [C || C <- aeso_compiler_tests:compilable_contracts()
+                             , not aeso_compiler_tests:wants_stdlib(C)].
 
 aci_test_contract(Name) ->
     String = aeso_test_utils:read_contract(Name),

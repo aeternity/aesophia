@@ -13,7 +13,7 @@ open Voting;
 
 let print_tally() = {
   let tally = call(other, () => currentTally());
-  List.map(((name, count)) => Printf.printf("%s: %d\n", name, count), tally);
+  MyList.map(((name, count)) => Printf.printf("%s: %d\n", name, count), tally);
   let winner = call(other, () => winnerName());
   Printf.printf("Winner: %s\n", winner);
 };

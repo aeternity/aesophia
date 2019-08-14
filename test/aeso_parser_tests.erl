@@ -15,7 +15,7 @@ simple_contracts_test_() ->
             ?assertMatch(
                 [{contract, _, {con, _, "Identity"},
                     [{letfun, _, {id, _, "id"}, [{arg, _, {id, _, "x"}, {id, _, "_"}}], {id, _, "_"},
-                        {id, _, "x"}}]}], parse_string(Text)),
+                        {id, _, "x"}}]}], parse_string(Text, [no_implicit_stdlib])),
             ok
        end},
       {"Operator precedence test.",
@@ -71,21 +71,23 @@ parse_contract(Name) ->
 roundtrip_contract(Name) ->
     round_trip(aeso_test_utils:read_contract(Name)).
 
-parse_string(Text) ->
-    case aeso_parser:string(Text) of
+parse_string(Text) -> parse_string(Text, []).
+
+parse_string(Text, Opts) ->
+    case aeso_parser:string(Text, Opts) of
         {ok, Contract} -> Contract;
         Err -> error(Err)
     end.
 
 parse_expr(Text) ->
     [{letval, _, _, _, Expr}] =
-        parse_string("let _ = " ++ Text),
+        parse_string("let _ = " ++ Text, [no_implicit_stdlib]),
     Expr.
 
 round_trip(Text) ->
-    Contract  = parse_string(Text),
+    Contract  = parse_string(Text, [no_implicit_stdlib]),
     Text1     = prettypr:format(aeso_pretty:decls(Contract)),
-    Contract1 = parse_string(Text1),
+    Contract1 = parse_string(Text1, [no_implicit_stdlib]),
     NoSrcLoc  = remove_line_numbers(Contract),
     NoSrcLoc1 = remove_line_numbers(Contract1),
     ?assertMatch(NoSrcLoc, diff(NoSrcLoc, NoSrcLoc1)).

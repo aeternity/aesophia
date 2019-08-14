@@ -1,0 +1,3 @@
+contract StdInc =
+  entrypoint test() = List.map((x) => Func.id(x), [1,2,3,4])
+

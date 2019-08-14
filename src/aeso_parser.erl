@@ -6,6 +6,8 @@
 
 -export([string/1,
          string/2,
+         string/3,
+         hash_include/2,
          type/1]).
 
 -include("aeso_parse_lib.hrl").
@@ -14,15 +16,25 @@
                       | {error, {aeso_parse_lib:pos(), atom(), term()}}
                       | {error, {aeso_parse_lib:pos(), atom()}}.
 
+-type include_hash() :: {string(), binary()}.
+
 -spec string(string()) -> parse_result().
 string(String) ->
-    string(String, []).
+    string(String, sets:new(), []).
 
--spec string(string(), aeso_compiler:options()) -> parse_result().
+
+-spec string(string(), compiler:options()) -> parse_result().
 string(String, Opts) ->
+    case lists:keyfind(src_file, 1, Opts) of
+        {src_file, File} -> string(String, sets:add_element(File, sets:new()), Opts);
+        false -> string(String, sets:new(), Opts)
+    end.
+
+-spec string(string(), sets:set(include_hash()), aeso_compiler:options()) -> parse_result().
+string(String, Included, Opts) ->
     case parse_and_scan(file(), String, Opts) of
         {ok, AST} ->
-            expand_includes(AST, Opts);
+            expand_includes(AST, Included, Opts);
         Err = {error, _} ->
             Err
     end.
@@ -230,10 +242,24 @@ exprAtom() ->
         , {bool, keyword(false), false}
         , ?LET_P(Fs, brace_list(?LAZY_P(field_assignment())), record(Fs))
         , {list, [], bracket_list(Expr)}
+        , ?RULE(keyword('['), Expr, token('|'), comma_sep(comprehension_exp()), tok(']'), list_comp_e(_1, _2, _4))
         , ?RULE(tok('['), Expr, binop('..'), Expr, tok(']'), _3(_2, _4))
         , ?RULE(keyword('('), comma_sep(Expr), tok(')'), tuple_e(_1, _2))
         ])
     end).
+
+comprehension_exp() ->
+    ?LAZY_P(choice(
+      [ comprehension_bind()
+      , letdecl()
+      , comprehension_if()
+      ])).
+
+comprehension_if() ->
+    ?RULE(keyword('if'), parens(expr()), {comprehension_if, _1, _2}).
+
+comprehension_bind() ->
+    ?RULE(id(), tok('<-'), expr(), {comprehension_bind, _1, _3}).
 
 arg_expr() ->
     ?LAZY_P(
@@ -481,6 +507,8 @@ fun_t(Domains, Type) ->
 tuple_e(_Ann, [Expr]) -> Expr;  %% Not a tuple
 tuple_e(Ann, Exprs)   -> {tuple, Ann, Exprs}.
 
+list_comp_e(Ann, Expr, Binds) -> {list_comp, Ann, Expr, Binds}.
+
 -spec parse_pattern(aeso_syntax:expr()) -> aeso_parse_lib:parser(aeso_syntax:pat()).
 parse_pattern({app, Ann, Con = {'::', _}, Es}) ->
     {app, Ann, Con, lists:map(fun parse_pattern/1, Es)};
@@ -521,26 +549,36 @@ bad_expr_err(Reason, E) ->
                             prettypr:nest(2, aeso_pretty:expr(E))])).
 
 %% -- Helper functions -------------------------------------------------------
-expand_includes(AST, Opts) ->
-    expand_includes(AST, [], Opts).
+expand_includes(AST, Included, Opts) ->
+    expand_includes(AST, Included, [], Opts).
 
-expand_includes([], Acc, _Opts) ->
+expand_includes([], _Included, Acc, _Opts) ->
     {ok, lists:reverse(Acc)};
-expand_includes([{include, _, S = {string, _, File}} | AST], Acc, Opts) ->
-    case read_file(File, Opts) of
-        {ok, Bin} ->
-            Opts1 = lists:keystore(src_file, 1, Opts, {src_file, File}),
-            case string(binary_to_list(Bin), Opts1) of
-                {ok, AST1} ->
-                    expand_includes(AST1 ++ AST, Acc, Opts);
-                Err = {error, _} ->
-                    Err
+expand_includes([{include, Ann, {string, SAnn, File}} | AST], Included, Acc, Opts) ->
+    case get_include_code(File, Ann, Opts) of
+        {ok, Code} ->
+            Hashed = hash_include(File, Code),
+            case sets:is_element(Hashed, Included) of
+                false ->
+                    Opts1 = lists:keystore(src_file, 1, Opts, {src_file, File}),
+                    Included1 = sets:add_element(Hashed, Included),
+                    case string(Code, Included1, Opts1) of
+                        {ok, AST1} ->
+                            Dependencies = [ {include, Ann, {string, SAnn, Dep}}
+                                             || Dep <- aeso_stdlib:dependencies(File)
+                                           ],
+                            expand_includes(Dependencies ++ AST1 ++ AST, Included1, Acc, Opts);
+                        Err = {error, _} ->
+                            Err
+                    end;
+                true ->
+                    expand_includes(AST, Included, Acc, Opts)
             end;
-        {error, _} ->
-            {error, {get_pos(S), include_error, File}}
+        Err = {error, _} ->
+            Err
     end;
-expand_includes([E | AST], Acc, Opts) ->
-    expand_includes(AST, [E | Acc], Opts).
+expand_includes([E | AST], Included, Acc, Opts) ->
+    expand_includes(AST, Included, [E | Acc], Opts).
 
 read_file(File, Opts) ->
     case proplists:get_value(include, Opts, {explicit_files, #{}}) of
@@ -555,3 +593,20 @@ read_file(File, Opts) ->
             end
     end.
 
+get_include_code(File, Ann, Opts) ->
+    case {read_file(File, Opts), maps:find(File, aeso_stdlib:stdlib())} of
+        {{ok, _}, {ok,_ }} ->
+            return_error(ann_pos(Ann), "Illegal redefinition of standard library " ++ File);
+        {_, {ok, Lib}} ->
+            {ok, Lib};
+        {{ok, Bin}, _} ->
+            {ok, binary_to_list(Bin)};
+        {_, _} ->
+            {error, {ann_pos(Ann), include_error, File}}
+    end.
+
+-spec hash_include(string() | binary(), string()) -> include_hash().
+hash_include(File, Code) when is_binary(File) ->
+    hash_include(binary_to_list(File), Code);
+hash_include(File, Code) when is_list(File) ->
+    {filename:basename(File), crypto:hash(sha256, Code)}.

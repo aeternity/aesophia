@@ -363,6 +363,8 @@ global_env() ->
     Pair    = fun(A, B) -> {tuple_t, Ann, [A, B]} end,
     Fun     = fun(Ts, T) -> {type_sig, Ann, [], Ts, T} end,
     Fun1    = fun(S, T) -> Fun([S], T) end,
+    %% Lambda    = fun(Ts, T) -> {fun_t, Ann, [], Ts, T} end,
+    %% Lambda1   = fun(S, T) -> Lambda([S], T) end,
     StateFun  = fun(Ts, T) -> {type_sig, [stateful|Ann], [], Ts, T} end,
     TVar      = fun(X) -> {tvar, Ann, "'" ++ X} end,
     SignId    = {id, Ann, "signature"},
@@ -1074,6 +1076,58 @@ infer_expr(Env, {list, As, Elems}) ->
     ElemType = fresh_uvar(As),
     NewElems = [check_expr(Env, X, ElemType) || X <- Elems],
     {typed, As, {list, As, NewElems}, {app_t, As, {id, As, "list"}, [ElemType]}};
+infer_expr(Env, {list_comp, As, Yield, []}) ->
+    {typed, _, TypedYield, Type} = infer_expr(Env, Yield),
+    {typed, As, {list_comp, As, TypedYield, []}, {app_t, As, {id, As, "list"}, [Type]}};
+infer_expr(Env, {list_comp, As, Yield, [{comprehension_bind, Arg, BExpr}|Rest]}) ->
+    BindVarType = fresh_uvar(As),
+    TypedBind = {typed, As2, _, TypeBExpr} = infer_expr(Env, BExpr),
+    unify( Env
+         , TypeBExpr
+         , {app_t, As, {id, As, "list"}, [BindVarType]}
+         , {list_comp, TypedBind, TypeBExpr, {app_t, As2, {id, As, "list"}, [BindVarType]}}),
+    NewE = bind_var(Arg, BindVarType, Env),
+    {typed, _, {list_comp, _, TypedYield, TypedRest}, ResType} =
+        infer_expr(NewE, {list_comp, As, Yield, Rest}),
+    { typed
+    , As
+    , {list_comp, As, TypedYield, [{comprehension_bind, {typed, Arg, BindVarType}, TypedBind}|TypedRest]}
+    , ResType};
+infer_expr(Env, {list_comp, AttrsL, Yield, [{comprehension_if, AttrsIF, Cond}|Rest]}) ->
+    NewCond = check_expr(Env, Cond, {id, AttrsIF, "bool"}),
+    {typed, _, {list_comp, _, TypedYield, TypedRest}, ResType} =
+        infer_expr(Env, {list_comp, AttrsL, Yield, Rest}),
+    { typed
+    , AttrsL
+    , {list_comp, AttrsL, TypedYield, [{comprehension_if, AttrsIF, NewCond}|TypedRest]}
+    , ResType};
+infer_expr(Env, {list_comp, AsLC, Yield, [{letval, AsLV, Pattern, Type, E}|Rest]}) ->
+    NewE = {typed, _, _, PatType} = infer_expr(Env, {typed, AsLV, E, arg_type(Type)}),
+    BlockType = fresh_uvar(AsLV),
+    {'case', _, NewPattern, NewRest} =
+        infer_case( Env
+                  , AsLC
+                  , Pattern
+                  , PatType
+                  , {list_comp, AsLC, Yield, Rest}
+                  , BlockType),
+    {typed, _, {list_comp, _, TypedYield, TypedRest}, ResType} = NewRest,
+    { typed
+    , AsLC
+    , {list_comp, AsLC, TypedYield, [{letval, AsLV, NewPattern, Type, NewE}|TypedRest]}
+    , ResType
+    };
+infer_expr(Env, {list_comp, AsLC, Yield, [Def={letfun, AsLF, _, _, _, _}|Rest]}) ->
+    {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
+    FunT = freshen_type(AsLF, typesig_to_fun_t(TypeSig)),
+    NewE = bind_var({id, AsLF, Name}, FunT, Env),
+    {typed, _, {list_comp, _, TypedYield, TypedRest}, ResType} =
+        infer_expr(NewE, {list_comp, AsLC, Yield, Rest}),
+    { typed
+    , AsLC
+    , {list_comp, AsLC, TypedYield, [LetFun|TypedRest]}
+    , ResType
+    };
 infer_expr(Env, {typed, As, Body, Type}) ->
     Type1 = check_type(Env, Type),
     {typed, _, NewBody, NewType} = check_expr(Env, Body, Type1),
@@ -2253,6 +2307,13 @@ pp_when({check_expr, Expr, Inferred0, Expected0}) ->
 pp_when({checking_init_type, Ann}) ->
     io_lib:format("when checking that 'init' returns a value of type 'state' at ~s\n",
                   [pp_loc(Ann)]);
+pp_when({list_comp, BindExpr, Inferred0, Expected0}) ->
+    {Inferred, Expected} = instantiate({Inferred0, Expected0}),
+    io_lib:format("when checking rvalue of list comprehension binding at ~s\n~s\n"
+                  "against type \n~s\n",
+                  [pp_loc(BindExpr), pp_typed("  ", BindExpr, Inferred), pp_type("  ", Expected)]
+                 );
+
 pp_when(unknown) -> "".
 
 -spec pp_why_record(why_record()) -> iolist().

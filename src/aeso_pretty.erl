@@ -235,6 +235,8 @@ type(Type, Options) ->
 -spec type(aeso_syntax:type()) -> doc().
 type({fun_t, _, Named, Args, Ret}) ->
     follow(hsep(args_type(Named ++ Args), text("=>")), type(Ret));
+type({type_sig, _, Named, Args, Ret}) ->
+    follow(hsep(tuple_type(Named ++ Args), text("=>")), type(Ret));
 type({app_t, _, Type, []}) ->
     type(Type);
 type({app_t, _, Type, Args}) ->

@@ -1,5 +1,5 @@
 
-namespace List =
+namespace MyList =
 
   function map1(f : 'a => 'b, xs : list('a)) =
     switch(xs)
@@ -14,8 +14,8 @@ namespace List =
 contract Deadcode =
 
   entrypoint inc1(xs : list(int)) : list(int) =
-    List.map1((x) => x + 1, xs)
+    MyList.map1((x) => x + 1, xs)
 
   entrypoint inc2(xs : list(int)) : list(int) =
-    List.map1((x) => x + 1, xs)
+    MyList.map1((x) => x + 1, xs)
 

@@ -47,7 +47,7 @@ module Voting : Voting = {
   let init(proposalNames: args): state =
     { chairPerson: caller(),
       voters:      AddrMap.empty,
-      proposals:   List.map((name) => {name: name, voteCount: 0}, proposalNames)
+      proposals:   MyList.map((name) => {name: name, voteCount: 0}, proposalNames)
     };
 
   /* Boilerplate */
@@ -73,7 +73,7 @@ module Voting : Voting = {
   };
 
   let addVote(candidate, weight) = {
-    let proposal = List.nth(state().proposals, candidate);
+    let proposal = MyList.nth(state().proposals, candidate);
     proposal.voteCount = proposal.voteCount + weight;
   };
 
@@ -121,6 +121,6 @@ module Voting : Voting = {
 
   /* const */
   let currentTally() =
-    List.map((p) => (p.name, p.voteCount), state().proposals);
+    MyList.map((p) => (p.name, p.voteCount), state().proposals);
 
 }

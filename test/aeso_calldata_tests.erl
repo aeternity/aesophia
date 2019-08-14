@@ -21,12 +21,14 @@ calldata_test_() ->
            ContractString = aeso_test_utils:read_contract(ContractName),
            AevmExprs =
               case not lists:member(ContractName, not_yet_compilable(aevm)) of
-                  true -> ast_exprs(ContractString, Fun, Args, [{backend, aevm}]);
+                  true -> ast_exprs(ContractString, Fun, Args, [{backend, aevm}]
+                                    ++ [no_implicit_stdlib || not aeso_compiler_tests:wants_stdlib(ContractName)]);
                   false -> undefined
               end,
            FateExprs =
               case not lists:member(ContractName, not_yet_compilable(fate)) of
-                  true -> ast_exprs(ContractString, Fun, Args, [{backend, fate}]);
+                  true -> ast_exprs(ContractString, Fun, Args, [{backend, fate}]
+                                    ++ [no_implicit_stdlib || not aeso_compiler_tests:wants_stdlib(ContractName)]);
                   false -> undefined
               end,
            case FateExprs == undefined orelse AevmExprs == undefined of
@@ -45,12 +47,14 @@ calldata_aci_test_() ->
            io:format("ACI:\n~s\n", [ContractACIBin]),
            AevmExprs =
               case not lists:member(ContractName, not_yet_compilable(aevm)) of
-                  true -> ast_exprs(ContractACI, Fun, Args, [{backend, aevm}]);
+                  true -> ast_exprs(ContractACI, Fun, Args, [{backend, aevm}]
+                                    ++ [no_implicit_stdlib || not aeso_compiler_tests:wants_stdlib(ContractName)]);
                   false -> undefined
               end,
            FateExprs =
               case not lists:member(ContractName, not_yet_compilable(fate)) of
-                  true -> ast_exprs(ContractACI, Fun, Args, [{backend, fate}]);
+                  true -> ast_exprs(ContractACI, Fun, Args, [{backend, fate}]
+                                    ++ [no_implicit_stdlib || not aeso_compiler_tests:wants_stdlib(ContractName)]);
                   false -> undefined
               end,
            case FateExprs == undefined orelse AevmExprs == undefined of
