@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- New builtin function `Crypto.ecrecover_secp256k1: (hash, bytes(65)) => bytes(32)`
+  for recovering Ethereum address from message hash and signature.
+
 ### Changed
 - New syntax for tuple types. Now 0-tuple type is encoded as `unit` instead of `()` and
   regular tuples are encoded by interspersing inner types with `*`, for instance `int * string`. 
