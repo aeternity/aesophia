@@ -504,7 +504,8 @@ global_env() ->
     IntScope     = #scope{ funs = MkDefs([{"to_str", Fun1(Int,     String)}]) },
     AddressScope = #scope{ funs = MkDefs([{"to_str", Fun1(Address, String)},
                                           {"is_oracle", Fun1(Address, Bool)},
-                                          {"is_contract", Fun1(Address, Bool)}]) },
+                                          {"is_contract", Fun1(Address, Bool)},
+                                          {"is_payable", Fun1(Address, Bool)}]) },
 
     #env{ scopes =
             #{ []           => TopScope

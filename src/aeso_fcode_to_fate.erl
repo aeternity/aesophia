@@ -109,6 +109,7 @@
      Op =:= 'ORACLE_CHECK_QUERY'  orelse
      Op =:= 'IS_ORACLE'           orelse
      Op =:= 'IS_CONTRACT'         orelse
+     Op =:= 'IS_PAYABLE'          orelse
      Op =:= 'CREATOR'             orelse
      false)).
 
@@ -543,6 +544,8 @@ builtin_to_scode(Env, address_is_oracle, [_] = Args) ->
     call_to_scode(Env, aeb_fate_ops:is_oracle(?a, ?a), Args);
 builtin_to_scode(Env, address_is_contract, [_] = Args) ->
     call_to_scode(Env, aeb_fate_ops:is_contract(?a, ?a), Args);
+builtin_to_scode(Env, address_is_payable, [_] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:is_payable(?a, ?a), Args);
 builtin_to_scode(Env, aens_resolve, [_Name, _Key, _Type] = Args) ->
     call_to_scode(Env, aeb_fate_ops:aens_resolve(?a, ?a, ?a, ?a), Args);
 builtin_to_scode(Env, aens_preclaim, [_Sign, _Account, _Hash] = Args) ->
@@ -836,6 +839,7 @@ attributes(I) ->
         {'ORACLE_CHECK_QUERY', A, B, C, D, E} -> Impure(A, [B, C, D, E]);
         {'IS_ORACLE', A, B}                   -> Impure(A, [B]);
         {'IS_CONTRACT', A, B}                 -> Impure(A, [B]);
+        {'IS_PAYABLE', A, B}                  -> Impure(A, [B]);
         {'CREATOR', A}                        -> Pure(A, []);
         {'ADDRESS', A}                        -> Pure(A, []);
         {'BALANCE', A}                        -> Impure(A, []);

@@ -31,3 +31,6 @@ contract AddrChain =
 
   entrypoint c_creator() : address =
     Contract.creator
+
+  entrypoint is_payable(a : address) : bool =
+    Address.is_payable(a)

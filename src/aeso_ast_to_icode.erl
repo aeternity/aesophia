@@ -433,6 +433,9 @@ ast_body(?qid_app(["Address", "is_oracle"], [Addr], _, _), Icode) ->
 ast_body(?qid_app(["Address", "is_contract"], [Addr], _, _), Icode) ->
     prim_call(?PRIM_CALL_ADDR_IS_CONTRACT, #integer{value = 0},
               [ast_body(Addr, Icode)], [word], word);
+ast_body(?qid_app(["Address", "is_payable"], [Addr], _, _), Icode) ->
+    prim_call(?PRIM_CALL_ADDR_IS_PAYABLE, #integer{value = 0},
+              [ast_body(Addr, Icode)], [word], word);
 
 ast_body(?qid_app(["Bytes", "to_int"], [Bytes], _, _), Icode) ->
     {typed, _, _, {bytes_t, _, N}} = Bytes,

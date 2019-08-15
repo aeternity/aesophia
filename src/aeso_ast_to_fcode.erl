@@ -197,7 +197,7 @@ builtins() ->
                               {"union", 2}, {"difference", 2}, {"none", none}, {"all", none}]},
               {["Bytes"],    [{"to_int", 1}, {"to_str", 1}]},
               {["Int"],      [{"to_str", 1}]},
-              {["Address"],  [{"to_str", 1}, {"is_oracle", 1}, {"is_contract", 1}]}
+              {["Address"],  [{"to_str", 1}, {"is_oracle", 1}, {"is_contract", 1}, {"is_payable", 1}]}
              ],
     maps:from_list([ {NS ++ [Fun], {MkName(NS, Fun), Arity}}
                      || {NS, Funs} <- Scopes,
