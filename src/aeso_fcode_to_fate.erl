@@ -328,17 +328,19 @@ to_scode(Env, {funcall, Fun, Args}) ->
 to_scode(Env, {builtin, B, Args}) ->
     builtin_to_scode(Env, B, Args);
 
-to_scode(Env, {remote, Ct, Fun, [{builtin, call_gas_left, _}, Value | Args]}) ->
-    %% Gas is not limited.
-    Lbl  = make_function_id(Fun),
-    Call = aeb_fate_ops:call_r(?a, Lbl, length(Args), ?a),    %% No remote tail calls
-    call_to_scode(Env, Call, [Ct, Value | Args]);
-
-to_scode(Env, {remote, Ct, Fun, [Gas, Value | Args]}) ->
-    %% Gas is limited.
+to_scode(Env, {remote, ArgsT, RetT, Ct, Fun, [Gas, Value | Args]}) ->
     Lbl = make_function_id(Fun),
-    Call = aeb_fate_ops:call_gr(?a, Lbl, length(Args), ?a, ?a),   %% No remote tail calls
-    call_to_scode(Env, Call, [Ct, Value, Gas | Args]);
+    {ArgTypes, RetType0} = typesig_to_scode([{"_", T} || T <- ArgsT], RetT),
+    ArgType = ?i(aeb_fate_data:make_typerep({tuple, ArgTypes})),
+    RetType = ?i(aeb_fate_data:make_typerep(RetType0)),
+    case Gas of
+        {builtin, call_gas_left, _} ->
+            Call = aeb_fate_ops:call_r(?a, Lbl, ArgType, RetType, ?a),
+            call_to_scode(Env, Call, [Ct, Value | Args]);
+        _ ->
+            Call = aeb_fate_ops:call_gr(?a, Lbl, ArgType, RetType, ?a, ?a),
+            call_to_scode(Env, Call, [Ct, Value, Gas | Args])
+    end;
 
 to_scode(Env, {closure, Fun, FVs}) ->
     to_scode(Env, {tuple, [{lit, {string, make_function_id(Fun)}}, FVs]});
@@ -745,8 +747,8 @@ attributes(I) ->
         'RETURN'                              -> Impure(pc, []);
         {'RETURNR', A}                        -> Impure(pc, A);
         {'CALL', _}                           -> Impure(?a, []);
-        {'CALL_R', A, _, _, B}                -> Impure(?a, [A, B]);
-        {'CALL_GR', A, _, _, B, C}            -> Impure(?a, [A, B, C]);
+        {'CALL_R', A, _, B, C, D}             -> Impure(?a, [A, B, C, D]);
+        {'CALL_GR', A, _, B, C, D, E}         -> Impure(?a, [A, B, C, D, E]);
         {'CALL_T', _}                         -> Impure(pc, []);
         {'CALL_VALUE', A}                     -> Pure(A, []);
         {'JUMP', _}                           -> Impure(pc, []);
