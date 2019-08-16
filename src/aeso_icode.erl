@@ -49,6 +49,7 @@
                   , type_vars => #{ string() => aeb_aevm_data:type() }
                   , constructors => #{ [string()] => integer() }  %% name to tag
                   , options => [any()]
+                  , payable => boolean()
                   }.
 
 pp(Icode) ->
