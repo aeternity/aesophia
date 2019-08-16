@@ -14,20 +14,22 @@ test_contract(N) ->
     ?assertEqual({ok, DecACI}, aeso_aci:render_aci_json(JSON)).
 
 test_cases(1) ->
-    Contract = <<"contract C =\n"
-		 "  entrypoint a(i : int) = i+1\n">>,
+    Contract = <<"payable contract C =\n"
+		 "  payable stateful entrypoint a(i : int) = i+1\n">>,
     MapACI = #{contract =>
 		   #{name => <<"C">>,
 		     type_defs => [],
+                     payable => true,
 		     functions =>
 			 [#{name => <<"a">>,
 			    arguments =>
 				[#{name => <<"i">>,
 				   type => <<"int">>}],
 			    returns => <<"int">>,
-			    stateful => false}]}},
-    DecACI = <<"contract C =\n"
-	       "  entrypoint a : (int) => int\n">>,
+			    stateful => true,
+                            payable  => true}]}},
+    DecACI = <<"payable contract C =\n"
+	       "  payable entrypoint a : (int) => int\n">>,
     {Contract,MapACI,DecACI};
 
 test_cases(2) ->
@@ -35,7 +37,7 @@ test_cases(2) ->
 		 "  type allan = int\n"
 		 "  entrypoint a(i : allan) = i+1\n">>,
     MapACI = #{contract =>
-                       #{name => <<"C">>,
+                       #{name => <<"C">>, payable => false,
                          type_defs =>
                              [#{name => <<"allan">>,
                                 typedef => <<"int">>,
@@ -46,7 +48,8 @@ test_cases(2) ->
                                        type => <<"C.allan">>}],
                                 name => <<"a">>,
                                 returns => <<"int">>,
-                                stateful => false}]}},
+                                stateful => false,
+                                payable  => false}]}},
     DecACI = <<"contract C =\n"
                "  type allan = int\n"
                "  entrypoint a : (C.allan) => int\n">>,
@@ -64,8 +67,8 @@ test_cases(3) ->
 				   type =>
 				       #{<<"C.bert">> => [<<"string">>]}}],
 			    name => <<"a">>,returns => <<"int">>,
-			    stateful => false}],
-		     name => <<"C">>,
+			    stateful => false, payable  => false}],
+		     name => <<"C">>, payable => false,
                      event => #{variant => [#{<<"SingleEventDefined">> => []}]},
                      state => <<"unit">>,
 		     type_defs =>
