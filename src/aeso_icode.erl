@@ -13,6 +13,7 @@
          pp/1,
          set_name/2,
          set_namespace/2,
+         set_payable/2,
          enter_namespace/2,
          get_namespace/1,
          qualify/2,
@@ -48,6 +49,7 @@
                   , type_vars => #{ string() => aeb_aevm_data:type() }
                   , constructors => #{ [string()] => integer() }  %% name to tag
                   , options => [any()]
+                  , payable => boolean()
                   }.
 
 pp(Icode) ->
@@ -65,7 +67,8 @@ new(Options) ->
      , types => builtin_types()
      , type_vars => #{}
      , constructors => builtin_constructors()
-     , options => Options}.
+     , options => Options
+     , payable => false }.
 
 builtin_types() ->
     Word = fun([]) -> word end,
@@ -102,6 +105,10 @@ new_env() ->
 -spec set_name(string(), icode()) -> icode().
 set_name(Name, Icode) ->
     maps:put(contract_name, Name, Icode).
+
+-spec set_payable(boolean(), icode()) -> icode().
+set_payable(Payable, Icode) ->
+    maps:put(payable, Payable, Icode).
 
 -spec set_namespace(aeso_syntax:con() | aeso_syntax:qcon(), icode()) -> icode().
 set_namespace(NS, Icode) -> Icode#{ namespace => NS }.

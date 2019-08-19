@@ -123,7 +123,8 @@ from_string1(aevm, ContractString, Options) ->
            compiler_version => Version,
            contract_source => ContractString,
            type_info => TypeInfo,
-           abi_version => aeb_aevm_abi:abi_version()
+           abi_version => aeb_aevm_abi:abi_version(),
+           payable => maps:get(payable, Icode)
           }};
 from_string1(fate, ContractString, Options) ->
     #{fcode := FCode} = string_to_code(ContractString, Options),
@@ -135,7 +136,8 @@ from_string1(fate, ContractString, Options) ->
            contract_source => ContractString,
            type_info => [],
            fate_code => FateCode,
-           abi_version => aeb_fate_abi:abi_version()
+           abi_version => aeb_fate_abi:abi_version(),
+           payable => maps:get(payable, FCode)
           }}.
 
 -spec string_to_code(string(), options()) -> map().
@@ -549,8 +551,9 @@ to_bytecode([], _) -> [].
 
 extract_type_info(#{functions := Functions} =_Icode) ->
     ArgTypesOnly = fun(As) -> [ T || {_, T} <- As ] end,
+    Payable = fun(Attrs) -> proplists:get_value(payable, Attrs, false) end,
     TypeInfo = [aeb_aevm_abi:function_type_info(list_to_binary(lists:last(Name)),
-                                            ArgTypesOnly(Args), TypeRep)
+                                            Payable(Attrs), ArgTypesOnly(Args), TypeRep)
                 || {Name, Attrs, Args,_Body, TypeRep} <- Functions,
                    not is_tuple(Name),
                    not lists:member(private, Attrs)

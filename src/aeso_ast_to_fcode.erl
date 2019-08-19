@@ -16,7 +16,7 @@
 
 -type option() :: term().
 
--type attribute() :: stateful | pure | private.
+-type attribute() :: stateful | payable | pure | private.
 
 -type fun_name() :: {entrypoint, binary()}
                   | {local_fun, [string()]}
@@ -109,7 +109,8 @@
 -type fcode() :: #{ contract_name := string(),
                     state_type    := ftype(),
                     event_type    := ftype() | none,
-                    functions     := #{ fun_name() => fun_def() } }.
+                    functions     := #{ fun_name() => fun_def() },
+                    payable       := boolean() }.
 
 -type type_def() :: fun(([ftype()]) -> ftype()).
 
@@ -196,7 +197,7 @@ builtins() ->
                               {"union", 2}, {"difference", 2}, {"none", none}, {"all", none}]},
               {["Bytes"],    [{"to_int", 1}, {"to_str", 1}]},
               {["Int"],      [{"to_str", 1}]},
-              {["Address"],  [{"to_str", 1}, {"is_oracle", 1}, {"is_contract", 1}]}
+              {["Address"],  [{"to_str", 1}, {"is_oracle", 1}, {"is_contract", 1}, {"is_payable", 1}]}
              ],
     maps:from_list([ {NS ++ [Fun], {MkName(NS, Fun), Arity}}
                      || {NS, Funs} <- Scopes,
@@ -227,7 +228,7 @@ init_type_env() ->
 %% -- Compilation ------------------------------------------------------------
 
 -spec to_fcode(env(), aeso_syntax:ast()) -> fcode().
-to_fcode(Env, [{contract, _, {con, _, Main}, Decls}]) ->
+to_fcode(Env, [{contract, Attrs, {con, _, Main}, Decls}]) ->
     #{ builtins := Builtins } = Env,
     MainEnv = Env#{ context  => {main_contract, Main},
                     builtins => Builtins#{[Main, "state"]          => {get_state, none},
@@ -237,9 +238,11 @@ to_fcode(Env, [{contract, _, {con, _, Main}, Decls}]) ->
         decls_to_fcode(MainEnv, Decls),
     StateType = lookup_type(Env1, [Main, "state"], [], {tuple, []}),
     EventType = lookup_type(Env1, [Main, "event"], [], none),
+    Payable   = proplists:get_value(payable, Attrs, false),
     #{ contract_name => Main,
        state_type    => StateType,
        event_type    => EventType,
+       payable       => Payable,
        functions     => add_init_function(Env1,
                         add_event_function(Env1, EventType, Funs)) };
 to_fcode(Env, [{contract, _, {con, _, Con}, Decls} | Code]) ->
@@ -1304,7 +1307,9 @@ field_value({field_t, _, {id, _, X}, _}, Fields) ->
 %% -- Attributes --
 
 get_attributes(Ann) ->
-    [stateful || proplists:get_value(stateful, Ann, false)].
+    [stateful || proplists:get_value(stateful, Ann, false)] ++
+    [payable  || proplists:get_value(payable, Ann, false)] ++
+    [private  || not proplists:get_value(entrypoint, Ann, false)].
 
 %% -- Basic utilities --
 
