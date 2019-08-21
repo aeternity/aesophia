@@ -226,6 +226,9 @@ init_type_env() ->
        ["Chain", "ttl"] => ?type({variant, [[integer], [integer]]})
      }.
 
+is_no_code(Env) ->
+    proplists:get_value(no_code, maps:get(options, Env, []), false).
+
 %% -- Compilation ------------------------------------------------------------
 
 -spec to_fcode(env(), aeso_syntax:ast()) -> fcode().
@@ -244,7 +247,7 @@ to_fcode(Env, [{contract, Attrs, {con, _, Main}, Decls}]) ->
        state_type    => StateType,
        event_type    => EventType,
        payable       => Payable,
-       functions     => add_init_function(Env1,
+       functions     => add_init_function(Env1, StateType,
                         add_event_function(Env1, EventType, Funs)) };
 to_fcode(Env, [{contract, _, {con, _, Con}, Decls} | Code]) ->
     Env1 = decls_to_fcode(Env#{ context => {abstract_contract, Con} }, Decls),
@@ -268,7 +271,7 @@ decls_to_fcode(Env, Decls) ->
 -spec decl_to_fcode(env(), aeso_syntax:decl()) -> env().
 decl_to_fcode(Env, {type_decl, _, _, _}) -> Env;
 decl_to_fcode(Env = #{context := {main_contract, _}}, {fun_decl, Ann, {id, _, Name}, _}) ->
-    case proplists:get_value(no_code, maps:get(options, Env, []), false) of
+    case is_no_code(Env) of
         false -> fcode_error({missing_definition, Name, lists:keydelete(entrypoint, 1, Ann)});
         true  -> Env
     end;
@@ -852,16 +855,30 @@ builtin_to_fcode(Builtin, Args) ->
 
 %% -- Init function --
 
-add_init_function(_Env, Funs) ->
+add_init_function(Env, StateType, Funs0) ->
+    case is_no_code(Env) of
+        true  -> Funs0;
+        false ->
+            Funs     = add_default_init_function(Env, StateType, Funs0),
+            InitName = {entrypoint, <<"init">>},
+            InitFun  = #{ args := InitArgs } = maps:get(InitName, Funs, none),
+            Vars     = [ {var, X} || {X, _} <- InitArgs ],
+            Funs#{ init => InitFun#{ return => {tuple, []},
+                                     body   => {builtin, set_state, [{def, InitName, Vars}]} } }
+    end.
+
+add_default_init_function(_Env, StateType, Funs) ->
     InitName = {entrypoint, <<"init">>},
-    InitFun = #{ args := InitArgs } =
-        case maps:get(InitName, Funs, none) of
-            none -> #{ attrs => [], args => [], return => {tuple, []}, body => {tuple, []} };
-            Info -> Info
-        end,
-    Vars = [ {var, X} || {X, _} <- InitArgs ],
-    Funs#{ init => InitFun#{ return => {tuple, []},
-                             body   => {builtin, set_state, [{def, InitName, Vars}]} } }.
+    case maps:get(InitName, Funs, none) of
+        %% Only add default init function if state is unit.
+        none when StateType == {tuple, []} ->
+            Funs#{ InitName => #{attrs  => [],
+                                 args   => [],
+                                 return => {tuple, []},
+                                 body   => {tuple, []}} };
+        none -> fcode_error(missing_init_function);
+        _    -> Funs
+    end.
 
 %% -- Event function --
 
