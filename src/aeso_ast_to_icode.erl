@@ -355,20 +355,25 @@ ast_body({map, Ann, Map, [Upd | Upds]}, Icode) ->
     ast_body({map, Ann, {map, Ann, Map, [Upd]}, Upds}, Icode);
 
 %% Crypto
-ast_body(?qid_app(["Crypto", "ecrecover_secp256k1"], [Msg, Sig], _, _), Icode) ->
-    prim_call(?PRIM_CALL_CRYPTO_ECRECOVER_SECP256K1, #integer{value = 0},
-              [ast_body(Msg, Icode), ast_body(Sig, Icode)],
-              [word, bytes_t(65)], word);
-
-ast_body(?qid_app(["Crypto", "ecverify"], [Msg, PK, Sig], _, _), Icode) ->
-    prim_call(?PRIM_CALL_CRYPTO_ECVERIFY, #integer{value = 0},
+ast_body(?qid_app(["Crypto", "verify_sig"], [Msg, PK, Sig], _, _), Icode) ->
+    prim_call(?PRIM_CALL_CRYPTO_VERIFY_SIG, #integer{value = 0},
               [ast_body(Msg, Icode), ast_body(PK, Icode), ast_body(Sig, Icode)],
               [word, word, sign_t()], word);
 
-ast_body(?qid_app(["Crypto", "ecverify_secp256k1"], [Msg, PK, Sig], _, _), Icode) ->
-    prim_call(?PRIM_CALL_CRYPTO_ECVERIFY_SECP256K1, #integer{value = 0},
+ast_body(?qid_app(["Crypto", "verify_sig_secp256k1"], [Msg, PK, Sig], _, _), Icode) ->
+    prim_call(?PRIM_CALL_CRYPTO_VERIFY_SIG_SECP256K1, #integer{value = 0},
               [ast_body(Msg, Icode), ast_body(PK, Icode), ast_body(Sig, Icode)],
               [bytes_t(32), bytes_t(64), bytes_t(64)], word);
+
+ast_body(?qid_app(["Crypto", "ecverify_secp256k1"], [Msg, Addr, Sig], _, _), Icode) ->
+    prim_call(?PRIM_CALL_CRYPTO_ECVERIFY_SECP256K1, #integer{value = 0},
+              [ast_body(Msg, Icode), ast_body(Addr, Icode), ast_body(Sig, Icode)],
+              [word, bytes_t(20), bytes_t(65)], word);
+
+ast_body(?qid_app(["Crypto", "ecrecover_secp256k1"], [Msg, Sig], _, _), Icode) ->
+    prim_call(?PRIM_CALL_CRYPTO_ECRECOVER_SECP256K1, #integer{value = 0},
+              [ast_body(Msg, Icode), ast_body(Sig, Icode)],
+              [word, bytes_t(65)], aeso_icode:option_typerep(bytes_t(20)));
 
 ast_body(?qid_app(["Crypto", "sha3"], [Term], [Type], _), Icode) ->
     generic_hash_primop(?PRIM_CALL_CRYPTO_SHA3, Term, Type, Icode);
