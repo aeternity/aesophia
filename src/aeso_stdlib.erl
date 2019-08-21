@@ -282,7 +282,7 @@ namespace List =
   private function intersperse_(delim : 'a, l : list('a), acc : list('a)) : list('a) = switch(l)
     []   => reverse(acc)
     [e]  => reverse(e::acc)
-    h::t => intersperse_(delim, t, h::delim::acc)
+    h::t => intersperse_(delim, t, delim::h::acc)
 
 
   function enumerate(l : list('a)) : list(int * 'a) = enumerate_(l, 0, [])
