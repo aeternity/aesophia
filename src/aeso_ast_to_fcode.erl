@@ -1007,12 +1007,15 @@ lambda_lift_exprs(As) -> [lambda_lift_expr(A) || A <- As].
 
 -spec optimize_fcode(fcode()) -> fcode().
 optimize_fcode(Code = #{ functions := Funs }) ->
-    Code#{ functions := maps:map(fun(Name, Def) -> optimize_fun(Code, Name, Def) end, Funs) }.
+    Code1 = Code#{ functions := maps:map(fun(Name, Def) -> optimize_fun(Code, Name, Def) end, Funs) },
+    eliminate_dead_code(Code1).
 
 -spec optimize_fun(fcode(), fun_name(), fun_def()) -> fun_def().
 optimize_fun(Fcode, Fun, Def = #{ body := Body }) ->
     %% io:format("Optimizing ~p =\n~s\n", [_Fun, prettypr:format(pp_fexpr(_Body))]),
     Def#{ body := inliner(Fcode, Fun, Body) }.
+
+%% --- Inlining ---
 
 -spec inliner(fcode(), fun_name(), fexpr()) -> fexpr().
 inliner(Fcode, Fun, {def, Fun1, Args} = E) when Fun1 /= Fun ->
@@ -1025,6 +1028,33 @@ inliner(_Fcode, _Fun, E) -> E.
 should_inline(_Fcode, _Fun1) -> false == list_to_atom("true").  %% Dialyzer
 
 inline(_Fcode, Fun, Args) -> {def, Fun, Args}. %% TODO
+
+%% --- Deadcode elimination ---
+
+-spec eliminate_dead_code(fcode()) -> fcode().
+eliminate_dead_code(Code = #{ functions := Funs }) ->
+    UsedFuns = used_functions(Funs),
+    Code#{ functions := maps:filter(fun(Name, _) -> maps:is_key(Name, UsedFuns) end,
+                                    Funs) }.
+
+-spec used_functions(#{ fun_name() => fun_def() }) -> #{ fun_name() => true }.
+used_functions(Funs) ->
+    Exported = [ Fun || {Fun, #{ attrs := Attrs }} <- maps:to_list(Funs),
+                        not lists:member(private, Attrs) ],
+    used_functions(#{}, Exported, Funs).
+
+used_functions(Used, [], _) -> Used;
+used_functions(Used, [Name | Rest], Defs) ->
+    case maps:is_key(Name, Used) of
+        true  -> used_functions(Used, Rest, Defs);
+        false ->
+            New =
+                case maps:get(Name, Defs, undef) of
+                    undef             -> []; %% We might be compiling a stub
+                    #{ body := Body } -> used_defs(Body)
+                end,
+            used_functions(Used#{ Name => true }, New ++ Rest, Defs)
+    end.
 
 %% -- Helper functions -------------------------------------------------------
 
@@ -1193,6 +1223,34 @@ free_vars(Expr) ->
         {split, _, X, As}    -> free_vars([{var, X} | As]);
         {nosplit, A}         -> free_vars(A);
         {'case', P, A}       -> free_vars(A) -- lists:sort(fsplit_pat_vars(P))
+    end.
+
+used_defs(Xs) when is_list(Xs) ->
+    lists:umerge([ used_defs(X) || X <- Xs ]);
+used_defs(Expr) ->
+    case Expr of
+        {var, _}             -> [];
+        {lit, _}             -> [];
+        nil                  -> [];
+        {def, F, As}         -> lists:umerge([F], used_defs(As));
+        {def_u, F, _}        -> [F];
+        {remote, _, _, Ct, _, As} -> used_defs([Ct | As]);
+        {remote_u, _, _, Ct, _}   -> used_defs(Ct);
+        {builtin, _, As}     -> used_defs(As);
+        {builtin_u, _, _}    -> [];
+        {con, _, _, As}      -> used_defs(As);
+        {tuple, As}          -> used_defs(As);
+        {proj, A, _}         -> used_defs(A);
+        {set_proj, A, _, B}  -> used_defs([A, B]);
+        {op, _, As}          -> used_defs(As);
+        {'let', _, A, B}     -> used_defs([A, B]);
+        {funcall, A, Bs}     -> used_defs([A | Bs]);
+        {lam, _, B}          -> used_defs(B);
+        {closure, F, A}      -> lists:umerge([F], used_defs(A));
+        {switch, A}          -> used_defs(A);
+        {split, _, _, As}    -> used_defs(As);
+        {nosplit, A}         -> used_defs(A);
+        {'case', _, A}       -> used_defs(A)
     end.
 
 get_named_args(NamedArgsT, Args) ->
