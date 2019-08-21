@@ -120,7 +120,7 @@ compilable_contracts() ->
      {"complex_types", "filter_some", ["[Some(11), Some(12), None]"]},
      {"complex_types", "init", ["ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ"]},
      {"__call" "init", []},
-     {"bitcoin_auth", "authorize", ["1", "#0102030405060708090a0b0c0d0e0f101718192021222324252627282930313233343536373839401a1b1c1d1e1f202122232425262728293031323334353637"]},
+     {"bitcoin_auth", "authorize", ["1", "#0102030405060708090a0b0c0d0e0f101718192021222324252627282930313233343536373839401a1b1c1d1e1f20212223242526272829303132333435363738"]},
      {"bitcoin_auth", "to_sign", ["#0102030405060708090a0b0c0d0e0f1017181920212223242526272829303132", "2"]},
      {"stub", "foo", ["42"]},
      {"stub", "foo", ["-42"]},

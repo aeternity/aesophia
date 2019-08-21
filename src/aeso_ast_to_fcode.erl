@@ -32,9 +32,9 @@
               map_delete | map_member | map_size | string_length |
               string_concat | bits_set | bits_clear | bits_test | bits_sum |
               bits_intersection | bits_union | bits_difference |
-              contract_to_address | crypto_ecverify | crypto_ecverify_secp256k1 |
+              contract_to_address | crypto_verify_sig | crypto_verify_sig_secp256k1 |
               crypto_sha3 | crypto_sha256 | crypto_blake2b |
-              crypto_ecrecover_secp256k1.
+              crypto_ecverify_secp256k1 | crypto_ecrecover_secp256k1.
 
 -type flit() :: {int, integer()}
               | {string, binary()}
@@ -189,7 +189,8 @@ builtins() ->
                               {"revoke", 3}]},
               {["Map"],      [{"from_list", 1}, {"to_list", 1}, {"lookup", 2},
                               {"lookup_default", 3}, {"delete", 2}, {"member", 2}, {"size", 1}]},
-              {["Crypto"],   [{"ecrecover_secp256k1", 2}, {"ecverify", 3}, {"ecverify_secp256k1", 3},
+              {["Crypto"],   [{"verify_sig", 3}, {"verify_sig_secp256k1", 3},
+                              {"ecverify_secp256k1", 3}, {"ecrecover_secp256k1", 2},
                               {"sha3", 1}, {"sha256", 1}, {"blake2b", 1}]},
               {["Auth"],     [{"tx_hash", none}]},
               {["String"],   [{"length", 1}, {"concat", 2}, {"sha3", 1}, {"sha256", 1}, {"blake2b", 1}]},
@@ -822,9 +823,9 @@ op_builtins() ->
     [map_from_list, map_to_list, map_delete, map_member, map_size,
      string_length, string_concat, string_sha3, string_sha256, string_blake2b,
      bits_set, bits_clear, bits_test, bits_sum, bits_intersection, bits_union,
-     bits_difference, int_to_str, address_to_str, crypto_ecverify,
-     crypto_ecverify_secp256k1, crypto_sha3, crypto_sha256, crypto_blake2b,
-     crypto_ecrecover_secp256k1
+     bits_difference, int_to_str, address_to_str, crypto_verify_sig,
+     crypto_verify_sig_secp256k1, crypto_sha3, crypto_sha256, crypto_blake2b,
+     crypto_ecverify_secp256k1, crypto_ecrecover_secp256k1
     ].
 
 builtin_to_fcode(require, [Cond, Msg]) ->
