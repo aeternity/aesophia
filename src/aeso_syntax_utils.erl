@@ -71,6 +71,15 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
             {proj, _, E, _}        -> Expr(E);
             {tuple, _, As}         -> Expr(As);
             {list, _, As}          -> Expr(As);
+            {list_comp, _, Y, []}  -> Expr(Y);
+            {list_comp, A, Y, [{comprehension_bind, I, E}|R]} ->
+                Plus(Expr(E), Scoped(BindExpr(I), Expr({list_comp, A, Y, R})));
+            {list_comp, A, Y, [{comprehension_if, E}|R]} ->
+                Plus(Expr(E), Expr({list_comp, A, Y, R}));
+            {list_comp, A, Y, [D = {letval, _, F, _, _} | R]} ->
+                Plus(Decl(D), Scoped(BindExpr(F), Expr({list_comp, A, Y, R})));
+            {list_comp, A, Y, [D = {letfun, _, F, _, _, _} | R]} ->
+                Plus(Decl(D), Scoped(BindExpr(F), Expr({list_comp, A, Y, R})));
             {typed, _, E, T}       -> Plus(Expr(E), Type(T));
             {record, _, Fs}        -> Expr(Fs);
             {record, _, E, Fs}     -> Expr([E | Fs]);
