@@ -114,7 +114,7 @@
      Op =:= 'CREATOR'              orelse
      false)).
 
--record(env, { contract, vars = [], locals = [], tailpos = true }).
+-record(env, { contract, vars = [], locals = [], current_function, tailpos = true }).
 
 %% -- Debugging --------------------------------------------------------------
 
@@ -154,10 +154,10 @@ functions_to_scode(ContractName, Functions, Options) ->
                     attrs  := Attrs,
                     return := Type}} <- maps:to_list(Functions)]).
 
-function_to_scode(ContractName, Functions, _Name, Attrs0, Args, Body, ResType, _Options) ->
+function_to_scode(ContractName, Functions, Name, Attrs0, Args, Body, ResType, _Options) ->
     {ArgTypes, ResType1} = typesig_to_scode(Args, ResType),
     Attrs = Attrs0 -- [stateful], %% Only track private and payable from here.
-    SCode = to_scode(init_env(ContractName, Functions, Args), Body),
+    SCode = to_scode(init_env(ContractName, Functions, Name, Args), Body),
     {Attrs, {ArgTypes, ResType1}, SCode}.
 
 -define(tvars, '$tvars').
@@ -199,10 +199,11 @@ type_to_scode({tvar, X}) ->
 
 %% -- Environment functions --
 
-init_env(ContractName, FunNames, Args) ->
+init_env(ContractName, FunNames, Name, Args) ->
     #env{ vars      = [ {X, {arg, I}} || {I, {X, _}} <- with_ixs(Args) ],
           contract  = ContractName,
           locals    = FunNames,
+          current_function = Name,
           tailpos   = true }.
 
 next_var(#env{ vars = Vars }) ->
@@ -305,6 +306,24 @@ to_scode(Env, {'let', X, Expr, Body}) ->
       aeb_fate_ops:store({var, I}, {stack, 0}),
       to_scode(Env1, Body) ];
 
+to_scode(Env = #env{ current_function = Fun, tailpos = true }, {def, Fun, Args}) ->
+    %% Tail-call to current function, f(e0..en). Compile to
+    %%      [ let xi = ei ]
+    %%      [ STORE argi xi ]
+    %%      jump 0
+    {Vars, Code, _Env} =
+        lists:foldl(fun(Arg, {Is, Acc, Env1}) ->
+                        {I, Env2} = bind_local("_", Env1),
+                        ArgCode   = to_scode(notail(Env2), Arg),
+                        Acc1 = [Acc, ArgCode,
+                                aeb_fate_ops:store({var, I}, ?a)],
+                        {[I | Is], Acc1, Env2}
+                    end, {[], [], Env}, Args),
+    [ Code,
+      [ aeb_fate_ops:store({arg, I}, {var, J})
+        || {I, J} <- lists:zip(lists:seq(0, length(Vars) - 1),
+                               lists:reverse(Vars)) ],
+      loop ];
 to_scode(Env, {def, Fun, Args}) ->
     FName = make_function_id(Fun),
     Lbl   = aeb_fate_data:make_string(FName),
@@ -662,12 +681,15 @@ pp_ann(Ind, [{i, #{ live_in := In, live_out := Out }, I} | Code]) ->
     Fmt = fun([]) -> "()";
              (Xs) -> string:join([lists:concat(["var", N]) || {var, N} <- Xs], " ")
           end,
-    Op  = [Ind, aeb_fate_pp:format_op(I, #{})],
+    Op  = [Ind, pp_op(I)],
     Ann = [["   % ", Fmt(In), " -> ", Fmt(Out)] || In ++ Out /= []],
     [io_lib:format("~-40s~s\n", [Op, Ann]),
      pp_ann(Ind, Code)];
 pp_ann(_, []) -> [].
 
+pp_op(loop) -> "LOOP";
+pp_op(I)    ->
+    aeb_fate_pp:format_op(I, #{}).
 
 pp_arg(?i(I))    -> io_lib:format("~w", [I]);
 pp_arg({arg, N}) -> io_lib:format("arg~p", [N]);
@@ -734,6 +756,7 @@ attributes(I) ->
     Pure   = fun(W, R) -> Attr(W, R, true) end,
     Impure = fun(W, R) -> Attr(W, R, false) end,
     case I of
+        loop                                  -> Impure(pc, []);
         'RETURN'                              -> Impure(pc, []);
         {'RETURNR', A}                        -> Impure(pc, A);
         {'CALL', _}                           -> Impure(?a, []);
@@ -1503,7 +1526,8 @@ split_calls(Ref, [], Acc, Blocks) ->
 split_calls(Ref, [I | Code], Acc, Blocks) when element(1, I) == 'CALL';
                                                element(1, I) == 'CALL_R';
                                                element(1, I) == 'CALL_GR';
-                                               element(1, I) == 'jumpif' ->
+                                               element(1, I) == 'jumpif';
+                                               I == loop ->
     split_calls(make_ref(), Code, [], [{Ref, lists:reverse([I | Acc])} | Blocks]);
 split_calls(Ref, [{'ABORT', _} = I | _Code], Acc, Blocks) ->
     lists:reverse([{Ref, lists:reverse([I | Acc])} | Blocks]);
@@ -1516,7 +1540,8 @@ split_calls(Ref, [I | Code], Acc, Blocks) ->
 
 set_labels(Labels, {Ref, Code}) when is_reference(Ref) ->
     {maps:get(Ref, Labels), [ set_labels(Labels, I) || I <- Code ]};
-set_labels(Labels, {jump, Ref})   -> aeb_fate_ops:jump(maps:get(Ref, Labels));
+set_labels(_Labels, loop)              -> aeb_fate_ops:jump(0);
+set_labels(Labels, {jump, Ref})        -> aeb_fate_ops:jump(maps:get(Ref, Labels));
 set_labels(Labels, {jumpif, Arg, Ref}) -> aeb_fate_ops:jumpif(Arg, maps:get(Ref, Labels));
 set_labels(Labels, {switch, Arg, Refs}) ->
     case [ maps:get(Ref, Labels) || Ref <- Refs ] of
