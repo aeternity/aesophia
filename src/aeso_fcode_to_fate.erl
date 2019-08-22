@@ -936,11 +936,20 @@ simpl_s({switch, Arg, Type, Alts, Def}, Options) ->
     {switch, Arg, Type, [simplify(A, Options) || A <- Alts], simplify(Def, Options)};
 simpl_s(I, _) -> I.
 
-simpl_top(I, Code, Options) ->
-    apply_rules(rules(), I, Code, Options).
+%% Safe-guard against loops in the rewriting. Shouldn't happen so throw an
+%% error if we run out.
+-define(SIMPL_FUEL, 5000).
 
-apply_rules(Rules, I, Code, Options) ->
-    Cons = fun(X, Xs) -> simpl_top(X, Xs, Options) end,
+simpl_top(I, Code, Options) ->
+    simpl_top(?SIMPL_FUEL, I, Code, Options).
+
+simpl_top(0, I, Code, _Options) ->
+    error({out_of_fuel, I, Code});
+simpl_top(Fuel, I, Code, Options) ->
+    apply_rules(Fuel, rules(), I, Code, Options).
+
+apply_rules(Fuel, Rules, I, Code, Options) ->
+    Cons = fun(X, Xs) -> simpl_top(Fuel - 1, X, Xs, Options) end,
     case apply_rules_once(Rules, I, Code) of
         false -> [I | Code];
         {RName, New, Rest} ->
@@ -968,6 +977,7 @@ merge_rules() ->
 rules() ->
     merge_rules() ++
     [?RULE(r_swap_push),
+     ?RULE(r_swap_pop),
      ?RULE(r_swap_write),
      ?RULE(r_constant_propagation),
      ?RULE(r_prune_impossible_branches),
@@ -1005,11 +1015,12 @@ inline_push(Ann1, Arg, Stack, [{i, Ann2, I} = AI | Code], Acc) ->
                     {As0, As1} = split_stack_arg(Stack, As),
                     Acc1 = [{i, merge_ann(Ann1, Ann2), from_op_view(Op, R, As0 ++ [Arg] ++ As1)} | Acc],
                     {lists:reverse(Acc1), Code};
-                false ->
+                false when Arg /= R ->
                     {AI1, {i, Ann1b, _}} = swap_instrs({i, Ann1, {'STORE', ?a, Arg}}, AI),
-                    inline_push(Ann1b, Arg, Stack + Produces - Consumes, Code, [AI1 | Acc])
+                    inline_push(Ann1b, Arg, Stack + Produces - Consumes, Code, [AI1 | Acc]);
+                false -> false
             end;
-        false -> false
+        _ -> false
     end;
 inline_push(_, _, _, _, _) -> false.
 
@@ -1021,15 +1032,41 @@ split_stack_arg(N, [A | As], Acc) ->
             true    -> N end,
     split_stack_arg(N1, As, [A | Acc]).
 
-%% Move PUSH A past non-stack instructions.
-r_swap_push(Push = {i, _, {'STORE', ?a, _}}, [I | Code]) ->
-    case independent(Push, I) of
-        true ->
-            {I1, Push1} = swap_instrs(Push, I),
-            {[I1, Push1], Code};
-        false -> false
+%% Move PUSHes past non-stack instructions.
+r_swap_push(Push = {i, _, PushI}, [I | Code]) ->
+    case op_view(PushI) of
+        {_, ?a, _} ->
+            case independent(Push, I) of
+                true ->
+                    {I1, Push1} = swap_instrs(Push, I),
+                    {[I1, Push1], Code};
+                false -> false
+            end;
+        _ -> false
     end;
 r_swap_push(_, _) -> false.
+
+%% Move non-stack instruction past POPs.
+r_swap_pop(IA = {i, _, I}, [JA = {i, _, J} | Code]) ->
+    case independent(IA, JA) of
+        true ->
+            case {op_view(I), op_view(J)} of
+                {false, _} -> false;
+                {_, false} -> false;
+                {{_, IR, IAs}, {_, RJ, JAs}} ->
+                    NonStackI = not lists:member(?a, [IR | IAs]),
+                    %% RJ /= ?a to not conflict with r_swap_push
+                    PopJ      = RJ /= ?a andalso lists:member(?a, JAs),
+                    case NonStackI andalso PopJ of
+                        false -> false;
+                        true  ->
+                            {JA1, IA1} = swap_instrs(IA, JA),
+                            {[JA1, IA1], Code}
+                    end
+            end;
+        false -> false
+    end;
+r_swap_pop(_, _) -> false.
 
 %% Match up writes to variables with instructions further down.
 r_swap_write(I = {i, _, _}, [J | Code]) ->
@@ -1166,6 +1203,8 @@ r_float_switch_body(I = {i, _, _}, [switch_body | Code]) ->
 r_float_switch_body(_, _) -> false.
 
 %% Inline stores
+r_inline_store({i, _, {'STORE', R, R}}, Code) ->
+    {[], Code};
 r_inline_store(I = {i, _, {'STORE', R = {var, _}, A}}, Code) ->
     %% Not when A is var unless updating the annotations properly.
     Inline = case A of
@@ -1258,9 +1297,13 @@ unannotate(Code) when is_list(Code) ->
 unannotate({i, _Ann, I}) -> [I].
 
 %% Desugar and specialize
-desugar({'ADD', ?a, ?i(1), ?a})     -> [aeb_fate_ops:inc()];
-desugar({'SUB', ?a, ?a, ?i(1)})     -> [aeb_fate_ops:dec()];
-desugar({'STORE', ?a, A})           -> [aeb_fate_ops:push(A)];
+desugar({'ADD', ?a, ?i(1), ?a}) -> [aeb_fate_ops:inc()];
+desugar({'ADD', A,  ?i(1), A})  -> [aeb_fate_ops:inc(A)];
+desugar({'ADD', ?a, ?a, ?i(1)}) -> [aeb_fate_ops:inc()];
+desugar({'ADD', A,  A,  ?i(1)}) -> [aeb_fate_ops:inc(A)];
+desugar({'SUB', ?a, ?a, ?i(1)}) -> [aeb_fate_ops:dec()];
+desugar({'SUB', A, A, ?i(1)})   -> [aeb_fate_ops:dec(A)];
+desugar({'STORE', ?a, A})       -> [aeb_fate_ops:push(A)];
 desugar({switch, Arg, Type, Alts, Def}) ->
     [{switch, Arg, Type, [desugar(A) || A <- Alts], desugar(Def)}];
 desugar(missing) -> missing;
