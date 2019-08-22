@@ -130,12 +130,10 @@ debug(Tag, Options, Fmt, Args) ->
 %% @doc Main entry point.
 compile(FCode, Options) ->
     #{ contract_name := ContractName,
-       state_type    := StateType,
        functions     := Functions } = FCode,
     SFuns  = functions_to_scode(ContractName, Functions, Options),
     SFuns1 = optimize_scode(SFuns, Options),
-    SFuns2 = add_default_init_function(SFuns1, StateType),
-    FateCode = to_basic_blocks(SFuns2),
+    FateCode = to_basic_blocks(SFuns1),
     debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
     FateCode.
 
@@ -194,21 +192,6 @@ type_to_scode({tvar, X}) ->
             put(?tvars, {I + 1, Vars#{ X => I }}),
             {tvar, I};
         J -> {tvar, J}
-    end.
-
-add_default_init_function(SFuns, StateType) when StateType /= {tuple, []} ->
-    %% Only add default if the type is unit.
-    SFuns;
-add_default_init_function(SFuns, {tuple, []}) ->
-    %% Only add default if the init function is not present
-    InitName = make_function_name({entrypoint, <<"init">>}),
-    case maps:find(InitName, SFuns) of
-        {ok, _} ->
-            SFuns;
-        error ->
-            Sig = {[], {tuple, []}},
-            Body = [tuple(0)],
-            SFuns#{ InitName => {[], Sig, Body} }
     end.
 
 %% -- Phase I ----------------------------------------------------------------
