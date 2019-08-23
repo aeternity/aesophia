@@ -118,9 +118,12 @@
 
 %% -- Debugging --------------------------------------------------------------
 
-debug(Tag, Options, Fmt, Args) ->
+is_debug(Tag, Options) ->
     Tags = proplists:get_value(debug, Options, []),
-    case Tags == all orelse lists:member(Tag, Tags) of
+    Tags == all orelse lists:member(Tag, Tags).
+
+debug(Tag, Options, Fmt, Args) ->
+    case is_debug(Tag, Options) of
         true  -> io:format(Fmt, Args);
         false -> ok
     end.
@@ -976,7 +979,12 @@ apply_rules(Fuel, Rules, I, Code, Options) ->
     case apply_rules_once(Rules, I, Code) of
         false -> [I | Code];
         {RName, New, Rest} ->
-            debug(opt_rules, Options, "  Applied ~p:\n~s  ==>\n~s\n", [RName, pp_ann("    ", [I | Code]), pp_ann("    ", New ++ Rest)]),
+            case is_debug(opt_rules, Options) of
+                true ->
+                    {OldCode, NewCode} = drop_common_suffix([I | Code], New ++ Rest),
+                    debug(opt_rules, Options, "  Applied ~p:\n~s  ==>\n~s\n", [RName, pp_ann("    ", OldCode), pp_ann("    ", NewCode)]);
+                false -> ok
+            end,
             lists:foldr(Cons, Rest, New)
     end.
 
@@ -1555,4 +1563,12 @@ set_labels(_, I) -> I.
 
 with_ixs(Xs) ->
     lists:zip(lists:seq(0, length(Xs) - 1), Xs).
+
+drop_common_suffix(Xs, Ys) ->
+    drop_common_suffix_r(lists:reverse(Xs), lists:reverse(Ys)).
+
+drop_common_suffix_r([X | Xs], [X | Ys]) ->
+    drop_common_suffix_r(Xs, Ys);
+drop_common_suffix_r(Xs, Ys) ->
+    {lists:reverse(Xs), lists:reverse(Ys)}.
 
