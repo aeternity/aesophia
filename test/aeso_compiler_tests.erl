@@ -76,8 +76,7 @@ check_errors(Expect, ErrorString) ->
 
 compile(Backend, Name) ->
     compile(Backend, Name,
-            [{include, {file_system, [aeso_test_utils:contract_path()]}}]
-            ++ [no_implicit_stdlib || not wants_stdlib(Name)]).
+            [{include, {file_system, [aeso_test_utils:contract_path()]}}]).
 
 compile(Backend, Name, Options) ->
     String = aeso_test_utils:read_contract(Name),
@@ -375,12 +374,3 @@ failing_contracts() ->
       ]}
     ].
 
-wants_stdlib(Name) ->
-    lists:member
-      (Name,
-       [ "stdlib_include",
-         "list_comp",
-         "list_comp_not_a_list",
-         "list_comp_if_not_bool",
-         "list_comp_bad_shadow"
-       ]).

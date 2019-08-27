@@ -15,7 +15,7 @@ simple_contracts_test_() ->
             ?assertMatch(
                 [{contract, _, {con, _, "Identity"},
                     [{letfun, _, {id, _, "id"}, [{arg, _, {id, _, "x"}, {id, _, "_"}}], {id, _, "_"},
-                        {id, _, "x"}}]}], parse_string(Text, [no_implicit_stdlib])),
+                        {id, _, "x"}}]}], parse_string(Text)),
             ok
        end},
       {"Operator precedence test.",
@@ -81,13 +81,13 @@ parse_string(Text, Opts) ->
 
 parse_expr(Text) ->
     [{letval, _, _, _, Expr}] =
-        parse_string("let _ = " ++ Text, [no_implicit_stdlib]),
+        parse_string("let _ = " ++ Text),
     Expr.
 
 round_trip(Text) ->
-    Contract  = parse_string(Text, [no_implicit_stdlib]),
+    Contract  = parse_string(Text),
     Text1     = prettypr:format(aeso_pretty:decls(strip_stdlib(Contract))),
-    Contract1 = parse_string(Text1, [no_implicit_stdlib]),
+    Contract1 = parse_string(Text1),
     NoSrcLoc  = remove_line_numbers(Contract),
     NoSrcLoc1 = remove_line_numbers(Contract1),
     ?assertMatch(NoSrcLoc, diff(NoSrcLoc, NoSrcLoc1)).

@@ -80,11 +80,11 @@ encode_decode_sophia_string(SophiaType, String) ->
            , "  record r = {x : an_alias(int), y : variant}\n"
            , "  datatype variant = Red | Blue(map(string, int))\n"
            , "  entrypoint foo : arg_type => arg_type\n" ],
-    case aeso_compiler:check_call(lists:flatten(Code), "foo", [String], [no_implicit_stdlib]) of
+    case aeso_compiler:check_call(lists:flatten(Code), "foo", [String], []) of
         {ok, _, {[Type], _}, [Arg]} ->
             io:format("Type ~p~n", [Type]),
             Data = encode(Arg),
-            case aeso_compiler:to_sophia_value(Code, "foo", ok, Data, [no_implicit_stdlib]) of
+            case aeso_compiler:to_sophia_value(Code, "foo", ok, Data, []) of
                 {ok, Sophia} ->
                     lists:flatten(io_lib:format("~s", [prettypr:format(aeso_pretty:expr(Sophia))]));
                 {error, Err} ->
@@ -152,7 +152,7 @@ oracle_test() ->
         "    Oracle.get_question(o, q)\n",
     {ok, _, {[word, word], {list, string}}, [16#123, 16#456]} =
         aeso_compiler:check_call(Contract, "question", ["ok_111111111111111111111111111111ZrdqRz9",
-                                                        "oq_1111111111111111111111111111113AFEFpt5"], [no_implicit_stdlib]),
+                                                        "oq_1111111111111111111111111111113AFEFpt5"], []),
 
     ok.
 
@@ -162,7 +162,7 @@ permissive_literals_fail_test() ->
         "  stateful entrypoint haxx(o : oracle(list(string), option(int))) =\n"
         "    Chain.spend(o, 1000000)\n",
         {error, <<"Type errors\nCannot unify", _/binary>>} =
-            aeso_compiler:check_call(Contract, "haxx", ["#123"], [no_implicit_stdlib]),
+            aeso_compiler:check_call(Contract, "haxx", ["#123"], []),
     ok.
 
 encode_decode_calldata(FunName, Types, Args) ->
@@ -173,8 +173,8 @@ encode_decode_calldata(FunName, Types, Args, RetType) ->
     encode_decode_calldata_(Code, FunName, Args, RetType).
 
 encode_decode_calldata_(Code, FunName, Args, RetVMType) ->
-    {ok, Calldata} = aeso_compiler:create_calldata(Code, FunName, Args, [no_implicit_stdlib]),
-    {ok, _, {ArgTypes, RetType}, _} = aeso_compiler:check_call(Code, FunName, Args, [{backend, aevm}, no_implicit_stdlib]),
+    {ok, Calldata} = aeso_compiler:create_calldata(Code, FunName, Args, []),
+    {ok, _, {ArgTypes, RetType}, _} = aeso_compiler:check_call(Code, FunName, Args, [{backend, aevm}]),
     ?assertEqual(RetType, RetVMType),
     CalldataType = {tuple, [word, {tuple, ArgTypes}]},
     {ok, {_Hash, ArgTuple}} = aeb_heap:from_binary(CalldataType, Calldata),
@@ -182,7 +182,7 @@ encode_decode_calldata_(Code, FunName, Args, RetVMType) ->
         "init" ->
             ok;
         _ ->
-            {ok, _ArgTypes, ValueASTs} = aeso_compiler:decode_calldata(Code, FunName, Calldata, [no_implicit_stdlib]),
+            {ok, _ArgTypes, ValueASTs} = aeso_compiler:decode_calldata(Code, FunName, Calldata, []),
             Values = [ prettypr:format(aeso_pretty:expr(V)) || V <- ValueASTs ],
             ?assertMatch({X, X}, {Args, Values})
     end,

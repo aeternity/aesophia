@@ -36,7 +36,6 @@
                 | pp_assembler
                 | pp_bytecode
                 | no_code
-                | no_implicit_stdlib
                 | {backend, aevm | fate}
                 | {include, {file_system, [string()]} |
                             {explicit_files, #{string() => binary()}}}
@@ -308,7 +307,7 @@ to_sophia_value(_, _, revert, Data, Options) ->
             {ok, {app, [], {id, [], "abort"}, [{string, [], Err}]}}
     end;
 to_sophia_value(ContractString, FunName, ok, Data, Options0) ->
-    Options = [no_implicit_stdlib, no_code | Options0],
+    Options = [no_code | Options0],
     try
         Code = string_to_code(ContractString, Options),
         #{ typed_ast := TypedAst, type_env  := TypeEnv} = Code,
@@ -369,7 +368,7 @@ create_calldata(Code, Fun, Args) ->
                              {ok, binary()}
                              | {error, term()}.
 create_calldata(Code, Fun, Args, Options0) ->
-    Options = [no_implicit_stdlib, no_code | Options0],
+    Options = [no_code | Options0],
     case proplists:get_value(backend, Options, aevm) of
         aevm ->
             case check_call(Code, Fun, Args, Options) of
@@ -392,7 +391,7 @@ decode_calldata(ContractString, FunName, Calldata) ->
     decode_calldata(ContractString, FunName, Calldata, [{backend, aevm}]).
 
 decode_calldata(ContractString, FunName, Calldata, Options0) ->
-    Options = [no_implicit_stdlib, no_code | Options0],
+    Options = [no_code | Options0],
     try
         Code = string_to_code(ContractString, Options),
         #{ typed_ast := TypedAst, type_env  := TypeEnv} = Code,
