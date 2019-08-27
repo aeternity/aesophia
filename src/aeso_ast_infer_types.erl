@@ -767,7 +767,9 @@ check_type(Env, Type = {fun_t, Ann, NamedArgs, Args, Ret}, Arity) ->
     {fun_t, Ann, NamedArgs1, Args1, Ret1};
 check_type(_Env, Type = {uvar, _, _}, Arity) ->
     ensure_base_type(Type, Arity),
-    Type.
+    Type;
+check_type(_Env, {args_t, Ann, Ts}, _) ->
+    type_error({new_tuple_syntax, Ann, Ts}).
 
 ensure_base_type(Type, Arity) ->
     [ type_error({wrong_type_arguments, Type, Arity, 0}) || Arity /= 0 ],
@@ -2222,6 +2224,9 @@ pp_error({contract_has_no_entrypoints, Con}) ->
                   "'function'.\n", [pp_expr("", Con), pp_loc(Con)]);
 pp_error({unbound_type, Type}) ->
     io_lib:format("Unbound type ~s (at ~s).\n", [pp_type("", Type), pp_loc(Type)]);
+pp_error({new_tuple_syntax, Ann, Ts}) ->
+    io_lib:format("Invalid type\n~s  (at ~s)\nThe syntax of tuple types changed in Sophia version 4.0. Did you mean\n~s\n",
+                  [pp_type("  ", {args_t, Ann, Ts}), pp_loc(Ann), pp_type("  ", {tuple_t, Ann, Ts})]);
 pp_error(Err) ->
     io_lib:format("Unknown error: ~p\n", [Err]).
 

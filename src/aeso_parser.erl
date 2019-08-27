@@ -150,7 +150,7 @@ type() -> ?LAZY_P(type100()).
 type100() -> type200().
 
 type200() ->
-    ?RULE(many({fun_domain(), keyword('=>')}), type300(), fun_t(_1, _2)).
+    ?RULE(many({type300(), keyword('=>')}), type300(), fun_t(_1, _2)).
 
 type300() ->
     ?RULE(sep1(type400(), tok('*')), tuple_t(get_ann(lists:nth(1, _1)), _1)).
@@ -169,16 +169,15 @@ type400() ->
 typeAtom() ->
     ?LAZY_P(choice(
     [ parens(type())
+    , args_t()
     , id(), token(con), token(qcon), token(qid), tvar()
     ])).
 
-fun_domain() -> ?LAZY_P(choice(
-    [ ?RULE(tok('('), tok(')'), [])
-      %% Note avoidance of ambiguity: `(int)` can be treated as:
-      %% - literally `int`
-      %% - list of arguments with just one element – int. This approach is dropped.
-    , ?RULE(tok('('), type(), tok(','), sep1(type(), tok(',')), tok(')'), [_2|_4])
-    , ?RULE(type300(), [_1])
+args_t() ->
+    ?LAZY_P(choice(
+    [ ?RULE(tok('('), tok(')'), {args_t, get_ann(_1), []})
+      %% Singleton case handled separately
+    , ?RULE(tok('('), type(), tok(','), sep1(type(), tok(',')), tok(')'), {args_t, get_ann(_1), [_2|_4]})
     ])).
 
 %% -- Statements -------------------------------------------------------------
@@ -501,7 +500,8 @@ tuple_t(_Ann, [Type]) -> Type;  %% Not a tuple
 tuple_t(Ann, Types)   -> {tuple_t, Ann, Types}.
 
 fun_t(Domains, Type) ->
-    lists:foldr(fun({Dom, Ann}, T) -> {fun_t, Ann, [], Dom, T} end,
+    lists:foldr(fun({{args_t, _, Dom}, Ann}, T) -> {fun_t, Ann, [], Dom, T};
+                    ({Dom, Ann}, T)             -> {fun_t, Ann, [], [Dom], T} end,
                 Type, Domains).
 
 tuple_e(_Ann, [Expr]) -> Expr;  %% Not a tuple
