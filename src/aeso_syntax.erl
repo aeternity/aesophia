@@ -105,9 +105,9 @@
      | id() | qid() | con() | qcon()
      | constant().
 
--type comprehension_exp() :: [{ comprehension_bind, ann(), id(), expr()}
-                             | {comprehension_if, expr()}
-                             | letbind()].
+-type comprehension_exp() :: [ {comprehension_bind, id(), expr()}
+                             | {comprehension_if, ann(), expr()}
+                             | letbind() ].
 
 -type arg_expr() :: expr() | {named_arg, ann(), id(), expr()}.
 
