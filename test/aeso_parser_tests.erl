@@ -86,11 +86,15 @@ parse_expr(Text) ->
 
 round_trip(Text) ->
     Contract  = parse_string(Text, [no_implicit_stdlib]),
-    Text1     = prettypr:format(aeso_pretty:decls(Contract)),
+    Text1     = prettypr:format(aeso_pretty:decls(strip_stdlib(Contract))),
     Contract1 = parse_string(Text1, [no_implicit_stdlib]),
     NoSrcLoc  = remove_line_numbers(Contract),
     NoSrcLoc1 = remove_line_numbers(Contract1),
     ?assertMatch(NoSrcLoc, diff(NoSrcLoc, NoSrcLoc1)).
+
+strip_stdlib([{namespace, _, {con, _, "ListInternal"}, _} | Decls]) ->
+    strip_stdlib(Decls);
+strip_stdlib(Decls) -> Decls.
 
 remove_line_numbers({line, _L}) -> {line, 0};
 remove_line_numbers({col,  _C}) -> {col, 0};
