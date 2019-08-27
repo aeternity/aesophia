@@ -1352,6 +1352,9 @@ infer_infix({RelOp, As})
     T = fresh_uvar(As),     %% allow any type here, check in ast_to_icode that we have comparison for it
     Bool = {id, As, "bool"},
     {fun_t, As, [], [T, T], Bool};
+infer_infix({'..', As}) ->
+    Int = {id, As, "int"},
+    {fun_t, As, [], [Int, Int], {app_t, As, {id, As, "list"}, [Int]}};
 infer_infix({'::', As}) ->
     ElemType = fresh_uvar(As),
     ListType = {app_t, As, {id, As, "list"}, [ElemType]},

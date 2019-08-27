@@ -523,6 +523,10 @@ ast_body({app, _, {typed, _, {con, _, Name}, _}, Args}, Icode) ->
 ast_body({app, _, {typed, _, {qcon, _, Name}, _}, Args}, Icode) ->
     Tag = aeso_icode:get_constructor_tag(Name, Icode),
     #tuple{cpts = [#integer{value = Tag} | [ ast_body(Arg, Icode) || Arg <- Args ]]};
+ast_body({app, _, {'..', _}, [A, B]}, Icode) ->
+    #funcall
+    { function = #var_ref{ name = ["ListInternal", "from_to"] }
+    , args     = [ast_body(A, Icode), ast_body(B, Icode)] };
 ast_body({app,As,Fun,Args}, Icode) ->
     case aeso_syntax:get_ann(format, As) of
         infix  ->
@@ -541,7 +545,7 @@ ast_body({list_comp, _, Yield, []}, Icode) ->
     #list{elems = [ast_body(Yield, Icode)]};
 ast_body({list_comp, As, Yield, [{comprehension_bind, {typed, Arg, ArgType}, BindExpr}|Rest]}, Icode) ->
     #funcall
-        { function = #var_ref{ name = ["List", "flat_map"] }
+        { function = #var_ref{ name = ["ListInternal", "flat_map"] }
         , args =
               [ #lambda{ args=[#arg{name = ast_id(Arg), type = ast_type(ArgType, Icode)}]
                        , body = ast_body({list_comp, As, Yield, Rest}, Icode)
