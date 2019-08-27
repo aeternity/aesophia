@@ -102,10 +102,8 @@ namespace List =
     []   => reverse(acc)
     h::t => map_(f, t, f(h)::acc)
 
-  function flat_map(f : 'a => list('b), l : list('a)) : list('b) = flat_map_(f, l, [])
-  private function flat_map_(f : 'a => list('b), l : list('a), acc : list('b)) : list('b) = switch(l)
-    []   => reverse(acc)
-    h::t => flat_map_(f, t, reverse(f(h)) ++ acc)
+  function flat_map(f : 'a => list('b), l : list('a)) : list('b) =
+    ListInternal.flat_map(f, l)
 
   function filter(p : 'a => bool, l : list('a)) : list('a) = filter_(p, l, [])
   private function filter_(p : 'a => bool, l : list('a), acc : list('a)) : list('a) = switch(l)

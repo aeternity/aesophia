@@ -1,9 +1,9 @@
 namespace ListInternal =
 
-  private function reverse_(xs : list('a), ys : list('a)) : list('a) =
-    switch(xs)
-      []      => ys
-      x :: xs => reverse_(xs, x :: ys)
+  // -- Flatmap ----------------------------------------------------------------
 
-  function reverse(xs : list('a)) = reverse_(xs, [])
+  function flat_map(f : 'a => list('b), xs : list('a)) : list('b) =
+    switch(xs)
+      []      => []
+      x :: xs => f(x) ++ flat_map(f, xs)
 
