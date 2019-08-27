@@ -59,6 +59,7 @@
 -type type() :: {fun_t, ann(), [named_arg_t()], [type()], type()}
               | {app_t, ann(), type(), [type()]}
               | {tuple_t, ann(), [type()]}
+              | {args_t, ann(), [type()]}   %% old tuple syntax, old for error messages
               | {bytes_t, ann(), integer() | any}
               | id()  | qid()
               | con() | qcon()  %% contracts
