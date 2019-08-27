@@ -551,7 +551,10 @@ bad_expr_err(Reason, E) ->
 %% -- Helper functions -------------------------------------------------------
 
 expand_includes(AST, Included, Opts) ->
-    expand_includes(AST, Included, [], Opts).
+    Ann  = [{origin, system}],
+    AST1 = [ {include, Ann, {string, Ann, File}}
+             || File <- lists:usort(auto_imports(AST)) ] ++ AST,
+    expand_includes(AST1, Included, [], Opts).
 
 expand_includes([], _Included, Acc, _Opts) ->
     {ok, lists:reverse(Acc)};
@@ -611,3 +614,11 @@ hash_include(File, Code) when is_binary(File) ->
     hash_include(binary_to_list(File), Code);
 hash_include(File, Code) when is_list(File) ->
     {filename:basename(File), crypto:hash(sha256, Code)}.
+
+auto_imports({comprehension_bind, _, _}) -> [<<"ListInternal.aes">>];
+auto_imports({'..', _})                  -> [<<"ListInternal.aes">>];
+auto_imports(L) when is_list(L) ->
+    lists:flatmap(fun auto_imports/1, L);
+auto_imports(T) when is_tuple(T) ->
+    auto_imports(tuple_to_list(T));
+auto_imports(_) -> [].
