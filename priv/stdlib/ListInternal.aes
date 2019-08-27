@@ -1,0 +1,9 @@
+namespace ListInternal =
+
+  private function reverse_(xs : list('a), ys : list('a)) : list('a) =
+    switch(xs)
+      []      => ys
+      x :: xs => reverse_(xs, x :: ys)
+
+  function reverse(xs : list('a)) = reverse_(xs, [])
+

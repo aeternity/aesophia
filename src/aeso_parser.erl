@@ -549,12 +549,13 @@ bad_expr_err(Reason, E) ->
                             prettypr:nest(2, aeso_pretty:expr(E))])).
 
 %% -- Helper functions -------------------------------------------------------
+
 expand_includes(AST, Included, Opts) ->
     expand_includes(AST, Included, [], Opts).
 
 expand_includes([], _Included, Acc, _Opts) ->
     {ok, lists:reverse(Acc)};
-expand_includes([{include, Ann, {string, SAnn, File}} | AST], Included, Acc, Opts) ->
+expand_includes([{include, Ann, {string, _SAnn, File}} | AST], Included, Acc, Opts) ->
     case get_include_code(File, Ann, Opts) of
         {ok, Code} ->
             Hashed = hash_include(File, Code),
@@ -564,10 +565,7 @@ expand_includes([{include, Ann, {string, SAnn, File}} | AST], Included, Acc, Opt
                     Included1 = sets:add_element(Hashed, Included),
                     case string(Code, Included1, Opts1) of
                         {ok, AST1} ->
-                            Dependencies = [ {include, Ann, {string, SAnn, Dep}}
-                                             || Dep <- aeso_stdlib:dependencies(File)
-                                           ],
-                            expand_includes(Dependencies ++ AST1 ++ AST, Included1, Acc, Opts);
+                            expand_includes(AST1 ++ AST, Included1, Acc, Opts);
                         Err = {error, _} ->
                             Err
                     end;
@@ -593,12 +591,15 @@ read_file(File, Opts) ->
             end
     end.
 
+stdlib_options() ->
+    [{include, {file_system, [aeso_stdlib:stdlib_include_path()]}}].
+
 get_include_code(File, Ann, Opts) ->
-    case {read_file(File, Opts), maps:find(File, aeso_stdlib:stdlib())} of
+    case {read_file(File, Opts), read_file(File, stdlib_options())} of
         {{ok, _}, {ok,_ }} ->
             return_error(ann_pos(Ann), "Illegal redefinition of standard library " ++ File);
-        {_, {ok, Lib}} ->
-            {ok, Lib};
+        {_, {ok, Bin}} ->
+            {ok, binary_to_list(Bin)};
         {{ok, Bin}, _} ->
             {ok, binary_to_list(Bin)};
         {_, _} ->
