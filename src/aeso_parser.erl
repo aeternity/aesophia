@@ -566,7 +566,7 @@ expand_includes([{include, Ann, {string, _SAnn, File}} | AST], Included, Acc, Op
                 false ->
                     Opts1 = lists:keystore(src_file, 1, Opts, {src_file, File}),
                     Included1 = sets:add_element(Hashed, Included),
-                    case string(Code, Included1, Opts1) of
+                    case parse_and_scan(file(), Code, Opts1) of
                         {ok, AST1} ->
                             expand_includes(AST1 ++ AST, Included1, Acc, Opts);
                         Err = {error, _} ->
