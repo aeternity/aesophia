@@ -23,11 +23,6 @@ namespace List =
     []   => None
     h::t => if(p(h)) Some(h) else find(p, t)
 
-  function find_all(p : 'a => bool, l : list('a)) : list('a) = find_all_(p, l, [])
-  private function find_all_(p : 'a => bool, l : list('a), acc : list('a)) : list('a) = switch(l)
-    []   => reverse(acc)
-    h::t => find_all_(p, t, if(p(h)) h::acc else acc)
-
   function find_indices(p : 'a => bool, l : list('a)) : list(int) = find_indices_(p, l, 0, [])
   private function find_indices_( p : 'a => bool
                                 , l : list('a)
