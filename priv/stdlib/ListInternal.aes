@@ -1,0 +1,16 @@
+namespace ListInternal =
+
+  // -- Flatmap ----------------------------------------------------------------
+
+  function flat_map(f : 'a => list('b), xs : list('a)) : list('b) =
+    switch(xs)
+      []      => []
+      x :: xs => f(x) ++ flat_map(f, xs)
+
+  // -- From..to ---------------------------------------------------------------
+
+  function from_to(a : int, b : int) : list(int) = from_to_(a, b, [])
+
+  private function from_to_(a, b, acc) =
+    if (a > b) acc else from_to_(a, b - 1, b :: acc)
+

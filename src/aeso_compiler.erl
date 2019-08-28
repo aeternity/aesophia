@@ -36,7 +36,6 @@
                 | pp_assembler
                 | pp_bytecode
                 | no_code
-                | no_implicit_stdlib
                 | {backend, aevm | fate}
                 | {include, {file_system, [string()]} |
                             {explicit_files, #{string() => binary()}}}
@@ -142,16 +141,7 @@ from_string1(fate, ContractString, Options) ->
 
 -spec string_to_code(string(), options()) -> map().
 string_to_code(ContractString, Options) ->
-    Ast = case lists:member(no_implicit_stdlib, Options) of
-              true -> parse(ContractString, Options);
-              false ->
-                  IncludedSTD = sets:from_list(
-                                  [aeso_parser:hash_include(F, C)
-                                   || {F, C} <- aeso_stdlib:stdlib_list()]),
-                  InitAst = parse(ContractString, IncludedSTD, Options),
-                  STD = parse_stdlib(),
-                  STD ++ InitAst
-          end,
+    Ast = parse(ContractString, Options),
     pp_sophia_code(Ast, Options),
     pp_ast(Ast, Options),
     {TypeEnv, TypedAst} = aeso_ast_infer_types:infer(Ast, [return_env]),
@@ -317,7 +307,7 @@ to_sophia_value(_, _, revert, Data, Options) ->
             {ok, {app, [], {id, [], "abort"}, [{string, [], Err}]}}
     end;
 to_sophia_value(ContractString, FunName, ok, Data, Options0) ->
-    Options = [no_implicit_stdlib, no_code | Options0],
+    Options = [no_code | Options0],
     try
         Code = string_to_code(ContractString, Options),
         #{ typed_ast := TypedAst, type_env  := TypeEnv} = Code,
@@ -378,7 +368,7 @@ create_calldata(Code, Fun, Args) ->
                              {ok, binary()}
                              | {error, term()}.
 create_calldata(Code, Fun, Args, Options0) ->
-    Options = [no_implicit_stdlib, no_code | Options0],
+    Options = [no_code | Options0],
     case proplists:get_value(backend, Options, aevm) of
         aevm ->
             case check_call(Code, Fun, Args, Options) of
@@ -401,7 +391,7 @@ decode_calldata(ContractString, FunName, Calldata) ->
     decode_calldata(ContractString, FunName, Calldata, [{backend, aevm}]).
 
 decode_calldata(ContractString, FunName, Calldata, Options0) ->
-    Options = [no_implicit_stdlib, no_code | Options0],
+    Options = [no_code | Options0],
     try
         Code = string_to_code(ContractString, Options),
         #{ typed_ast := TypedAst, type_env  := TypeEnv} = Code,
@@ -578,15 +568,6 @@ pp(Code, Options, Option, PPFun) ->
     end.
 
 %% -------------------------------------------------------------------
-
--spec parse_stdlib() -> none() | aeso_syntax:ast().
-parse_stdlib() ->
-    lists:foldr(
-      fun ({Lib, LibCode}, Acc) ->
-              parse(LibCode, [{src_file, binary_to_list(Lib)}]) ++ Acc
-      end,
-      [],
-      aeso_stdlib:stdlib_list()).
 
 sophia_type_to_typerep(String) ->
     {ok, Ast} = aeso_parser:type(String),

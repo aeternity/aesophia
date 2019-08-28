@@ -1,5 +1,4 @@
-// This contract should be compiled with no_implicit_stdlib option.
-// It should include Lists.aes implicitly however, because Option.aes depends on it.
+// This should include Lists.aes implicitly, since Option.aes does.
 include "Option.aes"
 
 contract Test =

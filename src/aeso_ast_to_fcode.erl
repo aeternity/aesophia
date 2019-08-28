@@ -453,12 +453,16 @@ expr_to_fcode(Env, _Type, {list, _, Es}) ->
     lists:foldr(fun(E, L) -> {op, '::', [expr_to_fcode(Env, E), L]} end,
                 nil, Es);
 
+expr_to_fcode(Env, _Type, {app, _, {'..', _}, [A, B]}) ->
+    {def_u, FromTo, _} = resolve_fun(Env, ["ListInternal", "from_to"]),
+    {def, FromTo, [expr_to_fcode(Env, A), expr_to_fcode(Env, B)]};
+
 expr_to_fcode(Env, _Type, {list_comp, _, Yield, []}) ->
     {op, '::', [expr_to_fcode(Env, Yield), nil]};
 expr_to_fcode(Env, _Type, {list_comp, As, Yield, [{comprehension_bind, {typed, {id, _, Arg}, _}, BindExpr}|Rest]}) ->
     Env1 = bind_var(Env, Arg),
     Bind = {lam, [Arg], expr_to_fcode(Env1, {list_comp, As, Yield, Rest})},
-    {def_u, FlatMap, _} = resolve_fun(Env, ["List", "flat_map"]),
+    {def_u, FlatMap, _} = resolve_fun(Env, ["ListInternal", "flat_map"]),
     {def, FlatMap, [Bind, expr_to_fcode(Env, BindExpr)]};
 expr_to_fcode(Env, Type, {list_comp, As, Yield, [{comprehension_if, _, Cond}|Rest]}) ->
     make_if(expr_to_fcode(Env, Cond),

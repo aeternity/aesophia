@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Added the `[a..b]` language construct, returning the list of numbers between
+  `a` and `b` (inclusive). Returns the empty list if `a` > `b`.
 ### Changed
 ### Removed
 

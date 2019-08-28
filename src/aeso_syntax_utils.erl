@@ -49,7 +49,7 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
             {type_def, _, I, _, D}   -> Plus(BindType(I), Decl(D));
             {fun_decl, _, _, T}      -> Type(T);
             {letval, _, F, T, E}     -> Sum([BindExpr(F), Type(T), Expr(E)]);
-            {letfun, _, F, Xs, T, E} -> Sum([BindExpr(F), Type(T), Scoped(BindExpr(Xs), Expr(E))]);
+            {letfun, _, F, Xs, T, E} -> Sum([BindExpr(F), Type(T), Expr(Xs ++ [E])]);
             %% typedef()
             {alias_t, T}    -> Type(T);
             {record_t, Fs}  -> Type(Fs);
@@ -74,7 +74,7 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
             {list_comp, _, Y, []}  -> Expr(Y);
             {list_comp, A, Y, [{comprehension_bind, I, E}|R]} ->
                 Plus(Expr(E), Scoped(BindExpr(I), Expr({list_comp, A, Y, R})));
-            {list_comp, A, Y, [{comprehension_if, E}|R]} ->
+            {list_comp, A, Y, [{comprehension_if, _, E}|R]} ->
                 Plus(Expr(E), Expr({list_comp, A, Y, R}));
             {list_comp, A, Y, [D = {letval, _, F, _, _} | R]} ->
                 Plus(Decl(D), Scoped(BindExpr(F), Expr({list_comp, A, Y, R})));
@@ -92,7 +92,7 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
             {field, _, LV, E}    -> Expr([LV, E]);
             {field, _, LV, _, E} -> Expr([LV, E]);
             %% arg()
-            {arg, _, X, T} -> Plus(Expr(X), Type(T));
+            {arg, _, Y, T} -> Plus(BindExpr(Y), Type(T));
             %% alt()
             {'case', _, P, E} -> Scoped(BindExpr(P), Expr(E));
             %% elim()
@@ -124,12 +124,12 @@ used_types([Top] = _CurrentNS, T) ->
 entity_alg() ->
     IsBound = fun({K, _}) -> lists:member(K, [bound_term, bound_type]) end,
     Unbind  = fun(bound_term) -> term; (bound_type) -> type end,
-    Remove  = fun(Keys, Map) -> lists:foldl(fun maps:remove/2, Map, Keys) end,
+    Remove  = fun(Keys, Map) -> maps:without(Keys, Map) end,
     Scoped = fun(Xs, Ys) ->
-                Bound  = [E || E <- maps:keys(Ys), IsBound(E)],
-                Others = Remove(Bound, Ys),
+                Bound  = [E || E <- maps:keys(Xs), IsBound(E)],
                 Bound1 = [ {Unbind(Tag), X} || {Tag, X} <- Bound ],
-                maps:merge(Remove(Bound1, Xs), Others)
+                Others = Remove(Bound1, Ys),
+                maps:merge(Remove(Bound, Xs), Others)
             end,
     #alg{ zero   = #{}
         , plus   = fun maps:merge/2

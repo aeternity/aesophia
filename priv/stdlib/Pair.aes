@@ -1,0 +1,20 @@
+namespace Pair =
+
+  function fst(t : ('a * 'b)) : 'a = switch(t)
+    (x, _) => x
+
+  function snd(t : ('a * 'b)) : 'b = switch(t)
+    (_, y) => y
+
+  function map1(f : 'a => 'c, t : ('a * 'b)) : ('c * 'b) = switch(t)
+    (x, y) => (f(x), y)
+
+  function map2(f : 'b => 'c, t : ('a * 'b)) : ('a * 'c) = switch(t)
+    (x, y) => (x, f(y))
+
+  function bimap(f : 'a => 'c, g : 'b => 'd, t : ('a * 'b)) : ('c * 'd) = switch(t)
+    (x, y) => (f(x), g(y))
+
+  function swap(t : ('a * 'b)) : ('b * 'a) = switch(t)
+    (x, y) => (y, x)
+
