@@ -272,7 +272,7 @@ ast_body(?qid_app(["AENS", "preclaim"], Args, _, _), Icode) ->
 ast_body(?qid_app(["AENS", "claim"], Args, _, _), Icode) ->
     {Sign, [Addr, Name, Salt, NameFee]} = get_signature_arg(Args),
     prim_call(?PRIM_CALL_AENS_CLAIM, #integer{value = 0},
-              [ast_body(Addr, Icode), ast_body(Name, Icode), ast_body(Salt, Icode), ast_body(Sign, Icode), ast_body(NameFee, Icode)],
+              [ast_body(Addr, Icode), ast_body(Name, Icode), ast_body(Salt, Icode), ast_body(NameFee, Icode), ast_body(Sign, Icode)],
               [word, string, word, sign_t(), word], {tuple, []});
 
 ast_body(?qid_app(["AENS", "transfer"], Args, _, _), Icode) ->
