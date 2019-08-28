@@ -1,6 +1,8 @@
 // AENS tests
 contract AENSTest =
 
+  type subnames = map(string, map(string, address))
+
   // Name resolution
 
   stateful entrypoint resolve_word(name : string, key : string) : option(address) =
@@ -53,3 +55,14 @@ contract AENSTest =
                                    sign      : signature) : unit =
     AENS.revoke(owner, name, signature = sign)
 
+
+  stateful entrypoint subname(owner    : address,
+                              name     : string,
+                              subnames : subnames) : unit =
+    AENS.subname(owner, name, subnames)
+
+  stateful entrypoint signedSubname(owner    : address,
+                                    name     : string,
+                                    subnames : subnames,
+                                    sign     : signature) : unit =
+    AENS.subname(owner, name, subnames, signature = sign)

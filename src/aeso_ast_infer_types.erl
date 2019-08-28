@@ -445,7 +445,8 @@ global_env() ->
                       {"preclaim", SignFun([Address, Hash], Unit)},
                       {"claim",    SignFun([Address, String, Int], Unit)},
                       {"transfer", SignFun([Address, Address, String], Unit)},
-                      {"revoke",   SignFun([Address, String], Unit)}]) },
+                      {"revoke",   SignFun([Address, String], Unit)},
+                      {"subname",  SignFun([Address, String, Map(Q, Map(K, A))], Unit)}]) },
 
     MapScope = #scope
         { funs = MkDefs(

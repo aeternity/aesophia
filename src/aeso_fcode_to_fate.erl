@@ -566,6 +566,8 @@ builtin_to_scode(Env, aens_transfer, [_Sign, _From, _To, _Name] = Args) ->
 builtin_to_scode(Env, aens_revoke, [_Sign, _Account, _Name] = Args) ->
     call_to_scode(Env, [aeb_fate_ops:aens_revoke(?a, ?a, ?a),
                         tuple(0)], Args);
+builtin_to_scode(Env, aens_subname, [_Sign, _Account, _Name, _Subnames] = Args) ->
+    call_to_scode(Env, [aeb_fate_ops:aens_subname(?a, ?a, ?a, ?a), tuple(0)], Args);
 builtin_to_scode(_Env, auth_tx_hash, []) ->
     [aeb_fate_ops:auth_tx_hash(?a)].
 
@@ -887,6 +889,7 @@ attributes(I) ->
         'AENS_UPDATE'                         -> Impure(none, []);%% TODO
         {'AENS_TRANSFER', A, B, C, D}         -> Impure(none, [A, B, C, D]);
         {'AENS_REVOKE', A, B, C}              -> Impure(none, [A, B, C]);
+        {'AENS_SUBNAME', A, B, C}             -> Impure(none, [A, B, C]);
         {'ABORT', A}                          -> Impure(pc, A);
         {'EXIT', A}                           -> Impure(pc, A);
         'NOP'                                 -> Pure(none, [])
@@ -1571,4 +1574,3 @@ drop_common_suffix_r([X | Xs], [X | Ys]) ->
     drop_common_suffix_r(Xs, Ys);
 drop_common_suffix_r(Xs, Ys) ->
     {lists:reverse(Xs), lists:reverse(Ys)}.
-

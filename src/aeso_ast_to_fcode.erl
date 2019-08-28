@@ -186,7 +186,7 @@ builtins() ->
                               {"respond", 4}, {"extend", 3}, {"get_answer", 2},
                               {"check", 1}, {"check_query", 2}]},
               {["AENS"],     [{"resolve", 2}, {"preclaim", 3}, {"claim", 4}, {"transfer", 4},
-                              {"revoke", 3}]},
+                              {"revoke", 3}, {"subname", 3}]},
               {["Map"],      [{"from_list", 1}, {"to_list", 1}, {"lookup", 2},
                               {"lookup_default", 3}, {"delete", 2}, {"member", 2}, {"size", 1}]},
               {["Crypto"],   [{"verify_sig", 3}, {"verify_sig_secp256k1", 3},
@@ -1555,4 +1555,3 @@ pp_pat(Pat)              -> pp_fexpr(Pat).
 is_infix(Op) ->
     C = hd(atom_to_list(Op)),
     C < $a orelse C > $z.
-

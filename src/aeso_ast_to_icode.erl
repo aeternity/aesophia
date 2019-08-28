@@ -285,11 +285,18 @@ ast_body(?qid_app(["AENS", "revoke"], Args, _, _), Icode) ->
               [ast_body(Addr, Icode), ast_body(Name, Icode), ast_body(Sign, Icode)],
               [word, word, sign_t()], {tuple, []});
 
+ast_body(?qid_app(["AENS", "subname"], Args, _, _), Icode) ->
+    {Sign, [Addr, Name, Subnames]} = get_signature_arg(Args),
+    prim_call(?PRIM_CALL_AENS_SUBNAME, #integer{value = 0},
+              [ast_body(Addr, Icode), ast_body(Name, Icode), ast_body(Subnames, Icode), ast_body(Sign, Icode)],
+              [word, word, word, sign_t()], {tuple, []});
+
 ast_body({qid, _, ["AENS", "resolve"]}, _Icode)  -> gen_error({underapplied_primitive, 'AENS.resolve'});
 ast_body({qid, _, ["AENS", "preclaim"]}, _Icode) -> gen_error({underapplied_primitive, 'AENS.preclaim'});
 ast_body({qid, _, ["AENS", "claim"]}, _Icode)    -> gen_error({underapplied_primitive, 'AENS.claim'});
 ast_body({qid, _, ["AENS", "transfer"]}, _Icode) -> gen_error({underapplied_primitive, 'AENS.transfer'});
 ast_body({qid, _, ["AENS", "revoke"]}, _Icode)   -> gen_error({underapplied_primitive, 'AENS.revoke'});
+ast_body({qid, _, ["AENS", "subname"]}, _Icode)   -> gen_error({underapplied_primitive, 'AENS.subname'});
 
 %% Maps
 
