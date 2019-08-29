@@ -38,13 +38,15 @@ namespace List =
     h::t => find_indices_(p, t, n+1, if(p(h)) n::acc else acc)
 
   function nth(n : int, l : list('a)) : option('a) =
-    if(n < 0) None else switch(l)
+    if(n < 0) None
+    else switch(l)
       []   => None
       h::t => if(n == 0) Some(h) else nth(n-1, t)
 
   /* Unsafe version of `nth` */
   function get(n : int, l : list('a)) : 'a =
-    if(n < 0) abort("Negative index get") else switch(l)
+    if(n < 0) abort("Negative index get")
+    else switch(l)
       [] => abort("Out of index get")
       h::t => if(n == 0) h else get(n-1, t)
 
@@ -88,10 +90,10 @@ namespace List =
     switch(l)
       []   => reverse(x::acc)
       h::t =>
-        if(cmp(x, e)) // x < e
+        if(cmp(x, h)) // x < h
           reverse(acc) ++ (x::l)
         else
-          insert_by(cmp, x, t, e::acc)
+          insert_by_(cmp, x, t, h::acc)
 
 
   function foldr(cons : ('a, 'b) => 'b, nil : 'b, l : list('a)) : 'b = switch(l)
