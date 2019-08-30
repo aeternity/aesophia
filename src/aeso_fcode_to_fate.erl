@@ -41,8 +41,8 @@
 -define(TODO(What), error({todo, ?FILE, ?LINE, ?FUNCTION_NAME, What})).
 
 -define(i(X), {immediate, X}).
--define(a, {stack, 0}).
--define(s, {store, 1}).
+-define(a,    {stack, 0}).
+-define(s(N), {var, -N}).
 -define(void, {var, 9999}).
 
 -record(env, { contract, vars = [], locals = [], current_function, tailpos = true }).
@@ -421,9 +421,9 @@ call_to_scode(Env, CallCode, Args) ->
      CallCode].
 
 builtin_to_scode(_Env, get_state, []) ->
-    [push(?s)];
+    [push(?s(1))];
 builtin_to_scode(Env, set_state, [_] = Args) ->
-    call_to_scode(Env, [{'STORE', ?s, ?a},
+    call_to_scode(Env, [aeb_fate_ops:store(?s(1), ?a),
                         tuple(0)], Args);
 builtin_to_scode(Env, chain_event, Args) ->
     call_to_scode(Env, [erlang:apply(aeb_fate_ops, log, lists:duplicate(length(Args), ?a)),
