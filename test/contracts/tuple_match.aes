@@ -1,6 +1,6 @@
 contract TuplesMatch =
 
-  entrypoint tuplify3() = (t) => switch(t)
+  function tuplify3() = (t) => switch(t)
     (x, y, z) => 3
 
   entrypoint fst(p : int * string) =
