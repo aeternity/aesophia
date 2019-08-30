@@ -304,14 +304,15 @@ typedef_to_fcode(Env, Id = {id, _, Name}, Xs, Def) ->
     FDef = fun(Args) when length(Args) == length(Xs) ->
                 Sub = maps:from_list(lists:zip([X || {tvar, _, X} <- Xs], Args)),
                 case Def of
-                    {record_t, Fields} -> {todo, Xs, Args, record_t, Fields};
+                    {record_t, Fields} ->
+                        {tuple, [type_to_fcode(Env, Sub, T) || {field_t, _, _, T} <- Fields]};
                     {variant_t, Cons}  ->
                         FCons = [ begin
                                       {constr_t, _, _, Ts} = Con,
                                       [type_to_fcode(Env, Sub, T) || T <- Ts]
                                   end || Con <- Cons ],
                         {variant, FCons};
-                    {alias_t, Type}    -> {todo, Xs, Args, alias_t, Type}
+                    {alias_t, Type}    -> type_to_fcode(Env, Sub, Type)
                 end;
               (Args) -> internal_error({type_arity_mismatch, Name, length(Args), length(Xs)})
            end,
