@@ -57,7 +57,7 @@ namespace List =
     _::t => length_(t, acc + 1)
 
 
-  function from_to(a : int, b : int) : list(int) = from_to_(a, b, [])
+  function from_to(a : int, b : int) : list(int) = [a..b]
   private function from_to_(a, b, acc) =
     if (a > b) acc else from_to_(a, b - 1, b :: acc)
 
