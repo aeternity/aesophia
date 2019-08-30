@@ -1327,7 +1327,7 @@ infer_block(Env, _, [E], BlockType) ->
     [check_expr(Env, E, BlockType)];
 infer_block(Env, Attrs, [Def={letfun, Ann, _, _, _, _}|Rest], BlockType) ->
     {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
-    FunT = freshen_type(Ann, typesig_to_fun_t(TypeSig)),
+    FunT = typesig_to_fun_t(TypeSig),
     NewE = bind_var({id, Ann, Name}, FunT, Env),
     [LetFun|infer_block(NewE, Attrs, Rest, BlockType)];
 infer_block(Env, _, [{letval, Attrs, Pattern, Type, E}|Rest], BlockType) ->
