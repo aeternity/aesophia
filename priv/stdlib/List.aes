@@ -56,8 +56,6 @@ namespace List =
 
 
   function from_to(a : int, b : int) : list(int) = [a..b]
-  private function from_to_(a, b, acc) =
-    if (a > b) acc else from_to_(a, b - 1, b :: acc)
 
   function from_to_step(a : int, b : int, s : int) : list(int) = from_to_step_(a, b, s, [])
   private function from_to_step_(a, b, s, acc) =
