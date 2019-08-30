@@ -12,7 +12,7 @@
 
 -module(aeso_ast_infer_types).
 
--export([infer/1, infer/2, infer_constant/1, unfold_types_in_type/3]).
+-export([infer/1, infer/2, unfold_types_in_type/3]).
 
 -type utype() :: {fun_t, aeso_syntax:ann(), named_args_t(), [utype()], utype()}
                | {app_t, aeso_syntax:ann(), utype(), [utype()]}
@@ -598,13 +598,6 @@ check_scope_name_clash(Env, Kind, Name) ->
 infer_contract_top(Env, Kind, Defs0, _Options) ->
     Defs = desugar(Defs0),
     infer_contract(Env, Kind, Defs).
-
-%% TODO: revisit
-infer_constant({letval, Attrs,_Pattern, Type, E}) ->
-    ets_init(), %% Init the ETS table state
-    {typed, _, _, PatType} =
-        infer_expr(global_env(), {typed, Attrs, E, arg_type(Type)}),
-    instantiate(PatType).
 
 %% infer_contract takes a proplist mapping global names to types, and
 %% a list of definitions.
