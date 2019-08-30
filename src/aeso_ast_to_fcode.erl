@@ -282,10 +282,13 @@ decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, {id, _, Name}, Args, R
     Attrs = get_attributes(Ann),
     FName = lookup_fun(Env, qname(Env, Name)),
     FArgs = args_to_fcode(Env, Args),
+    FRet  = type_to_fcode(Env, Ret),
     FBody = expr_to_fcode(Env#{ vars => [X || {X, _} <- FArgs] }, Body),
+    [ ensure_first_order_entrypoint(Ann, FArgs, FRet)
+      || aeso_syntax:get_ann(entrypoint, Ann, false) ],
     Def   = #{ attrs  => Attrs,
                args   => FArgs,
-               return => type_to_fcode(Env, Ret),
+               return => FRet,
                body   => FBody },
     NewFuns = Funs#{ FName => Def },
     Env#{ functions := NewFuns }.
@@ -510,7 +513,7 @@ expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
     end;
 
 %% Function calls
-expr_to_fcode(Env, Type, {app, _Ann, Fun = {typed, _, _, {fun_t, _, NamedArgsT, _, _}}, Args}) ->
+expr_to_fcode(Env, Type, {app, _, Fun = {typed, _, _, {fun_t, _, NamedArgsT, _, _}}, Args}) ->
     Args1 = get_named_args(NamedArgsT, Args),
     FArgs = [expr_to_fcode(Env, Arg) || Arg <- Args1],
     case expr_to_fcode(Env, Fun) of
@@ -524,11 +527,13 @@ expr_to_fcode(Env, Type, {app, _Ann, Fun = {typed, _, _, {fun_t, _, NamedArgsT, 
             %% Get the type of the oracle from the args or the expression itself
             OType = get_oracle_type(B, Type, Args1),
             {oracle, QType, RType} = type_to_fcode(Env, OType),
+            validate_oracle_type(aeso_syntax:get_ann(Fun), QType, RType),
             TypeArgs = [{lit, {typerep, QType}}, {lit, {typerep, RType}}],
             builtin_to_fcode(B, FArgs ++ TypeArgs);
         {builtin_u, B, _} when B =:= aens_resolve ->
             %% Get the type we are assuming the name resolves to
             AensType = type_to_fcode(Env, Type),
+            validate_aens_resolve_type(aeso_syntax:get_ann(Fun), AensType),
             TypeArgs = [{lit, {typerep, AensType}}],
             builtin_to_fcode(B, FArgs ++ TypeArgs);
         {builtin_u, B, _Ar}       -> builtin_to_fcode(B, FArgs);
@@ -603,6 +608,46 @@ get_oracle_type(oracle_get_answer,   _Type, [{typed, _, _Expr, OType} | _])   ->
 get_oracle_type(oracle_check,        _Type, [{typed, _, _Expr, OType}])       -> OType;
 get_oracle_type(oracle_check_query,  _Type, [{typed, _, _Expr, OType} | _])   -> OType;
 get_oracle_type(oracle_respond,      _Type, [_, {typed, _,_Expr, OType} | _]) -> OType.
+
+validate_oracle_type(Ann, QType, RType) ->
+    ensure_monomorphic(QType, {polymorphic_query_type, Ann, QType}),
+    ensure_monomorphic(RType, {polymorphic_response_type, Ann, RType}),
+    ensure_first_order(QType, {higher_order_query_type, Ann, QType}),
+    ensure_first_order(RType, {higher_order_response_type, Ann, RType}),
+    ok.
+
+validate_aens_resolve_type(Ann, {variant, [[], [Type]]}) ->
+    ensure_monomorphic(Type, {polymorphic_aens_resolve, Ann, Type}),
+    ensure_first_order(Type, {higher_order_aens_resolve, Ann, Type}),
+    ok.
+
+ensure_first_order_entrypoint(Ann, Args, Ret) ->
+    [ ensure_first_order(T, {higher_order_entrypoint_argument, Ann, X, T})
+      || {X, T} <- Args ],
+    ensure_first_order(Ret, {higher_order_entrypoint_return, Ann, Ret}),
+    ok.
+
+ensure_monomorphic(Type, Err) ->
+    case is_monomorphic(Type) of
+        true  -> ok;
+        false -> fcode_error(Err)
+    end.
+
+ensure_first_order(Type, Err) ->
+    case is_first_order(Type) of
+        true  -> ok;
+        false -> fcode_error(Err)
+    end.
+
+is_monomorphic({tvar, _})              -> false;
+is_monomorphic(Ts) when is_list(Ts)    -> lists:all(fun is_monomorphic/1, Ts);
+is_monomorphic(Tup) when is_tuple(Tup) -> is_monomorphic(tuple_to_list(Tup));
+is_monomorphic(_)                      -> true.
+
+is_first_order({function, _, _})       -> false;
+is_first_order(Ts) when is_list(Ts)    -> lists:all(fun is_first_order/1, Ts);
+is_first_order(Tup) when is_tuple(Tup) -> is_first_order(tuple_to_list(Tup));
+is_first_order(_)                      -> true.
 
 %% -- Pattern matching --
 
