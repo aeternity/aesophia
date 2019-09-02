@@ -557,8 +557,8 @@ builtin_to_scode(Env, aens_resolve, [_Name, _Key, _Type] = Args) ->
 builtin_to_scode(Env, aens_preclaim, [_Sign, _Account, _Hash] = Args) ->
     call_to_scode(Env, [aeb_fate_ops:aens_preclaim(?a, ?a, ?a),
                         tuple(0)], Args);
-builtin_to_scode(Env, aens_claim, [_Sign, _Account, _NameString, _Salt] = Args) ->
-    call_to_scode(Env, [aeb_fate_ops:aens_claim(?a, ?a, ?a, ?a),
+builtin_to_scode(Env, aens_claim, [_Sign, _Account, _NameString, _Salt, _NameFee] = Args) ->
+    call_to_scode(Env, [aeb_fate_ops:aens_claim(?a, ?a, ?a, ?a, ?a),
                         tuple(0)], Args);
 builtin_to_scode(Env, aens_transfer, [_Sign, _From, _To, _Name] = Args) ->
     call_to_scode(Env, [aeb_fate_ops:aens_transfer(?a, ?a, ?a, ?a),
@@ -883,7 +883,7 @@ attributes(I) ->
         {'ORACLE_QUERY_FEE', A, B}            -> Impure(A, [B]);
         {'AENS_RESOLVE', A, B, C, D}          -> Impure(A, [B, C, D]);
         {'AENS_PRECLAIM', A, B, C}            -> Impure(none, [A, B, C]);
-        {'AENS_CLAIM', A, B, C, D}            -> Impure(none, [A, B, C, D]);
+        {'AENS_CLAIM', A, B, C, D, E}         -> Impure(none, [A, B, C, D, E]);
         'AENS_UPDATE'                         -> Impure(none, []);%% TODO
         {'AENS_TRANSFER', A, B, C, D}         -> Impure(none, [A, B, C, D]);
         {'AENS_REVOKE', A, B, C}              -> Impure(none, [A, B, C]);
@@ -1571,4 +1571,3 @@ drop_common_suffix_r([X | Xs], [X | Ys]) ->
     drop_common_suffix_r(Xs, Ys);
 drop_common_suffix_r(Xs, Ys) ->
     {lists:reverse(Xs), lists:reverse(Ys)}.
-
