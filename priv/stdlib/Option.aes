@@ -19,7 +19,7 @@ namespace Option =
 
   function force(o : option('a)) : 'a = default(abort("Forced None value"), o)
 
-  function on_elem(f : 'a => unit, o : option('a)) : unit = match((), f, o)
+  function on_elem(o : option('a), f : 'a => unit) : unit = match((), f, o)
 
   function map(f : 'a => 'b, o : option('a)) : option('b) = switch(o)
     None => None
