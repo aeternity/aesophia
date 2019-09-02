@@ -151,10 +151,10 @@ ast_to_fcode(Code, Options) ->
     Verbose = lists:member(pp_fcode, Options),
     FCode1 = to_fcode(init_env(Options), Code),
     [io:format("-- Before lambda lifting --\n~s\n\n", [format_fcode(FCode1)]) || Verbose],
-    FCode2 = lambda_lift(FCode1),
-    [ io:format("-- After lambda lifting --\n~s\n\n", [format_fcode(FCode2)]) || Verbose, FCode2 /= FCode1 ],
-    FCode3 = optimize_fcode(FCode2),
-    [ io:format("-- After optimization --\n~s\n\n", [format_fcode(FCode3)]) || Verbose, FCode3 /= FCode2 ],
+    FCode2 = optimize_fcode(FCode1),
+    [ io:format("-- After optimization --\n~s\n\n", [format_fcode(FCode2)]) || Verbose, FCode2 /= FCode1 ],
+    FCode3 = lambda_lift(FCode2),
+    [ io:format("-- After lambda lifting --\n~s\n\n", [format_fcode(FCode3)]) || Verbose, FCode3 /= FCode2 ],
     FCode3.
 
 %% -- Environment ------------------------------------------------------------
