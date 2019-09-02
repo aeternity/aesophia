@@ -150,7 +150,7 @@ type() -> ?LAZY_P(type100()).
 type100() -> type200().
 
 type200() ->
-    ?RULE(many({fun_domain(), keyword('=>')}), type300(), fun_t(_1, _2)).
+    ?RULE(many({type300(), keyword('=>')}), type300(), fun_t(_1, _2)).
 
 type300() ->
     ?RULE(sep1(type400(), tok('*')), tuple_t(get_ann(lists:nth(1, _1)), _1)).
@@ -169,16 +169,15 @@ type400() ->
 typeAtom() ->
     ?LAZY_P(choice(
     [ parens(type())
+    , args_t()
     , id(), token(con), token(qcon), token(qid), tvar()
     ])).
 
-fun_domain() -> ?LAZY_P(choice(
-    [ ?RULE(tok('('), tok(')'), [])
-      %% Note avoidance of ambiguity: `(int)` can be treated as:
-      %% - literally `int`
-      %% - list of arguments with just one element – int. This approach is dropped.
-    , ?RULE(tok('('), type(), tok(','), sep1(type(), tok(',')), tok(')'), [_2|_4])
-    , ?RULE(type300(), [_1])
+args_t() ->
+    ?LAZY_P(choice(
+    [ ?RULE(tok('('), tok(')'), {args_t, get_ann(_1), []})
+      %% Singleton case handled separately
+    , ?RULE(tok('('), type(), tok(','), sep1(type(), tok(',')), tok(')'), {args_t, get_ann(_1), [_2|_4]})
     ])).
 
 %% -- Statements -------------------------------------------------------------
@@ -501,7 +500,8 @@ tuple_t(_Ann, [Type]) -> Type;  %% Not a tuple
 tuple_t(Ann, Types)   -> {tuple_t, Ann, Types}.
 
 fun_t(Domains, Type) ->
-    lists:foldr(fun({Dom, Ann}, T) -> {fun_t, Ann, [], Dom, T} end,
+    lists:foldr(fun({{args_t, _, Dom}, Ann}, T) -> {fun_t, Ann, [], Dom, T};
+                    ({Dom, Ann}, T)             -> {fun_t, Ann, [], [Dom], T} end,
                 Type, Domains).
 
 tuple_e(_Ann, [Expr]) -> Expr;  %% Not a tuple
@@ -549,12 +549,16 @@ bad_expr_err(Reason, E) ->
                             prettypr:nest(2, aeso_pretty:expr(E))])).
 
 %% -- Helper functions -------------------------------------------------------
+
 expand_includes(AST, Included, Opts) ->
-    expand_includes(AST, Included, [], Opts).
+    Ann  = [{origin, system}],
+    AST1 = [ {include, Ann, {string, Ann, File}}
+             || File <- lists:usort(auto_imports(AST)) ] ++ AST,
+    expand_includes(AST1, Included, [], Opts).
 
 expand_includes([], _Included, Acc, _Opts) ->
     {ok, lists:reverse(Acc)};
-expand_includes([{include, Ann, {string, SAnn, File}} | AST], Included, Acc, Opts) ->
+expand_includes([{include, Ann, {string, _SAnn, File}} | AST], Included, Acc, Opts) ->
     case get_include_code(File, Ann, Opts) of
         {ok, Code} ->
             Hashed = hash_include(File, Code),
@@ -562,12 +566,9 @@ expand_includes([{include, Ann, {string, SAnn, File}} | AST], Included, Acc, Opt
                 false ->
                     Opts1 = lists:keystore(src_file, 1, Opts, {src_file, File}),
                     Included1 = sets:add_element(Hashed, Included),
-                    case string(Code, Included1, Opts1) of
+                    case parse_and_scan(file(), Code, Opts1) of
                         {ok, AST1} ->
-                            Dependencies = [ {include, Ann, {string, SAnn, Dep}}
-                                             || Dep <- aeso_stdlib:dependencies(File)
-                                           ],
-                            expand_includes(Dependencies ++ AST1 ++ AST, Included1, Acc, Opts);
+                            expand_includes(AST1 ++ AST, Included1, Acc, Opts);
                         Err = {error, _} ->
                             Err
                     end;
@@ -593,12 +594,15 @@ read_file(File, Opts) ->
             end
     end.
 
+stdlib_options() ->
+    [{include, {file_system, [aeso_stdlib:stdlib_include_path()]}}].
+
 get_include_code(File, Ann, Opts) ->
-    case {read_file(File, Opts), maps:find(File, aeso_stdlib:stdlib())} of
+    case {read_file(File, Opts), read_file(File, stdlib_options())} of
         {{ok, _}, {ok,_ }} ->
             return_error(ann_pos(Ann), "Illegal redefinition of standard library " ++ File);
-        {_, {ok, Lib}} ->
-            {ok, Lib};
+        {_, {ok, Bin}} ->
+            {ok, binary_to_list(Bin)};
         {{ok, Bin}, _} ->
             {ok, binary_to_list(Bin)};
         {_, _} ->
@@ -610,3 +614,11 @@ hash_include(File, Code) when is_binary(File) ->
     hash_include(binary_to_list(File), Code);
 hash_include(File, Code) when is_list(File) ->
     {filename:basename(File), crypto:hash(sha256, Code)}.
+
+auto_imports({comprehension_bind, _, _}) -> [<<"ListInternal.aes">>];
+auto_imports({'..', _})                  -> [<<"ListInternal.aes">>];
+auto_imports(L) when is_list(L) ->
+    lists:flatmap(fun auto_imports/1, L);
+auto_imports(T) when is_tuple(T) ->
+    auto_imports(tuple_to_list(T));
+auto_imports(_) -> [].

@@ -443,7 +443,7 @@ global_env() ->
         { funs = MkDefs(
                      [{"resolve",  Fun([String, String], option_t(Ann, A))},
                       {"preclaim", SignFun([Address, Hash], Unit)},
-                      {"claim",    SignFun([Address, String, Int], Unit)},
+                      {"claim",    SignFun([Address, String, Int, Int], Unit)},
                       {"transfer", SignFun([Address, Address, String], Unit)},
                       {"revoke",   SignFun([Address, String], Unit)}]) },
 
@@ -767,7 +767,9 @@ check_type(Env, Type = {fun_t, Ann, NamedArgs, Args, Ret}, Arity) ->
     {fun_t, Ann, NamedArgs1, Args1, Ret1};
 check_type(_Env, Type = {uvar, _, _}, Arity) ->
     ensure_base_type(Type, Arity),
-    Type.
+    Type;
+check_type(_Env, {args_t, Ann, Ts}, _) ->
+    type_error({new_tuple_syntax, Ann, Ts}).
 
 ensure_base_type(Type, Arity) ->
     [ type_error({wrong_type_arguments, Type, Arity, 0}) || Arity /= 0 ],
@@ -1325,7 +1327,7 @@ infer_block(Env, _, [E], BlockType) ->
     [check_expr(Env, E, BlockType)];
 infer_block(Env, Attrs, [Def={letfun, Ann, _, _, _, _}|Rest], BlockType) ->
     {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
-    FunT = freshen_type(Ann, typesig_to_fun_t(TypeSig)),
+    FunT = typesig_to_fun_t(TypeSig),
     NewE = bind_var({id, Ann, Name}, FunT, Env),
     [LetFun|infer_block(NewE, Attrs, Rest, BlockType)];
 infer_block(Env, _, [{letval, Attrs, Pattern, Type, E}|Rest], BlockType) ->
@@ -1352,6 +1354,9 @@ infer_infix({RelOp, As})
     T = fresh_uvar(As),     %% allow any type here, check in ast_to_icode that we have comparison for it
     Bool = {id, As, "bool"},
     {fun_t, As, [], [T, T], Bool};
+infer_infix({'..', As}) ->
+    Int = {id, As, "int"},
+    {fun_t, As, [], [Int, Int], {app_t, As, {id, As, "list"}, [Int]}};
 infer_infix({'::', As}) ->
     ElemType = fresh_uvar(As),
     ListType = {app_t, As, {id, As, "list"}, [ElemType]},
@@ -2219,6 +2224,9 @@ pp_error({contract_has_no_entrypoints, Con}) ->
                   "'function'.\n", [pp_expr("", Con), pp_loc(Con)]);
 pp_error({unbound_type, Type}) ->
     io_lib:format("Unbound type ~s (at ~s).\n", [pp_type("", Type), pp_loc(Type)]);
+pp_error({new_tuple_syntax, Ann, Ts}) ->
+    io_lib:format("Invalid type\n~s  (at ~s)\nThe syntax of tuple types changed in Sophia version 4.0. Did you mean\n~s\n",
+                  [pp_type("  ", {args_t, Ann, Ts}), pp_loc(Ann), pp_type("  ", {tuple_t, Ann, Ts})]);
 pp_error(Err) ->
     io_lib:format("Unknown error: ~p\n", [Err]).
 

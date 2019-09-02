@@ -93,6 +93,8 @@ contract_to_icode([{letfun, Attrib, Name, Args, _What, Body={typed,_,_,T}}|Rest]
     FunAttrs = [ stateful || proplists:get_value(stateful, Attrib, false) ] ++
                [ payable  || proplists:get_value(payable, Attrib, false) ] ++
                [ private  || is_private(Attrib, Icode) ],
+    [ check_entrypoint_type(Attrib, Name, Args, T)
+      || aeso_syntax:get_ann(entrypoint, Attrib, false) ],
     %% TODO: Handle types
     FunName = ast_id(Name),
     %% TODO: push funname to env
@@ -105,7 +107,7 @@ contract_to_icode([{letfun, Attrib, Name, Args, _What, Body={typed,_,_,T}}|Rest]
                 #{ state_type := StateType } = Icode,
                 {#tuple{ cpts = [type_value(StateType), ast_body(Body, Icode)] },
                  {tuple, [typerep, ast_typerep(T, Icode)]}};
-            _ -> {ast_body(Body, Icode), ast_typerep(T, Icode)}
+            _ -> {ast_body(Body, Icode), ast_typerep1(T, Icode)}
         end,
     QName    = aeso_icode:qualify(Name, Icode),
     NewIcode = ast_fun_to_icode(ast_id(QName), FunAttrs, FunArgs, FunBody, TypeRep, Icode),
@@ -121,7 +123,7 @@ ast_id({id, _, Id}) -> Id;
 ast_id({qid, _, Id}) -> Id.
 
 ast_args([{arg, _, Name, Type}|Rest], Acc, Icode) ->
-    ast_args(Rest, [{ast_id(Name), ast_type(Type, Icode)}| Acc], Icode);
+    ast_args(Rest, [{ast_id(Name), ast_typerep1(Type, Icode)}| Acc], Icode);
 ast_args([], Acc, _Icode) -> lists:reverse(Acc).
 
 ast_type(T, Icode) ->
@@ -268,10 +270,10 @@ ast_body(?qid_app(["AENS", "preclaim"], Args, _, _), Icode) ->
               [word, word, sign_t()], {tuple, []});
 
 ast_body(?qid_app(["AENS", "claim"], Args, _, _), Icode) ->
-    {Sign, [Addr, Name, Salt]} = get_signature_arg(Args),
+    {Sign, [Addr, Name, Salt, NameFee]} = get_signature_arg(Args),
     prim_call(?PRIM_CALL_AENS_CLAIM, #integer{value = 0},
-              [ast_body(Addr, Icode), ast_body(Name, Icode), ast_body(Salt, Icode), ast_body(Sign, Icode)],
-              [word, string, word, sign_t()], {tuple, []});
+              [ast_body(Addr, Icode), ast_body(Name, Icode), ast_body(Salt, Icode), ast_body(NameFee, Icode), ast_body(Sign, Icode)],
+              [word, string, word, word, sign_t()], {tuple, []});
 
 ast_body(?qid_app(["AENS", "transfer"], Args, _, _), Icode) ->
     {Sign, [FromAddr, ToAddr, Name]} = get_signature_arg(Args),
@@ -523,6 +525,10 @@ ast_body({app, _, {typed, _, {con, _, Name}, _}, Args}, Icode) ->
 ast_body({app, _, {typed, _, {qcon, _, Name}, _}, Args}, Icode) ->
     Tag = aeso_icode:get_constructor_tag(Name, Icode),
     #tuple{cpts = [#integer{value = Tag} | [ ast_body(Arg, Icode) || Arg <- Args ]]};
+ast_body({app, _, {'..', _}, [A, B]}, Icode) ->
+    #funcall
+    { function = #var_ref{ name = ["ListInternal", "from_to"] }
+    , args     = [ast_body(A, Icode), ast_body(B, Icode)] };
 ast_body({app,As,Fun,Args}, Icode) ->
     case aeso_syntax:get_ann(format, As) of
         infix  ->
@@ -541,7 +547,7 @@ ast_body({list_comp, _, Yield, []}, Icode) ->
     #list{elems = [ast_body(Yield, Icode)]};
 ast_body({list_comp, As, Yield, [{comprehension_bind, {typed, Arg, ArgType}, BindExpr}|Rest]}, Icode) ->
     #funcall
-        { function = #var_ref{ name = ["List", "flat_map"] }
+        { function = #var_ref{ name = ["ListInternal", "flat_map"] }
         , args =
               [ #lambda{ args=[#arg{name = ast_id(Arg), type = ast_type(ArgType, Icode)}]
                        , body = ast_body({list_comp, As, Yield, Rest}, Icode)
@@ -578,7 +584,7 @@ ast_body({block,As,[E|Rest]}, Icode) ->
     #switch{expr=ast_body(E, Icode),
             cases=[{#var_ref{name="_"},ast_body({block,As,Rest}, Icode)}]};
 ast_body({lam,_,Args,Body}, Icode) ->
-    #lambda{args=[#arg{name = ast_id(P), type = ast_type(T, Icode)} || {arg,_,P,T} <- Args],
+    #lambda{args=[#arg{name = ast_id(P), type = ast_typerep1(T, Icode)} || {arg,_,P,T} <- Args],
             body=ast_body(Body, Icode)};
 ast_body({typed,_,{record,Attrs,Fields},{record_t,DefFields}}, Icode) ->
     %% Compile as a tuple with the fields in the order they appear in the definition.
@@ -713,6 +719,22 @@ map_upd(Key, Default, ValFun, Map = {typed, Ann, _, MapType}, Icode) ->
     Args    = [ast_body(Map, Icode), ast_body(Key, Icode), ast_body(Default, Icode), ast_body(ValFun, Icode)],
     builtin_call(FunName, Args).
 
+check_entrypoint_type(Ann, Name, Args, Ret) ->
+    Check = fun(T, Err) ->
+                case is_simple_type(T) of
+                    false -> gen_error(Err);
+                    true  -> ok
+                end end,
+    [ Check(T, {entrypoint_argument_must_have_simple_type, Ann1, Name, X, T})
+      || {arg, Ann1, X, T} <- Args ],
+    Check(Ret, {entrypoint_must_have_simple_return_type, Ann, Name, Ret}).
+
+is_simple_type({tvar, _, _})        -> false;
+is_simple_type({fun_t, _, _, _, _}) -> false;
+is_simple_type(Ts) when is_list(Ts) -> lists:all(fun is_simple_type/1, Ts);
+is_simple_type(T) when is_tuple(T)  -> is_simple_type(tuple_to_list(T));
+is_simple_type(_)                   -> true.
+
 is_monomorphic({tvar, _, _}) -> false;
 is_monomorphic([H|T]) ->
   is_monomorphic(H) andalso is_monomorphic(T);
@@ -753,42 +775,49 @@ make_type_def(Args, Def, Icode = #{ type_vars := TypeEnv }) ->
     TVars = [ X || {tvar, _, X} <- Args ],
     fun(Types) ->
         TypeEnv1 = maps:from_list(lists:zip(TVars, Types)),
-        ast_typerep(Def, Icode#{ type_vars := maps:merge(TypeEnv, TypeEnv1) })
+        ast_typerep1(Def, Icode#{ type_vars := maps:merge(TypeEnv, TypeEnv1) })
     end.
 
 -spec ast_typerep(aeso_syntax:type()) -> aeb_aevm_data:type().
-ast_typerep(Type) -> ast_typerep(Type, aeso_icode:new([])).
+ast_typerep(Type) ->
+    ast_typerep(Type, aeso_icode:new([])).
 
-ast_typerep({id, _, Name}, Icode) ->
+ast_typerep(Type, Icode) ->
+    case is_simple_type(Type) of
+        false -> gen_error({not_a_simple_type, Type});
+        true  -> ast_typerep1(Type, Icode)
+    end.
+
+ast_typerep1({id, _, Name}, Icode) ->
     lookup_type_id(Name, [], Icode);
-ast_typerep({qid, _, Name}, Icode) ->
+ast_typerep1({qid, _, Name}, Icode) ->
     lookup_type_id(Name, [], Icode);
-ast_typerep({con, _, _}, _) ->
+ast_typerep1({con, _, _}, _) ->
     word;   %% Contract type
-ast_typerep({bytes_t, _, Len}, _) ->
+ast_typerep1({bytes_t, _, Len}, _) ->
     bytes_t(Len);
-ast_typerep({app_t, _, {I, _, Name}, Args}, Icode) when I =:= id; I =:= qid ->
-    ArgReps = [ ast_typerep(Arg, Icode) || Arg <- Args ],
+ast_typerep1({app_t, _, {I, _, Name}, Args}, Icode) when I =:= id; I =:= qid ->
+    ArgReps = [ ast_typerep1(Arg, Icode) || Arg <- Args ],
     lookup_type_id(Name, ArgReps, Icode);
-ast_typerep({tvar,_,A}, #{ type_vars := TypeVars }) ->
+ast_typerep1({tvar,_,A}, #{ type_vars := TypeVars }) ->
     case maps:get(A, TypeVars, undefined) of
         undefined -> word; %% We serialize type variables just as addresses in the originating VM.
         Type      -> Type
     end;
-ast_typerep({tuple_t,_,Cpts}, Icode) ->
-    {tuple, [ast_typerep(C, Icode) || C<-Cpts]};
-ast_typerep({record_t,Fields}, Icode) ->
+ast_typerep1({tuple_t,_,Cpts}, Icode) ->
+    {tuple, [ast_typerep1(C, Icode) || C<-Cpts]};
+ast_typerep1({record_t,Fields}, Icode) ->
     {tuple, [ begin
                 {field_t, _, _, T} = Field,
-                ast_typerep(T, Icode)
+                ast_typerep1(T, Icode)
               end || Field <- Fields]};
-ast_typerep({fun_t,_,_,_,_}, _Icode) ->
+ast_typerep1({fun_t,_,_,_,_}, _Icode) ->
     function;
-ast_typerep({alias_t, T}, Icode) -> ast_typerep(T, Icode);
-ast_typerep({variant_t, Cons}, Icode) ->
+ast_typerep1({alias_t, T}, Icode) -> ast_typerep1(T, Icode);
+ast_typerep1({variant_t, Cons}, Icode) ->
     {variant, [ begin
                   {constr_t, _, _, Args} = Con,
-                  [ ast_typerep(Arg, Icode) || Arg <- Args ]
+                  [ ast_typerep1(Arg, Icode) || Arg <- Args ]
                 end || Con <- Cons ]}.
 
 ttl_t(Icode) ->
@@ -837,13 +866,6 @@ type_value({map, K, V}) ->
     #tuple{ cpts = [#integer{ value = ?TYPEREP_MAP_TAG },
                     type_value(K), type_value(V)] }.
 
-%% As abort is a built-in in the future it will be illegal to for
-%% users to define abort. For the time being strip away all user
-%% defined abort functions.
-
-ast_fun_to_icode("abort", _Atts, _Args, _Body, _TypeRep, Icode) ->
-    %% Strip away all user defined abort functions.
-    Icode;
 ast_fun_to_icode(Name, Attrs, Args, Body, TypeRep, #{functions := Funs} = Icode) ->
     NewFuns = [{Name, Attrs, Args, Body, TypeRep}| Funs],
     aeso_icode:set_functions(NewFuns, Icode).

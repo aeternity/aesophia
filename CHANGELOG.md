@@ -6,17 +6,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- New builtin function `Crypto.ecrecover_secp256k1: (hash, bytes(65)) => bytes(32)`
-  for recovering Ethereum address from message hash and signature.
-- List comprehensions syntax `[x | a <- [1,2,3] ++ l, let x = a + 1, if(x > 1)]`
 - Standard library support. `ListInternal` can be included implicitly if list comprehensions are used.
+- Added the `[a..b]` language construct, returning the list of numbers between
+  `a` and `b` (inclusive). Returns the empty list if `a` > `b`.
+### Changed
+### Removed
 
+## [4.0.0-rc1] - 2019-08-22
+### Added
+- FATE backend - the compiler is able to produce VM code for both `AEVM` and `FATE`. Many
+  of the APIs now take `{backend, aevm | fate}` to decide wich backend to produce artifacts
+  for.
+- New builtin functions `Crypto.ecrecover_secp256k1: (hash, bytes(65)) => option(bytes(20))`
+  and `Crypto.ecverify_secp256k1 : (hash, bytes(20), bytes(65)) => bool` for recovering
+  and verifying an Ethereum address for a message hash and a signature.
+- Sophia supports list comprehensions known from languages like Python, Haskell or Erlang.
+  Example syntax:
+```
+[x + y | x <- [1,2,3,4,5], let k = x*x, if (k > 5), y <- [k, k+1, k+2]]
+// yields [12,13,14,20,21,22,30,31,32]
+```
+- A new contract, and endpoint, modifier `payable` is introduced. Contracts, and enpoints,
+  that shall be able to receive funds should be marked as payable. `Address.is_payable(a)`
+  can be used to check if an (contract) address is payable or not.
 ### Changed
 - New syntax for tuple types. Now 0-tuple type is encoded as `unit` instead of `()` and
-  regular tuples are encoded by interspersing inner types with `*`, for instance `int * string`. 
+  regular tuples are encoded by interspersing inner types with `*`, for instance `int * string`.
   Parens are not necessary. Note it only affects the types, values remain as their were before,
   so `(1, "a") : int * string`
-
+- The `AENS.transfer` and `AENS.revoke` functions have been updated to take a name `string`
+  instead of a name `hash`.
+- Fixed a bug where the `AEVM` backend complained about a missing `init` function when
+  trying to generate calldata from an ACI-generated interface.
+- Compiler now returns the ABI-version in the compiler result map.
+- Renamed `Crypto.ecverify` and `Crypto.ecverify_secp256k1` into `Crypto.verify_sig` and
+  `Crypto.verify_sig_secp256k1` respectively.
 ### Removed
 
 ## [3.2.0] - 2019-06-28
@@ -113,7 +137,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v3.2.0...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v4.0.0-rc1...HEAD
+[4.0.0-rc1]: https://github.com/aeternity/aesophia/compare/v3.2.0...v4.0.0-rc1
 [3.2.0]: https://github.com/aeternity/aesophia/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/aeternity/aesophia/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/aeternity/aesophia/compare/v2.1.0...v3.0.0

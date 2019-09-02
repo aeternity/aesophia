@@ -53,15 +53,17 @@ simple_compile_test_() ->
             #{byte_code := Code2} = compile(aevm, "include"),
             ?assertMatch(true, Code1 == Code2)
         end} ] ++
-     [ {"Testing deadcode elimination",
+     [ {"Testing deadcode elimination for " ++ atom_to_list(Backend),
         fun() ->
-            #{ byte_code := NoDeadCode } = compile(aevm, "nodeadcode"),
-            #{ byte_code := DeadCode   } = compile(aevm, "deadcode"),
+            #{ byte_code := NoDeadCode } = compile(Backend, "nodeadcode"),
+            #{ byte_code := DeadCode   } = compile(Backend, "deadcode"),
             SizeNoDeadCode = byte_size(NoDeadCode),
             SizeDeadCode   = byte_size(DeadCode),
-            ?assertMatch({_, _, true}, {SizeDeadCode, SizeNoDeadCode, SizeDeadCode + 40 < SizeNoDeadCode}),
+            Delta          = if Backend == aevm -> 40;
+                                Backend == fate -> 20 end,
+            ?assertMatch({_, _, true}, {SizeDeadCode, SizeNoDeadCode, SizeDeadCode + Delta < SizeNoDeadCode}),
             ok
-        end} ].
+        end} || Backend <- [aevm, fate] ].
 
 check_errors(Expect, ErrorString) ->
     %% This removes the final single \n as well.
@@ -74,8 +76,7 @@ check_errors(Expect, ErrorString) ->
 
 compile(Backend, Name) ->
     compile(Backend, Name,
-            [{include, {file_system, [aeso_test_utils:contract_path()]}}]
-            ++ [no_implicit_stdlib || not wants_stdlib(Name)]).
+            [{include, {file_system, [aeso_test_utils:contract_path()]}}]).
 
 compile(Backend, Name, Options) ->
     String = aeso_test_utils:read_contract(Name),
@@ -373,12 +374,3 @@ failing_contracts() ->
       ]}
     ].
 
-wants_stdlib(Name) ->
-    lists:member
-      (Name,
-       [ "stdlib_include",
-         "list_comp",
-         "list_comp_not_a_list",
-         "list_comp_if_not_bool",
-         "list_comp_bad_shadow"
-       ]).

@@ -59,6 +59,7 @@
 -type type() :: {fun_t, ann(), [named_arg_t()], [type()], type()}
               | {app_t, ann(), type(), [type()]}
               | {tuple_t, ann(), [type()]}
+              | {args_t, ann(), [type()]}   %% old tuple syntax, old for error messages
               | {bytes_t, ann(), integer() | any}
               | id()  | qid()
               | con() | qcon()  %% contracts
@@ -105,9 +106,9 @@
      | id() | qid() | con() | qcon()
      | constant().
 
--type comprehension_exp() :: [{ comprehension_bind, ann(), id(), expr()}
-                             | {comprehension_if, expr()}
-                             | letbind()].
+-type comprehension_exp() :: [ {comprehension_bind, id(), expr()}
+                             | {comprehension_if, ann(), expr()}
+                             | letbind() ].
 
 -type arg_expr() :: expr() | {named_arg, ann(), id(), expr()}.
 

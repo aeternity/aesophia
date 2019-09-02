@@ -36,7 +36,6 @@
                 | pp_assembler
                 | pp_bytecode
                 | no_code
-                | no_implicit_stdlib
                 | {backend, aevm | fate}
                 | {include, {file_system, [string()]} |
                             {explicit_files, #{string() => binary()}}}
@@ -142,16 +141,7 @@ from_string1(fate, ContractString, Options) ->
 
 -spec string_to_code(string(), options()) -> map().
 string_to_code(ContractString, Options) ->
-    Ast = case lists:member(no_implicit_stdlib, Options) of
-              true -> parse(ContractString, Options);
-              false ->
-                  IncludedSTD = sets:from_list(
-                                  [aeso_parser:hash_include(F, C)
-                                   || {F, C} <- aeso_stdlib:stdlib_list()]),
-                  InitAst = parse(ContractString, IncludedSTD, Options),
-                  STD = parse_stdlib(),
-                  STD ++ InitAst
-          end,
+    Ast = parse(ContractString, Options),
     pp_sophia_code(Ast, Options),
     pp_ast(Ast, Options),
     {TypeEnv, TypedAst} = aeso_ast_infer_types:infer(Ast, [return_env]),
@@ -578,15 +568,6 @@ pp(Code, Options, Option, PPFun) ->
     end.
 
 %% -------------------------------------------------------------------
-
--spec parse_stdlib() -> none() | aeso_syntax:ast().
-parse_stdlib() ->
-    lists:foldr(
-      fun ({Lib, LibCode}, Acc) ->
-              parse(LibCode, [{src_file, binary_to_list(Lib)}]) ++ Acc
-      end,
-      [],
-      aeso_stdlib:stdlib_list()).
 
 sophia_type_to_typerep(String) ->
     {ok, Ast} = aeso_parser:type(String),

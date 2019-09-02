@@ -78,6 +78,7 @@ builtin_types() ->
      , "string"       => fun([]) -> string end
      , "address"      => Word
      , "hash"         => Word
+     , "unit"         => fun([]) -> {tuple, []} end
      , "signature"    => fun([]) -> {tuple, [word, word]} end
      , "oracle"       => fun([_, _]) -> word end
      , "oracle_query" => fun([_, _]) -> word end

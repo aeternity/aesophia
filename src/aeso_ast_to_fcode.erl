@@ -185,7 +185,7 @@ builtins() ->
               {["Oracle"],   [{"register", 4}, {"query_fee", 1}, {"query", 5}, {"get_question", 2},
                               {"respond", 4}, {"extend", 3}, {"get_answer", 2},
                               {"check", 1}, {"check_query", 2}]},
-              {["AENS"],     [{"resolve", 2}, {"preclaim", 3}, {"claim", 4}, {"transfer", 4},
+              {["AENS"],     [{"resolve", 2}, {"preclaim", 3}, {"claim", 5}, {"transfer", 4},
                               {"revoke", 3}]},
               {["Map"],      [{"from_list", 1}, {"to_list", 1}, {"lookup", 2},
                               {"lookup_default", 3}, {"delete", 2}, {"member", 2}, {"size", 1}]},
@@ -226,6 +226,9 @@ init_type_env() ->
        ["Chain", "ttl"] => ?type({variant, [[integer], [integer]]})
      }.
 
+is_no_code(Env) ->
+    proplists:get_value(no_code, maps:get(options, Env, []), false).
+
 %% -- Compilation ------------------------------------------------------------
 
 -spec to_fcode(env(), aeso_syntax:ast()) -> fcode().
@@ -244,7 +247,7 @@ to_fcode(Env, [{contract, Attrs, {con, _, Main}, Decls}]) ->
        state_type    => StateType,
        event_type    => EventType,
        payable       => Payable,
-       functions     => add_init_function(Env1,
+       functions     => add_init_function(Env1, StateType,
                         add_event_function(Env1, EventType, Funs)) };
 to_fcode(Env, [{contract, _, {con, _, Con}, Decls} | Code]) ->
     Env1 = decls_to_fcode(Env#{ context => {abstract_contract, Con} }, Decls),
@@ -268,7 +271,7 @@ decls_to_fcode(Env, Decls) ->
 -spec decl_to_fcode(env(), aeso_syntax:decl()) -> env().
 decl_to_fcode(Env, {type_decl, _, _, _}) -> Env;
 decl_to_fcode(Env = #{context := {main_contract, _}}, {fun_decl, Ann, {id, _, Name}, _}) ->
-    case proplists:get_value(no_code, maps:get(options, Env, []), false) of
+    case is_no_code(Env) of
         false -> fcode_error({missing_definition, Name, lists:keydelete(entrypoint, 1, Ann)});
         true  -> Env
     end;
@@ -279,10 +282,13 @@ decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, {id, _, Name}, Args, R
     Attrs = get_attributes(Ann),
     FName = lookup_fun(Env, qname(Env, Name)),
     FArgs = args_to_fcode(Env, Args),
+    FRet  = type_to_fcode(Env, Ret),
     FBody = expr_to_fcode(Env#{ vars => [X || {X, _} <- FArgs] }, Body),
+    [ ensure_first_order_entrypoint(Ann, FArgs, FRet)
+      || aeso_syntax:get_ann(entrypoint, Ann, false) ],
     Def   = #{ attrs  => Attrs,
                args   => FArgs,
-               return => type_to_fcode(Env, Ret),
+               return => FRet,
                body   => FBody },
     NewFuns = Funs#{ FName => Def },
     Env#{ functions := NewFuns }.
@@ -450,12 +456,16 @@ expr_to_fcode(Env, _Type, {list, _, Es}) ->
     lists:foldr(fun(E, L) -> {op, '::', [expr_to_fcode(Env, E), L]} end,
                 nil, Es);
 
+expr_to_fcode(Env, _Type, {app, _, {'..', _}, [A, B]}) ->
+    {def_u, FromTo, _} = resolve_fun(Env, ["ListInternal", "from_to"]),
+    {def, FromTo, [expr_to_fcode(Env, A), expr_to_fcode(Env, B)]};
+
 expr_to_fcode(Env, _Type, {list_comp, _, Yield, []}) ->
     {op, '::', [expr_to_fcode(Env, Yield), nil]};
 expr_to_fcode(Env, _Type, {list_comp, As, Yield, [{comprehension_bind, {typed, {id, _, Arg}, _}, BindExpr}|Rest]}) ->
     Env1 = bind_var(Env, Arg),
     Bind = {lam, [Arg], expr_to_fcode(Env1, {list_comp, As, Yield, Rest})},
-    {def_u, FlatMap, _} = resolve_fun(Env, ["List", "flat_map"]),
+    {def_u, FlatMap, _} = resolve_fun(Env, ["ListInternal", "flat_map"]),
     {def, FlatMap, [Bind, expr_to_fcode(Env, BindExpr)]};
 expr_to_fcode(Env, Type, {list_comp, As, Yield, [{comprehension_if, _, Cond}|Rest]}) ->
     make_if(expr_to_fcode(Env, Cond),
@@ -503,7 +513,7 @@ expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
     end;
 
 %% Function calls
-expr_to_fcode(Env, Type, {app, _Ann, Fun = {typed, _, _, {fun_t, _, NamedArgsT, _, _}}, Args}) ->
+expr_to_fcode(Env, Type, {app, _, Fun = {typed, _, _, {fun_t, _, NamedArgsT, _, _}}, Args}) ->
     Args1 = get_named_args(NamedArgsT, Args),
     FArgs = [expr_to_fcode(Env, Arg) || Arg <- Args1],
     case expr_to_fcode(Env, Fun) of
@@ -517,11 +527,13 @@ expr_to_fcode(Env, Type, {app, _Ann, Fun = {typed, _, _, {fun_t, _, NamedArgsT, 
             %% Get the type of the oracle from the args or the expression itself
             OType = get_oracle_type(B, Type, Args1),
             {oracle, QType, RType} = type_to_fcode(Env, OType),
+            validate_oracle_type(aeso_syntax:get_ann(Fun), QType, RType),
             TypeArgs = [{lit, {typerep, QType}}, {lit, {typerep, RType}}],
             builtin_to_fcode(B, FArgs ++ TypeArgs);
         {builtin_u, B, _} when B =:= aens_resolve ->
             %% Get the type we are assuming the name resolves to
             AensType = type_to_fcode(Env, Type),
+            validate_aens_resolve_type(aeso_syntax:get_ann(Fun), AensType),
             TypeArgs = [{lit, {typerep, AensType}}],
             builtin_to_fcode(B, FArgs ++ TypeArgs);
         {builtin_u, B, _Ar}       -> builtin_to_fcode(B, FArgs);
@@ -596,6 +608,46 @@ get_oracle_type(oracle_get_answer,   _Type, [{typed, _, _Expr, OType} | _])   ->
 get_oracle_type(oracle_check,        _Type, [{typed, _, _Expr, OType}])       -> OType;
 get_oracle_type(oracle_check_query,  _Type, [{typed, _, _Expr, OType} | _])   -> OType;
 get_oracle_type(oracle_respond,      _Type, [_, {typed, _,_Expr, OType} | _]) -> OType.
+
+validate_oracle_type(Ann, QType, RType) ->
+    ensure_monomorphic(QType, {polymorphic_query_type, Ann, QType}),
+    ensure_monomorphic(RType, {polymorphic_response_type, Ann, RType}),
+    ensure_first_order(QType, {higher_order_query_type, Ann, QType}),
+    ensure_first_order(RType, {higher_order_response_type, Ann, RType}),
+    ok.
+
+validate_aens_resolve_type(Ann, {variant, [[], [Type]]}) ->
+    ensure_monomorphic(Type, {polymorphic_aens_resolve, Ann, Type}),
+    ensure_first_order(Type, {higher_order_aens_resolve, Ann, Type}),
+    ok.
+
+ensure_first_order_entrypoint(Ann, Args, Ret) ->
+    [ ensure_first_order(T, {higher_order_entrypoint_argument, Ann, X, T})
+      || {X, T} <- Args ],
+    ensure_first_order(Ret, {higher_order_entrypoint_return, Ann, Ret}),
+    ok.
+
+ensure_monomorphic(Type, Err) ->
+    case is_monomorphic(Type) of
+        true  -> ok;
+        false -> fcode_error(Err)
+    end.
+
+ensure_first_order(Type, Err) ->
+    case is_first_order(Type) of
+        true  -> ok;
+        false -> fcode_error(Err)
+    end.
+
+is_monomorphic({tvar, _})              -> false;
+is_monomorphic(Ts) when is_list(Ts)    -> lists:all(fun is_monomorphic/1, Ts);
+is_monomorphic(Tup) when is_tuple(Tup) -> is_monomorphic(tuple_to_list(Tup));
+is_monomorphic(_)                      -> true.
+
+is_first_order({function, _, _})       -> false;
+is_first_order(Ts) when is_list(Ts)    -> lists:all(fun is_first_order/1, Ts);
+is_first_order(Tup) when is_tuple(Tup) -> is_first_order(tuple_to_list(Tup));
+is_first_order(_)                      -> true.
 
 %% -- Pattern matching --
 
@@ -852,16 +904,30 @@ builtin_to_fcode(Builtin, Args) ->
 
 %% -- Init function --
 
-add_init_function(_Env, Funs) ->
+add_init_function(Env, StateType, Funs0) ->
+    case is_no_code(Env) of
+        true  -> Funs0;
+        false ->
+            Funs     = add_default_init_function(Env, StateType, Funs0),
+            InitName = {entrypoint, <<"init">>},
+            InitFun  = #{ args := InitArgs } = maps:get(InitName, Funs, none),
+            Vars     = [ {var, X} || {X, _} <- InitArgs ],
+            Funs#{ init => InitFun#{ return => {tuple, []},
+                                     body   => {builtin, set_state, [{def, InitName, Vars}]} } }
+    end.
+
+add_default_init_function(_Env, StateType, Funs) ->
     InitName = {entrypoint, <<"init">>},
-    InitFun = #{ args := InitArgs } =
-        case maps:get(InitName, Funs, none) of
-            none -> #{ attrs => [], args => [], return => {tuple, []}, body => {tuple, []} };
-            Info -> Info
-        end,
-    Vars = [ {var, X} || {X, _} <- InitArgs ],
-    Funs#{ init => InitFun#{ return => {tuple, []},
-                             body   => {builtin, set_state, [{def, InitName, Vars}]} } }.
+    case maps:get(InitName, Funs, none) of
+        %% Only add default init function if state is unit.
+        none when StateType == {tuple, []} ->
+            Funs#{ InitName => #{attrs  => [],
+                                 args   => [],
+                                 return => {tuple, []},
+                                 body   => {tuple, []}} };
+        none -> fcode_error(missing_init_function);
+        _    -> Funs
+    end.
 
 %% -- Event function --
 
@@ -990,12 +1056,15 @@ lambda_lift_exprs(As) -> [lambda_lift_expr(A) || A <- As].
 
 -spec optimize_fcode(fcode()) -> fcode().
 optimize_fcode(Code = #{ functions := Funs }) ->
-    Code#{ functions := maps:map(fun(Name, Def) -> optimize_fun(Code, Name, Def) end, Funs) }.
+    Code1 = Code#{ functions := maps:map(fun(Name, Def) -> optimize_fun(Code, Name, Def) end, Funs) },
+    eliminate_dead_code(Code1).
 
 -spec optimize_fun(fcode(), fun_name(), fun_def()) -> fun_def().
 optimize_fun(Fcode, Fun, Def = #{ body := Body }) ->
     %% io:format("Optimizing ~p =\n~s\n", [_Fun, prettypr:format(pp_fexpr(_Body))]),
     Def#{ body := inliner(Fcode, Fun, Body) }.
+
+%% --- Inlining ---
 
 -spec inliner(fcode(), fun_name(), fexpr()) -> fexpr().
 inliner(Fcode, Fun, {def, Fun1, Args} = E) when Fun1 /= Fun ->
@@ -1008,6 +1077,33 @@ inliner(_Fcode, _Fun, E) -> E.
 should_inline(_Fcode, _Fun1) -> false == list_to_atom("true").  %% Dialyzer
 
 inline(_Fcode, Fun, Args) -> {def, Fun, Args}. %% TODO
+
+%% --- Deadcode elimination ---
+
+-spec eliminate_dead_code(fcode()) -> fcode().
+eliminate_dead_code(Code = #{ functions := Funs }) ->
+    UsedFuns = used_functions(Funs),
+    Code#{ functions := maps:filter(fun(Name, _) -> maps:is_key(Name, UsedFuns) end,
+                                    Funs) }.
+
+-spec used_functions(#{ fun_name() => fun_def() }) -> #{ fun_name() => true }.
+used_functions(Funs) ->
+    Exported = [ Fun || {Fun, #{ attrs := Attrs }} <- maps:to_list(Funs),
+                        not lists:member(private, Attrs) ],
+    used_functions(#{}, Exported, Funs).
+
+used_functions(Used, [], _) -> Used;
+used_functions(Used, [Name | Rest], Defs) ->
+    case maps:is_key(Name, Used) of
+        true  -> used_functions(Used, Rest, Defs);
+        false ->
+            New =
+                case maps:get(Name, Defs, undef) of
+                    undef             -> []; %% We might be compiling a stub
+                    #{ body := Body } -> used_defs(Body)
+                end,
+            used_functions(Used#{ Name => true }, New ++ Rest, Defs)
+    end.
 
 %% -- Helper functions -------------------------------------------------------
 
@@ -1176,6 +1272,34 @@ free_vars(Expr) ->
         {split, _, X, As}    -> free_vars([{var, X} | As]);
         {nosplit, A}         -> free_vars(A);
         {'case', P, A}       -> free_vars(A) -- lists:sort(fsplit_pat_vars(P))
+    end.
+
+used_defs(Xs) when is_list(Xs) ->
+    lists:umerge([ used_defs(X) || X <- Xs ]);
+used_defs(Expr) ->
+    case Expr of
+        {var, _}             -> [];
+        {lit, _}             -> [];
+        nil                  -> [];
+        {def, F, As}         -> lists:umerge([F], used_defs(As));
+        {def_u, F, _}        -> [F];
+        {remote, _, _, Ct, _, As} -> used_defs([Ct | As]);
+        {remote_u, _, _, Ct, _}   -> used_defs(Ct);
+        {builtin, _, As}     -> used_defs(As);
+        {builtin_u, _, _}    -> [];
+        {con, _, _, As}      -> used_defs(As);
+        {tuple, As}          -> used_defs(As);
+        {proj, A, _}         -> used_defs(A);
+        {set_proj, A, _, B}  -> used_defs([A, B]);
+        {op, _, As}          -> used_defs(As);
+        {'let', _, A, B}     -> used_defs([A, B]);
+        {funcall, A, Bs}     -> used_defs([A | Bs]);
+        {lam, _, B}          -> used_defs(B);
+        {closure, F, A}      -> lists:umerge([F], used_defs(A));
+        {switch, A}          -> used_defs(A);
+        {split, _, _, As}    -> used_defs(As);
+        {nosplit, A}         -> used_defs(A);
+        {'case', _, A}       -> used_defs(A)
     end.
 
 get_named_args(NamedArgsT, Args) ->
@@ -1476,4 +1600,3 @@ pp_pat(Pat)              -> pp_fexpr(Pat).
 is_infix(Op) ->
     C = hd(atom_to_list(Op)),
     C < $a orelse C > $z.
-
