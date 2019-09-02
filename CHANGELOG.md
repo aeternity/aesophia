@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New builtin function `Crypto.ecrecover_secp256k1: (hash, bytes(65)) => bytes(32)`
   for recovering Ethereum address from message hash and signature.
 - List comprehensions syntax `[x | a <- [1,2,3] ++ l, let x = a + 1, if(x > 1)]`
-- Standard library support (slows down compilation, can be skipped by adding `no_implicit_stdlib` compiler option)
+- Standard library support. `ListInternal` can be included implicitly if list comprehensions are used.
 
 ### Changed
 - New syntax for tuple types. Now 0-tuple type is encoded as `unit` instead of `()` and
