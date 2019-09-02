@@ -9,7 +9,7 @@
 -module(aeso_parse_lib).
 
 -export([parse/2,
-         return/1, fail/0, fail/1, map/2, bind/2,
+         return/1, fail/0, fail/1, fail/2, map/2, bind/2,
          lazy/1, choice/1, choice/2, tok/1, layout/0,
          left/2, right/2, between/3, optional/1,
          many/1, many1/1, sep/2, sep1/2,
@@ -97,6 +97,10 @@ apply_p(X, K) -> K(X).
 %% @doc Create a delayed parser. Required when building recursive parsers to avoid looping.
 -spec lazy(fun(() -> parser(A))) -> parser(A).
 lazy(Delayed) -> ?lazy(Delayed).
+
+%% @doc A parser that always fails at a known location.
+-spec fail(pos(), term()) -> parser(none()).
+fail(Pos, Err) -> ?fail({Pos, Err}).
 
 %% @doc A parser that always fails.
 -spec fail(term()) -> parser(none()).
@@ -322,6 +326,8 @@ current_pos(#ts{ tokens   = [T | _] }) -> pos(T);
 current_pos(#ts{ last     = T })       -> end_pos(pos(T)).
 
 -spec mk_error(#ts{}, term()) -> error().
+mk_error(_Ts, {Pos, Err}) ->
+    {Pos, Err};
 mk_error(Ts, Err) ->
     {current_pos(Ts), Err}.
 

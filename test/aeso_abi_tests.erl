@@ -161,8 +161,10 @@ permissive_literals_fail_test() ->
         "contract OracleTest =\n"
         "  stateful entrypoint haxx(o : oracle(list(string), option(int))) =\n"
         "    Chain.spend(o, 1000000)\n",
-        {error, <<"Type errors\nCannot unify", _/binary>>} =
-            aeso_compiler:check_call(Contract, "haxx", ["#123"], []),
+    {error, [Err]} =
+        aeso_compiler:check_call(Contract, "haxx", ["#123"], []),
+    ?assertMatch("Cannot unify" ++ _, aeso_errors:pp(Err)),
+    ?assertEqual(type_error, aeso_errors:type(Err)),
     ok.
 
 encode_decode_calldata(FunName, Types, Args) ->

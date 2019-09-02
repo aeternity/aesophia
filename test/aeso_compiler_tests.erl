@@ -35,10 +35,10 @@ simple_compile_test_() ->
      [ {"Testing error messages of " ++ ContractName,
         fun() ->
             case compile(aevm, ContractName) of
-                <<"Type errors\n", ErrorString/binary>> ->
-                    check_errors(lists:sort(ExpectedErrors), ErrorString);
                 <<"Parse errors\n", ErrorString/binary>> ->
-                    check_errors(lists:sort(ExpectedErrors), ErrorString)
+                    check_errors(lists:sort(ExpectedErrors), ErrorString);
+                Errors ->
+                    check_errors(lists:sort(ExpectedErrors), Errors)
             end
         end} ||
             {ContractName, ExpectedErrors} <- failing_contracts() ] ++
@@ -65,9 +65,8 @@ simple_compile_test_() ->
             ok
         end} || Backend <- [aevm, fate] ].
 
-check_errors(Expect, ErrorString) ->
-    %% This removes the final single \n as well.
-    Actual = binary:split(<<ErrorString/binary,$\n>>, <<"\n\n">>, [global,trim]),
+check_errors(Expect, Actual0) ->
+    Actual = [ list_to_binary(string:trim(aeso_errors:msg(Err))) || Err <- Actual0 ],
     case {Expect -- Actual, Actual -- Expect} of
         {[], Extra}   -> ?assertMatch({unexpected, []}, {unexpected, Extra});
         {Missing, []} -> ?assertMatch({missing, []}, {missing, Missing});
@@ -81,8 +80,9 @@ compile(Backend, Name) ->
 compile(Backend, Name, Options) ->
     String = aeso_test_utils:read_contract(Name),
     case aeso_compiler:from_string(String, [{src_file, Name}, {backend, Backend} | Options]) of
-        {ok, Map}            -> Map;
-        {error, ErrorString} -> ErrorString
+        {ok, Map}                                        -> Map;
+        {error, ErrorString} when is_binary(ErrorString) -> ErrorString;
+        {error, Errors}                                  -> Errors
     end.
 
 %% compilable_contracts() -> [ContractName].
@@ -353,8 +353,7 @@ failing_contracts() ->
           "but it calls\n"
           "  - state (at line 13, column 13)">>]}
     , {"field_parse_error",
-       [<<"line 6, column 1: In field_parse_error at 5:26:\n"
-          "Cannot use nested fields or keys in record construction: p.x\n">>]}
+       [<<"Cannot use nested fields or keys in record construction: p.x">>]}
     , {"modifier_checks",
        [<<"The function all_the_things (at line 11, column 3) cannot be both public and private.">>,
         <<"Namespaces cannot contain entrypoints (at line 3, column 3). Use 'function' instead.">>,

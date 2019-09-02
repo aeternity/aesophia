@@ -19,7 +19,7 @@
 -import(aeso_parse_lib,
         [tok/1, tok/2, between/3, many/1, many1/1, sep/2, sep1/2,
          infixl/1, infixr/1, choice/1, choice/2, return/1, layout/0,
-         fail/0, fail/1, map/2, infixl/2, infixr/2, infixl1/2, infixr1/2,
+         fail/0, fail/1, fail/2, map/2, infixl/2, infixr/2, infixl1/2, infixr1/2,
          left/2, right/2, optional/1]).
 
 

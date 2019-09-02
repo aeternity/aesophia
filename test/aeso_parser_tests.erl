@@ -39,7 +39,7 @@ simple_contracts_test_() ->
             RightAssoc = fun(Op) -> CheckParens({a, Op, {b, Op, c}}) end,
             NonAssoc   = fun(Op) ->
                             OpAtom = list_to_atom(Op),
-                            ?assertError({error, {_, parse_error, _}},
+                            ?assertThrow({parse_errors, [_]},
                                          parse_expr(NoPar({a, Op, {b, Op, c}}))) end,
             Stronger = fun(Op1, Op2) ->
                     CheckParens({{a, Op1, b}, Op2, c}),
@@ -74,10 +74,7 @@ roundtrip_contract(Name) ->
 parse_string(Text) -> parse_string(Text, []).
 
 parse_string(Text, Opts) ->
-    case aeso_parser:string(Text, Opts) of
-        {ok, Contract} -> Contract;
-        Err -> error(Err)
-    end.
+    aeso_parser:string(Text, Opts).
 
 parse_expr(Text) ->
     [{letval, _, _, _, Expr}] =

@@ -74,15 +74,13 @@ do_contract_interface(Type, ContractString, Options) ->
             string -> do_render_aci_json(JArray)
         end
     catch
+        throw:{type_errors, Errors} -> {error, Errors};
         %% The compiler errors.
         error:{parse_errors, Errors} ->
             {error, join_errors("Parse errors", Errors, fun(E) -> E end)};
-        error:{type_errors, Errors} ->
-            {error, join_errors("Type errors", Errors, fun(E) -> E end)};
         error:{code_errors, Errors} ->
             {error, join_errors("Code errors", Errors,
                                 fun (E) -> io_lib:format("~p", [E]) end)}
-        %% General programming errors in the compiler just signal error.
     end.
 
 join_errors(Prefix, Errors, Pfun) ->
