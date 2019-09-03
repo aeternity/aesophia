@@ -27,7 +27,7 @@ convert(#{ contract_name := _ContractName
               },
         _Options) ->
     %% Create a function dispatcher
-    DispatchFun = {"_main", [], [{"arg", "_"}],
+    DispatchFun = {"%main", [], [{"arg", "_"}],
                    {switch, {var_ref, "arg"},
                     [{{tuple, [fun_hash(Fun),
                                {tuple, make_args(Args)}]},
@@ -44,7 +44,7 @@ convert(#{ contract_name := _ContractName
     %% taken from the stack
     StopLabel = make_ref(),
     StatefulStopLabel = make_ref(),
-    MainFunction = lookup_fun(Funs, "_main"),
+    MainFunction = lookup_fun(Funs, "%main"),
 
     StateTypeValue = aeso_ast_to_icode:type_value(StateType),
 
