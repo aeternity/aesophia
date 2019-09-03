@@ -1,0 +1,9 @@
+contract Remote =
+  entrypoint foo : int => int
+
+contract UnappliedContractCall =
+
+  function f(r) = r.foo
+
+  entrypoint test(r) = f(r)(0)
+

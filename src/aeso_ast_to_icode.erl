@@ -113,8 +113,12 @@ contract_to_icode([{letfun, Attrib, Name, Args, _What, Body={typed,_,_,T}}|Rest]
     NewIcode = ast_fun_to_icode(ast_id(QName), FunAttrs, FunArgs, FunBody, TypeRep, Icode),
     contract_to_icode(Rest, NewIcode);
 contract_to_icode([], Icode) -> Icode;
-contract_to_icode([{fun_decl, _, _, _} | Code], Icode) ->
-    contract_to_icode(Code, Icode);
+contract_to_icode([{fun_decl, _, Id, _} | Code], Icode = #{ options := Options }) ->
+    NoCode = proplists:get_value(no_code, Options, false),
+    case aeso_icode:in_main_contract(Icode) andalso not NoCode of
+        true  -> gen_error({missing_definition, Id});
+        false -> contract_to_icode(Code, Icode)
+    end;
 contract_to_icode([Decl | Code], Icode) ->
     io:format("Unhandled declaration: ~p\n", [Decl]),
     contract_to_icode(Code, Icode).
@@ -267,8 +271,8 @@ ast_body({app, _, {typed, _, {proj, _, Addr, {id, _, FunName}},
        %% entrypoint on the callee side.
         type_hash= #integer{value = 0}
       };
-ast_body(Call = {proj, _, {typed, _, _, {con, _, _Contract}}, {id, _, _FunName}}, _Icode) ->
-    gen_error({unapplied_contract_call, Call});
+ast_body({proj, _, Con = {typed, _, _, {con, _, _}}, _Fun}, _Icode) ->
+    gen_error({unapplied_contract_call, Con});
 
 ast_body({con, _, Name}, Icode) ->
     Tag = aeso_icode:get_constructor_tag([Name], Icode),
@@ -405,7 +409,7 @@ ast_binop(Op, Ann, {typed, _, A, Type}, B, Icode)
             Neg = case Op of
                     '==' -> fun(X) -> X end;
                     '!=' -> fun(X) -> #unop{ op = '!', rand = X } end;
-                    _    -> gen_error({cant_compare, Ann, Op, Type})
+                    _    -> gen_error({cant_compare_type_aevm, Ann, Op, Type})
                   end,
             Args = [ast_body(A, Icode), ast_body(B, Icode)],
             Builtin =
@@ -416,10 +420,10 @@ ast_binop(Op, Ann, {typed, _, A, Type}, B, Icode)
                         case lists:usort(Types) of
                             [word] ->
                                 builtin_call(str_equal_p, [ #integer{value = 32 * length(Types)} | Args]);
-                            _ -> gen_error({cant_compare, Ann, Op, Type})
+                            _ -> gen_error({cant_compare_type_aevm, Ann, Op, Type})
                         end;
                     _ ->
-                        gen_error({cant_compare, Ann, Op, Type})
+                        gen_error({cant_compare_type_aevm, Ann, Op, Type})
                 end,
             Neg(Builtin)
     end;
@@ -508,48 +512,57 @@ builtin_code(_, {id, _, "require"}, [Bool, String], _, _, Icode) ->
     builtin_call(require, [ast_body(Bool, Icode), ast_body(String, Icode)]);
 
 %% Oracles
-builtin_code(_, {qid, _, ["Oracle", "register"]}, Args, _, ?oracle_t(QType, RType), Icode) ->
+builtin_code(_, {qid, Ann, ["Oracle", "register"]}, Args, _, OracleType = ?oracle_t(QType, RType), Icode) ->
+    check_oracle_type(Ann, OracleType),
     {Sign, [Acct, QFee, TTL]} = get_signature_arg(Args),
     prim_call(?PRIM_CALL_ORACLE_REGISTER, #integer{value = 0},
               [ast_body(Acct, Icode), ast_body(Sign, Icode), ast_body(QFee, Icode), ast_body(TTL, Icode),
                ast_type_value(QType, Icode), ast_type_value(RType, Icode)],
               [word, sign_t(), word, ttl_t(Icode), typerep, typerep], word);
 
-builtin_code(_, {qid, _, ["Oracle", "query_fee"]}, [Oracle], _, _, Icode) ->
+builtin_code(_, {qid, Ann, ["Oracle", "query_fee"]}, [Oracle], [OracleType], _, Icode) ->
+    check_oracle_type(Ann, OracleType),
     prim_call(?PRIM_CALL_ORACLE_QUERY_FEE, #integer{value = 0},
               [ast_body(Oracle, Icode)], [word], word);
 
-builtin_code(_, {qid, _, ["Oracle", "query"]}, [Oracle, Q, QFee, QTTL, RTTL], [_, QType, _, _, _], _, Icode) ->
+builtin_code(_, {qid, Ann, ["Oracle", "query"]}, [Oracle, Q, QFee, QTTL, RTTL], [OracleType, QType, _, _, _], _, Icode) ->
+    check_oracle_type(Ann, OracleType),
     prim_call(?PRIM_CALL_ORACLE_QUERY, ast_body(QFee, Icode),
               [ast_body(Oracle, Icode), ast_body(Q, Icode), ast_body(QTTL, Icode), ast_body(RTTL, Icode)],
               [word, ast_type(QType, Icode), ttl_t(Icode), ttl_t(Icode)], word);
 
-builtin_code(_, {qid, _, ["Oracle", "extend"]}, Args, _, _, Icode) ->
+builtin_code(_, {qid, Ann, ["Oracle", "extend"]}, Args, [OracleType, _], _, Icode) ->
+    check_oracle_type(Ann, OracleType),
     {Sign, [Oracle, TTL]} = get_signature_arg(Args),
     prim_call(?PRIM_CALL_ORACLE_EXTEND, #integer{value = 0},
               [ast_body(Oracle, Icode), ast_body(Sign, Icode), ast_body(TTL, Icode)],
               [word, sign_t(), ttl_t(Icode)], {tuple, []});
 
-builtin_code(_, {qid, _, ["Oracle", "respond"]}, Args, [_, _, RType], _, Icode) ->
+builtin_code(_, {qid, Ann, ["Oracle", "respond"]}, Args, [OracleType, _, RType], _, Icode) ->
+    check_oracle_type(Ann, OracleType),
     {Sign, [Oracle, Query, R]} = get_signature_arg(Args),
     prim_call(?PRIM_CALL_ORACLE_RESPOND, #integer{value = 0},
               [ast_body(Oracle, Icode), ast_body(Query, Icode), ast_body(Sign, Icode), ast_body(R, Icode)],
               [word, word, sign_t(), ast_type(RType, Icode)], {tuple, []});
 
-builtin_code(_, {qid, _, ["Oracle", "get_question"]}, [Oracle, Q], [_, ?query_t(QType, _)], _, Icode) ->
+builtin_code(_, {qid, Ann, ["Oracle", "get_question"]}, [Oracle, Q], [OracleType, ?query_t(QType, _)], _, Icode) ->
+    check_oracle_type(Ann, OracleType),
     prim_call(?PRIM_CALL_ORACLE_GET_QUESTION, #integer{value = 0},
               [ast_body(Oracle, Icode), ast_body(Q, Icode)], [word, word], ast_type(QType, Icode));
 
-builtin_code(_, {qid, _, ["Oracle", "get_answer"]}, [Oracle, Q], [_, ?query_t(_, RType)], _, Icode) ->
+builtin_code(_, {qid, Ann, ["Oracle", "get_answer"]}, [Oracle, Q], [OracleType, ?query_t(_, RType)], _, Icode) ->
+    check_oracle_type(Ann, OracleType),
     prim_call(?PRIM_CALL_ORACLE_GET_ANSWER, #integer{value = 0},
               [ast_body(Oracle, Icode), ast_body(Q, Icode)], [word, word], aeso_icode:option_typerep(ast_type(RType, Icode)));
 
-builtin_code(_, {qid, _, ["Oracle", "check"]}, [Oracle], [?oracle_t(Q, R)], _, Icode) ->
+builtin_code(_, {qid, Ann, ["Oracle", "check"]}, [Oracle], [OracleType = ?oracle_t(Q, R)], _, Icode) ->
+    check_oracle_type(Ann, OracleType),
     prim_call(?PRIM_CALL_ORACLE_CHECK, #integer{value = 0},
               [ast_body(Oracle, Icode), ast_type_value(Q, Icode), ast_type_value(R, Icode)],
               [word, typerep, typerep], word);
 
-builtin_code(_, {qid, _, ["Oracle", "check_query"]}, [Oracle, Query], [_, ?query_t(Q, R)], _, Icode) ->
+builtin_code(_, {qid, Ann, ["Oracle", "check_query"]}, [Oracle, Query], [OracleType, ?query_t(Q, R)], _, Icode) ->
+    check_oracle_type(Ann, OracleType),
     prim_call(?PRIM_CALL_ORACLE_CHECK_QUERY, #integer{value = 0},
               [ast_body(Oracle, Icode), ast_body(Query, Icode),
                ast_type_value(Q, Icode), ast_type_value(R, Icode)],
@@ -730,8 +743,8 @@ map_empty(KeyType, ValType, Icode) ->
                ast_type_value(ValType, Icode)],
               [typerep, typerep], word).
 
-map_get(Key, Map = {typed, Ann, _, MapType}, Icode) ->
-    {_KeyType, ValType} = check_monomorphic_map(Ann, MapType, Icode),
+map_get(Key, Map = {typed, _Ann, _, MapType}, Icode) ->
+    {_KeyType, ValType} = check_monomorphic_map(aeso_syntax:get_ann(Key), MapType, Icode),
     builtin_call({map_lookup, ast_type(ValType, Icode)}, [ast_body(Map, Icode), ast_body(Key, Icode)]).
 
 map_put(Key, Val, Map, Icode) ->
@@ -771,12 +784,19 @@ check_entrypoint_type(Ann, Name, Args, Ret) ->
                     false -> gen_error(Err);
                     true  -> ok
                 end end,
-    [ CheckFirstOrder(T, {entrypoint_argument_must_have_first_order_type, Ann1, Name, X, T})
+    [ CheckFirstOrder(T, {invalid_entrypoint, higher_order, Ann1, Name, {argument, X, T}})
       || {arg, Ann1, X, T} <- Args ],
-    CheckFirstOrder(Ret, {entrypoint_must_have_first_order_return_type, Ann, Name, Ret}),
-    [ CheckMonomorphic(T, {entrypoint_argument_must_have_monomorphic_type, Ann1, Name, X, T})
+    CheckFirstOrder(Ret, {invalid_entrypoint, higher_order, Ann, Name, {result, Ret}}),
+    [ CheckMonomorphic(T, {invalid_entrypoint, polymorphic, Ann1, Name, {argument, X, T}})
       || {arg, Ann1, X, T} <- Args ],
-    CheckMonomorphic(Ret, {entrypoint_must_have_monomorphic_return_type, Ann, Name, Ret}).
+    CheckMonomorphic(Ret, {invalid_entrypoint, polymorphic, Ann, Name, {result, Ret}}).
+
+check_oracle_type(Ann, Type = ?oracle_t(QType, RType)) ->
+    [ gen_error({invalid_oracle_type, Why, Which, Ann, Type})
+      || {Why, Check} <- [{polymorphic, fun is_monomorphic/1},
+                          {higher_order, fun is_first_order_type/1}],
+         {Which, T}   <- [{query, QType}, {response, RType}],
+         not Check(T) ].
 
 is_simple_type({tvar, _, _})        -> false;
 is_simple_type({fun_t, _, _, _, _}) -> false;

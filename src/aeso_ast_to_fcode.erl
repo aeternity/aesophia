@@ -140,6 +140,7 @@
                   functions  := #{ fun_name() => fun_def() } }.
 
 -define(HASH_BYTES, 32).
+
 %% -- Entrypoint -------------------------------------------------------------
 
 %% Main entrypoint. Takes typed syntax produced by aeso_ast_infer_types:infer/1,2
@@ -272,21 +273,21 @@ decls_to_fcode(Env, Decls) ->
 
 -spec decl_to_fcode(env(), aeso_syntax:decl()) -> env().
 decl_to_fcode(Env, {type_decl, _, _, _}) -> Env;
-decl_to_fcode(Env = #{context := {main_contract, _}}, {fun_decl, Ann, {id, _, Name}, _}) ->
+decl_to_fcode(Env = #{context := {main_contract, _}}, {fun_decl, _, Id, _}) ->
     case is_no_code(Env) of
-        false -> fcode_error({missing_definition, Name, lists:keydelete(entrypoint, 1, Ann)});
+        false -> fcode_error({missing_definition, Id});
         true  -> Env
     end;
 decl_to_fcode(Env, {fun_decl, _, _, _})  -> Env;
 decl_to_fcode(Env, {type_def, _Ann, Name, Args, Def}) ->
     typedef_to_fcode(Env, Name, Args, Def);
-decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, {id, _, Name}, Args, Ret, Body}) ->
+decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, Id = {id, _, Name}, Args, Ret, Body}) ->
     Attrs = get_attributes(Ann),
     FName = lookup_fun(Env, qname(Env, Name)),
     FArgs = args_to_fcode(Env, Args),
     FRet  = type_to_fcode(Env, Ret),
     FBody = expr_to_fcode(Env#{ vars => [X || {X, _} <- FArgs] }, Body),
-    [ ensure_first_order_entrypoint(Ann, FArgs, FRet)
+    [ ensure_first_order_entrypoint(Ann, Id, Args, Ret, FArgs, FRet)
       || aeso_syntax:get_ann(entrypoint, Ann, false) ],
     Def   = #{ attrs  => Attrs,
                args   => FArgs,
@@ -415,7 +416,7 @@ expr_to_fcode(Env, _Type, {app, _, {typed, _, {C, _, _} = Con, _}, Args}) when C
     Arity = lists:nth(I + 1, Arities),
     case length(Args) == Arity of
         true  -> {con, Arities, I, [expr_to_fcode(Env, Arg) || Arg <- Args]};
-        false -> fcode_error({constructor_arity_mismatch, Con, length(Args), Arity})
+        false -> internal_error({constructor_arity_mismatch, Con, length(Args), Arity})
     end;
 
 %% Tuples
@@ -540,7 +541,7 @@ expr_to_fcode(Env, Type, {app, _, Fun = {typed, _, _, {fun_t, _, NamedArgsT, _, 
             %% Get the type of the oracle from the args or the expression itself
             OType = get_oracle_type(B, Type, Args1),
             {oracle, QType, RType} = type_to_fcode(Env, OType),
-            validate_oracle_type(aeso_syntax:get_ann(Fun), QType, RType),
+            validate_oracle_type(aeso_syntax:get_ann(Fun), OType, QType, RType),
             TypeArgs = [{lit, {typerep, QType}}, {lit, {typerep, RType}}],
             builtin_to_fcode(B, FArgs ++ TypeArgs);
         {builtin_u, B, _} when B =:= aens_resolve ->
@@ -622,11 +623,11 @@ get_oracle_type(oracle_check,        _Type, [{typed, _, _Expr, OType}])       ->
 get_oracle_type(oracle_check_query,  _Type, [{typed, _, _Expr, OType} | _])   -> OType;
 get_oracle_type(oracle_respond,      _Type, [_, {typed, _,_Expr, OType} | _]) -> OType.
 
-validate_oracle_type(Ann, QType, RType) ->
-    ensure_monomorphic(QType, {polymorphic_query_type, Ann, QType}),
-    ensure_monomorphic(RType, {polymorphic_response_type, Ann, RType}),
-    ensure_first_order(QType, {higher_order_query_type, Ann, QType}),
-    ensure_first_order(RType, {higher_order_response_type, Ann, RType}),
+validate_oracle_type(Ann, Type, QType, RType) ->
+    ensure_monomorphic(QType, {invalid_oracle_type, polymorphic,  query,    Ann, Type}),
+    ensure_monomorphic(RType, {invalid_oracle_type, polymorphic,  response, Ann, Type}),
+    ensure_first_order(QType, {invalid_oracle_type, higher_order, query,    Ann, Type}),
+    ensure_first_order(RType, {invalid_oracle_type, higher_order, response, Ann, Type}),
     ok.
 
 validate_aens_resolve_type(Ann, {app_t, _, _, [Type]}, {variant, [[], [FType]]}) ->
@@ -639,10 +640,10 @@ validate_aens_resolve_type(Ann, {app_t, _, _, [Type]}, {variant, [[], [FType]]})
         _              -> fcode_error({invalid_aens_resolve_type, Ann, Type})
     end.
 
-ensure_first_order_entrypoint(Ann, Args, Ret) ->
-    [ ensure_first_order(T, {higher_order_entrypoint_argument, Ann, X, T})
-      || {X, T} <- Args ],
-    ensure_first_order(Ret, {higher_order_entrypoint_return, Ann, Ret}),
+ensure_first_order_entrypoint(Ann, Name, Args, Ret, FArgs, FRet) ->
+    [ ensure_first_order(FT, {invalid_entrypoint, higher_order, Ann1, Name, {argument, X, T}})
+      || {{arg, Ann1, X, T}, {_, FT}} <- lists:zip(Args, FArgs) ],
+    ensure_first_order(FRet, {invalid_entrypoint, higher_order, Ann, Name, {result, Ret}}),
     ok.
 
 ensure_monomorphic(Type, Err) ->
@@ -1218,7 +1219,7 @@ resolve_var(Env, Q) -> resolve_fun(Env, Q).
 
 resolve_fun(#{ fun_env := Funs, builtins := Builtin }, Q) ->
     case {maps:get(Q, Funs, not_found), maps:get(Q, Builtin, not_found)} of
-        {not_found, not_found} -> fcode_error({unbound_variable, Q});
+        {not_found, not_found} -> internal_error({unbound_variable, Q});
         {_, {B, none}}         -> {builtin, B, []};
         {_, {B, Ar}}           -> {builtin_u, B, Ar};
         {{Fun, Ar}, _}         -> {def_u, Fun, Ar}

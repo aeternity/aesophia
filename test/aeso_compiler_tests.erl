@@ -492,11 +492,26 @@ failing_contracts() ->
 failing_code_gen_contracts() ->
     [ ?SAME(last_declaration_must_be_contract, 1, 1,
             "Expected a contract as the last declaration instead of the namespace 'LastDeclarationIsNotAContract'")
+    , ?SAME(missing_definition, 2, 14,
+            "Missing definition of function 'foo'.")
     , ?AEVM(polymorphic_entrypoint, 2, 17,
             "The argument\n"
             "  x : 'a\n"
-            "of entrypoint 'id' does not have a monomorphic type.\n"
+            "of entrypoint 'id' has a polymorphic (contains type variables) type.\n"
             "Use the FATE backend if you want polymorphic entrypoints.")
+    , ?AEVM(polymorphic_entrypoint_return, 2, 3,
+            "The return type\n"
+            "  'a\n"
+            "of entrypoint 'fail' is polymorphic (contains type variables).\n"
+            "Use the FATE backend if you want polymorphic entrypoints.")
+    , ?SAME(higher_order_entrypoint, 2, 20,
+            "The argument\n"
+            "  f : (int) => int\n"
+            "of entrypoint 'apply' has a higher-order (contains function types) type.")
+    , ?SAME(higher_order_entrypoint_return, 2, 3,
+            "The return type\n"
+            "  (int) => int\n"
+            "of entrypoint 'add' is higher-order (contains function types).")
     , ?SAME(missing_init_function, 1, 10,
             "Missing init function for the contract 'MissingInitFunction'.\n"
             "The 'init' function can only be omitted if the state type is 'unit'.")
@@ -520,11 +535,53 @@ failing_code_gen_contracts() ->
             "- type string\n"
             "- tuple or record of word type\n"
             "Use FATE if you need to compare arbitrary types.")
+    , ?AEVM(complex_compare, 4, 5,
+            "Cannot compare values of type\n"
+            "  (string * int)\n"
+            "The AEVM only supports '!=' on values of\n"
+            "- word type (int, bool, bits, address, oracle(_, _), etc)\n"
+            "- type string\n"
+            "- tuple or record of word type\n"
+            "Use FATE if you need to compare arbitrary types.")
+    , ?AEVM(complex_compare_leq, 4, 5,
+            "Cannot compare values of type\n"
+            "  (int * int)\n"
+            "The AEVM only supports '=<' on values of\n"
+            "- word type (int, bool, bits, address, oracle(_, _), etc)\n"
+            "Use FATE if you need to compare arbitrary types.")
     , ?AEVM(higher_order_compare, 4, 5,
             "Cannot compare values of type\n"
             "  (int) => int\n"
             "The AEVM only supports '<' on values of\n"
             "- word type (int, bool, bits, address, oracle(_, _), etc)\n"
             "Use FATE if you need to compare arbitrary types.")
+    , ?AEVM(unapplied_contract_call, 6, 19,
+            "The AEVM does not support unapplied contract call to\n"
+            "  r : Remote\n"
+            "Use FATE if you need this.")
+    , ?AEVM(polymorphic_map_keys, 4, 34,
+            "Invalid map key type\n"
+            "  'a\n"
+            "Map keys cannot be polymorphic in the AEVM. Use FATE if you need this.")
+    , ?AEVM(higher_order_map_keys, 4, 42,
+            "Invalid map key type\n"
+            "  (int) => int\n"
+            "Map keys cannot be higher-order.")
+    , ?SAME(polymorphic_query_type, 3, 5,
+            "Invalid oracle type\n"
+            "  oracle('a, 'b)\n"
+            "The query type must not be polymorphic (contain type variables).")
+    , ?SAME(polymorphic_response_type, 3, 5,
+            "Invalid oracle type\n"
+            "  oracle(string, 'r)\n"
+            "The response type must not be polymorphic (contain type variables).")
+    , ?SAME(higher_order_query_type, 3, 5,
+            "Invalid oracle type\n"
+            "  oracle((int) => int, string)\n"
+            "The query type must not be higher-order (contain function types).")
+    , ?SAME(higher_order_response_type, 3, 5,
+            "Invalid oracle type\n"
+            "  oracle(string, (int) => int)\n"
+            "The response type must not be higher-order (contain function types).")
     ].
 

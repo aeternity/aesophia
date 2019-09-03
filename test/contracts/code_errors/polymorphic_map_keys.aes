@@ -1,0 +1,6 @@
+contract MapAsMapKey =
+  type t('key) = map('key, int)
+
+  function foo(m) : t('a) = {[m] = 0}
+
+  entrypoint main() = ()

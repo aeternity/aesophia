@@ -1,0 +1,2 @@
+contract HigherOrderEntrypoint =
+  entrypoint apply(f : int => int, x : int) = f(x)
