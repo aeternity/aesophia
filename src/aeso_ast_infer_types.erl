@@ -717,12 +717,15 @@ check_modifiers1(What, Decls) when is_list(Decls) ->
 check_modifiers1(What, Decl) when element(1, Decl) == letfun; element(1, Decl) == fun_decl ->
     Public     = aeso_syntax:get_ann(public,     Decl, false),
     Private    = aeso_syntax:get_ann(private,    Decl, false),
+    Payable    = aeso_syntax:get_ann(payable,    Decl, false),
     Entrypoint = aeso_syntax:get_ann(entrypoint, Decl, false),
     FunDecl    = element(1, Decl) == fun_decl,
     {id, _, Name} = element(3, Decl),
+    IsInit     = Name == "init" andalso What == contract,
     _ = [ type_error({proto_must_be_entrypoint, Decl})    || FunDecl, Private orelse not Entrypoint, What == contract ],
     _ = [ type_error({proto_in_namespace, Decl})          || FunDecl, What == namespace ],
-    _ = [ type_error({init_must_be_an_entrypoint, Decl})  || not Entrypoint, Name == "init", What == contract ],
+    _ = [ type_error({init_must_be_an_entrypoint, Decl})  || not Entrypoint, IsInit ],
+    _ = [ type_error({init_must_not_be_payable, Decl})    || Payable, IsInit ],
     _ = [ type_error({public_modifier_in_contract, Decl}) || Public, not Private, not Entrypoint, What == contract ],
     _ = [ type_error({entrypoint_in_namespace, Decl})     || Entrypoint, What == namespace ],
     _ = [ type_error({private_entrypoint, Decl})          || Private, Entrypoint ],
@@ -2238,6 +2241,12 @@ mk_error({init_must_be_an_entrypoint, Decl}) ->
     Msg = io_lib:format("The init function (at ~s) must be an entrypoint:\n~s\n",
                         [pp_loc(Decl),
                          prettypr:format(prettypr:nest(2, aeso_pretty:decl(Decl1)))]),
+    mk_t_err(pos(Decl), Msg);
+mk_error({init_must_not_be_payable, Decl}) ->
+    Msg = io_lib:format("The init function (at ~s) cannot be payable.\n"
+                        "You don't need the 'payable' annotation to be able to attach\n"
+                        "funds to the create contract transaction.",
+                        [pp_loc(Decl)]),
     mk_t_err(pos(Decl), Msg);
 mk_error({proto_must_be_entrypoint, Decl}) ->
     Decl1 = mk_entrypoint(Decl),
