@@ -15,6 +15,8 @@
          many/1, many1/1, sep/2, sep1/2,
          infixl/2, infixr/2]).
 
+-export([current_file/0, set_current_file/1]).
+
 %% -- Types ------------------------------------------------------------------
 
 -export_type([parser/1, parser_expr/1, pos/0, token/0, tokens/0]).
@@ -159,7 +161,7 @@ layout() -> ?layout.
 -spec parse(parser(A), tokens()) -> {ok, A} | {error, term()}.
 parse(P, S) ->
   case parse1(apply_p(P, fun(X) -> {return_plus, X, {fail, no_error}} end), S) of
-    {[], {Pos, Err}} -> {error, {Pos, parse_error, flatten_error(Err)}};
+    {[], {Pos, Err}} -> {error, {add_current_file(Pos), parse_error, flatten_error(Err)}};
     {[A], _}         -> {ok, A};
     {As, _}          -> {error, {{1, 1}, ambiguous_parse, As}}
   end.
@@ -289,7 +291,7 @@ parse1({tok_bind, Map}, Ts, Acc, Err) ->
                     %%            y + y)(4)
                     case maps:get(vclose, Map, '$not_found') of
                         '$not_found' ->
-                            {Acc, unexpected_token_error(Ts, T)};
+                            {Acc, unexpected_token_error(Ts, maps:keys(Map), T)};
                         F ->
                             VClose = {vclose, pos(T)},
                             Ts2    = pop_layout(VClose, Ts#ts{ last = VClose }),
@@ -333,7 +335,45 @@ mk_error(Ts, Err) ->
 
 -spec unexpected_token_error(#ts{}, token()) -> error().
 unexpected_token_error(Ts, T) ->
-    mk_error(Ts, io_lib:format("Unexpected token ~p", [tag(T)])).
+    unexpected_token_error(Ts, [], T).
+
+unexpected_token_error(Ts, Expect, {Tag, _}) when Tag == vclose; Tag == vsemi ->
+    Braces = [')', ']', '}'],
+    Fix    = case lists:filter(fun(T) -> lists:member(T, Braces) end, Expect) of
+                 []      -> " Probable causes:\n"
+                            "  - something is missing in the previous statement, or\n"
+                            "  - this line should be indented more.";
+                 [T | _] -> io_lib:format(" Did you forget a ~p?", [T])
+             end,
+    Msg = io_lib:format("Unexpected indentation.~s", [Fix]),
+    mk_error(Ts, Msg);
+unexpected_token_error(Ts, Expect, T) ->
+    ExpectCon = lists:member(con, Expect),
+    ExpectId  = lists:member(id,  Expect),
+    Fix = case T of
+              {id, _,  X}   when ExpectCon, hd(X) /= $_ -> io_lib:format(" Did you mean ~s?", [mk_upper(X)]);
+              {con, _, X}   when ExpectId               -> io_lib:format(" Did you mean ~s?", [mk_lower(X)]);
+              {qcon, _, Xs} when ExpectCon              -> io_lib:format(" Did you mean ~s?", [lists:last(Xs)]);
+              {qid, _,  Xs} when ExpectId               -> io_lib:format(" Did you mean ~s?", [lists:last(Xs)]);
+              _ -> ""
+          end,
+    mk_error(Ts, io_lib:format("Unexpected ~s.~s", [describe(T), Fix])).
+
+mk_upper([C | Rest]) -> string:to_upper([C]) ++ Rest.
+mk_lower([C | Rest]) -> string:to_lower([C]) ++ Rest.
+
+
+describe({id, _, X})     -> io_lib:format("identifier ~s", [X]);
+describe({con, _, X})    -> io_lib:format("identifier ~s", [X]);
+describe({qid, _, Xs})   -> io_lib:format("qualified identifier ~s", [string:join(Xs, ".")]);
+describe({qcon, _, Xs})  -> io_lib:format("qualified identifier ~s", [string:join(Xs, ".")]);
+describe({tvar, _, X})   -> io_lib:format("type variable ~s", [X]);
+describe({char, _, _})   -> "character literal";
+describe({string, _, _}) -> "string literal";
+describe({hex, _, _})    -> "integer literal";
+describe({int, _, _})    -> "integer literal";
+describe({bytes, _, _})  -> "bytes literal";
+describe(T)              -> io_lib:format("token '~s'", [tag(T)]).
 
 %% Get the next token from a token stream. Inserts layout tokens if necessary.
 -spec next_token(#ts{}) -> false | {token(), #ts{}}.
@@ -416,4 +456,14 @@ merge_with(Fun, Map1, Map2) ->
                             maps:update_with(K, fun(R) -> Fun(L, R) end, L, M)
                         end, Map2, maps:to_list(Map1))
     end.
+
+%% Current source file
+current_file() ->
+    get('$current_file').
+
+set_current_file(File) ->
+    put('$current_file', File).
+
+add_current_file({L, C}) -> {current_file(), L, C};
+add_current_file(Pos)    -> Pos.
 

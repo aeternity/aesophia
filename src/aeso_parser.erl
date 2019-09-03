@@ -11,6 +11,7 @@
          type/1]).
 
 -include("aeso_parse_lib.hrl").
+-import(aeso_parse_lib, [current_file/0, set_current_file/1]).
 
 -type parse_result() :: aeso_syntax:ast() | none().
 
@@ -450,12 +451,6 @@ bracket_list(P) -> brackets(comma_sep(P)).
 
 -spec pos_ann(ann_line(), ann_col()) -> ann().
 pos_ann(Line, Col) -> [{file, current_file()}, {line, Line}, {col, Col}].
-
-current_file() ->
-    get('$current_file').
-
-set_current_file(File) ->
-    put('$current_file', File).
 
 ann_pos(Ann) ->
     {proplists:get_value(file, Ann),

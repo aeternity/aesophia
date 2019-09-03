@@ -162,7 +162,16 @@ not_yet_compilable(aevm) -> [].
      end)()).
 
 failing_contracts() ->
-    [ ?TEST(name_clash,
+    %% Parse errors
+    [ ?TEST(field_parse_error,
+       [<<?Pos(5, 26)
+          "Cannot use nested fields or keys in record construction: p.x">>])
+    , ?TEST(vsemi,  [<<?Pos(3, 3) "Unexpected indentation. Did you forget a '}'?">>])
+    , ?TEST(vclose, [<<?Pos(4, 3) "Unexpected indentation. Did you forget a ']'?">>])
+    , ?TEST(indent_fail, [<<?Pos(3, 2) "Unexpected token 'entrypoint'.">>])
+
+    %% Type errors
+    , ?TEST(name_clash,
        [<<?Pos(14, 3)
           "Duplicate definitions of abort at\n"
           "  - (builtin location)\n"
@@ -444,9 +453,6 @@ failing_contracts() ->
           "The init function should return the initial state as its result and cannot read the state,\n"
           "but it calls\n"
           "  - state (at line 13, column 13)">>])
-    , ?TEST(field_parse_error,
-       [<<?Pos("field_parse_error", 5, 26)
-          "Cannot use nested fields or keys in record construction: p.x">>])
     , ?TEST(modifier_checks,
        [<<?Pos(11, 3)
           "The function all_the_things (at line 11, column 3) cannot be both public and private.">>,
