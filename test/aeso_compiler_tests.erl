@@ -601,5 +601,9 @@ failing_code_gen_contracts() ->
             "Invalid oracle type\n"
             "  oracle(string, (int) => int)\n"
             "The response type must not be higher-order (contain function types).")
+    , ?AEVM(higher_order_state, 3, 3,
+            "Invalid state type\n"
+            "  {f : (int) => int}\n"
+            "The state cannot contain functions in the AEVM. Use FATE if you need this.")
     ].
 

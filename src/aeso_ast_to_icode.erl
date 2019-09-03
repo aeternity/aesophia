@@ -67,7 +67,7 @@ contract_to_icode([{namespace, _, Name, Defs} | Rest], Icode) ->
     NS = aeso_icode:get_namespace(Icode),
     Icode1 = contract_to_icode(Defs, aeso_icode:enter_namespace(Name, Icode)),
     contract_to_icode(Rest, aeso_icode:set_namespace(NS, Icode1));
-contract_to_icode([{type_def, _Attrib, Id = {id, _, Name}, Args, Def} | Rest],
+contract_to_icode([Decl = {type_def, _Attrib, Id = {id, _, Name}, Args, Def} | Rest],
                   Icode = #{ types := Types, constructors := Constructors }) ->
     TypeDef = make_type_def(Args, Def, Icode),
     NewConstructors =
@@ -83,7 +83,11 @@ contract_to_icode([{type_def, _Attrib, Id = {id, _, Name}, Args, Def} | Rest],
     Icode1 = Icode#{ types := Types#{ TName => TypeDef },
                      constructors := maps:merge(Constructors, NewConstructors) },
     Icode2 = case Name of
-                "state" when Args == [] -> Icode1#{ state_type => ast_typerep(Def, Icode) };
+                "state" when Args == [] ->
+                     case is_first_order_type(Def) of
+                         true  -> Icode1#{ state_type => ast_typerep(Def, Icode) };
+                         false -> gen_error({higher_order_state, Decl})
+                     end;
                 "state"                 -> gen_error({parameterized_state, Id});
                 "event" when Args == [] -> Icode1#{ event_type => Def };
                 "event"                 -> gen_error({parameterized_event, Id});

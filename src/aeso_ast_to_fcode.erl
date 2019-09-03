@@ -640,10 +640,12 @@ validate_aens_resolve_type(Ann, {app_t, _, _, [Type]}, {variant, [[], [FType]]})
         _              -> fcode_error({invalid_aens_resolve_type, Ann, Type})
     end.
 
-ensure_first_order_entrypoint(Ann, Name, Args, Ret, FArgs, FRet) ->
-    [ ensure_first_order(FT, {invalid_entrypoint, higher_order, Ann1, Name, {argument, X, T}})
+ensure_first_order_entrypoint(Ann, Id = {id, _, Name}, Args, Ret, FArgs, FRet) ->
+    [ ensure_first_order(FT, {invalid_entrypoint, higher_order, Ann1, Id, {argument, X, T}})
       || {{arg, Ann1, X, T}, {_, FT}} <- lists:zip(Args, FArgs) ],
-    ensure_first_order(FRet, {invalid_entrypoint, higher_order, Ann, Name, {result, Ret}}),
+    [ ensure_first_order(FRet, {invalid_entrypoint, higher_order, Ann, Id, {result, Ret}})
+      || Name /= "init" ],  %% init can return higher-order values, since they're written to the store
+                            %% rather than being returned.
     ok.
 
 ensure_monomorphic(Type, Err) ->

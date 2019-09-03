@@ -79,6 +79,10 @@ format({invalid_oracle_type, Why, What, Ann, Type}) ->
     Msg = io_lib:format("Invalid oracle type\n~s\n", [pp_type(2, Type)]),
     Cxt = io_lib:format("The ~s type must not be ~s.\n", [What, WhyS]),
     mk_err(pos(Ann), Msg, Cxt);
+format({higher_order_state, {type_def, Ann, _, _, State}}) ->
+    Msg = io_lib:format("Invalid state type\n~s\n", [pp_type(2, State)]),
+    Cxt = "The state cannot contain functions in the AEVM. Use FATE if you need this.\n",
+    mk_err(pos(Ann), Msg, Cxt);
 
 format(Err) ->
     mk_err(aeso_errors:pos(0, 0), io_lib:format("Unknown error: ~p\n", [Err])).
