@@ -548,7 +548,6 @@ init_env(_Options) -> global_env().
 infer(Contracts, Options) ->
     ets_init(), %% Init the ETS table state
     try
-        io:format("Options = ~p\n", [Options]),
         Env = init_env(Options),
         create_options(Options),
         ets_new(type_vars, [set]),
