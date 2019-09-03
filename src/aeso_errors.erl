@@ -50,6 +50,7 @@ pos(Line, Col) ->
 pos(File, Line, Col) ->
     #pos{ file = File, line = Line, col = Col }.
 
+-spec throw(_) -> ok | no_return().
 throw([]) -> ok;
 throw(Errs) when is_list(Errs) ->
     erlang:throw({error, Errs});

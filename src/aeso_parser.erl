@@ -33,10 +33,10 @@ string(String, Included, Opts) ->
         {ok, AST} ->
             case expand_includes(AST, Included, Opts) of
                 {ok, AST1}   -> AST1;
-                {error, Err} -> aeso_errors:throw(mk_error(Err))
+                {error, Err} -> parse_error(Err)
             end;
         {error, Err} ->
-            aeso_errors:throw(mk_error(Err))
+            parse_error(Err)
     end.
 
 type(String) ->
@@ -51,6 +51,10 @@ parse_and_scan(P, S, Opts) ->
         {ok, Tokens} -> aeso_parse_lib:parse(P, Tokens);
         Error        -> Error
     end.
+
+-dialyzer({nowarn_function, parse_error/1}).
+parse_error(Err) ->
+    aeso_errors:throw(mk_error(Err)).
 
 mk_p_err(Pos, Msg) ->
     aeso_errors:new(parse_error, mk_pos(Pos), lists:flatten(Msg)).

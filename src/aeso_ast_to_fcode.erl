@@ -1459,6 +1459,8 @@ get_attributes(Ann) ->
 indexed(Xs) ->
     lists:zip(lists:seq(1, length(Xs)), Xs).
 
+-dialyzer({nowarn_function, [fcode_error/1, internal_error/1]}).
+
 fcode_error(Error) ->
     aeso_errors:throw(aeso_code_errors:format(Error)).
 

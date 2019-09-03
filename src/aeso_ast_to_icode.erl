@@ -41,6 +41,7 @@ code([], Icode, Options) ->
 
 %% Generate error on correct format.
 
+-dialyzer({nowarn_function, gen_error/1}).
 gen_error(Error) ->
     aeso_errors:throw(aeso_code_errors:format(Error)).
 
@@ -731,6 +732,7 @@ eta_expand(Id = {_, Ann0, _}, {fun_t, _, _, ArgsT, _}, Icode) ->
 check_monomorphic_map({typed, Ann, _, MapType}, Icode) ->
     check_monomorphic_map(Ann, MapType, Icode).
 
+-dialyzer({nowarn_function, check_monomorphic_map/3}).
 check_monomorphic_map(Ann, ?map_t(KeyType, ValType), _Icode) ->
     Err = fun(Why) -> gen_error({invalid_map_key_type, Why, Ann, KeyType}) end,
     [ Err(polymorphic) || not is_monomorphic(KeyType) ],
