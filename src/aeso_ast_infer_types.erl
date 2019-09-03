@@ -2195,7 +2195,7 @@ mk_error({reserved_entrypoint, Name, Def}) ->
 mk_error({duplicate_definition, Name, Locs}) ->
     Msg = io_lib:format("Duplicate definitions of ~s at\n~s",
                         [Name, [ ["  - ", pp_loc(L), "\n"] || L <- Locs ]]),
-    mk_t_err(pos(hd(Locs)), Msg);
+    mk_t_err(pos(lists:last(Locs)), Msg);
 mk_error({duplicate_scope, Kind, Name, OtherKind, L}) ->
     Msg = io_lib:format("The ~p ~s (at ~s) has the same name as a ~p at ~s\n",
                         [Kind, pp(Name), pp_loc(Name), OtherKind, pp_loc(L)]),
