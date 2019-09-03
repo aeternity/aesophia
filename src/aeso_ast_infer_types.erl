@@ -706,7 +706,8 @@ check_modifiers(Env, Contracts) ->
                   {true, []} -> type_error({contract_has_no_entrypoints, Con});
                   _          -> ok
               end;
-          {namespace, _, _, Decls} -> check_modifiers1(namespace, Decls)
+          {namespace, _, _, Decls} -> check_modifiers1(namespace, Decls);
+          Decl -> type_error({bad_top_level_decl, Decl})
       end || C <- Contracts ],
     destroy_and_report_type_errors(Env).
 
@@ -2301,6 +2302,15 @@ mk_error({cannot_call_init_function, Ann}) ->
     Msg = "The 'init' function is called exclusively by the create contract transaction\n"
           "and cannot be called from the contract code.\n",
     mk_t_err(pos(Ann), Msg);
+mk_error({bad_top_level_decl, Decl}) ->
+    What = case element(1, Decl) of
+               letval -> "function or entrypoint";
+               _      -> "contract or namespace"
+           end,
+    Id = element(3, Decl),
+    Msg = io_lib:format("The definition of '~s' must appear inside a ~s.\n",
+                        [pp_expr("", Id), What]),
+    mk_t_err(pos(Decl), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p\n", [Err]),
     mk_t_err(pos(0, 0), Msg).

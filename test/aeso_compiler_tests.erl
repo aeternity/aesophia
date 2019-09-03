@@ -493,6 +493,8 @@ failing_contracts() ->
        [<<?Pos(7, 28)
           "The 'init' function is called exclusively by the create contract transaction\n"
           "and cannot be called from the contract code.">>])
+    , ?TEST(bad_top_level_decl,
+        [<<?Pos(1, 1) "The definition of 'square' must appear inside a contract or namespace.">>])
     ].
 
 -define(Path(File), "code_errors/" ??File).
