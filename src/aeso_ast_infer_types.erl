@@ -2440,7 +2440,7 @@ pp_expr(Label, Expr) ->
 pp_type(Label, Type) ->
     prettypr:format(prettypr:beside(prettypr:text(Label), aeso_pretty:type(Type, [show_generated]))).
 
-src_file(T)      -> aeso_syntax:get_ann(src_file, T, no_file).
+src_file(T)      -> aeso_syntax:get_ann(file, T, no_file).
 line_number(T)   -> aeso_syntax:get_ann(line, T, 0).
 column_number(T) -> aeso_syntax:get_ann(col, T, 0).
 

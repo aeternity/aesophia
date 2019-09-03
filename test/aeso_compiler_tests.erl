@@ -152,11 +152,17 @@ not_yet_compilable(aevm) -> [].
 
 %% Contracts that should produce type errors
 
--define(Pos(Line, Col), "At line " ??Line ", col " ??Col ":\n").
--define(Pos(File, Line, Col), "In '" File ".aes' at line " ??Line ", col " ??Col ":\n").
+-define(Pos(File, Line, Col), "In '", (list_to_binary(File))/binary, ".aes' at line " ??Line ", col " ??Col ":\n").
+-define(Pos(Line, Col), ?Pos(__File, Line, Col)).
+
+-define(TEST(Name, Errs),
+    (fun() ->
+        __File = ??Name,
+        {__File, Errs}
+     end)()).
 
 failing_contracts() ->
-    [ {"name_clash",
+    [ ?TEST(name_clash,
        [<<?Pos(14, 3)
           "Duplicate definitions of abort at\n"
           "  - (builtin location)\n"
@@ -184,8 +190,8 @@ failing_contracts() ->
         <<?Pos(17, 3)
           "Duplicate definitions of state at\n"
           "  - (builtin location)\n"
-          "  - line 17, column 3">>]}
-    , {"type_errors",
+          "  - line 17, column 3">>])
+    , ?TEST(type_errors,
        [<<?Pos(17, 23)
           "Unbound variable zz at line 17, column 23">>,
         <<?Pos(26, 9)
@@ -273,51 +279,51 @@ failing_contracts() ->
         <<?Pos(54, 5)
           "Let binding at line 54, column 5 must be followed by an expression">>,
         <<?Pos(58, 5)
-          "Let binding at line 58, column 5 must be followed by an expression">>]}
-    , {"init_type_error",
+          "Let binding at line 58, column 5 must be followed by an expression">>])
+    , ?TEST(init_type_error,
        [<<?Pos(7, 3)
           "Cannot unify string\n"
           "         and map(int, int)\n"
-          "when checking that 'init' returns a value of type 'state' at line 7, column 3">>]}
-    , {"missing_state_type",
+          "when checking that 'init' returns a value of type 'state' at line 7, column 3">>])
+    , ?TEST(missing_state_type,
        [<<?Pos(5, 3)
           "Cannot unify string\n"
           "         and unit\n"
-          "when checking that 'init' returns a value of type 'state' at line 5, column 3">>]}
-    , {"missing_fields_in_record_expression",
+          "when checking that 'init' returns a value of type 'state' at line 5, column 3">>])
+    , ?TEST(missing_fields_in_record_expression,
        [<<?Pos(7, 42)
           "The field x is missing when constructing an element of type r('a) (at line 7, column 42)">>,
         <<?Pos(8, 42)
           "The field y is missing when constructing an element of type r(int) (at line 8, column 42)">>,
         <<?Pos(6, 42)
-          "The fields y, z are missing when constructing an element of type r('a) (at line 6, column 42)">>]}
-    , {"namespace_clash",
+          "The fields y, z are missing when constructing an element of type r('a) (at line 6, column 42)">>])
+    , ?TEST(namespace_clash,
        [<<?Pos(4, 10)
-          "The contract Call (at line 4, column 10) has the same name as a namespace at (builtin location)">>]}
-    , {"bad_events",
+          "The contract Call (at line 4, column 10) has the same name as a namespace at (builtin location)">>])
+    , ?TEST(bad_events,
         [<<?Pos(9, 25)
            "The indexed type string (at line 9, column 25) is not a word type">>,
          <<?Pos(10, 25)
-           "The indexed type alias_string (at line 10, column 25) equals string which is not a word type">>]}
-    , {"bad_events2",
+           "The indexed type alias_string (at line 10, column 25) equals string which is not a word type">>])
+    , ?TEST(bad_events2,
         [<<?Pos(9, 7)
            "The event constructor BadEvent1 (at line 9, column 7) has too many non-indexed values (max 1)">>,
          <<?Pos(10, 7)
-           "The event constructor BadEvent2 (at line 10, column 7) has too many indexed values (max 3)">>]}
-    , {"type_clash",
+           "The event constructor BadEvent2 (at line 10, column 7) has too many indexed values (max 3)">>])
+    , ?TEST(type_clash,
         [<<?Pos(12, 42)
            "Cannot unify int\n"
            "         and string\n"
            "when checking the record projection at line 12, column 42\n"
            "  r.foo : (gas : int, value : int) => Remote.themap\n"
            "against the expected type\n"
-           "  (gas : int, value : int) => map(string, int)">>]}
-    , {"bad_include_and_ns",
+           "  (gas : int, value : int) => map(string, int)">>])
+    , ?TEST(bad_include_and_ns,
         [<<?Pos(2, 11)
            "Include of 'included.aes' at line 2, column 11\nnot allowed, include only allowed at top level.">>,
          <<?Pos(3, 13)
-           "Nested namespace not allowed\nNamespace 'Foo' at line 3, column 13 not defined at top level.">>]}
-    , {"bad_address_literals",
+           "Nested namespace not allowed\nNamespace 'Foo' at line 3, column 13 not defined at top level.">>])
+    , ?TEST(bad_address_literals,
         [<<?Pos(32, 5)
            "The type bytes(32) is not a contract type\n"
            "when checking that the contract literal at line 32, column 5\n"
@@ -404,8 +410,8 @@ failing_contracts() ->
            "when checking the type of the expression at line 7, column 5\n"
            "  ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt : address\n"
            "against the expected type\n"
-           "  bytes(32)">>]}
-    , {"stateful",
+           "  bytes(32)">>])
+    , ?TEST(stateful,
        [<<?Pos(13, 35)
           "Cannot reference stateful function Chain.spend (at line 13, column 35)\nin the definition of non-stateful function fail1.">>,
         <<?Pos(14, 35)
@@ -421,8 +427,8 @@ failing_contracts() ->
         <<?Pos(49, 56)
           "Cannot pass non-zero value argument 1000 (at line 49, column 56)\nin the definition of non-stateful function fail7.">>,
         <<?Pos(52, 17)
-          "Cannot pass non-zero value argument 1000 (at line 52, column 17)\nin the definition of non-stateful function fail8.">>]}
-    , {"bad_init_state_access",
+          "Cannot pass non-zero value argument 1000 (at line 52, column 17)\nin the definition of non-stateful function fail8.">>])
+    , ?TEST(bad_init_state_access,
        [<<?Pos(11, 5)
           "The init function should return the initial state as its result and cannot write the state,\n"
           "but it calls\n"
@@ -437,11 +443,11 @@ failing_contracts() ->
         <<?Pos(13, 13)
           "The init function should return the initial state as its result and cannot read the state,\n"
           "but it calls\n"
-          "  - state (at line 13, column 13)">>]}
-    , {"field_parse_error",
+          "  - state (at line 13, column 13)">>])
+    , ?TEST(field_parse_error,
        [<<?Pos("field_parse_error", 5, 26)
-          "Cannot use nested fields or keys in record construction: p.x">>]}
-    , {"modifier_checks",
+          "Cannot use nested fields or keys in record construction: p.x">>])
+    , ?TEST(modifier_checks,
        [<<?Pos(11, 3)
           "The function all_the_things (at line 11, column 3) cannot be both public and private.">>,
         <<?Pos(3, 3)
@@ -455,20 +461,20 @@ failing_contracts() ->
         <<?Pos(10, 3)
           "Use 'entrypoint' instead of 'function' for public function foo (at line 10, column 3):\n  entrypoint foo() = ()">>,
         <<?Pos(6, 3)
-          "Use 'entrypoint' instead of 'function' for public function foo (at line 6, column 3):\n  entrypoint foo : () => unit">>]}
-    , {"list_comp_not_a_list",
+          "Use 'entrypoint' instead of 'function' for public function foo (at line 6, column 3):\n  entrypoint foo : () => unit">>])
+    , ?TEST(list_comp_not_a_list,
       [<<?Pos(2, 36)
          "Cannot unify int\n         and list('a)\nwhen checking rvalue of list comprehension binding at line 2, column 36\n  1 : int\nagainst type \n  list('a)">>
-      ]}
-    , {"list_comp_if_not_bool",
+      ])
+    , ?TEST(list_comp_if_not_bool,
       [<<?Pos(2, 44)
          "Cannot unify int\n         and bool\nwhen checking the type of the expression at line 2, column 44\n  3 : int\nagainst the expected type\n  bool">>
-      ]}
-    , {"list_comp_bad_shadow",
+      ])
+    , ?TEST(list_comp_bad_shadow,
       [<<?Pos(2, 53)
          "Cannot unify int\n         and string\nwhen checking the type of the pattern at line 2, column 53\n  x : int\nagainst the expected type\n  string">>
-      ]}
-    , {"map_as_map_key",
+      ])
+    , ?TEST(map_as_map_key,
        [<<?Pos(5, 25)
          "Invalid key type\n"
          "  map(int, int)\n"
@@ -476,11 +482,11 @@ failing_contracts() ->
         <<?Pos(6, 25)
          "Invalid key type\n"
          "  lm\n"
-         "Map keys cannot contain other maps.">>]}
-    , {"calling_init_function",
+         "Map keys cannot contain other maps.">>])
+    , ?TEST(calling_init_function,
        [<<?Pos(7, 28)
           "The 'init' function is called exclusively by the create contract transaction\n"
-          "and cannot be called from the contract code.">>]}
+          "and cannot be called from the contract code.">>])
     ].
 
 -define(Path(File), "code_errors/" ??File).
