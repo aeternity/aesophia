@@ -468,6 +468,15 @@ failing_contracts() ->
       [<<?Pos(2, 53)
          "Cannot unify int\n         and string\nwhen checking the type of the pattern at line 2, column 53\n  x : int\nagainst the expected type\n  string">>
       ]}
+    , {"map_as_map_key",
+       [<<?Pos(5, 25)
+         "Invalid key type\n"
+         "  map(int, int)\n"
+         "Map keys cannot contain other maps.">>,
+        <<?Pos(6, 25)
+         "Invalid key type\n"
+         "  lm\n"
+         "Map keys cannot contain other maps.">>]}
     ].
 
 -define(Path(File), "code_errors/" ??File).

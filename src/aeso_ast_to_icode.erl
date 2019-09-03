@@ -718,15 +718,11 @@ eta_expand(Id = {_, Ann0, _}, {fun_t, _, _, ArgsT, _}, Icode) ->
 check_monomorphic_map({typed, Ann, _, MapType}, Icode) ->
     check_monomorphic_map(Ann, MapType, Icode).
 
-check_monomorphic_map(Ann, Type = ?map_t(KeyType, ValType), Icode) ->
-    case is_monomorphic(KeyType) of
-        true  ->
-            case has_maps(ast_type(KeyType, Icode)) of
-                false -> {KeyType, ValType};
-                true  -> gen_error({cant_use_map_as_map_keys, Ann, Type})
-            end;
-        false -> gen_error({cant_compile_map_with_polymorphic_keys, Ann, Type})
-    end.
+check_monomorphic_map(Ann, ?map_t(KeyType, ValType), _Icode) ->
+    Err = fun(Why) -> gen_error({invalid_map_key_type, Why, Ann, KeyType}) end,
+    [ Err(polymorphic) || not is_monomorphic(KeyType) ],
+    [ Err(function)    || not is_first_order_type(KeyType) ],
+    {KeyType, ValType}.
 
 map_empty(KeyType, ValType, Icode) ->
     prim_call(?PRIM_CALL_MAP_EMPTY, #integer{value = 0},
@@ -927,14 +923,6 @@ type_value({map, K, V}) ->
 ast_fun_to_icode(Name, Attrs, Args, Body, TypeRep, #{functions := Funs} = Icode) ->
     NewFuns = [{Name, Attrs, Args, Body, TypeRep}| Funs],
     aeso_icode:set_functions(NewFuns, Icode).
-
-has_maps({map, _, _})   -> true;
-has_maps(word)          -> false;
-has_maps(string)        -> false;
-has_maps(typerep)       -> false;
-has_maps({list, T})     -> has_maps(T);
-has_maps({tuple, Ts})   -> lists:any(fun has_maps/1, Ts);
-has_maps({variant, Cs}) -> lists:any(fun has_maps/1, lists:append(Cs)).
 
 %% A function is private if not an 'entrypoint', or if it's not defined in the
 %% main contract name space. (NOTE: changes when we introduce inheritance).

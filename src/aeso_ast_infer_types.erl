@@ -1708,7 +1708,7 @@ solve_known_record_types(Env, Constraints) ->
                              C
                      end;
                 _ ->
-                    type_error({not_a_record_type, RecId, When}),
+                    type_error({not_a_record_type, RecType, When}),
                     not_solved
              end
          end
@@ -1823,6 +1823,10 @@ unfold_types(_Env, X, _Options) ->
 unfold_types_in_type(Env, T) ->
     unfold_types_in_type(Env, T, []).
 
+unfold_types_in_type(Env, {app_t, Ann, Id = {id, _, "map"}, Args = [KeyType0, _]}, Options) ->
+    Args1 = [KeyType, _] = unfold_types_in_type(Env, Args, Options),
+    [ type_error({map_in_map_key, KeyType0}) || has_maps(KeyType) ],
+    {app_t, Ann, Id, Args1};
 unfold_types_in_type(Env, {app_t, Ann, Id, Args}, Options) when ?is_type_id(Id) ->
     UnfoldRecords  = proplists:get_value(unfold_record_types, Options, false),
     UnfoldVariants = proplists:get_value(unfold_variant_types, Options, false),
@@ -1870,6 +1874,13 @@ unfold_types_in_type(Env, [H|T], Options) ->
 unfold_types_in_type(_Env, X, _Options) ->
     X.
 
+has_maps({app_t, _, {id, _, "map"}, _}) ->
+    true;
+has_maps(L) when is_list(L) ->
+    lists:any(fun has_maps/1, L);
+has_maps(T) when is_tuple(T) ->
+    has_maps(tuple_to_list(T));
+has_maps(_) -> false.
 
 subst_tvars(Env, Type) ->
     subst_tvars1([{V, T} || {{tvar, _, V}, T} <- Env], Type).
@@ -2282,6 +2293,10 @@ mk_error({new_tuple_syntax, Ann, Ts}) ->
     Msg = io_lib:format("Invalid type\n~s  (at ~s)\nThe syntax of tuple types changed in Sophia version 4.0. Did you mean\n~s\n",
                         [pp_type("  ", {args_t, Ann, Ts}), pp_loc(Ann), pp_type("  ", {tuple_t, Ann, Ts})]),
     mk_t_err(pos(Ann), Msg);
+mk_error({map_in_map_key, KeyType}) ->
+    Msg = io_lib:format("Invalid key type\n~s\n", [pp_type("  ", KeyType)]),
+    Cxt = "Map keys cannot contain other maps.\n",
+    mk_t_err(pos(KeyType), Msg, Cxt);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p\n", [Err]),
     mk_t_err(pos(0, 0), Msg).
