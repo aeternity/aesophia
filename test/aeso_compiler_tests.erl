@@ -477,6 +477,10 @@ failing_contracts() ->
          "Invalid key type\n"
          "  lm\n"
          "Map keys cannot contain other maps.">>]}
+    , {"calling_init_function",
+       [<<?Pos(7, 28)
+          "The 'init' function is called exclusively by the create contract transaction\n"
+          "and cannot be called from the contract code.">>]}
     ].
 
 -define(Path(File), "code_errors/" ??File).

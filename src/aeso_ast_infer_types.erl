@@ -2297,6 +2297,10 @@ mk_error({map_in_map_key, KeyType}) ->
     Msg = io_lib:format("Invalid key type\n~s\n", [pp_type("  ", KeyType)]),
     Cxt = "Map keys cannot contain other maps.\n",
     mk_t_err(pos(KeyType), Msg, Cxt);
+mk_error({cannot_call_init_function, Ann}) ->
+    Msg = "The 'init' function is called exclusively by the create contract transaction\n"
+          "and cannot be called from the contract code.\n",
+    mk_t_err(pos(Ann), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p\n", [Err]),
     mk_t_err(pos(0, 0), Msg).
