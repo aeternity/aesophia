@@ -143,7 +143,6 @@ compile(FCode, Options) ->
 make_function_id(X) ->
     aeb_fate_code:symbol_identifier(make_function_name(X)).
 
-make_function_name(init)               -> <<"INIT">>;
 make_function_name(event)              -> <<"Chain.event">>;
 make_function_name({entrypoint, Name}) -> Name;
 make_function_name({local_fun, Xs})    -> list_to_binary("." ++ string:join(Xs, ".")).

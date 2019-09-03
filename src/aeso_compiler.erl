@@ -144,7 +144,7 @@ string_to_code(ContractString, Options) ->
     Ast = parse(ContractString, Options),
     pp_sophia_code(Ast, Options),
     pp_ast(Ast, Options),
-    {TypeEnv, TypedAst} = aeso_ast_infer_types:infer(Ast, [return_env]),
+    {TypeEnv, TypedAst} = aeso_ast_infer_types:infer(Ast, [return_env | Options]),
     pp_typed_ast(TypedAst, Options),
     case proplists:get_value(backend, Options, aevm) of
         aevm ->

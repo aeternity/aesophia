@@ -106,6 +106,7 @@
     , in_pattern = false              :: boolean()
     , stateful   = false              :: boolean()
     , current_function = none         :: none | aeso_syntax:id()
+    , what       = top                :: top | namespace | contract
     }).
 
 -type env() :: #env{}.
@@ -162,7 +163,7 @@ check_tvar(#env{ typevars = TVars}, T = {tvar, _, X}) ->
 
 -spec bind_fun(name(), type() | typesig(), env()) -> env().
 bind_fun(X, Type, Env) ->
-    case lookup_name(Env, [X]) of
+    case lookup_env(Env, term, [], [X]) of
         false -> force_bind_fun(X, Type, Env);
         {_QId, {Ann1, _}} ->
             type_error({duplicate_definition, X, [Ann1, aeso_syntax:get_ann(Type)]}),
@@ -171,9 +172,14 @@ bind_fun(X, Type, Env) ->
 
 -spec force_bind_fun(name(), type() | typesig(), env()) -> env().
 force_bind_fun(X, Type, Env) ->
-    Ann = aeso_syntax:get_ann(Type),
+    Ann    = aeso_syntax:get_ann(Type),
+    NoCode = get_option(no_code, false),
+    Entry = case X == "init" andalso Env#env.what == contract andalso not NoCode of
+                true  -> {reserved_init, Ann, Type};
+                false -> {Ann, Type}
+            end,
     on_current_scope(Env, fun(Scope = #scope{ funs = Funs }) ->
-                            Scope#scope{ funs = [{X, {Ann, Type}} | Funs] }
+                            Scope#scope{ funs = [{X, Entry} | Funs] }
                           end).
 
 -spec bind_funs([{name(), type() | typesig()}], env()) -> env().
@@ -253,34 +259,32 @@ possible_scopes(#env{ namespace = Current}, Name) ->
     Qual = lists:droplast(Name),
     [ lists:sublist(Current, I) ++ Qual || I <- lists:seq(0, length(Current)) ].
 
--spec lookup_name(env(), qname()) -> false | {qname(), fun_info()}.
-lookup_name(Env, Name) ->
-    lookup_env(Env, term, Name).
-
 -spec lookup_type(env(), type_id()) -> false | {qname(), type_info()}.
 lookup_type(Env, Id) ->
-    lookup_env(Env, type, qname(Id)).
+    lookup_env(Env, type, aeso_syntax:get_ann(Id), qname(Id)).
 
--spec lookup_env(env(), term, qname()) -> false | {qname(), fun_info()};
-                (env(), type, qname()) -> false | {qname(), type_info()}.
-lookup_env(Env, Kind, Name) ->
+-spec lookup_env(env(), term, aeso_syntax:ann(), qname()) -> false | {qname(), fun_info()};
+                (env(), type, aeso_syntax:ann(), qname()) -> false | {qname(), type_info()}.
+lookup_env(Env, Kind, Ann, Name) ->
     Var = case Name of
             [X] when Kind == term -> proplists:get_value(X, Env#env.vars, false);
             _                     -> false
           end,
     case Var of
-        {Ann, Type} -> {Name, {Ann, Type}};
+        {Ann1, Type} -> {Name, {Ann1, Type}};
         false ->
             Names = [ Qual ++ [lists:last(Name)] || Qual <- possible_scopes(Env, Name) ],
-            case [ Res || QName <- Names, Res <- [lookup_env1(Env, Kind, QName)], Res /= false] of
+            case [ Res || QName <- Names, Res <- [lookup_env1(Env, Kind, Ann, QName)], Res /= false] of
                 []    -> false;
                 [Res] -> Res;
-                Many  -> type_error({ambiguous_name, [{qid, Ann, Q} || {Q, {Ann, _}} <- Many]})
+                Many  ->
+                    type_error({ambiguous_name, [{qid, A, Q} || {Q, {A, _}} <- Many]}),
+                    false
             end
     end.
 
--spec lookup_env1(env(), type | term, qname()) -> false | {qname(), fun_info()}.
-lookup_env1(#env{ namespace = Current, scopes = Scopes }, Kind, QName) ->
+-spec lookup_env1(env(), type | term, aeso_syntax:ann(), qname()) -> false | {qname(), fun_info()}.
+lookup_env1(#env{ namespace = Current, scopes = Scopes }, Kind, Ann, QName) ->
     Qual = lists:droplast(QName),
     Name = lists:last(QName),
     AllowPrivate = lists:prefix(Qual, Current),
@@ -295,9 +299,12 @@ lookup_env1(#env{ namespace = Current, scopes = Scopes }, Kind, QName) ->
             %% Look up the unqualified name
             case proplists:get_value(Name, Defs, false) of
                 false -> false;
-                {Ann, _} = E ->
+                {reserved_init, Ann1, Type} ->
+                    type_error({cannot_call_init_function, Ann}),
+                    {QName, {Ann1, Type}};  %% Return the type to avoid an extra not-in-scope error
+                {Ann1, _} = E ->
                     %% Check that it's not private (or we can see private funs)
-                    case not is_private(Ann) orelse AllowPrivate of
+                    case not is_private(Ann1) orelse AllowPrivate of
                         true  -> {QName, E};
                         false -> false
                     end
@@ -532,7 +539,7 @@ map_t(As, K, V) -> {app_t, As, {id, As, "map"}, [K, V]}.
 infer(Contracts) ->
     infer(Contracts, []).
 
--type option() :: return_env | dont_unfold.
+-type option() :: return_env | dont_unfold | no_code | term().
 
 -spec init_env(list(option())) -> env().
 init_env(_Options) -> global_env().
@@ -602,7 +609,8 @@ infer_constant({letval, Attrs,_Pattern, Type, E}) ->
 %% infer_contract takes a proplist mapping global names to types, and
 %% a list of definitions.
 -spec infer_contract(env(), contract | namespace, [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
-infer_contract(Env, What, Defs) ->
+infer_contract(Env0, What, Defs) ->
+    Env  = Env0#env{ what = What },
     Kind = fun({type_def, _, _, _, _})  -> type;
               ({letfun, _, _, _, _, _}) -> function;
               ({fun_decl, _, _, _})     -> prototype;
@@ -830,8 +838,8 @@ is_string_type({bytes_t, _, N}) -> N > 32;
 is_string_type(_) -> false.
 
 -spec check_constructor_overlap(env(), aeso_syntax:con(), type()) -> ok | no_return().
-check_constructor_overlap(Env, Con = {con, _, Name}, NewType) ->
-    case lookup_name(Env, Name) of
+check_constructor_overlap(Env, Con = {con, Ann, Name}, NewType) ->
+    case lookup_env(Env, term, Ann, Name) of
         false -> ok;
         {_, {Ann, Type}} ->
             OldType = case Type of {type_sig, _, _, _, T} -> T;
@@ -965,7 +973,7 @@ lookup_name(Env, As, Name) ->
     lookup_name(Env, As, Name, []).
 
 lookup_name(Env, As, Id, Options) ->
-    case lookup_name(Env, qname(Id)) of
+    case lookup_env(Env, term, As, qname(Id)) of
         false ->
             type_error({unbound_variable, Id}),
             {Id, fresh_uvar(As)};
