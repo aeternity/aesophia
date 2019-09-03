@@ -34,6 +34,7 @@
         , pos/2
         , pos/3
         , pp/1
+        , throw/1
         , type/1
         ]).
 
@@ -48,6 +49,12 @@ pos(Line, Col) ->
 
 pos(File, Line, Col) ->
     #pos{ file = File, line = Line, col = Col }.
+
+throw([]) -> ok;
+throw(Errs) when is_list(Errs) ->
+    erlang:throw({error, Errs});
+throw(#err{} = Err) ->
+    erlang:throw({error, [Err]}).
 
 msg(#err{ message = Msg, context = none }) -> Msg;
 msg(#err{ message = Msg, context = Ctxt }) -> Msg ++ Ctxt.
@@ -68,4 +75,4 @@ pp(#err{ pos = Pos } = Err) ->
 pp_pos(#pos{file = no_file, line = L, col = C}) ->
     io_lib:format("At line ~p, col ~p:", [L, C]);
 pp_pos(#pos{file = F, line = L, col = C}) ->
-    io_lib:format("In '~s' at line ~p, col~p:", [F, L, C]).
+    io_lib:format("In '~s' at line ~p, col ~p:", [F, L, C]).

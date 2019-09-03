@@ -39,7 +39,7 @@ simple_contracts_test_() ->
             RightAssoc = fun(Op) -> CheckParens({a, Op, {b, Op, c}}) end,
             NonAssoc   = fun(Op) ->
                             OpAtom = list_to_atom(Op),
-                            ?assertThrow({parse_errors, [_]},
+                            ?assertThrow({error, [_]},
                                          parse_expr(NoPar({a, Op, {b, Op, c}}))) end,
             Stronger = fun(Op1, Op2) ->
                     CheckParens({{a, Op1, b}, Op2, c}),

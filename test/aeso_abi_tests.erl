@@ -163,7 +163,7 @@ permissive_literals_fail_test() ->
         "    Chain.spend(o, 1000000)\n",
     {error, [Err]} =
         aeso_compiler:check_call(Contract, "haxx", ["#123"], []),
-    ?assertMatch("Cannot unify" ++ _, aeso_errors:pp(Err)),
+    ?assertMatch("At line 3, col 5:\nCannot unify" ++ _, aeso_errors:pp(Err)),
     ?assertEqual(type_error, aeso_errors:type(Err)),
     ok.
 

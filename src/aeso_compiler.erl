@@ -98,15 +98,7 @@ from_string(Backend, ContractString, Options) ->
     try
         from_string1(Backend, ContractString, Options)
     catch
-        %% The compiler errors.
-        throw:{parse_errors, Errors} ->
-            {error, Errors};
-        throw:{type_errors, Errors} ->
-            {error, Errors};
-        error:{code_errors, Errors} ->
-            {error, join_errors("Code errors", Errors,
-                                fun (E) -> io_lib:format("~p", [E]) end)}
-        %% General programming errors in the compiler just signal error.
+        throw:{error, Errors} -> {error, Errors}
     end.
 
 from_string1(aevm, ContractString, Options) ->
@@ -230,16 +222,10 @@ check_call1(ContractString0, FunName, Args, Options) ->
                 {ok, FunName, CallArgs}
         end
     catch
-        throw:{parse_errors, Errors} ->
-            {error, Errors};
-        throw:{type_errors, Errors} ->
-            {error, Errors};
+        throw:{error, Errors} -> {error, Errors};
         error:{badmatch, {error, missing_call_function}} ->
             {error, join_errors("Type errors", ["missing __call function"],
-                                fun (E) -> E end)};
-        throw:Error ->                          %Don't ask
-            {error, join_errors("Code errors", [Error],
-                                fun (E) -> io_lib:format("~p", [E]) end)}
+                                fun (E) -> E end)}
     end.
 
 arguments_of_body(CallName, _FunName, Fcode) ->
@@ -345,16 +331,10 @@ to_sophia_value(ContractString, FunName, ok, Data, Options0) ->
                end
         end
     catch
-        throw:{parse_errors, Errors} ->
-            {error, Errors};
-        throw:{type_errors, Errors} ->
-            {error, Errors};
+        throw:{error, Errors} -> {error, Errors};
         error:{badmatch, {error, missing_function}} ->
             {error, join_errors("Type errors", ["no function: '" ++ FunName ++ "'"],
-                                fun (E) -> E end)};
-        throw:Error ->                          %Don't ask
-            {error, join_errors("Code errors", [Error],
-                                fun (E) -> io_lib:format("~p", [E]) end)}
+                                fun (E) -> E end)}
     end.
 
 
@@ -444,16 +424,11 @@ decode_calldata(ContractString, FunName, Calldata, Options0) ->
                 end
         end
     catch
-        throw:{parse_errors, Errors} ->
-            {error, Errors};
-        throw:{type_errors, Errors} ->
+        throw:{error, Errors} ->
             {error, Errors};
         error:{badmatch, {error, missing_function}} ->
             {error, join_errors("Type errors", ["no function: '" ++ FunName ++ "'"],
-                                fun (E) -> E end)};
-        throw:Error ->                          %Don't ask
-            {error, join_errors("Code errors", [Error],
-                                fun (E) -> io_lib:format("~p", [E]) end)}
+                                fun (E) -> E end)}
     end.
 
 get_arg_icode(Funs) ->

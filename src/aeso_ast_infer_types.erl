@@ -2069,7 +2069,7 @@ destroy_and_report_type_errors(Env) ->
     %% io:format("Type errors now: ~p\n", [Errors0]),
     ets_delete(type_errors),
     Errors  = [ mk_error(unqualify(Env, Err)) || Err <- Errors0 ],
-    Errors == [] orelse throw({type_errors, Errors}).
+    aeso_errors:throw(Errors).  %% No-op if Errors == []
 
 %% Strip current namespace from error message for nicer printing.
 unqualify(#env{ namespace = NS }, {qid, Ann, Xs}) ->

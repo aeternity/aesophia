@@ -33,10 +33,10 @@ string(String, Included, Opts) ->
         {ok, AST} ->
             case expand_includes(AST, Included, Opts) of
                 {ok, AST1}   -> AST1;
-                {error, Err} -> throw({parse_errors, [mk_error(Err)]})
+                {error, Err} -> aeso_errors:throw(mk_error(Err))
             end;
         {error, Err} ->
-            throw({parse_errors, [mk_error(Err)]})
+            aeso_errors:throw(mk_error(Err))
     end.
 
 type(String) ->

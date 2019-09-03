@@ -74,18 +74,8 @@ do_contract_interface(Type, ContractString, Options) ->
             string -> do_render_aci_json(JArray)
         end
     catch
-        throw:{type_errors, Errors} -> {error, Errors};
-        %% The compiler errors.
-        error:{parse_errors, Errors} ->
-            {error, join_errors("Parse errors", Errors, fun(E) -> E end)};
-        error:{code_errors, Errors} ->
-            {error, join_errors("Code errors", Errors,
-                                fun (E) -> io_lib:format("~p", [E]) end)}
+        throw:{error, Errors} -> {error, Errors}
     end.
-
-join_errors(Prefix, Errors, Pfun) ->
-    Ess = [ Pfun(E) || E <- Errors ],
-    list_to_binary(string:join([Prefix|Ess], "\n")).
 
 encode_contract(Contract = {contract, _, {con, _, Name}, _}) ->
     C0 = #{name => encode_name(Name)},

@@ -21,8 +21,8 @@ convert_typed(TypedTree, Options) ->
         case lists:last(TypedTree) of
             {contract, Attrs, {con, _, Con}, _} ->
                 {proplists:get_value(payable, Attrs, false), Con};
-            _ ->
-                gen_error(last_declaration_must_be_contract)
+            Decl ->
+                gen_error({last_declaration_must_be_contract, Decl})
            end,
     NewIcode = aeso_icode:set_payable(Payable,
                    aeso_icode:set_name(Name, aeso_icode:new(Options))),
@@ -42,17 +42,17 @@ code([], Icode, Options) ->
 %% Generate error on correct format.
 
 gen_error(Error) ->
-    error({code_errors, [Error]}).
+    aeso_errors:throw(aeso_code_errors:format(Error)).
 
 %% Create default init function (only if state is unit).
-add_default_init_function(Icode = #{functions := Funs, state_type := State}, Options) ->
+add_default_init_function(Icode = #{namespace := NS, functions := Funs, state_type := State}, Options) ->
     NoCode        = proplists:get_value(no_code, Options, false),
     {_, _, QInit} = aeso_icode:qualify({id, [], "init"}, Icode),
     case lists:keymember(QInit, 1, Funs) of
         true -> Icode;
         false when NoCode -> Icode;
         false when State /= {tuple, []} ->
-            gen_error(missing_init_function);
+            gen_error({missing_init_function, NS});
         false ->
             Type  = {tuple, [typerep, {tuple, []}]},
             Value = #tuple{ cpts = [type_value({tuple, []}), {tuple, []}] },
@@ -83,9 +83,9 @@ contract_to_icode([{type_def, _Attrib, Id = {id, _, Name}, Args, Def} | Rest],
                      constructors := maps:merge(Constructors, NewConstructors) },
     Icode2 = case Name of
                 "state" when Args == [] -> Icode1#{ state_type => ast_typerep(Def, Icode) };
-                "state"                 -> gen_error(state_type_cannot_be_parameterized);
+                "state"                 -> gen_error({parameterized_state, Id});
                 "event" when Args == [] -> Icode1#{ event_type => Def };
-                "event"                 -> gen_error(event_type_cannot_be_parameterized);
+                "event"                 -> gen_error({parameterized_event, Id});
                 _                       -> Icode1
              end,
     contract_to_icode(Rest, Icode2);
@@ -398,10 +398,8 @@ ast_binop(Op, Ann, {typed, _, A, Type}, B, Icode)
     when Op == '=='; Op == '!=';
          Op == '<';  Op == '>';
          Op == '<='; Op == '=<'; Op == '>=' ->
-    Monomorphic = is_monomorphic(Type),
+    [ gen_error({cant_compare_type_aevm, Ann, Op, Type}) || not is_simple_type(Type) ],
     case ast_typerep(Type, Icode) of
-        _ when not Monomorphic ->
-            gen_error({cant_compare_polymorphic_type, Ann, Op, Type});
         word   -> #binop{op = Op, left = ast_body(A, Icode), right = ast_body(B, Icode)};
         OtherType ->
             Neg = case Op of
@@ -767,20 +765,33 @@ map_upd(Key, Default, ValFun, Map = {typed, Ann, _, MapType}, Icode) ->
     builtin_call(FunName, Args).
 
 check_entrypoint_type(Ann, Name, Args, Ret) ->
-    Check = fun(T, Err) ->
-                case is_simple_type(T) of
+    CheckFirstOrder = fun(T, Err) ->
+                case is_first_order_type(T) of
                     false -> gen_error(Err);
                     true  -> ok
                 end end,
-    [ Check(T, {entrypoint_argument_must_have_simple_type, Ann1, Name, X, T})
+    CheckMonomorphic = fun(T, Err) ->
+                case is_monomorphic(T) of
+                    false -> gen_error(Err);
+                    true  -> ok
+                end end,
+    [ CheckFirstOrder(T, {entrypoint_argument_must_have_first_order_type, Ann1, Name, X, T})
       || {arg, Ann1, X, T} <- Args ],
-    Check(Ret, {entrypoint_must_have_simple_return_type, Ann, Name, Ret}).
+    CheckFirstOrder(Ret, {entrypoint_must_have_first_order_return_type, Ann, Name, Ret}),
+    [ CheckMonomorphic(T, {entrypoint_argument_must_have_monomorphic_type, Ann1, Name, X, T})
+      || {arg, Ann1, X, T} <- Args ],
+    CheckMonomorphic(Ret, {entrypoint_must_have_monomorphic_return_type, Ann, Name, Ret}).
 
 is_simple_type({tvar, _, _})        -> false;
 is_simple_type({fun_t, _, _, _, _}) -> false;
 is_simple_type(Ts) when is_list(Ts) -> lists:all(fun is_simple_type/1, Ts);
 is_simple_type(T) when is_tuple(T)  -> is_simple_type(tuple_to_list(T));
 is_simple_type(_)                   -> true.
+
+is_first_order_type({fun_t, _, _, _, _}) -> false;
+is_first_order_type(Ts) when is_list(Ts) -> lists:all(fun is_first_order_type/1, Ts);
+is_first_order_type(T) when is_tuple(T)  -> is_first_order_type(tuple_to_list(T));
+is_first_order_type(_)                   -> true.
 
 is_monomorphic({tvar, _, _}) -> false;
 is_monomorphic([H|T]) ->

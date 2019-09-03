@@ -1,0 +1,8 @@
+contract HigherOrderCompare =
+
+  function cmp(x : int => int, y) : bool =
+    x < y
+
+  entrypoint test() =
+    let f(x) = (y) => x + y
+    cmp(f(1), f(2))
