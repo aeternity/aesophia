@@ -20,7 +20,7 @@
 
 -type fun_name() :: {entrypoint, binary()}
                   | {local_fun, [string()]}
-                  | init | event.
+                  | event.
 -type var_name() :: string().
 -type sophia_name() :: [string()].
 
@@ -910,10 +910,9 @@ add_init_function(Env, StateType, Funs0) ->
         false ->
             Funs     = add_default_init_function(Env, StateType, Funs0),
             InitName = {entrypoint, <<"init">>},
-            InitFun  = #{ args := InitArgs } = maps:get(InitName, Funs, none),
-            Vars     = [ {var, X} || {X, _} <- InitArgs ],
-            Funs#{ init => InitFun#{ return => {tuple, []},
-                                     body   => {builtin, set_state, [{def, InitName, Vars}]} } }
+            InitFun  = #{ body := InitBody} = maps:get(InitName, Funs),
+            Funs#{ InitName => InitFun#{ return => {tuple, []},
+                                         body   => {builtin, set_state, [InitBody]} } }
     end.
 
 add_default_init_function(_Env, StateType, Funs) ->
@@ -1460,7 +1459,6 @@ pp_fun(Name, #{ args := Args, return := Return, body := Body }) ->
                pp_text(" : "), pp_ftype(Return), pp_text(" =")]),
              prettypr:nest(2, pp_fexpr(Body))).
 
-pp_fun_name(init)            -> pp_text('INIT');
 pp_fun_name(event)           -> pp_text(event);
 pp_fun_name({entrypoint, E}) -> pp_text(binary_to_list(E));
 pp_fun_name({local_fun, Q})  -> pp_text(string:join(Q, ".")).
