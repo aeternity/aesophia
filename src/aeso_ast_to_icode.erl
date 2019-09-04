@@ -220,8 +220,8 @@ ast_body({qid, _, ["Bits", "all"]}, _Icode) ->
 %% Other terms
 ast_body({id, _, Name}, _Icode) ->
     #var_ref{name = Name};
-ast_body({typed, _, Id = {qid, _, Name}, Type}, Icode) ->
-    case is_builtin_fun(Name, Icode) of
+ast_body({typed, _, Id = {qid, _, _}, Type}, Icode) ->
+    case is_builtin_fun(Id, Icode) of
         true  -> eta_expand(Id, Type, Icode);
         false -> ast_body(Id, Icode)
     end;
@@ -342,9 +342,12 @@ ast_body({switch,_,A,Cases}, Icode) ->
     #switch{expr=ast_body(A, Icode),
             cases=[{ast_body(Pat, Icode),ast_body(Body, Icode)}
               || {'case',_,Pat,Body} <- Cases]};
-ast_body({block,As,[{letval,_,Pat,_,E}|Rest]}, Icode) ->
-    #switch{expr=ast_body(E, Icode),
-            cases=[{ast_body(Pat, Icode),ast_body({block,As,Rest}, Icode)}]};
+ast_body({block, As, [{letval, _, Pat, _, E} | Rest]}, Icode) ->
+    E1    = ast_body(E, Icode),
+    Pat1  = ast_body(Pat, Icode),
+    Rest1 = ast_body({block, As, Rest}, Icode),
+    #switch{expr  = E1,
+            cases = [{Pat1, Rest1}]};
 ast_body({block, As, [{letfun, Ann, F, Args, _Type, Expr} | Rest]}, Icode) ->
     ast_body({block, As, [{letval, Ann, F, unused, {lam, Ann, Args, Expr}} | Rest]}, Icode);
 ast_body({block,_,[]}, _Icode) ->
@@ -726,12 +729,14 @@ builtin_code(_, {qid, _, ["Bytes", "to_str"]}, [Bytes], _, _, Icode) ->
 builtin_code(_As, Fun, _Args, _ArgsT, _RetT, _Icode) ->
     gen_error({missing_code_for, Fun}).
 
-eta_expand(Id = {_, Ann0, _}, {fun_t, _, _, ArgsT, _}, Icode) ->
+eta_expand(Id = {_, Ann0, _}, {fun_t, _, [], ArgsT, _}, Icode) ->
     Ann = [{origin, system} | Ann0],
     Xs  = [ {arg, Ann, {id, Ann, "%" ++ integer_to_list(I)}, T} ||
             {I, T} <- lists:zip(lists:seq(1, length(ArgsT)), ArgsT) ],
     Args = [ X || {arg, _, X, _} <- Xs ],
-    ast_body({lam, Ann, Xs, {app, Ann, Id, Args}}, Icode).
+    ast_body({lam, Ann, Xs, {app, Ann, Id, Args}}, Icode);
+eta_expand(Id, _Type, _Icode) ->
+    gen_error({unapplied_named_arg_builtin, Id}).
 
 check_monomorphic_map({typed, Ann, _, MapType}, Icode) ->
     check_monomorphic_map(Ann, MapType, Icode).
