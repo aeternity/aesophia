@@ -528,8 +528,7 @@ builtin_code(_, {qid, Ann, ["Oracle", "register"]}, Args, _, OracleType = ?oracl
                ast_type_value(QType, Icode), ast_type_value(RType, Icode)],
               [word, sign_t(), word, ttl_t(Icode), typerep, typerep], word);
 
-builtin_code(_, {qid, Ann, ["Oracle", "query_fee"]}, [Oracle], [OracleType], _, Icode) ->
-    check_oracle_type(Ann, OracleType),
+builtin_code(_, {qid, _, ["Oracle", "query_fee"]}, [Oracle], [_], _, Icode) ->
     prim_call(?PRIM_CALL_ORACLE_QUERY_FEE, #integer{value = 0},
               [ast_body(Oracle, Icode)], [word], word);
 
@@ -539,8 +538,7 @@ builtin_code(_, {qid, Ann, ["Oracle", "query"]}, [Oracle, Q, QFee, QTTL, RTTL], 
               [ast_body(Oracle, Icode), ast_body(Q, Icode), ast_body(QTTL, Icode), ast_body(RTTL, Icode)],
               [word, ast_type(QType, Icode), ttl_t(Icode), ttl_t(Icode)], word);
 
-builtin_code(_, {qid, Ann, ["Oracle", "extend"]}, Args, [OracleType, _], _, Icode) ->
-    check_oracle_type(Ann, OracleType),
+builtin_code(_, {qid, _, ["Oracle", "extend"]}, Args, [_, _], _, Icode) ->
     {Sign, [Oracle, TTL]} = get_signature_arg(Args),
     prim_call(?PRIM_CALL_ORACLE_EXTEND, #integer{value = 0},
               [ast_body(Oracle, Icode), ast_body(Sign, Icode), ast_body(TTL, Icode)],
@@ -729,14 +727,14 @@ builtin_code(_, {qid, _, ["Bytes", "to_str"]}, [Bytes], _, _, Icode) ->
 builtin_code(_As, Fun, _Args, _ArgsT, _RetT, _Icode) ->
     gen_error({missing_code_for, Fun}).
 
-eta_expand(Id = {_, Ann0, _}, {fun_t, _, [], ArgsT, _}, Icode) ->
+eta_expand(Id = {_, Ann0, _}, Type = {fun_t, _, [], ArgsT, _}, Icode) ->
     Ann = [{origin, system} | Ann0],
     Xs  = [ {arg, Ann, {id, Ann, "%" ++ integer_to_list(I)}, T} ||
             {I, T} <- lists:zip(lists:seq(1, length(ArgsT)), ArgsT) ],
-    Args = [ X || {arg, _, X, _} <- Xs ],
-    ast_body({lam, Ann, Xs, {app, Ann, Id, Args}}, Icode);
+    Args = [ {typed, Ann, X, T} || {arg, _, X, T} <- Xs ],
+    ast_body({lam, Ann, Xs, {app, Ann, {typed, Ann, Id, Type}, Args}}, Icode);
 eta_expand(Id, _Type, _Icode) ->
-    gen_error({unapplied_named_arg_builtin, Id}).
+    gen_error({unapplied_builtin, Id}).
 
 check_monomorphic_map({typed, Ann, _, MapType}, Icode) ->
     check_monomorphic_map(Ann, MapType, Icode).
