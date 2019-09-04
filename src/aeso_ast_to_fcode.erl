@@ -67,6 +67,7 @@
                | {def_u, fun_name(), arity()}
                | {remote_u, [ftype()], ftype(), fexpr(), fun_name()}
                | {builtin_u, builtin(), arity()}
+               | {builtin_u, builtin(), arity(), [fexpr()]} %% Typerep arguments to be added after normal args.
                | {lam, [var_name()], fexpr()}.
 
 -type fsplit() :: {split, ftype(), var_name(), [fcase()]}
@@ -406,7 +407,28 @@ expr_to_fcode(_Env, _Type, {bytes,           _, B}) -> {lit, {bytes, B}};
 
 %% Variables
 expr_to_fcode(Env, _Type, {id, _, X})  -> resolve_var(Env, [X]);
-expr_to_fcode(Env, _Type, {qid, _, X}) -> resolve_var(Env, X);
+expr_to_fcode(Env, Type, {qid, Ann, X}) ->
+    case resolve_var(Env, X) of
+        {builtin_u, B, Ar} when B =:= oracle_query;
+                                B =:= oracle_get_question;
+                                B =:= oracle_get_answer;
+                                B =:= oracle_respond;
+                                B =:= oracle_register;
+                                B =:= oracle_check;
+                                B =:= oracle_check_query ->
+            OType = get_oracle_type(B, Type),
+            {oracle, QType, RType} = type_to_fcode(Env, OType),
+            validate_oracle_type(Ann, OType, QType, RType),
+            TypeArgs = [{lit, {typerep, QType}}, {lit, {typerep, RType}}],
+            {builtin_u, B, Ar, TypeArgs};
+        {builtin_u, B = aens_resolve, Ar} ->
+            {fun_t, _, _, _, ResType} = Type,
+            AensType = type_to_fcode(Env, ResType),
+            validate_aens_resolve_type(Ann, ResType, AensType),
+            TypeArgs = [{lit, {typerep, AensType}}],
+            {builtin_u, B, Ar, TypeArgs};
+        Other -> Other
+    end;
 
 %% Constructors
 expr_to_fcode(Env, Type, {C, _, _} = Con) when C == con; C == qcon ->
@@ -527,31 +549,13 @@ expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
     end;
 
 %% Function calls
-expr_to_fcode(Env, Type, {app, _, Fun = {typed, _, _, {fun_t, _, NamedArgsT, _, _}}, Args}) ->
+expr_to_fcode(Env, _Type, {app, _, Fun = {typed, _, _, {fun_t, _, NamedArgsT, _, _}}, Args}) ->
     Args1 = get_named_args(NamedArgsT, Args),
     FArgs = [expr_to_fcode(Env, Arg) || Arg <- Args1],
     case expr_to_fcode(Env, Fun) of
-        {builtin_u, B, _} when B =:= oracle_query;
-                               B =:= oracle_get_question;
-                               B =:= oracle_get_answer;
-                               B =:= oracle_respond;
-                               B =:= oracle_register;
-                               B =:= oracle_check;
-                               B =:= oracle_check_query ->
-            %% Get the type of the oracle from the args or the expression itself
-            OType = get_oracle_type(B, Type, Args1),
-            {oracle, QType, RType} = type_to_fcode(Env, OType),
-            validate_oracle_type(aeso_syntax:get_ann(Fun), OType, QType, RType),
-            TypeArgs = [{lit, {typerep, QType}}, {lit, {typerep, RType}}],
-            builtin_to_fcode(B, FArgs ++ TypeArgs);
-        {builtin_u, B, _} when B =:= aens_resolve ->
-            %% Get the type we are assuming the name resolves to
-            AensType = type_to_fcode(Env, Type),
-            validate_aens_resolve_type(aeso_syntax:get_ann(Fun), Type, AensType),
-            TypeArgs = [{lit, {typerep, AensType}}],
-            builtin_to_fcode(B, FArgs ++ TypeArgs);
-        {builtin_u, B, _Ar}       -> builtin_to_fcode(B, FArgs);
-        {def_u, F, _Ar}           -> {def, F, FArgs};
+        {builtin_u, B, _Ar, TypeArgs}     -> builtin_to_fcode(B, FArgs ++ TypeArgs);
+        {builtin_u, B, _Ar}               -> builtin_to_fcode(B, FArgs);
+        {def_u, F, _Ar}                   -> {def, F, FArgs};
         {remote_u, ArgsT, RetT, Ct, RFun} -> {remote, ArgsT, RetT, Ct, RFun, FArgs};
         FFun ->
             %% FFun is a closure, with first component the function name and
@@ -615,13 +619,13 @@ make_if(Cond, Then, Else) ->
     {'let', X, Cond, make_if({var, X}, Then, Else)}.
 
 
-get_oracle_type(oracle_register,     OType, _Args) -> OType;
-get_oracle_type(oracle_query,        _Type, [{typed, _, _Expr, OType} | _])   -> OType;
-get_oracle_type(oracle_get_question, _Type, [{typed, _, _Expr, OType} | _])   -> OType;
-get_oracle_type(oracle_get_answer,   _Type, [{typed, _, _Expr, OType} | _])   -> OType;
-get_oracle_type(oracle_check,        _Type, [{typed, _, _Expr, OType}])       -> OType;
-get_oracle_type(oracle_check_query,  _Type, [{typed, _, _Expr, OType} | _])   -> OType;
-get_oracle_type(oracle_respond,      _Type, [_, {typed, _,_Expr, OType} | _]) -> OType.
+get_oracle_type(oracle_register,     {fun_t, _, _, _, OType})       -> OType;
+get_oracle_type(oracle_query,        {fun_t, _, _, [OType | _], _}) -> OType;
+get_oracle_type(oracle_get_question, {fun_t, _, _, [OType | _], _}) -> OType;
+get_oracle_type(oracle_get_answer,   {fun_t, _, _, [OType | _], _}) -> OType;
+get_oracle_type(oracle_check,        {fun_t, _, _, [OType | _], _}) -> OType;
+get_oracle_type(oracle_check_query,  {fun_t, _, _, [OType | _], _}) -> OType;
+get_oracle_type(oracle_respond,      {fun_t, _, _, [OType | _], _}) -> OType.
 
 validate_oracle_type(Ann, Type, QType, RType) ->
     ensure_monomorphic(QType, {invalid_oracle_type, polymorphic,  query,    Ann, Type}),
@@ -1027,9 +1031,14 @@ make_closure(FVs, Xs, Body) ->
 lambda_lift_expr({lam, Xs, Body}) ->
     FVs   = free_vars({lam, Xs, Body}),
     make_closure(FVs, Xs, lambda_lift_expr(Body));
-lambda_lift_expr({Tag, F, Ar}) when Tag == def_u; Tag == builtin_u ->
+lambda_lift_expr(UExpr) when element(1, UExpr) == def_u; element(1, UExpr) == builtin_u ->
+    [Tag, F, Ar | _] = tuple_to_list(UExpr),
+    ExtraArgs = case UExpr of
+                    {builtin_u, _, _, TypeArgs} -> TypeArgs;
+                    _                           -> []
+                end,
     Xs   = [ lists:concat(["arg", I]) || I <- lists:seq(1, Ar) ],
-    Args = [{var, X} || X <- Xs],
+    Args = [{var, X} || X <- Xs] ++ ExtraArgs,
     Body = case Tag of
                builtin_u -> builtin_to_fcode(F, Args);
                def_u     -> {def, F, Args}
@@ -1279,6 +1288,7 @@ free_vars(Expr) ->
         {remote_u, _, _, Ct, _}   -> free_vars(Ct);
         {builtin, _, As}     -> free_vars(As);
         {builtin_u, _, _}    -> [];
+        {builtin_u, _, _, _} -> [];     %% Typereps are always literals
         {con, _, _, As}      -> free_vars(As);
         {tuple, As}          -> free_vars(As);
         {proj, A, _}         -> free_vars(A);
@@ -1307,6 +1317,7 @@ used_defs(Expr) ->
         {remote_u, _, _, Ct, _}   -> used_defs(Ct);
         {builtin, _, As}     -> used_defs(As);
         {builtin_u, _, _}    -> [];
+        {builtin_u, _, _, _} -> [];
         {con, _, _, As}      -> used_defs(As);
         {tuple, As}          -> used_defs(As);
         {proj, A, _}         -> used_defs(A);
@@ -1347,6 +1358,7 @@ rename(Ren, Expr) ->
         {def_u, _, _}         -> Expr;
         {builtin, B, Es}      -> {builtin, B, [rename(Ren, E) || E <- Es]};
         {builtin_u, _, _}     -> Expr;
+        {builtin_u, _, _, _}  -> Expr;
         {remote, ArgsT, RetT, Ct, F, Es} -> {remote,   ArgsT, RetT, rename(Ren, Ct), F, [rename(Ren, E) || E <- Es]};
         {remote_u, ArgsT, RetT, Ct, F}   -> {remote_u, ArgsT, RetT, rename(Ren, Ct), F};
         {con, Ar, I, Es}      -> {con, Ar, I, [rename(Ren, E) || E <- Es]};
@@ -1493,7 +1505,8 @@ pp_fun_name({local_fun, Q})  -> pp_text(string:join(Q, ".")).
 pp_text(<<>>) -> prettypr:text("\"\"");
 pp_text(Bin) when is_binary(Bin) -> prettypr:text(lists:flatten(io_lib:format("~p", [binary_to_list(Bin)])));
 pp_text(S) when is_list(S) -> prettypr:text(lists:concat([S]));
-pp_text(A) when is_atom(A) -> prettypr:text(atom_to_list(A)).
+pp_text(A) when is_atom(A) -> prettypr:text(atom_to_list(A));
+pp_text(N) when is_integer(N) -> prettypr:text(integer_to_list(N)).
 
 pp_int(I) -> prettypr:text(integer_to_list(I)).
 
@@ -1567,6 +1580,8 @@ pp_fexpr({'let', X, A, B}) ->
             pp_fexpr(B)]);
 pp_fexpr({builtin_u, B, N}) ->
     pp_beside([pp_text(B), pp_text("/"), pp_text(N)]);
+pp_fexpr({builtin_u, B, N, TypeArgs}) ->
+    pp_beside([pp_text(B), pp_text("@"), pp_fexpr({tuple, TypeArgs}), pp_text("/"), pp_text(N)]);
 pp_fexpr({builtin, B, As}) ->
     pp_call(pp_text(B), As);
 pp_fexpr({remote_u, ArgsT, RetT, Ct, Fun}) ->
