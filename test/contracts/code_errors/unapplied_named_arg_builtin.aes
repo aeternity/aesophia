@@ -1,0 +1,5 @@
+contract UnappliedNamedArgBuiltin =
+  // Allowed in FATE, but not AEVM
+  stateful entrypoint main(s) =
+    let reg = Oracle.register
+    reg(signature = s, Contract.address, 100, RelativeTTL(100)) : oracle(int, int)

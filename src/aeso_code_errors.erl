@@ -66,6 +66,10 @@ format({unapplied_contract_call, Contract}) ->
                         "~s\n", [pp_expr(2, Contract)]),
     Cxt = "Use FATE if you need this.\n",
     mk_err(pos(Contract), Msg, Cxt);
+format({unapplied_builtin, Id}) ->
+    Msg = io_lib:format("The AEVM does not support unapplied use of ~s.\n", [pp_expr(0, Id)]),
+    Cxt = "Use FATE if you need this.\n",
+    mk_err(pos(Id), Msg, Cxt);
 format({invalid_map_key_type, Why, Ann, Type}) ->
     Msg = io_lib:format("Invalid map key type\n~s\n", [pp_type(2, Type)]),
     Cxt = case Why of

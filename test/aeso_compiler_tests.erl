@@ -144,7 +144,8 @@ compilable_contracts() ->
      "double_include",
      "manual_stdlib_include",
      "list_comp",
-     "payable"
+     "payable",
+     "unapplied_builtins"
     ].
 
 not_yet_compilable(fate) -> [];
@@ -576,6 +577,9 @@ failing_code_gen_contracts() ->
     , ?AEVM(unapplied_contract_call, 6, 19,
             "The AEVM does not support unapplied contract call to\n"
             "  r : Remote\n"
+            "Use FATE if you need this.")
+    , ?AEVM(unapplied_named_arg_builtin, 4, 15,
+            "The AEVM does not support unapplied use of Oracle.register.\n"
             "Use FATE if you need this.")
     , ?AEVM(polymorphic_map_keys, 4, 34,
             "Invalid map key type\n"
