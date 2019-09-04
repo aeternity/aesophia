@@ -205,18 +205,18 @@ bind_state(Env) ->
             {S, _} -> {qid, Ann, S};
             false  -> Unit
         end,
-    Event =
-        case lookup_type(Env, {id, Ann, "event"}) of
-            {E, _} -> {qid, Ann, E};
-            false  -> {id, Ann, "event"}    %% will cause type error if used(?)
-        end,
     Env1 = bind_funs([{"state", State},
                       {"put", {type_sig, [stateful | Ann], [], [State], Unit}}], Env),
 
-    %% We bind Chain.event in a local 'Chain' namespace.
-    pop_scope(
-      bind_fun("event", {fun_t, Ann, [], [Event], Unit},
-      push_scope(namespace, {con, Ann, "Chain"}, Env1))).
+    case lookup_type(Env, {id, Ann, "event"}) of
+        {E, _} ->
+            %% We bind Chain.event in a local 'Chain' namespace.
+            Event = {qid, Ann, E},
+            pop_scope(
+              bind_fun("event", {fun_t, Ann, [], [Event], Unit},
+              push_scope(namespace, {con, Ann, "Chain"}, Env1)));
+        false  -> Env1
+    end.
 
 -spec bind_field(name(), field_info(), env()) -> env().
 bind_field(X, Info, Env = #env{ fields = Fields }) ->
@@ -2112,7 +2112,12 @@ mk_error({cannot_unify, A, B, When}) ->
     mk_t_err(Pos, Msg, Ctxt);
 mk_error({unbound_variable, Id}) ->
     Msg = io_lib:format("Unbound variable ~s at ~s\n", [pp(Id), pp_loc(Id)]),
-    mk_t_err(pos(Id), Msg);
+    case Id of
+        {qid, _, ["Chain", "event"]} ->
+            Cxt = "Did you forget to define the event type?",
+            mk_t_err(pos(Id), Msg, Cxt);
+        _ -> mk_t_err(pos(Id), Msg)
+    end;
 mk_error({undefined_field, Id}) ->
     Msg = io_lib:format("Unbound field ~s at ~s\n", [pp(Id), pp_loc(Id)]),
     mk_t_err(pos(Id), Msg);

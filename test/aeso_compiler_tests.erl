@@ -496,6 +496,10 @@ failing_contracts() ->
           "and cannot be called from the contract code.">>])
     , ?TEST(bad_top_level_decl,
         [<<?Pos(1, 1) "The definition of 'square' must appear inside a contract or namespace.">>])
+    , ?TEST(missing_event_type,
+        [<<?Pos(3, 5)
+           "Unbound variable Chain.event at line 3, column 5\n"
+           "Did you forget to define the event type?">>])
     ].
 
 -define(Path(File), "code_errors/" ??File).
