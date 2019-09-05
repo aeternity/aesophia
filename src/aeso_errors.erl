@@ -15,7 +15,7 @@
              }).
 
 -type pos()        :: #pos{}.
--type error_type() :: type_error | parse_error | code_error | internal_error.
+-type error_type() :: type_error | parse_error | code_error | file_error | internal_error.
 
 -record(err, { pos = #pos{}   :: pos()
              , type           :: error_type()

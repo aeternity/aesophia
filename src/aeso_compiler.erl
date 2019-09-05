@@ -75,8 +75,9 @@ file(File, Options0) ->
     case read_contract(File) of
         {ok, Bin} -> from_string(Bin, [{src_file, File} | Options]);
         {error, Error} ->
-	    ErrorString = [File,": ",file:format_error(Error)],
-	    {error, join_errors("File errors", [ErrorString], fun(E) -> E end)}
+            Msg = lists:flatten([File,": ",file:format_error(Error)]),
+            Pos = aeso_errors:pos(File, 0, 0),
+            {error, [aeso_errors:new(file_error, Pos, Msg)]}
     end.
 
 add_include_path(File, Options) ->
