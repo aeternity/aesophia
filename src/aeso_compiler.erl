@@ -65,11 +65,11 @@ version() ->
             {ok, list_to_binary(VsnString)}
     end.
 
--spec file(string()) -> {ok, map()} | {error, binary()}.
+-spec file(string()) -> {ok, map()} | {error, [aeso_errors:error()]}.
 file(Filename) ->
     file(Filename, []).
 
--spec file(string(), options()) -> {ok, map()} | {error, binary()}.
+-spec file(string(), options()) -> {ok, map()} | {error, [aeso_errors:error()]}.
 file(File, Options0) ->
     Options = add_include_path(File, Options0),
     case read_contract(File) of
@@ -89,7 +89,7 @@ add_include_path(File, Options) ->
             [{include, {file_system, [Cwd, Dir]}} | Options]
     end.
 
--spec from_string(binary() | string(), options()) -> {ok, map()} | {error, binary()}.
+-spec from_string(binary() | string(), options()) -> {ok, map()} | {error, [aeso_errors:error()]}.
 from_string(Contract, Options) ->
     from_string(proplists:get_value(backend, Options, aevm), Contract, Options).
 
@@ -164,7 +164,7 @@ string_to_code(ContractString, Options) ->
 %%       a special return type (typerep, T)
 -spec check_call(string(), string(), [string()], options()) -> {ok, string(), {[Type], Type}, [term()]}
                                                                    | {ok, string(), [term()]}
-                                                                   | {error, term()}
+                                                                   | {error, [aeso_errors:error()]}
     when Type :: term().
 check_call(Source, "init" = FunName, Args, Options) ->
     case check_call1(Source, FunName, Args, Options) of
@@ -267,12 +267,12 @@ last_contract_indent(Decls) ->
     end.
 
 -spec to_sophia_value(string(), string(), ok | error | revert, aeb_aevm_data:data()) ->
-        {ok, aeso_syntax:expr()} | {error, term()}.
+        {ok, aeso_syntax:expr()} | {error, [aeso_errors:error()]}.
 to_sophia_value(ContractString, Fun, ResType, Data) ->
     to_sophia_value(ContractString, Fun, ResType, Data, [{backend, aevm}]).
 
 -spec to_sophia_value(string(), string(), ok | error | revert, binary(), options()) ->
-        {ok, aeso_syntax:expr()} | {error, term()}.
+        {ok, aeso_syntax:expr()} | {error, [aeso_errors:error()]}.
 to_sophia_value(_, _, error, Err, _Options) ->
     {ok, {app, [], {id, [], "error"}, [{string, [], Err}]}};
 to_sophia_value(_, _, revert, Data, Options) ->
@@ -340,13 +340,12 @@ to_sophia_value(ContractString, FunName, ok, Data, Options0) ->
 
 -spec create_calldata(string(), string(), [string()]) ->
                              {ok, binary(), aeb_aevm_data:type(), aeb_aevm_data:type()}
-                             | {error, term()}.
+                             | {error, [aeso_errors:error()]}.
 create_calldata(Code, Fun, Args) ->
     create_calldata(Code, Fun, Args, [{backend, aevm}]).
 
 -spec create_calldata(string(), string(), [string()], [{atom(), any()}]) ->
-                             {ok, binary()}
-                             | {error, term()}.
+                             {ok, binary()} | {error, [aeso_errors:error()]}.
 create_calldata(Code, Fun, Args, Options0) ->
     Options = [no_code | Options0],
     case proplists:get_value(backend, Options, aevm) of
@@ -366,7 +365,7 @@ create_calldata(Code, Fun, Args, Options0) ->
 
 -spec decode_calldata(string(), string(), binary()) ->
                              {ok, [aeso_syntax:type()], [aeso_syntax:expr()]}
-                             | {error, term()}.
+                             | {error, [aeso_errors:error()]}.
 decode_calldata(ContractString, FunName, Calldata) ->
     decode_calldata(ContractString, FunName, Calldata, [{backend, aevm}]).
 
@@ -431,6 +430,7 @@ get_arg_icode(Funs) ->
         []     -> error_missing_call_function()
     end.
 
+-dialyzer({nowarn_function, error_missing_call_function/0}).
 error_missing_call_function() ->
     Msg = "Internal error: missing '__call'-function",
     Pos = aeso_errors:pos(0, 0),
@@ -449,6 +449,7 @@ get_call_type([_ | Contracts]) ->
     %% The __call should be in the final contract
     get_call_type(Contracts).
 
+-dialyzer({nowarn_function, get_decode_type/2}).
 get_decode_type(FunName, [{contract, Ann, _, Defs}]) ->
     GetType = fun({letfun, _, {id, _, Name}, Args, Ret, _})               when Name == FunName -> [{Args, Ret}];
                  ({fun_decl, _, {id, _, Name}, {fun_t, _, _, Args, Ret}}) when Name == FunName -> [{Args, Ret}];
