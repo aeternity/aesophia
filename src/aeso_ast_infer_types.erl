@@ -12,7 +12,7 @@
 
 -module(aeso_ast_infer_types).
 
--export([infer/1, infer/2, infer_constant/1, unfold_types_in_type/3]).
+-export([infer/1, infer/2, unfold_types_in_type/3]).
 
 -type utype() :: {fun_t, aeso_syntax:ann(), named_args_t(), [utype()], utype()}
                | {app_t, aeso_syntax:ann(), utype(), [utype()]}
@@ -35,6 +35,8 @@
 
 -type why_record() :: aeso_syntax:field(aeso_syntax:expr())
                     | {proj, aeso_syntax:ann(), aeso_syntax:expr(), aeso_syntax:id()}.
+
+-type pos() :: aeso_errors:pos().
 
 -record(named_argument_constraint,
     {args :: named_args_t(),
@@ -203,18 +205,18 @@ bind_state(Env) ->
             {S, _} -> {qid, Ann, S};
             false  -> Unit
         end,
-    Event =
-        case lookup_type(Env, {id, Ann, "event"}) of
-            {E, _} -> {qid, Ann, E};
-            false  -> {id, Ann, "event"}    %% will cause type error if used(?)
-        end,
     Env1 = bind_funs([{"state", State},
                       {"put", {type_sig, [stateful | Ann], [], [State], Unit}}], Env),
 
-    %% We bind Chain.event in a local 'Chain' namespace.
-    pop_scope(
-      bind_fun("event", {fun_t, Ann, [], [Event], Unit},
-      push_scope(namespace, {con, Ann, "Chain"}, Env1))).
+    case lookup_type(Env, {id, Ann, "event"}) of
+        {E, _} ->
+            %% We bind Chain.event in a local 'Chain' namespace.
+            Event = {qid, Ann, E},
+            pop_scope(
+              bind_fun("event", {fun_t, Ann, [], [Event], Unit},
+              push_scope(namespace, {con, Ann, "Chain"}, Env1)));
+        false  -> Env1
+    end.
 
 -spec bind_field(name(), field_info(), env()) -> env().
 bind_field(X, Info, Env = #env{ fields = Fields }) ->
@@ -535,7 +537,7 @@ global_env() ->
 option_t(As, T) -> {app_t, As, {id, As, "option"}, [T]}.
 map_t(As, K, V) -> {app_t, As, {id, As, "map"}, [K, V]}.
 
--spec infer(aeso_syntax:ast()) -> aeso_syntax:ast().
+-spec infer(aeso_syntax:ast()) -> aeso_syntax:ast() | {env(), aeso_syntax:ast()}.
 infer(Contracts) ->
     infer(Contracts, []).
 
@@ -544,7 +546,8 @@ infer(Contracts) ->
 -spec init_env(list(option())) -> env().
 init_env(_Options) -> global_env().
 
--spec infer(aeso_syntax:ast(), list(option())) -> aeso_syntax:ast() | {env(), aeso_syntax:ast()}.
+-spec infer(aeso_syntax:ast(), list(option())) ->
+    aeso_syntax:ast() | {env(), aeso_syntax:ast()}.
 infer(Contracts, Options) ->
     ets_init(), %% Init the ETS table state
     try
@@ -598,13 +601,6 @@ check_scope_name_clash(Env, Kind, Name) ->
 infer_contract_top(Env, Kind, Defs0, _Options) ->
     Defs = desugar(Defs0),
     infer_contract(Env, Kind, Defs).
-
-%% TODO: revisit
-infer_constant({letval, Attrs,_Pattern, Type, E}) ->
-    ets_init(), %% Init the ETS table state
-    {typed, _, _, PatType} =
-        infer_expr(global_env(), {typed, Attrs, E, arg_type(Type)}),
-    instantiate(PatType).
 
 %% infer_contract takes a proplist mapping global names to types, and
 %% a list of definitions.
@@ -710,7 +706,8 @@ check_modifiers(Env, Contracts) ->
                   {true, []} -> type_error({contract_has_no_entrypoints, Con});
                   _          -> ok
               end;
-          {namespace, _, _, Decls} -> check_modifiers1(namespace, Decls)
+          {namespace, _, _, Decls} -> check_modifiers1(namespace, Decls);
+          Decl -> type_error({bad_top_level_decl, Decl})
       end || C <- Contracts ],
     destroy_and_report_type_errors(Env).
 
@@ -721,12 +718,15 @@ check_modifiers1(What, Decls) when is_list(Decls) ->
 check_modifiers1(What, Decl) when element(1, Decl) == letfun; element(1, Decl) == fun_decl ->
     Public     = aeso_syntax:get_ann(public,     Decl, false),
     Private    = aeso_syntax:get_ann(private,    Decl, false),
+    Payable    = aeso_syntax:get_ann(payable,    Decl, false),
     Entrypoint = aeso_syntax:get_ann(entrypoint, Decl, false),
     FunDecl    = element(1, Decl) == fun_decl,
     {id, _, Name} = element(3, Decl),
+    IsInit     = Name == "init" andalso What == contract,
     _ = [ type_error({proto_must_be_entrypoint, Decl})    || FunDecl, Private orelse not Entrypoint, What == contract ],
     _ = [ type_error({proto_in_namespace, Decl})          || FunDecl, What == namespace ],
-    _ = [ type_error({init_must_be_an_entrypoint, Decl})  || not Entrypoint, Name == "init", What == contract ],
+    _ = [ type_error({init_must_be_an_entrypoint, Decl})  || not Entrypoint, IsInit ],
+    _ = [ type_error({init_must_not_be_payable, Decl})    || Payable, IsInit ],
     _ = [ type_error({public_modifier_in_contract, Decl}) || Public, not Private, not Entrypoint, What == contract ],
     _ = [ type_error({entrypoint_in_namespace, Decl})     || Entrypoint, What == namespace ],
     _ = [ type_error({private_entrypoint, Decl})          || Private, Entrypoint ],
@@ -1709,7 +1709,7 @@ solve_known_record_types(Env, Constraints) ->
                              C
                      end;
                 _ ->
-                    type_error({not_a_record_type, RecId, When}),
+                    type_error({not_a_record_type, RecType, When}),
                     not_solved
              end
          end
@@ -1824,6 +1824,10 @@ unfold_types(_Env, X, _Options) ->
 unfold_types_in_type(Env, T) ->
     unfold_types_in_type(Env, T, []).
 
+unfold_types_in_type(Env, {app_t, Ann, Id = {id, _, "map"}, Args = [KeyType0, _]}, Options) ->
+    Args1 = [KeyType, _] = unfold_types_in_type(Env, Args, Options),
+    [ type_error({map_in_map_key, KeyType0}) || has_maps(KeyType) ],
+    {app_t, Ann, Id, Args1};
 unfold_types_in_type(Env, {app_t, Ann, Id, Args}, Options) when ?is_type_id(Id) ->
     UnfoldRecords  = proplists:get_value(unfold_record_types, Options, false),
     UnfoldVariants = proplists:get_value(unfold_variant_types, Options, false),
@@ -1871,6 +1875,13 @@ unfold_types_in_type(Env, [H|T], Options) ->
 unfold_types_in_type(_Env, X, _Options) ->
     X.
 
+has_maps({app_t, _, {id, _, "map"}, _}) ->
+    true;
+has_maps(L) when is_list(L) ->
+    lists:any(fun has_maps/1, L);
+has_maps(T) when is_tuple(T) ->
+    has_maps(tuple_to_list(T));
+has_maps(_) -> false.
 
 subst_tvars(Env, Type) ->
     subst_tvars1([{V, T} || {{tvar, _, V}, T} <- Env], Type).
@@ -2066,12 +2077,11 @@ create_type_errors() ->
     ets_new(type_errors, [bag]).
 
 destroy_and_report_type_errors(Env) ->
-    Errors   = lists:reverse(ets_tab2list(type_errors)),
-    %% io:format("Type errors now: ~p\n", [Errors]),
-    PPErrors = [ pp_error(unqualify(Env, Err)) || Err <- Errors ],
+    Errors0 = lists:reverse(ets_tab2list(type_errors)),
+    %% io:format("Type errors now: ~p\n", [Errors0]),
     ets_delete(type_errors),
-    Errors /= [] andalso
-        error({type_errors, [lists:flatten(Err) || Err <- PPErrors]}).
+    Errors  = [ mk_error(unqualify(Env, Err)) || Err <- Errors0 ],
+    aeso_errors:throw(Errors).  %% No-op if Errors == []
 
 %% Strip current namespace from error message for nicer printing.
 unqualify(#env{ namespace = NS }, {qid, Ann, Xs}) ->
@@ -2090,153 +2100,225 @@ unqualify1(NS, Xs) ->
     catch _:_ -> Xs
     end.
 
-pp_error({cannot_unify, A, B, When}) ->
-    io_lib:format("Cannot unify ~s\n"
-                  "         and ~s\n"
-                  "~s", [pp(instantiate(A)), pp(instantiate(B)), pp_when(When)]);
-pp_error({unbound_variable, Id}) ->
-    io_lib:format("Unbound variable ~s at ~s\n", [pp(Id), pp_loc(Id)]);
-pp_error({undefined_field, Id}) ->
-    io_lib:format("Unbound field ~s at ~s\n", [pp(Id), pp_loc(Id)]);
-pp_error({not_a_record_type, Type, Why}) ->
-    io_lib:format("~s\n~s\n", [pp_type("Not a record type: ", Type), pp_why_record(Why)]);
-pp_error({not_a_contract_type, Type, Lit}) ->
-    io_lib:format("The type ~s is not a contract type\n"
-                  "when checking that the contract literal at ~s\n~s\n"
-                  "has the type\n~s\n",
-                  [pp_type("", Type), pp_loc(Lit), pp_expr("  ", Lit), pp_type("  ", Type)]);
-pp_error({non_linear_pattern, Pattern, Nonlinear}) ->
-    Plural = [ $s || length(Nonlinear) > 1 ],
-    io_lib:format("Repeated name~s ~s in pattern\n~s (at ~s)\n",
-                  [Plural, string:join(Nonlinear, ", "), pp_expr("  ", Pattern), pp_loc(Pattern)]);
-pp_error({ambiguous_record, Fields = [{_, First} | _], Candidates}) ->
-    S = [ "s" || length(Fields) > 1 ],
-    io_lib:format("Ambiguous record type with field~s ~s (at ~s) could be one of\n~s",
-                  [S, string:join([ pp(F) || {_, F} <- Fields ], ", "),
-                   pp_loc(First),
-                   [ ["  - ", pp(C), " (at ", pp_loc(C), ")\n"] || C <- Candidates ]]);
-pp_error({missing_field, Field, Rec}) ->
-    io_lib:format("Record type ~s does not have field ~s (at ~s)\n", [pp(Rec), pp(Field), pp_loc(Field)]);
-pp_error({missing_fields, Ann, RecType, Fields}) ->
-    Many = length(Fields) > 1,
-    S    = [ "s" || Many ],
-    Are  = if Many -> "are"; true -> "is" end,
-    io_lib:format("The field~s ~s ~s missing when constructing an element of type ~s (at ~s)\n",
-                  [S, string:join(Fields, ", "), Are, pp(RecType), pp_loc(Ann)]);
-pp_error({no_records_with_all_fields, Fields = [{_, First} | _]}) ->
-    S = [ "s" || length(Fields) > 1 ],
-    io_lib:format("No record type with field~s ~s (at ~s)\n",
-                  [S, string:join([ pp(F) || {_, F} <- Fields ], ", "),
-                   pp_loc(First)]);
-pp_error({recursive_types_not_implemented, Types}) ->
-    S = if length(Types) > 1 -> "s are mutually";
-           true              -> " is" end,
-    io_lib:format("The following type~s recursive, which is not yet supported:\n~s",
-                    [S, [io_lib:format("  - ~s (at ~s)\n", [pp(T), pp_loc(T)]) || T <- Types]]);
-pp_error({event_must_be_variant_type, Where}) ->
-    io_lib:format("The event type must be a variant type (at ~s)\n", [pp_loc(Where)]);
-pp_error({indexed_type_must_be_word, Type, Type}) ->
-    io_lib:format("The indexed type ~s (at ~s) is not a word type\n",
-                    [pp_type("", Type), pp_loc(Type)]);
-pp_error({indexed_type_must_be_word, Type, Type1}) ->
-    io_lib:format("The indexed type ~s (at ~s) equals ~s which is not a word type\n",
-                    [pp_type("", Type), pp_loc(Type), pp_type("", Type1)]);
-pp_error({payload_type_must_be_string, Type, Type}) ->
-    io_lib:format("The payload type ~s (at ~s) should be string\n",
-                    [pp_type("", Type), pp_loc(Type)]);
-pp_error({payload_type_must_be_string, Type, Type1}) ->
-    io_lib:format("The payload type ~s (at ~s) equals ~s but it should be string\n",
-                    [pp_type("", Type), pp_loc(Type), pp_type("", Type1)]);
-pp_error({event_0_to_3_indexed_values, Constr}) ->
-    io_lib:format("The event constructor ~s (at ~s) has too many indexed values (max 3)\n",
-        [name(Constr), pp_loc(Constr)]);
-pp_error({event_0_to_1_string_values, Constr}) ->
-    io_lib:format("The event constructor ~s (at ~s) has too many non-indexed values (max 1)\n",
-        [name(Constr), pp_loc(Constr)]);
-pp_error({repeated_constructor, Cs}) ->
-    io_lib:format("Variant types must have distinct constructor names\n~s",
-                  [[ io_lib:format("~s  (at ~s)\n", [pp_typed("  - ", C, T), pp_loc(C)]) || {C, T} <- Cs ]]);
-pp_error({bad_named_argument, [], Name}) ->
-    io_lib:format("Named argument ~s (at ~s) supplied to function expecting no named arguments.\n",
-                  [pp(Name), pp_loc(Name)]);
-pp_error({bad_named_argument, Args, Name}) ->
-    io_lib:format("Named argument ~s (at ~s) is not one of the expected named arguments\n~s",
-                  [pp(Name), pp_loc(Name),
-                   [ io_lib:format("~s\n", [pp_typed("  - ", Arg, Type)])
-                     || {named_arg_t, _, Arg, Type, _} <- Args ]]);
-pp_error({unsolved_named_argument_constraint, #named_argument_constraint{name = Name, type = Type}}) ->
-    io_lib:format("Named argument ~s (at ~s) supplied to function with unknown named arguments.\n",
-                  [pp_typed("", Name, Type), pp_loc(Name)]);
-pp_error({reserved_entrypoint, Name, Def}) ->
-    io_lib:format("The name '~s' is reserved and cannot be used for a\ntop-level contract function (at ~s).\n",
-                  [Name, pp_loc(Def)]);
-pp_error({duplicate_definition, Name, Locs}) ->
-    io_lib:format("Duplicate definitions of ~s at\n~s",
-                  [Name, [ ["  - ", pp_loc(L), "\n"] || L <- Locs ]]);
-pp_error({duplicate_scope, Kind, Name, OtherKind, L}) ->
-    io_lib:format("The ~p ~s (at ~s) has the same name as a ~p at ~s\n",
-                  [Kind, pp(Name), pp_loc(Name), OtherKind, pp_loc(L)]);
-pp_error({include, _, {string, Pos, Name}}) ->
-    io_lib:format("Include of '~s' at ~s\nnot allowed, include only allowed at top level.\n",
-                  [binary_to_list(Name), pp_loc(Pos)]);
-pp_error({namespace, _Pos, {con, Pos, Name}, _Def}) ->
-    io_lib:format("Nested namespace not allowed\nNamespace '~s' at ~s not defined at top level.\n",
-                  [Name, pp_loc(Pos)]);
-pp_error({repeated_arg, Fun, Arg}) ->
-    io_lib:format("Repeated argument ~s to function ~s (at ~s).\n",
-                  [Arg, pp(Fun), pp_loc(Fun)]);
-pp_error({stateful_not_allowed, Id, Fun}) ->
-    io_lib:format("Cannot reference stateful function ~s (at ~s)\nin the definition of non-stateful function ~s.\n",
-                  [pp(Id), pp_loc(Id), pp(Fun)]);
-pp_error({value_arg_not_allowed, Value, Fun}) ->
-    io_lib:format("Cannot pass non-zero value argument ~s (at ~s)\nin the definition of non-stateful function ~s.\n",
-                  [pp_expr("", Value), pp_loc(Value), pp(Fun)]);
-pp_error({init_depends_on_state, Which, [_Init | Chain]}) ->
+mk_t_err(Pos, Msg) ->
+    aeso_errors:new(type_error, Pos, lists:flatten(Msg)).
+mk_t_err(Pos, Msg, Ctxt) ->
+    aeso_errors:new(type_error, Pos, lists:flatten(Msg), lists:flatten(Ctxt)).
+
+mk_error({cannot_unify, A, B, When}) ->
+    Msg = io_lib:format("Cannot unify ~s\n         and ~s\n",
+                        [pp(instantiate(A)), pp(instantiate(B))]),
+    {Pos, Ctxt} = pp_when(When),
+    mk_t_err(Pos, Msg, Ctxt);
+mk_error({unbound_variable, Id}) ->
+    Msg = io_lib:format("Unbound variable ~s at ~s\n", [pp(Id), pp_loc(Id)]),
+    case Id of
+        {qid, _, ["Chain", "event"]} ->
+            Cxt = "Did you forget to define the event type?",
+            mk_t_err(pos(Id), Msg, Cxt);
+        _ -> mk_t_err(pos(Id), Msg)
+    end;
+mk_error({undefined_field, Id}) ->
+    Msg = io_lib:format("Unbound field ~s at ~s\n", [pp(Id), pp_loc(Id)]),
+    mk_t_err(pos(Id), Msg);
+mk_error({not_a_record_type, Type, Why}) ->
+    Msg = io_lib:format("~s\n", [pp_type("Not a record type: ", Type)]),
+    {Pos, Ctxt} = pp_why_record(Why),
+    mk_t_err(Pos, Msg, Ctxt);
+mk_error({not_a_contract_type, Type, Lit}) ->
+    Msg = io_lib:format("The type ~s is not a contract type\n"
+                        "when checking that the contract literal at ~s\n~s\n"
+                        "has the type\n~s\n",
+                        [pp_type("", Type), pp_loc(Lit), pp_expr("  ", Lit), pp_type("  ", Type)]),
+    mk_t_err(pos(Lit), Msg);
+mk_error({non_linear_pattern, Pattern, Nonlinear}) ->
+    Msg = io_lib:format("Repeated name~s ~s in pattern\n~s (at ~s)\n",
+                        [plural("", "s", Nonlinear), string:join(Nonlinear, ", "),
+                         pp_expr("  ", Pattern), pp_loc(Pattern)]),
+    mk_t_err(pos(Pattern), Msg);
+mk_error({ambiguous_record, Fields = [{_, First} | _], Candidates}) ->
+    Msg = io_lib:format("Ambiguous record type with field~s ~s (at ~s) could be one of\n~s",
+                        [plural("", "s", Fields), string:join([ pp(F) || {_, F} <- Fields ], ", "),
+                        pp_loc(First), [ ["  - ", pp(C), " (at ", pp_loc(C), ")\n"] || C <- Candidates ]]),
+    mk_t_err(pos(First), Msg);
+mk_error({missing_field, Field, Rec}) ->
+    Msg = io_lib:format("Record type ~s does not have field ~s (at ~s)\n",
+                        [pp(Rec), pp(Field), pp_loc(Field)]),
+    mk_t_err(pos(Field), Msg);
+mk_error({missing_fields, Ann, RecType, Fields}) ->
+    Msg = io_lib:format("The field~s ~s ~s missing when constructing an element of type ~s (at ~s)\n",
+                        [plural("", "s", Fields), string:join(Fields, ", "),
+                         plural("is", "are", Fields), pp(RecType), pp_loc(Ann)]),
+    mk_t_err(pos(Ann), Msg);
+mk_error({no_records_with_all_fields, Fields = [{_, First} | _]}) ->
+    Msg = io_lib:format("No record type with field~s ~s (at ~s)\n",
+                        [plural("", "s", Fields), string:join([ pp(F) || {_, F} <- Fields ], ", "),
+                         pp_loc(First)]),
+    mk_t_err(pos(First), Msg);
+mk_error({recursive_types_not_implemented, Types}) ->
+    S = plural(" is", "s are mutually", Types),
+    Msg = io_lib:format("The following type~s recursive, which is not yet supported:\n~s",
+                        [S, [io_lib:format("  - ~s (at ~s)\n", [pp(T), pp_loc(T)]) || T <- Types]]),
+    mk_t_err(pos(hd(Types)), Msg);
+mk_error({event_must_be_variant_type, Where}) ->
+    Msg = io_lib:format("The event type must be a variant type (at ~s)\n", [pp_loc(Where)]),
+    mk_t_err(pos(Where), Msg);
+mk_error({indexed_type_must_be_word, Type, Type}) ->
+    Msg = io_lib:format("The indexed type ~s (at ~s) is not a word type\n",
+                        [pp_type("", Type), pp_loc(Type)]),
+    mk_t_err(pos(Type), Msg);
+mk_error({indexed_type_must_be_word, Type, Type1}) ->
+    Msg = io_lib:format("The indexed type ~s (at ~s) equals ~s which is not a word type\n",
+                        [pp_type("", Type), pp_loc(Type), pp_type("", Type1)]),
+    mk_t_err(pos(Type), Msg);
+mk_error({payload_type_must_be_string, Type, Type}) ->
+    Msg = io_lib:format("The payload type ~s (at ~s) should be string\n",
+                        [pp_type("", Type), pp_loc(Type)]),
+    mk_t_err(pos(Type), Msg);
+mk_error({payload_type_must_be_string, Type, Type1}) ->
+    Msg = io_lib:format("The payload type ~s (at ~s) equals ~s but it should be string\n",
+                        [pp_type("", Type), pp_loc(Type), pp_type("", Type1)]),
+    mk_t_err(pos(Type), Msg);
+mk_error({event_0_to_3_indexed_values, Constr}) ->
+    Msg = io_lib:format("The event constructor ~s (at ~s) has too many indexed values (max 3)\n",
+                        [name(Constr), pp_loc(Constr)]),
+    mk_t_err(pos(Constr), Msg);
+mk_error({event_0_to_1_string_values, Constr}) ->
+    Msg = io_lib:format("The event constructor ~s (at ~s) has too many non-indexed values (max 1)\n",
+                        [name(Constr), pp_loc(Constr)]),
+    mk_t_err(pos(Constr), Msg);
+mk_error({repeated_constructor, Cs}) ->
+    Msg = io_lib:format("Variant types must have distinct constructor names\n~s",
+                        [[ io_lib:format("~s  (at ~s)\n", [pp_typed("  - ", C, T), pp_loc(C)]) || {C, T} <- Cs ]]),
+    mk_t_err(pos(element(1, hd(Cs))), Msg);
+mk_error({bad_named_argument, [], Name}) ->
+    Msg = io_lib:format("Named argument ~s (at ~s) supplied to function expecting no named arguments.\n",
+                        [pp(Name), pp_loc(Name)]),
+    mk_t_err(pos(Name), Msg);
+mk_error({bad_named_argument, Args, Name}) ->
+    Msg = io_lib:format("Named argument ~s (at ~s) is not one of the expected named arguments\n~s",
+                        [pp(Name), pp_loc(Name),
+                        [ io_lib:format("~s\n", [pp_typed("  - ", Arg, Type)])
+                          || {named_arg_t, _, Arg, Type, _} <- Args ]]),
+    mk_t_err(pos(Name), Msg);
+mk_error({unsolved_named_argument_constraint, #named_argument_constraint{name = Name, type = Type}}) ->
+    Msg = io_lib:format("Named argument ~s (at ~s) supplied to function with unknown named arguments.\n",
+                        [pp_typed("", Name, Type), pp_loc(Name)]),
+    mk_t_err(pos(Name), Msg);
+mk_error({reserved_entrypoint, Name, Def}) ->
+    Msg = io_lib:format("The name '~s' is reserved and cannot be used for a\n"
+                        "top-level contract function (at ~s).\n", [Name, pp_loc(Def)]),
+    mk_t_err(pos(Def), Msg);
+mk_error({duplicate_definition, Name, Locs}) ->
+    Msg = io_lib:format("Duplicate definitions of ~s at\n~s",
+                        [Name, [ ["  - ", pp_loc(L), "\n"] || L <- Locs ]]),
+    mk_t_err(pos(lists:last(Locs)), Msg);
+mk_error({duplicate_scope, Kind, Name, OtherKind, L}) ->
+    Msg = io_lib:format("The ~p ~s (at ~s) has the same name as a ~p at ~s\n",
+                        [Kind, pp(Name), pp_loc(Name), OtherKind, pp_loc(L)]),
+    mk_t_err(pos(Name), Msg);
+mk_error({include, _, {string, Pos, Name}}) ->
+    Msg = io_lib:format("Include of '~s' at ~s\nnot allowed, include only allowed at top level.\n",
+                        [binary_to_list(Name), pp_loc(Pos)]),
+    mk_t_err(pos(Pos), Msg);
+mk_error({namespace, _Pos, {con, Pos, Name}, _Def}) ->
+    Msg = io_lib:format("Nested namespace not allowed\nNamespace '~s' at ~s not defined at top level.\n",
+                        [Name, pp_loc(Pos)]),
+    mk_t_err(pos(Pos), Msg);
+mk_error({repeated_arg, Fun, Arg}) ->
+    Msg = io_lib:format("Repeated argument ~s to function ~s (at ~s).\n",
+                        [Arg, pp(Fun), pp_loc(Fun)]),
+    mk_t_err(pos(Fun), Msg);
+mk_error({stateful_not_allowed, Id, Fun}) ->
+    Msg = io_lib:format("Cannot reference stateful function ~s (at ~s)\nin the definition of non-stateful function ~s.\n",
+                        [pp(Id), pp_loc(Id), pp(Fun)]),
+    mk_t_err(pos(Id), Msg);
+mk_error({value_arg_not_allowed, Value, Fun}) ->
+    Msg = io_lib:format("Cannot pass non-zero value argument ~s (at ~s)\nin the definition of non-stateful function ~s.\n",
+                        [pp_expr("", Value), pp_loc(Value), pp(Fun)]),
+    mk_t_err(pos(Value), Msg);
+mk_error({init_depends_on_state, Which, [_Init | Chain]}) ->
     WhichCalls = fun("put") -> ""; ("state") -> ""; (_) -> ", which calls" end,
-    io_lib:format("The init function should return the initial state as its result and cannot ~s the state,\nbut it calls\n~s",
-                  [if Which == put -> "write"; true -> "read" end,
-                   [ io_lib:format("  - ~s (at ~s)~s\n", [Fun, pp_loc(Ann), WhichCalls(Fun)])
-                     || {[_, Fun], Ann} <- Chain]]);
-pp_error({missing_body_for_let, Ann}) ->
-    io_lib:format("Let binding at ~s must be followed by an expression\n", [pp_loc(Ann)]);
-pp_error({public_modifier_in_contract, Decl}) ->
+    Msg = io_lib:format("The init function should return the initial state as its result and cannot ~s the state,\nbut it calls\n~s",
+                        [if Which == put -> "write"; true -> "read" end,
+                         [ io_lib:format("  - ~s (at ~s)~s\n", [Fun, pp_loc(Ann), WhichCalls(Fun)])
+                           || {[_, Fun], Ann} <- Chain]]),
+    mk_t_err(pos(element(2, hd(Chain))), Msg);
+mk_error({missing_body_for_let, Ann}) ->
+    Msg = io_lib:format("Let binding at ~s must be followed by an expression\n", [pp_loc(Ann)]),
+    mk_t_err(pos(Ann), Msg);
+mk_error({public_modifier_in_contract, Decl}) ->
     Decl1 = mk_entrypoint(Decl),
-    io_lib:format("Use 'entrypoint' instead of 'function' for public function ~s (at ~s):\n~s\n",
-                  [pp_expr("", element(3, Decl)), pp_loc(Decl),
-                   prettypr:format(prettypr:nest(2, aeso_pretty:decl(Decl1)))]);
-pp_error({init_must_be_an_entrypoint, Decl}) ->
+    Msg = io_lib:format("Use 'entrypoint' instead of 'function' for public function ~s (at ~s):\n~s\n",
+                        [pp_expr("", element(3, Decl)), pp_loc(Decl),
+                         prettypr:format(prettypr:nest(2, aeso_pretty:decl(Decl1)))]),
+    mk_t_err(pos(Decl), Msg);
+mk_error({init_must_be_an_entrypoint, Decl}) ->
     Decl1 = mk_entrypoint(Decl),
-    io_lib:format("The init function (at ~s) must be an entrypoint:\n~s\n",
-                  [pp_loc(Decl),
-                   prettypr:format(prettypr:nest(2, aeso_pretty:decl(Decl1)))]);
-pp_error({proto_must_be_entrypoint, Decl}) ->
+    Msg = io_lib:format("The init function (at ~s) must be an entrypoint:\n~s\n",
+                        [pp_loc(Decl),
+                         prettypr:format(prettypr:nest(2, aeso_pretty:decl(Decl1)))]),
+    mk_t_err(pos(Decl), Msg);
+mk_error({init_must_not_be_payable, Decl}) ->
+    Msg = io_lib:format("The init function (at ~s) cannot be payable.\n"
+                        "You don't need the 'payable' annotation to be able to attach\n"
+                        "funds to the create contract transaction.",
+                        [pp_loc(Decl)]),
+    mk_t_err(pos(Decl), Msg);
+mk_error({proto_must_be_entrypoint, Decl}) ->
     Decl1 = mk_entrypoint(Decl),
-    io_lib:format("Use 'entrypoint' for declaration of ~s (at ~s):\n~s\n",
-                  [pp_expr("", element(3, Decl)), pp_loc(Decl),
-                   prettypr:format(prettypr:nest(2, aeso_pretty:decl(Decl1)))]);
-pp_error({proto_in_namespace, Decl}) ->
-    io_lib:format("Namespaces cannot contain function prototypes (at ~s).\n",
-                  [pp_loc(Decl)]);
-pp_error({entrypoint_in_namespace, Decl}) ->
-    io_lib:format("Namespaces cannot contain entrypoints (at ~s). Use 'function' instead.\n",
-                  [pp_loc(Decl)]);
-pp_error({private_entrypoint, Decl}) ->
-    io_lib:format("The entrypoint ~s (at ~s) cannot be private. Use 'function' instead.\n",
-                  [pp_expr("", element(3, Decl)), pp_loc(Decl)]);
-pp_error({private_and_public, Decl}) ->
-    io_lib:format("The function ~s (at ~s) cannot be both public and private.\n",
-                  [pp_expr("", element(3, Decl)), pp_loc(Decl)]);
-pp_error({contract_has_no_entrypoints, Con}) ->
-    io_lib:format("The contract ~s (at ~s) has no entrypoints. Since Sophia version 3.2, public\n"
-                  "contract functions must be declared with the 'entrypoint' keyword instead of\n"
-                  "'function'.\n", [pp_expr("", Con), pp_loc(Con)]);
-pp_error({unbound_type, Type}) ->
-    io_lib:format("Unbound type ~s (at ~s).\n", [pp_type("", Type), pp_loc(Type)]);
-pp_error({new_tuple_syntax, Ann, Ts}) ->
-    io_lib:format("Invalid type\n~s  (at ~s)\nThe syntax of tuple types changed in Sophia version 4.0. Did you mean\n~s\n",
-                  [pp_type("  ", {args_t, Ann, Ts}), pp_loc(Ann), pp_type("  ", {tuple_t, Ann, Ts})]);
-pp_error(Err) ->
-    io_lib:format("Unknown error: ~p\n", [Err]).
+    Msg = io_lib:format("Use 'entrypoint' for declaration of ~s (at ~s):\n~s\n",
+                        [pp_expr("", element(3, Decl)), pp_loc(Decl),
+                         prettypr:format(prettypr:nest(2, aeso_pretty:decl(Decl1)))]),
+    mk_t_err(pos(Decl), Msg);
+mk_error({proto_in_namespace, Decl}) ->
+    Msg = io_lib:format("Namespaces cannot contain function prototypes (at ~s).\n",
+                        [pp_loc(Decl)]),
+    mk_t_err(pos(Decl), Msg);
+mk_error({entrypoint_in_namespace, Decl}) ->
+    Msg = io_lib:format("Namespaces cannot contain entrypoints (at ~s). Use 'function' instead.\n",
+                        [pp_loc(Decl)]),
+    mk_t_err(pos(Decl), Msg);
+mk_error({private_entrypoint, Decl}) ->
+    Msg = io_lib:format("The entrypoint ~s (at ~s) cannot be private. Use 'function' instead.\n",
+                        [pp_expr("", element(3, Decl)), pp_loc(Decl)]),
+    mk_t_err(pos(Decl), Msg);
+mk_error({private_and_public, Decl}) ->
+    Msg = io_lib:format("The function ~s (at ~s) cannot be both public and private.\n",
+                        [pp_expr("", element(3, Decl)), pp_loc(Decl)]),
+    mk_t_err(pos(Decl), Msg);
+mk_error({contract_has_no_entrypoints, Con}) ->
+    Msg = io_lib:format("The contract ~s (at ~s) has no entrypoints. Since Sophia version 3.2, public\n"
+                        "contract functions must be declared with the 'entrypoint' keyword instead of\n"
+                        "'function'.\n", [pp_expr("", Con), pp_loc(Con)]),
+    mk_t_err(pos(Con), Msg);
+mk_error({unbound_type, Type}) ->
+    Msg = io_lib:format("Unbound type ~s (at ~s).\n", [pp_type("", Type), pp_loc(Type)]),
+    mk_t_err(pos(Type), Msg);
+mk_error({new_tuple_syntax, Ann, Ts}) ->
+    Msg = io_lib:format("Invalid type\n~s  (at ~s)\nThe syntax of tuple types changed in Sophia version 4.0. Did you mean\n~s\n",
+                        [pp_type("  ", {args_t, Ann, Ts}), pp_loc(Ann), pp_type("  ", {tuple_t, Ann, Ts})]),
+    mk_t_err(pos(Ann), Msg);
+mk_error({map_in_map_key, KeyType}) ->
+    Msg = io_lib:format("Invalid key type\n~s\n", [pp_type("  ", KeyType)]),
+    Cxt = "Map keys cannot contain other maps.\n",
+    mk_t_err(pos(KeyType), Msg, Cxt);
+mk_error({cannot_call_init_function, Ann}) ->
+    Msg = "The 'init' function is called exclusively by the create contract transaction\n"
+          "and cannot be called from the contract code.\n",
+    mk_t_err(pos(Ann), Msg);
+mk_error({bad_top_level_decl, Decl}) ->
+    What = case element(1, Decl) of
+               letval -> "function or entrypoint";
+               _      -> "contract or namespace"
+           end,
+    Id = element(3, Decl),
+    Msg = io_lib:format("The definition of '~s' must appear inside a ~s.\n",
+                        [pp_expr("", Id), What]),
+    mk_t_err(pos(Decl), Msg);
+mk_error(Err) ->
+    Msg = io_lib:format("Unknown error: ~p\n", [Err]),
+    mk_t_err(pos(0, 0), Msg).
 
 mk_entrypoint(Decl) ->
     Ann   = [entrypoint | lists:keydelete(public, 1,
@@ -2244,110 +2326,114 @@ mk_entrypoint(Decl) ->
                             aeso_syntax:get_ann(Decl))) -- [public, private]],
     aeso_syntax:set_ann(Ann, Decl).
 
-pp_when({todo, What}) -> io_lib:format("[TODO] ~p\n", [What]);
-pp_when({at, Ann}) -> io_lib:format("at ~s\n", [pp_loc(Ann)]);
+pp_when({todo, What}) -> {pos(0, 0), io_lib:format("[TODO] ~p\n", [What])};
+pp_when({at, Ann}) -> {pos(Ann), io_lib:format("at ~s\n", [pp_loc(Ann)])};
 pp_when({check_typesig, Name, Inferred, Given}) ->
-    io_lib:format("when checking the definition of ~s\n"
-                  "  inferred type: ~s\n"
-                  "  given type:    ~s\n",
-        [Name, pp(instantiate(Inferred)), pp(instantiate(Given))]);
+    {pos(Given),
+     io_lib:format("when checking the definition of ~s (at ~s)\n"
+                   "  inferred type: ~s\n"
+                   "  given type:    ~s\n",
+         [Name, pp_loc(Given), pp(instantiate(Inferred)), pp(instantiate(Given))])};
 pp_when({infer_app, Fun, Args, Inferred0, ArgTypes0}) ->
     Inferred = instantiate(Inferred0),
     ArgTypes = instantiate(ArgTypes0),
-    io_lib:format("when checking the application at ~s of\n"
-                  "~s\n"
-                  "to arguments\n~s",
-                  [pp_loc(Fun),
-                   pp_typed("  ", Fun, Inferred),
-                   [ [pp_typed("  ", Arg, ArgT), "\n"]
-                      || {Arg, ArgT} <- lists:zip(Args, ArgTypes) ] ]);
+    {pos(Fun),
+     io_lib:format("when checking the application at ~s of\n"
+                   "~s\n"
+                   "to arguments\n~s",
+                   [pp_loc(Fun),
+                    pp_typed("  ", Fun, Inferred),
+                    [ [pp_typed("  ", Arg, ArgT), "\n"]
+                       || {Arg, ArgT} <- lists:zip(Args, ArgTypes) ] ])};
 pp_when({field_constraint, FieldType0, InferredType0, Fld}) ->
     FieldType    = instantiate(FieldType0),
     InferredType = instantiate(InferredType0),
-    case Fld of
-        {field, _Ann, LV, Id, E} ->
-            io_lib:format("when checking the assignment of the field\n~s (at ~s)\nto the old value ~s and the new value\n~s\n",
-                [pp_typed("  ", {lvalue, [], LV}, FieldType),
-                 pp_loc(Fld),
-                 pp(Id),
-                 pp_typed("  ", E, InferredType)]);
-        {field, _Ann, LV, E} ->
-            io_lib:format("when checking the assignment of the field\n~s (at ~s)\nto the value\n~s\n",
-                [pp_typed("  ", {lvalue, [], LV}, FieldType),
-                 pp_loc(Fld),
-                 pp_typed("  ", E, InferredType)]);
-        {proj, _Ann, _Rec, _Fld} ->
-            io_lib:format("when checking the record projection at ~s\n~s\nagainst the expected type\n~s\n",
-                [pp_loc(Fld),
-                 pp_typed("  ", Fld, FieldType),
-                 pp_type("  ", InferredType)])
-    end;
+    {pos(Fld),
+     case Fld of
+         {field, _Ann, LV, Id, E} ->
+             io_lib:format("when checking the assignment of the field\n~s (at ~s)\nto the old value ~s and the new value\n~s\n",
+                 [pp_typed("  ", {lvalue, [], LV}, FieldType),
+                  pp_loc(Fld),
+                  pp(Id),
+                  pp_typed("  ", E, InferredType)]);
+         {field, _Ann, LV, E} ->
+             io_lib:format("when checking the assignment of the field\n~s (at ~s)\nto the value\n~s\n",
+                 [pp_typed("  ", {lvalue, [], LV}, FieldType),
+                  pp_loc(Fld),
+                  pp_typed("  ", E, InferredType)]);
+         {proj, _Ann, _Rec, _Fld} ->
+             io_lib:format("when checking the record projection at ~s\n~s\nagainst the expected type\n~s\n",
+                 [pp_loc(Fld),
+                  pp_typed("  ", Fld, FieldType),
+                  pp_type("  ", InferredType)])
+     end};
 pp_when({record_constraint, RecType0, InferredType0, Fld}) ->
     RecType      = instantiate(RecType0),
     InferredType = instantiate(InferredType0),
+    {Pos, WhyRec} = pp_why_record(Fld),
     case Fld of
         {field, _Ann, _LV, _Id, _E} ->
-            io_lib:format("when checking that the record type\n~s\n~s\n"
-                          "matches the expected type\n~s\n",
-                [pp_type("  ", RecType),
-                 pp_why_record(Fld),
-                 pp_type("  ", InferredType)]);
+            {Pos,
+             io_lib:format("when checking that the record type\n~s\n~s\n"
+                           "matches the expected type\n~s\n",
+                 [pp_type("  ", RecType), WhyRec, pp_type("  ", InferredType)])};
         {field, _Ann, _LV, _E} ->
-            io_lib:format("when checking that the record type\n~s\n~s\n"
-                          "matches the expected type\n~s\n",
-                [pp_type("  ", RecType),
-                 pp_why_record(Fld),
-                 pp_type("  ", InferredType)]);
+            {Pos,
+             io_lib:format("when checking that the record type\n~s\n~s\n"
+                           "matches the expected type\n~s\n",
+                 [pp_type("  ", RecType), WhyRec, pp_type("  ", InferredType)])};
         {proj, _Ann, Rec, _FldName} ->
-            io_lib:format("when checking that the expression\n~s (at ~s)\nhas type\n~s\n~s\n",
-                [pp_typed("  ", Rec, InferredType),
-                 pp_loc(Rec),
-                 pp_type("  ", RecType),
-                 pp_why_record(Fld)])
+            {pos(Rec),
+             io_lib:format("when checking that the expression\n~s (at ~s)\nhas type\n~s\n~s\n",
+                 [pp_typed("  ", Rec, InferredType), pp_loc(Rec),
+                  pp_type("  ", RecType), WhyRec])}
     end;
 pp_when({if_branches, Then, ThenType0, Else, ElseType0}) ->
     {ThenType, ElseType} = instantiate({ThenType0, ElseType0}),
     Branches = [ {Then, ThenType} | [ {B, ElseType} || B <- if_branches(Else) ] ],
-    io_lib:format("when comparing the types of the if-branches\n"
-                  "~s", [ [ io_lib:format("~s (at ~s)\n", [pp_typed("  - ", B, BType), pp_loc(B)])
-                          || {B, BType} <- Branches ] ]);
+    {pos(element(1, hd(Branches))),
+     io_lib:format("when comparing the types of the if-branches\n"
+                   "~s", [ [ io_lib:format("~s (at ~s)\n", [pp_typed("  - ", B, BType), pp_loc(B)])
+                           || {B, BType} <- Branches ] ])};
 pp_when({case_pat, Pat, PatType0, ExprType0}) ->
     {PatType, ExprType} = instantiate({PatType0, ExprType0}),
-    io_lib:format("when checking the type of the pattern at ~s\n~s\n"
-                  "against the expected type\n~s\n",
-                  [pp_loc(Pat), pp_typed("  ", Pat, PatType),
-                   pp_type("  ", ExprType)]);
+    {pos(Pat),
+     io_lib:format("when checking the type of the pattern at ~s\n~s\n"
+                   "against the expected type\n~s\n",
+                   [pp_loc(Pat), pp_typed("  ", Pat, PatType),
+                    pp_type("  ", ExprType)])};
 pp_when({check_expr, Expr, Inferred0, Expected0}) ->
     {Inferred, Expected} = instantiate({Inferred0, Expected0}),
-    io_lib:format("when checking the type of the expression at ~s\n~s\n"
-                  "against the expected type\n~s\n",
-                  [pp_loc(Expr), pp_typed("  ", Expr, Inferred),
-                   pp_type("  ", Expected)]);
+    {pos(Expr),
+     io_lib:format("when checking the type of the expression at ~s\n~s\n"
+                   "against the expected type\n~s\n",
+                   [pp_loc(Expr), pp_typed("  ", Expr, Inferred),
+                    pp_type("  ", Expected)])};
 pp_when({checking_init_type, Ann}) ->
-    io_lib:format("when checking that 'init' returns a value of type 'state' at ~s\n",
-                  [pp_loc(Ann)]);
+    {pos(Ann),
+     io_lib:format("when checking that 'init' returns a value of type 'state' at ~s\n",
+                   [pp_loc(Ann)])};
 pp_when({list_comp, BindExpr, Inferred0, Expected0}) ->
     {Inferred, Expected} = instantiate({Inferred0, Expected0}),
-    io_lib:format("when checking rvalue of list comprehension binding at ~s\n~s\n"
-                  "against type \n~s\n",
-                  [pp_loc(BindExpr), pp_typed("  ", BindExpr, Inferred), pp_type("  ", Expected)]
-                 );
+    {pos(BindExpr),
+     io_lib:format("when checking rvalue of list comprehension binding at ~s\n~s\n"
+                   "against type \n~s\n",
+                   [pp_loc(BindExpr), pp_typed("  ", BindExpr, Inferred), pp_type("  ", Expected)])};
+pp_when(unknown) -> {pos(0,0), ""}.
 
-pp_when(unknown) -> "".
-
--spec pp_why_record(why_record()) -> iolist().
+-spec pp_why_record(why_record()) -> {pos(), iolist()}.
 pp_why_record(Fld = {field, _Ann, LV, _Id, _E}) ->
-    io_lib:format("arising from an assignment of the field ~s (at ~s)",
-        [pp_expr("", {lvalue, [], LV}),
-         pp_loc(Fld)]);
+    {pos(Fld),
+     io_lib:format("arising from an assignment of the field ~s (at ~s)",
+         [pp_expr("", {lvalue, [], LV}), pp_loc(Fld)])};
 pp_why_record(Fld = {field, _Ann, LV, _E}) ->
-    io_lib:format("arising from an assignment of the field ~s (at ~s)",
-        [pp_expr("", {lvalue, [], LV}),
-         pp_loc(Fld)]);
+    {pos(Fld),
+     io_lib:format("arising from an assignment of the field ~s (at ~s)",
+         [pp_expr("", {lvalue, [], LV}), pp_loc(Fld)])};
 pp_why_record({proj, _Ann, Rec, FldName}) ->
-    io_lib:format("arising from the projection of the field ~s (at ~s)",
-        [pp(FldName),
-         pp_loc(Rec)]).
+    {pos(Rec),
+     io_lib:format("arising from the projection of the field ~s (at ~s)",
+         [pp(FldName), pp_loc(Rec)])}.
 
 
 if_branches(If = {'if', Ann, _, Then, Else}) ->
@@ -2369,8 +2455,12 @@ pp_expr(Label, Expr) ->
 pp_type(Label, Type) ->
     prettypr:format(prettypr:beside(prettypr:text(Label), aeso_pretty:type(Type, [show_generated]))).
 
+src_file(T)      -> aeso_syntax:get_ann(file, T, no_file).
 line_number(T)   -> aeso_syntax:get_ann(line, T, 0).
 column_number(T) -> aeso_syntax:get_ann(col, T, 0).
+
+pos(T)    -> aeso_errors:pos(src_file(T), line_number(T), column_number(T)).
+pos(L, C) -> aeso_errors:pos(L, C).
 
 loc(T) ->
     {line_number(T), column_number(T)}.
@@ -2381,6 +2471,9 @@ pp_loc(T) ->
         {0, 0} -> "(builtin location)";
         _      -> io_lib:format("line ~p, column ~p", [Line, Col])
     end.
+
+plural(No, _Yes, [_]) -> No;
+plural(_No, Yes, _)   -> Yes.
 
 pp(T = {type_sig, _, _, _, _}) ->
     pp(typesig_to_fun_t(T));

@@ -1,0 +1,4 @@
+contract VClose =
+  entrypoint missing_bracket() =
+    let x = [1, 2, 3
+  entrypoint bar() = ()

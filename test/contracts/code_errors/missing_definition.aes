@@ -1,0 +1,3 @@
+contract MissingDefinition =
+  entrypoint foo : int => int
+  entrypoint main() = foo(0)

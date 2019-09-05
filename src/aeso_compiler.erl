@@ -98,15 +98,7 @@ from_string(Backend, ContractString, Options) ->
     try
         from_string1(Backend, ContractString, Options)
     catch
-        %% The compiler errors.
-        error:{parse_errors, Errors} ->
-            {error, join_errors("Parse errors", Errors, fun(E) -> E end)};
-        error:{type_errors, Errors} ->
-            {error, join_errors("Type errors", Errors, fun(E) -> E end)};
-        error:{code_errors, Errors} ->
-            {error, join_errors("Code errors", Errors,
-                                fun (E) -> io_lib:format("~p", [E]) end)}
-        %% General programming errors in the compiler just signal error.
+        throw:{error, Errors} -> {error, Errors}
     end.
 
 from_string1(aevm, ContractString, Options) ->
@@ -230,16 +222,10 @@ check_call1(ContractString0, FunName, Args, Options) ->
                 {ok, FunName, CallArgs}
         end
     catch
-        error:{parse_errors, Errors} ->
-            {error, join_errors("Parse errors", Errors, fun (E) -> E end)};
-        error:{type_errors, Errors} ->
-            {error, join_errors("Type errors", Errors, fun (E) -> E end)};
+        throw:{error, Errors} -> {error, Errors};
         error:{badmatch, {error, missing_call_function}} ->
             {error, join_errors("Type errors", ["missing __call function"],
-                                fun (E) -> E end)};
-        throw:Error ->                          %Don't ask
-            {error, join_errors("Code errors", [Error],
-                                fun (E) -> io_lib:format("~p", [E]) end)}
+                                fun (E) -> E end)}
     end.
 
 arguments_of_body(CallName, _FunName, Fcode) ->
@@ -345,16 +331,10 @@ to_sophia_value(ContractString, FunName, ok, Data, Options0) ->
                end
         end
     catch
-        error:{parse_errors, Errors} ->
-            {error, join_errors("Parse errors", Errors, fun (E) -> E end)};
-        error:{type_errors, Errors} ->
-            {error, join_errors("Type errors", Errors, fun (E) -> E end)};
+        throw:{error, Errors} -> {error, Errors};
         error:{badmatch, {error, missing_function}} ->
             {error, join_errors("Type errors", ["no function: '" ++ FunName ++ "'"],
-                                fun (E) -> E end)};
-        throw:Error ->                          %Don't ask
-            {error, join_errors("Code errors", [Error],
-                                fun (E) -> io_lib:format("~p", [E]) end)}
+                                fun (E) -> E end)}
     end.
 
 
@@ -444,16 +424,11 @@ decode_calldata(ContractString, FunName, Calldata, Options0) ->
                 end
         end
     catch
-        error:{parse_errors, Errors} ->
-            {error, join_errors("Parse errors", Errors, fun (E) -> E end)};
-        error:{type_errors, Errors} ->
-            {error, join_errors("Type errors", Errors, fun (E) -> E end)};
+        throw:{error, Errors} ->
+            {error, Errors};
         error:{badmatch, {error, missing_function}} ->
             {error, join_errors("Type errors", ["no function: '" ++ FunName ++ "'"],
-                                fun (E) -> E end)};
-        throw:Error ->                          %Don't ask
-            {error, join_errors("Code errors", [Error],
-                                fun (E) -> io_lib:format("~p", [E]) end)}
+                                fun (E) -> E end)}
     end.
 
 get_arg_icode(Funs) ->
@@ -582,37 +557,7 @@ parse(Text, Options) ->
 
 -spec parse(string(), sets:set(), aeso_compiler:options()) -> none() | aeso_syntax:ast().
 parse(Text, Included, Options) ->
-    %% Try and return something sensible here!
-    case aeso_parser:string(Text, Included, Options) of
-        %% Yay, it worked!
-        {ok, Contract} -> Contract;
-        %% Scan errors.
-        {error, {Pos, scan_error}} ->
-            parse_error(Pos, "scan error");
-        {error, {Pos, scan_error_no_state}} ->
-            parse_error(Pos, "scan error");
-        %% Parse errors.
-        {error, {Pos, parse_error, Error}} ->
-            parse_error(Pos, Error);
-        {error, {Pos, ambiguous_parse, As}} ->
-            ErrorString = io_lib:format("Ambiguous ~p", [As]),
-            parse_error(Pos, ErrorString);
-        %% Include error
-        {error, {Pos, include_error, File}} ->
-            parse_error(Pos, io_lib:format("could not find include file '~s'", [File]))
-    end.
-
--spec parse_error(aeso_parse_lib:pos(), string()) -> none().
-parse_error(Pos, ErrorString) ->
-    Error = io_lib:format("~s: ~s", [pos_error(Pos), ErrorString]),
-    error({parse_errors, [Error]}).
+    aeso_parser:string(Text, Included, Options).
 
 read_contract(Name) ->
     file:read_file(Name).
-
-pos_error({Line, Pos}) ->
-    io_lib:format("line ~p, column ~p", [Line, Pos]);
-pos_error({no_file, Line, Pos}) ->
-    pos_error({Line, Pos});
-pos_error({File, Line, Pos}) ->
-    io_lib:format("file ~s, line ~p, column ~p", [File, Line, Pos]).

@@ -1,0 +1,5 @@
+contract HigherOrderResponseType =
+  stateful function foo(o, q : oracle_query(string, _)) =
+    Oracle.respond(o, q, (x) => x + 1)
+
+  entrypoint main() = ()

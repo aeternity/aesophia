@@ -1,0 +1,4 @@
+contract ParameterisedEvent =
+
+  datatype event('a) = Event(int)
+

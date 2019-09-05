@@ -67,6 +67,7 @@
                | {def_u, fun_name(), arity()}
                | {remote_u, [ftype()], ftype(), fexpr(), fun_name()}
                | {builtin_u, builtin(), arity()}
+               | {builtin_u, builtin(), arity(), [fexpr()]} %% Typerep arguments to be added after normal args.
                | {lam, [var_name()], fexpr()}.
 
 -type fsplit() :: {split, ftype(), var_name(), [fcase()]}
@@ -140,6 +141,7 @@
                   functions  := #{ fun_name() => fun_def() } }.
 
 -define(HASH_BYTES, 32).
+
 %% -- Entrypoint -------------------------------------------------------------
 
 %% Main entrypoint. Takes typed syntax produced by aeso_ast_infer_types:infer/1,2
@@ -232,7 +234,7 @@ is_no_code(Env) ->
 %% -- Compilation ------------------------------------------------------------
 
 -spec to_fcode(env(), aeso_syntax:ast()) -> fcode().
-to_fcode(Env, [{contract, Attrs, {con, _, Main}, Decls}]) ->
+to_fcode(Env, [{contract, Attrs, MainCon = {con, _, Main}, Decls}]) ->
     #{ builtins := Builtins } = Env,
     MainEnv = Env#{ context  => {main_contract, Main},
                     builtins => Builtins#{[Main, "state"]          => {get_state, none},
@@ -247,8 +249,10 @@ to_fcode(Env, [{contract, Attrs, {con, _, Main}, Decls}]) ->
        state_type    => StateType,
        event_type    => EventType,
        payable       => Payable,
-       functions     => add_init_function(Env1, StateType,
+       functions     => add_init_function(Env1, MainCon, StateType,
                         add_event_function(Env1, EventType, Funs)) };
+to_fcode(_Env, [NotContract]) ->
+    fcode_error({last_declaration_must_be_contract, NotContract});
 to_fcode(Env, [{contract, _, {con, _, Con}, Decls} | Code]) ->
     Env1 = decls_to_fcode(Env#{ context => {abstract_contract, Con} }, Decls),
     to_fcode(Env1, Code);
@@ -270,21 +274,21 @@ decls_to_fcode(Env, Decls) ->
 
 -spec decl_to_fcode(env(), aeso_syntax:decl()) -> env().
 decl_to_fcode(Env, {type_decl, _, _, _}) -> Env;
-decl_to_fcode(Env = #{context := {main_contract, _}}, {fun_decl, Ann, {id, _, Name}, _}) ->
+decl_to_fcode(Env = #{context := {main_contract, _}}, {fun_decl, _, Id, _}) ->
     case is_no_code(Env) of
-        false -> fcode_error({missing_definition, Name, lists:keydelete(entrypoint, 1, Ann)});
+        false -> fcode_error({missing_definition, Id});
         true  -> Env
     end;
 decl_to_fcode(Env, {fun_decl, _, _, _})  -> Env;
 decl_to_fcode(Env, {type_def, _Ann, Name, Args, Def}) ->
     typedef_to_fcode(Env, Name, Args, Def);
-decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, {id, _, Name}, Args, Ret, Body}) ->
+decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, Id = {id, _, Name}, Args, Ret, Body}) ->
     Attrs = get_attributes(Ann),
     FName = lookup_fun(Env, qname(Env, Name)),
     FArgs = args_to_fcode(Env, Args),
     FRet  = type_to_fcode(Env, Ret),
     FBody = expr_to_fcode(Env#{ vars => [X || {X, _} <- FArgs] }, Body),
-    [ ensure_first_order_entrypoint(Ann, FArgs, FRet)
+    [ ensure_first_order_entrypoint(Ann, Id, Args, Ret, FArgs, FRet)
       || aeso_syntax:get_ann(entrypoint, Ann, false) ],
     Def   = #{ attrs  => Attrs,
                args   => FArgs,
@@ -294,9 +298,10 @@ decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, {id, _, Name}, Args, R
     Env#{ functions := NewFuns }.
 
 -spec typedef_to_fcode(env(), aeso_syntax:id(), [aeso_syntax:tvar()], aeso_syntax:typedef()) -> env().
-typedef_to_fcode(Env, {id, _, Name}, Xs, Def) ->
+typedef_to_fcode(Env, Id = {id, _, Name}, Xs, Def) ->
+    check_state_and_event_types(Env, Id, Xs),
     Q = qname(Env, Name),
-    FDef = fun(Args) ->
+    FDef = fun(Args) when length(Args) == length(Xs) ->
                 Sub = maps:from_list(lists:zip([X || {tvar, _, X} <- Xs], Args)),
                 case Def of
                     {record_t, Fields} -> {todo, Xs, Args, record_t, Fields};
@@ -307,7 +312,9 @@ typedef_to_fcode(Env, {id, _, Name}, Xs, Def) ->
                                   end || Con <- Cons ],
                         {variant, FCons};
                     {alias_t, Type}    -> {todo, Xs, Args, alias_t, Type}
-                end end,
+                end;
+              (Args) -> internal_error({type_arity_mismatch, Name, length(Args), length(Xs)})
+           end,
     Constructors =
         case Def of
             {variant_t, Cons} ->
@@ -327,6 +334,14 @@ typedef_to_fcode(Env, {id, _, Name}, Xs, Def) ->
              _       -> Env1
            end,
     bind_type(Env2, Q, FDef).
+
+check_state_and_event_types(#{ context := {main_contract, _} }, Id, [_ | _]) ->
+    case Id of
+        {id, _, "state"} -> fcode_error({parameterized_state, Id});
+        {id, _, "event"} -> fcode_error({parameterized_event, Id});
+        _                -> ok
+    end;
+check_state_and_event_types(_, _, _) -> ok.
 
 -spec type_to_fcode(env(), aeso_syntax:type()) -> ftype().
 type_to_fcode(Env, Type) ->
@@ -392,7 +407,28 @@ expr_to_fcode(_Env, _Type, {bytes,           _, B}) -> {lit, {bytes, B}};
 
 %% Variables
 expr_to_fcode(Env, _Type, {id, _, X})  -> resolve_var(Env, [X]);
-expr_to_fcode(Env, _Type, {qid, _, X}) -> resolve_var(Env, X);
+expr_to_fcode(Env, Type, {qid, Ann, X}) ->
+    case resolve_var(Env, X) of
+        {builtin_u, B, Ar} when B =:= oracle_query;
+                                B =:= oracle_get_question;
+                                B =:= oracle_get_answer;
+                                B =:= oracle_respond;
+                                B =:= oracle_register;
+                                B =:= oracle_check;
+                                B =:= oracle_check_query ->
+            OType = get_oracle_type(B, Type),
+            {oracle, QType, RType} = type_to_fcode(Env, OType),
+            validate_oracle_type(Ann, OType, QType, RType),
+            TypeArgs = [{lit, {typerep, QType}}, {lit, {typerep, RType}}],
+            {builtin_u, B, Ar, TypeArgs};
+        {builtin_u, B = aens_resolve, Ar} ->
+            {fun_t, _, _, _, ResType} = Type,
+            AensType = type_to_fcode(Env, ResType),
+            validate_aens_resolve_type(Ann, ResType, AensType),
+            TypeArgs = [{lit, {typerep, AensType}}],
+            {builtin_u, B, Ar, TypeArgs};
+        Other -> Other
+    end;
 
 %% Constructors
 expr_to_fcode(Env, Type, {C, _, _} = Con) when C == con; C == qcon ->
@@ -402,7 +438,7 @@ expr_to_fcode(Env, _Type, {app, _, {typed, _, {C, _, _} = Con, _}, Args}) when C
     Arity = lists:nth(I + 1, Arities),
     case length(Args) == Arity of
         true  -> {con, Arities, I, [expr_to_fcode(Env, Arg) || Arg <- Args]};
-        false -> fcode_error({constructor_arity_mismatch, Con, length(Args), Arity})
+        false -> internal_error({constructor_arity_mismatch, Con, length(Args), Arity})
     end;
 
 %% Tuples
@@ -513,31 +549,13 @@ expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
     end;
 
 %% Function calls
-expr_to_fcode(Env, Type, {app, _, Fun = {typed, _, _, {fun_t, _, NamedArgsT, _, _}}, Args}) ->
+expr_to_fcode(Env, _Type, {app, _, Fun = {typed, _, _, {fun_t, _, NamedArgsT, _, _}}, Args}) ->
     Args1 = get_named_args(NamedArgsT, Args),
     FArgs = [expr_to_fcode(Env, Arg) || Arg <- Args1],
     case expr_to_fcode(Env, Fun) of
-        {builtin_u, B, _} when B =:= oracle_query;
-                               B =:= oracle_get_question;
-                               B =:= oracle_get_answer;
-                               B =:= oracle_respond;
-                               B =:= oracle_register;
-                               B =:= oracle_check;
-                               B =:= oracle_check_query ->
-            %% Get the type of the oracle from the args or the expression itself
-            OType = get_oracle_type(B, Type, Args1),
-            {oracle, QType, RType} = type_to_fcode(Env, OType),
-            validate_oracle_type(aeso_syntax:get_ann(Fun), QType, RType),
-            TypeArgs = [{lit, {typerep, QType}}, {lit, {typerep, RType}}],
-            builtin_to_fcode(B, FArgs ++ TypeArgs);
-        {builtin_u, B, _} when B =:= aens_resolve ->
-            %% Get the type we are assuming the name resolves to
-            AensType = type_to_fcode(Env, Type),
-            validate_aens_resolve_type(aeso_syntax:get_ann(Fun), AensType),
-            TypeArgs = [{lit, {typerep, AensType}}],
-            builtin_to_fcode(B, FArgs ++ TypeArgs);
-        {builtin_u, B, _Ar}       -> builtin_to_fcode(B, FArgs);
-        {def_u, F, _Ar}           -> {def, F, FArgs};
+        {builtin_u, B, _Ar, TypeArgs}     -> builtin_to_fcode(B, FArgs ++ TypeArgs);
+        {builtin_u, B, _Ar}               -> builtin_to_fcode(B, FArgs);
+        {def_u, F, _Ar}                   -> {def, F, FArgs};
         {remote_u, ArgsT, RetT, Ct, RFun} -> {remote, ArgsT, RetT, Ct, RFun, FArgs};
         FFun ->
             %% FFun is a closure, with first component the function name and
@@ -601,30 +619,37 @@ make_if(Cond, Then, Else) ->
     {'let', X, Cond, make_if({var, X}, Then, Else)}.
 
 
-get_oracle_type(oracle_register,     OType, _Args) -> OType;
-get_oracle_type(oracle_query,        _Type, [{typed, _, _Expr, OType} | _])   -> OType;
-get_oracle_type(oracle_get_question, _Type, [{typed, _, _Expr, OType} | _])   -> OType;
-get_oracle_type(oracle_get_answer,   _Type, [{typed, _, _Expr, OType} | _])   -> OType;
-get_oracle_type(oracle_check,        _Type, [{typed, _, _Expr, OType}])       -> OType;
-get_oracle_type(oracle_check_query,  _Type, [{typed, _, _Expr, OType} | _])   -> OType;
-get_oracle_type(oracle_respond,      _Type, [_, {typed, _,_Expr, OType} | _]) -> OType.
+get_oracle_type(oracle_register,     {fun_t, _, _, _, OType})       -> OType;
+get_oracle_type(oracle_query,        {fun_t, _, _, [OType | _], _}) -> OType;
+get_oracle_type(oracle_get_question, {fun_t, _, _, [OType | _], _}) -> OType;
+get_oracle_type(oracle_get_answer,   {fun_t, _, _, [OType | _], _}) -> OType;
+get_oracle_type(oracle_check,        {fun_t, _, _, [OType | _], _}) -> OType;
+get_oracle_type(oracle_check_query,  {fun_t, _, _, [OType | _], _}) -> OType;
+get_oracle_type(oracle_respond,      {fun_t, _, _, [OType | _], _}) -> OType.
 
-validate_oracle_type(Ann, QType, RType) ->
-    ensure_monomorphic(QType, {polymorphic_query_type, Ann, QType}),
-    ensure_monomorphic(RType, {polymorphic_response_type, Ann, RType}),
-    ensure_first_order(QType, {higher_order_query_type, Ann, QType}),
-    ensure_first_order(RType, {higher_order_response_type, Ann, RType}),
+validate_oracle_type(Ann, Type, QType, RType) ->
+    ensure_monomorphic(QType, {invalid_oracle_type, polymorphic,  query,    Ann, Type}),
+    ensure_monomorphic(RType, {invalid_oracle_type, polymorphic,  response, Ann, Type}),
+    ensure_first_order(QType, {invalid_oracle_type, higher_order, query,    Ann, Type}),
+    ensure_first_order(RType, {invalid_oracle_type, higher_order, response, Ann, Type}),
     ok.
 
-validate_aens_resolve_type(Ann, {variant, [[], [Type]]}) ->
-    ensure_monomorphic(Type, {polymorphic_aens_resolve, Ann, Type}),
-    ensure_first_order(Type, {higher_order_aens_resolve, Ann, Type}),
-    ok.
+validate_aens_resolve_type(Ann, {app_t, _, _, [Type]}, {variant, [[], [FType]]}) ->
+    case FType of
+        string         -> ok;
+        address        -> ok;
+        contract       -> ok;
+        {oracle, _, _} -> ok;
+        oracle_query   -> ok;
+        _              -> fcode_error({invalid_aens_resolve_type, Ann, Type})
+    end.
 
-ensure_first_order_entrypoint(Ann, Args, Ret) ->
-    [ ensure_first_order(T, {higher_order_entrypoint_argument, Ann, X, T})
-      || {X, T} <- Args ],
-    ensure_first_order(Ret, {higher_order_entrypoint_return, Ann, Ret}),
+ensure_first_order_entrypoint(Ann, Id = {id, _, Name}, Args, Ret, FArgs, FRet) ->
+    [ ensure_first_order(FT, {invalid_entrypoint, higher_order, Ann1, Id, {argument, X, T}})
+      || {{arg, Ann1, X, T}, {_, FT}} <- lists:zip(Args, FArgs) ],
+    [ ensure_first_order(FRet, {invalid_entrypoint, higher_order, Ann, Id, {result, Ret}})
+      || Name /= "init" ],  %% init can return higher-order values, since they're written to the store
+                            %% rather than being returned.
     ok.
 
 ensure_monomorphic(Type, Err) ->
@@ -904,18 +929,18 @@ builtin_to_fcode(Builtin, Args) ->
 
 %% -- Init function --
 
-add_init_function(Env, StateType, Funs0) ->
+add_init_function(Env, Main, StateType, Funs0) ->
     case is_no_code(Env) of
         true  -> Funs0;
         false ->
-            Funs     = add_default_init_function(Env, StateType, Funs0),
+            Funs     = add_default_init_function(Env, Main, StateType, Funs0),
             InitName = {entrypoint, <<"init">>},
             InitFun  = #{ body := InitBody} = maps:get(InitName, Funs),
             Funs#{ InitName => InitFun#{ return => {tuple, []},
                                          body   => {builtin, set_state, [InitBody]} } }
     end.
 
-add_default_init_function(_Env, StateType, Funs) ->
+add_default_init_function(_Env, Main, StateType, Funs) ->
     InitName = {entrypoint, <<"init">>},
     case maps:get(InitName, Funs, none) of
         %% Only add default init function if state is unit.
@@ -924,7 +949,7 @@ add_default_init_function(_Env, StateType, Funs) ->
                                  args   => [],
                                  return => {tuple, []},
                                  body   => {tuple, []}} };
-        none -> fcode_error(missing_init_function);
+        none -> fcode_error({missing_init_function, Main});
         _    -> Funs
     end.
 
@@ -1006,9 +1031,14 @@ make_closure(FVs, Xs, Body) ->
 lambda_lift_expr({lam, Xs, Body}) ->
     FVs   = free_vars({lam, Xs, Body}),
     make_closure(FVs, Xs, lambda_lift_expr(Body));
-lambda_lift_expr({Tag, F, Ar}) when Tag == def_u; Tag == builtin_u ->
+lambda_lift_expr(UExpr) when element(1, UExpr) == def_u; element(1, UExpr) == builtin_u ->
+    [Tag, F, Ar | _] = tuple_to_list(UExpr),
+    ExtraArgs = case UExpr of
+                    {builtin_u, _, _, TypeArgs} -> TypeArgs;
+                    _                           -> []
+                end,
     Xs   = [ lists:concat(["arg", I]) || I <- lists:seq(1, Ar) ],
-    Args = [{var, X} || X <- Xs],
+    Args = [{var, X} || X <- Xs] ++ ExtraArgs,
     Body = case Tag of
                builtin_u -> builtin_to_fcode(F, Args);
                def_u     -> {def, F, Args}
@@ -1115,7 +1145,7 @@ lookup_type(Env, {qid, _, Name}, Args) ->
     lookup_type(Env, Name, Args);
 lookup_type(Env, Name, Args) ->
     case lookup_type(Env, Name, Args, not_found) of
-        not_found -> error({unknown_type, Name});
+        not_found -> internal_error({unknown_type, Name});
         Type      -> Type
     end.
 
@@ -1200,7 +1230,7 @@ resolve_var(Env, Q) -> resolve_fun(Env, Q).
 
 resolve_fun(#{ fun_env := Funs, builtins := Builtin }, Q) ->
     case {maps:get(Q, Funs, not_found), maps:get(Q, Builtin, not_found)} of
-        {not_found, not_found} -> fcode_error({unbound_variable, Q});
+        {not_found, not_found} -> internal_error({unbound_variable, Q});
         {_, {B, none}}         -> {builtin, B, []};
         {_, {B, Ar}}           -> {builtin_u, B, Ar};
         {{Fun, Ar}, _}         -> {def_u, Fun, Ar}
@@ -1258,6 +1288,7 @@ free_vars(Expr) ->
         {remote_u, _, _, Ct, _}   -> free_vars(Ct);
         {builtin, _, As}     -> free_vars(As);
         {builtin_u, _, _}    -> [];
+        {builtin_u, _, _, _} -> [];     %% Typereps are always literals
         {con, _, _, As}      -> free_vars(As);
         {tuple, As}          -> free_vars(As);
         {proj, A, _}         -> free_vars(A);
@@ -1286,6 +1317,7 @@ used_defs(Expr) ->
         {remote_u, _, _, Ct, _}   -> used_defs(Ct);
         {builtin, _, As}     -> used_defs(As);
         {builtin_u, _, _}    -> [];
+        {builtin_u, _, _, _} -> [];
         {con, _, _, As}      -> used_defs(As);
         {tuple, As}          -> used_defs(As);
         {proj, A, _}         -> used_defs(A);
@@ -1326,6 +1358,7 @@ rename(Ren, Expr) ->
         {def_u, _, _}         -> Expr;
         {builtin, B, Es}      -> {builtin, B, [rename(Ren, E) || E <- Es]};
         {builtin_u, _, _}     -> Expr;
+        {builtin_u, _, _, _}  -> Expr;
         {remote, ArgsT, RetT, Ct, F, Es} -> {remote,   ArgsT, RetT, rename(Ren, Ct), F, [rename(Ren, E) || E <- Es]};
         {remote_u, ArgsT, RetT, Ct, F}   -> {remote_u, ArgsT, RetT, rename(Ren, Ct), F};
         {con, Ar, I, Es}      -> {con, Ar, I, [rename(Ren, E) || E <- Es]};
@@ -1440,8 +1473,14 @@ get_attributes(Ann) ->
 indexed(Xs) ->
     lists:zip(lists:seq(1, length(Xs)), Xs).
 
-fcode_error(Err) ->
-    error(Err).
+-dialyzer({nowarn_function, [fcode_error/1, internal_error/1]}).
+
+fcode_error(Error) ->
+    aeso_errors:throw(aeso_code_errors:format(Error)).
+
+internal_error(Error) ->
+    Msg = lists:flatten(io_lib:format("~p\n", [Error])),
+    aeso_errors:throw(aeso_errors:new(internal_error, aeso_errors:pos(0, 0), Msg)).
 
 %% -- Pretty printing --------------------------------------------------------
 
@@ -1466,7 +1505,8 @@ pp_fun_name({local_fun, Q})  -> pp_text(string:join(Q, ".")).
 pp_text(<<>>) -> prettypr:text("\"\"");
 pp_text(Bin) when is_binary(Bin) -> prettypr:text(lists:flatten(io_lib:format("~p", [binary_to_list(Bin)])));
 pp_text(S) when is_list(S) -> prettypr:text(lists:concat([S]));
-pp_text(A) when is_atom(A) -> prettypr:text(atom_to_list(A)).
+pp_text(A) when is_atom(A) -> prettypr:text(atom_to_list(A));
+pp_text(N) when is_integer(N) -> prettypr:text(integer_to_list(N)).
 
 pp_int(I) -> prettypr:text(integer_to_list(I)).
 
@@ -1540,6 +1580,8 @@ pp_fexpr({'let', X, A, B}) ->
             pp_fexpr(B)]);
 pp_fexpr({builtin_u, B, N}) ->
     pp_beside([pp_text(B), pp_text("/"), pp_text(N)]);
+pp_fexpr({builtin_u, B, N, TypeArgs}) ->
+    pp_beside([pp_text(B), pp_text("@"), pp_fexpr({tuple, TypeArgs}), pp_text("/"), pp_text(N)]);
 pp_fexpr({builtin, B, As}) ->
     pp_call(pp_text(B), As);
 pp_fexpr({remote_u, ArgsT, RetT, Ct, Fun}) ->

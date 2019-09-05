@@ -107,11 +107,11 @@ aci_test_contract(Name) ->
 
 check_stub(Stub, Options) ->
     case aeso_parser:string(binary_to_list(Stub), Options) of
-        {ok, Ast} ->
+        Ast ->
             try
                 %% io:format("AST: ~120p\n", [Ast]),
                 aeso_ast_infer_types:infer(Ast, [])
-            catch _:{type_errors, TE} ->
+            catch throw:{type_errors, TE} ->
                 io:format("Type error:\n~s\n", [TE]),
                 error(TE);
                   _:R ->

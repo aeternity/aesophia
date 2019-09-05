@@ -1,0 +1,3 @@
+contract MissingInitFunction =
+  type state = int * int
+

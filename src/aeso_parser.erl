@@ -11,10 +11,9 @@
          type/1]).
 
 -include("aeso_parse_lib.hrl").
+-import(aeso_parse_lib, [current_file/0, set_current_file/1]).
 
--type parse_result() :: {ok, aeso_syntax:ast()}
-                      | {error, {aeso_parse_lib:pos(), atom(), term()}}
-                      | {error, {aeso_parse_lib:pos(), atom()}}.
+-type parse_result() :: aeso_syntax:ast() | none().
 
 -type include_hash() :: {string(), binary()}.
 
@@ -33,13 +32,19 @@ string(String, Opts) ->
 string(String, Included, Opts) ->
     case parse_and_scan(file(), String, Opts) of
         {ok, AST} ->
-            expand_includes(AST, Included, Opts);
-        Err = {error, _} ->
-            Err
+            case expand_includes(AST, Included, Opts) of
+                {ok, AST1}   -> AST1;
+                {error, Err} -> parse_error(Err)
+            end;
+        {error, Err} ->
+            parse_error(Err)
     end.
 
 type(String) ->
-    parse_and_scan(type(), String, []).
+    case parse_and_scan(type(), String, []) of
+        {ok, AST}    -> {ok, AST};
+        {error, Err} -> {error, [mk_error(Err)]}
+    end.
 
 parse_and_scan(P, S, Opts) ->
     set_current_file(proplists:get_value(src_file, Opts, no_file)),
@@ -47,6 +52,28 @@ parse_and_scan(P, S, Opts) ->
         {ok, Tokens} -> aeso_parse_lib:parse(P, Tokens);
         Error        -> Error
     end.
+
+-dialyzer({nowarn_function, parse_error/1}).
+parse_error(Err) ->
+    aeso_errors:throw(mk_error(Err)).
+
+mk_p_err(Pos, Msg) ->
+    aeso_errors:new(parse_error, mk_pos(Pos), lists:flatten(Msg)).
+
+mk_error({Pos, ScanE}) when ScanE == scan_error; ScanE == scan_error_no_state ->
+    mk_p_err(Pos, "Scan error\n");
+mk_error({Pos, parse_error, Err}) ->
+    Msg = io_lib:format("~s\n", [Err]),
+    mk_p_err(Pos, Msg);
+mk_error({Pos, ambiguous_parse, As}) ->
+    Msg = io_lib:format("Ambiguous parse result: ~p\n", [As]),
+    mk_p_err(Pos, Msg);
+mk_error({Pos, include_error, File}) ->
+    Msg = io_lib:format("Couldn't find include file '~s'\n", [File]),
+    mk_p_err(Pos, Msg).
+
+mk_pos({Line, Col})       -> aeso_errors:pos(Line, Col);
+mk_pos({File, Line, Col}) -> aeso_errors:pos(File, Line, Col).
 
 %% -- Parsing rules ----------------------------------------------------------
 
@@ -425,12 +452,6 @@ bracket_list(P) -> brackets(comma_sep(P)).
 -spec pos_ann(ann_line(), ann_col()) -> ann().
 pos_ann(Line, Col) -> [{file, current_file()}, {line, Line}, {col, Col}].
 
-current_file() ->
-    get('$current_file').
-
-set_current_file(File) ->
-    put('$current_file', File).
-
 ann_pos(Ann) ->
     {proplists:get_value(file, Ann),
      proplists:get_value(line, Ann),
@@ -533,14 +554,9 @@ parse_pattern(E) -> bad_expr_err("Not a valid pattern", E).
 parse_field_pattern({field, Ann, F, E}) ->
     {field, Ann, F, parse_pattern(E)}.
 
-return_error({no_file, L, C}, Err) ->
-    fail(io_lib:format("~p:~p:\n~s", [L, C, Err]));
-return_error({F, L, C}, Err) ->
-    fail(io_lib:format("In ~s at ~p:~p:\n~s", [F, L, C, Err])).
-
 -spec ret_doc_err(ann(), prettypr:document()) -> aeso_parse_lib:parser(none()).
 ret_doc_err(Ann, Doc) ->
-    return_error(ann_pos(Ann), prettypr:format(Doc)).
+    fail(ann_pos(Ann), prettypr:format(Doc)).
 
 -spec bad_expr_err(string(), aeso_syntax:expr()) -> aeso_parse_lib:parser(none()).
 bad_expr_err(Reason, E) ->
@@ -600,7 +616,7 @@ stdlib_options() ->
 get_include_code(File, Ann, Opts) ->
     case {read_file(File, Opts), read_file(File, stdlib_options())} of
         {{ok, _}, {ok,_ }} ->
-            return_error(ann_pos(Ann), "Illegal redefinition of standard library " ++ File);
+            fail(ann_pos(Ann), "Illegal redefinition of standard library " ++ File);
         {_, {ok, Bin}} ->
             {ok, binary_to_list(Bin)};
         {{ok, Bin}, _} ->

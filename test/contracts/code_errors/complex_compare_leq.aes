@@ -1,0 +1,4 @@
+contract ComplexCompare =
+
+  entrypoint test(x : int) =
+    (1, 2) =< (x, x + 1)

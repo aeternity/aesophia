@@ -16,6 +16,7 @@
          set_payable/2,
          enter_namespace/2,
          get_namespace/1,
+         in_main_contract/1,
          qualify/2,
          set_functions/2,
          map_typerep/2,
@@ -119,6 +120,10 @@ enter_namespace(NS, Icode = #{ namespace := NS1 }) ->
     Icode#{ namespace => aeso_syntax:qualify(NS1, NS) };
 enter_namespace(NS, Icode) ->
     Icode#{ namespace => NS }.
+
+-spec in_main_contract(icode()) -> boolean().
+in_main_contract(#{ namespace := {con, _, Main}, contract_name := Main }) -> true;
+in_main_contract(_Icode) -> false.
 
 -spec get_namespace(icode()) -> false | aeso_syntax:con() | aeso_syntax:qcon().
 get_namespace(Icode) -> maps:get(namespace, Icode, false).

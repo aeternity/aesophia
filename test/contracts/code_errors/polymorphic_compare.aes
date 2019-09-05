@@ -1,0 +1,7 @@
+contract PolymorphicCompare =
+
+  function cmp(x : 'a, y : 'a) : bool =
+    x == y
+
+  entrypoint test() =
+    cmp(4, 6) && cmp(true, false)

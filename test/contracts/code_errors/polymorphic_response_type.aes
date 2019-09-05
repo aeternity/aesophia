@@ -1,0 +1,5 @@
+contract PolymorphicResponseType =
+  function is_oracle(o : oracle(string, 'r)) =
+    Oracle.check(o)
+
+  entrypoint main(o : oracle(string, int)) = is_oracle(o)
