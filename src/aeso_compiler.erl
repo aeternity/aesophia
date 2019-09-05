@@ -76,7 +76,7 @@ file(File, Options0) ->
         {ok, Bin} -> from_string(Bin, [{src_file, File} | Options]);
         {error, Error} ->
             Msg = lists:flatten([File,": ",file:format_error(Error)]),
-            Pos = aeso_errors:pos(File, 0, 0),
+            Pos = aeso_errors:pos(0, 0),
             {error, [aeso_errors:new(file_error, Pos, Msg)]}
     end.
 

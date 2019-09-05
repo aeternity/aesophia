@@ -35,8 +35,7 @@ simple_compile_test_() ->
     [ {"Test file not found error",
        fun() ->
            {error, Errors} = aeso_compiler:file("does_not_exist.aes"),
-           ExpErr = <<"In 'does_not_exist.aes' at line 0, col 0:\n"
-                      "does_not_exist.aes: no such file or directory">>,
+           ExpErr = <<"does_not_exist.aes: no such file or directory">>,
            check_errors([ExpErr], Errors)
        end} ] ++
     [ {"Testing error messages of " ++ ContractName,
