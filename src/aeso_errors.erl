@@ -15,7 +15,8 @@
              }).
 
 -type pos()        :: #pos{}.
--type error_type() :: type_error | parse_error | code_error | file_error | internal_error.
+-type error_type() :: type_error | parse_error | code_error
+                    | file_error | data_error | internal_error.
 
 -record(err, { pos = #pos{}   :: pos()
              , type           :: error_type()
@@ -71,9 +72,11 @@ str_pos(#pos{file = F, line = L, col = C}) ->
 type(#err{ type = Type }) -> Type.
 
 pp(#err{ pos = Pos } = Err) ->
-    lists:flatten(io_lib:format("~s\n~s", [pp_pos(Pos), msg(Err)])).
+    lists:flatten(io_lib:format("~s~s", [pp_pos(Pos), msg(Err)])).
 
+pp_pos(#pos{file = no_file, line = 0, col = 0}) ->
+    "";
 pp_pos(#pos{file = no_file, line = L, col = C}) ->
-    io_lib:format("At line ~p, col ~p:", [L, C]);
+    io_lib:format("At line ~p, col ~p:\n", [L, C]);
 pp_pos(#pos{file = F, line = L, col = C}) ->
-    io_lib:format("In '~s' at line ~p, col ~p:", [F, L, C]).
+    io_lib:format("In '~s' at line ~p, col ~p:\n", [F, L, C]).

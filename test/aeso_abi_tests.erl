@@ -72,6 +72,58 @@ encode_decode_sophia_test() ->
     ok = Check("r", "{x = (\"foo\", 0), y = Red}"),
     ok.
 
+to_sophia_value_neg_test() ->
+    Code = [ "contract Foo =\n"
+             "  entrypoint x(y : int) : string = \"hello\"\n" ],
+
+    {error, [Err1]} = aeso_compiler:to_sophia_value(Code, "x", ok, encode(12)),
+    ?assertEqual("Failed to decode binary as type string\n", aeso_errors:pp(Err1)),
+    {error, [Err2]} = aeso_compiler:to_sophia_value(Code, "x", ok, encode(12), [{backend, fate}]),
+    ?assertEqual("Failed to decode binary as type string\n", aeso_errors:pp(Err2)),
+
+    {error, [Err3]} = aeso_compiler:to_sophia_value(Code, "x", revert, encode(12)),
+    ?assertEqual("Could not interpret the revert message\n", aeso_errors:pp(Err3)),
+    {error, [Err4]} = aeso_compiler:to_sophia_value(Code, "x", revert, encode(12), [{backend, fate}]),
+    ?assertEqual("Could not deserialize the revert message\n", aeso_errors:pp(Err4)),
+    ok.
+
+encode_calldata_neg_test() ->
+    Code = [ "contract Foo =\n"
+             "  entrypoint x(y : int) : string = \"hello\"\n" ],
+
+    ExpErr1 = "At line 5, col 34:\nCannot unify int\n         and bool\n"
+              "when checking the application at line 5, column 34 of\n"
+              "  x : (int) => string\nto arguments\n  true : bool\n",
+    {error, [Err1]} = aeso_compiler:create_calldata(Code, "x", ["true"]),
+    ?assertEqual(ExpErr1, aeso_errors:pp(Err1)),
+    {error, [Err2]} = aeso_compiler:create_calldata(Code, "x", ["true"], [{backend, fate}]),
+    ?assertEqual(ExpErr1, aeso_errors:pp(Err2)),
+
+    ok.
+
+decode_calldata_neg_test() ->
+    Code1 = [ "contract Foo =\n"
+              "  entrypoint x(y : int) : string = \"hello\"\n" ],
+    Code2 = [ "contract Foo =\n"
+              "  entrypoint x(y : string) : int = 42\n" ],
+
+    {ok, CallDataAEVM} = aeso_compiler:create_calldata(Code1, "x", ["42"]),
+    {ok, CallDataFATE} = aeso_compiler:create_calldata(Code1, "x", ["42"], [{backend, fate}]),
+
+    {error, [Err1]} = aeso_compiler:decode_calldata(Code2, "x", CallDataAEVM),
+    ?assertEqual("Failed to decode calldata as type {tuple,[string]}\n", aeso_errors:pp(Err1)),
+    {error, [Err2]} = aeso_compiler:decode_calldata(Code2, "x", <<1,2,3>>, [{backend, fate}]),
+    ?assertEqual("Failed to decode calldata binary\n", aeso_errors:pp(Err2)),
+    {error, [Err3]} = aeso_compiler:decode_calldata(Code2, "x", CallDataFATE, [{backend, fate}]),
+    ?assertEqual("Cannot translate FATE value \"*\"\n  of Sophia type (string)\n", aeso_errors:pp(Err3)),
+
+    {error, [Err4]} = aeso_compiler:decode_calldata(Code2, "y", CallDataAEVM),
+    ?assertEqual("At line 1, col 1:\nFunction 'y' is missing in contract\n", aeso_errors:pp(Err4)),
+    {error, [Err5]} = aeso_compiler:decode_calldata(Code2, "y", CallDataFATE, [{backend, fate}]),
+    ?assertEqual("At line 1, col 1:\nFunction 'y' is missing in contract\n", aeso_errors:pp(Err5)),
+    ok.
+
+
 encode_decode_sophia_string(SophiaType, String) ->
     io:format("String ~p~n", [String]),
     Code = [ "contract MakeCall =\n"
