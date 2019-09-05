@@ -74,6 +74,7 @@ builtin_types() ->
     Word = fun([]) -> word end,
     #{ "bool"         => Word
      , "int"          => Word
+     , "char"         => Word
      , "bits"         => Word
      , "string"       => fun([]) -> string end
      , "address"      => Word
