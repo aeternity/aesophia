@@ -35,6 +35,7 @@
         , pos/2
         , pos/3
         , pp/1
+        , to_json/1
         , throw/1
         , type/1
         ]).
@@ -80,3 +81,19 @@ pp_pos(#pos{file = no_file, line = L, col = C}) ->
     io_lib:format("At line ~p, col ~p:\n", [L, C]);
 pp_pos(#pos{file = F, line = L, col = C}) ->
     io_lib:format("In '~s' at line ~p, col ~p:\n", [F, L, C]).
+to_json(#err{pos = Pos, type = Type, message = Msg, context = Cxt}) ->
+    Json = #{ pos     => pos_to_json(Pos),
+              type    => atom_to_binary(Type, utf8),
+              message => iolist_to_binary(Msg) },
+    case Cxt of
+        none -> Json;
+        _    -> Json#{ context => iolist_to_binary(Cxt) }
+    end.
+
+pos_to_json(#pos{ file = File, line = Line, col = Col }) ->
+    Json = #{ line => Line, col => Col },
+    case File of
+        no_file -> Json;
+        _       -> Json#{ file => iolist_to_binary(File) }
+    end.
+
