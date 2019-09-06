@@ -32,6 +32,12 @@ simple_compile_test_() ->
            end
        end} || ContractName <- compilable_contracts(), Backend <- [aevm, fate],
                not lists:member(ContractName, not_yet_compilable(Backend))] ++
+    [ {"Test file not found error",
+       fun() ->
+           {error, Errors} = aeso_compiler:file("does_not_exist.aes"),
+           ExpErr = <<"does_not_exist.aes: no such file or directory">>,
+           check_errors([ExpErr], Errors)
+       end} ] ++
     [ {"Testing error messages of " ++ ContractName,
        fun() ->
            Errors = compile(aevm, ContractName),

@@ -8,7 +8,7 @@
 %%%-------------------------------------------------------------------
 -module(aeso_code_errors).
 
--export([format/1]).
+-export([format/1, pos/1]).
 
 format({last_declaration_must_be_contract, Decl = {namespace, _, {con, _, C}, _}}) ->
     Msg = io_lib:format("Expected a contract as the last declaration instead of the namespace '~s'\n",
