@@ -10,6 +10,7 @@
 -module(aeso_builtins).
 
 -export([ builtin_function/1
+        , bytes_to_raw_string/2
         , check_event_type/1
         , used_builtins/1 ]).
 
@@ -575,3 +576,10 @@ builtin_string_reverse_() ->
 builtin_addr_to_str() ->
     {[{"a", word}], ?call({baseX_int, 58}, [?V(a)]), word}.
 
+bytes_to_raw_string(N, Term) when N =< 32 ->
+    {tuple, [?I(N), Term]};
+bytes_to_raw_string(N, Term) when N > 32 ->
+    Elem  = fun(I) -> #binop{op = '!', left = ?I(32 * I), right = ?V(bin)}
+            end,
+    Words = (N + 31) div 32,
+    ?LET(bin, Term, {tuple, [?I(N) | [Elem(I) || I <- lists:seq(0, Words - 1)]]}).

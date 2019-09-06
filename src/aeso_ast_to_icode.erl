@@ -659,16 +659,12 @@ builtin_code(_, {qid, _, ["Crypto", "ecrecover_secp256k1"]}, [Msg, Sig], _, _, I
               [ast_body(Msg, Icode), ast_body(Sig, Icode)],
               [word, bytes_t(65)], aeso_icode:option_typerep(bytes_t(20)));
 
-builtin_code(_, {qid, _, ["Crypto", "sha3"]}, [Term], [Type], _, Icode) ->
-    generic_hash_primop(?PRIM_CALL_CRYPTO_SHA3, Term, Type, Icode);
-builtin_code(_, {qid, _, ["Crypto", "sha256"]}, [Term], [Type], _, Icode) ->
-    generic_hash_primop(?PRIM_CALL_CRYPTO_SHA256, Term, Type, Icode);
-builtin_code(_, {qid, _, ["Crypto", "blake2b"]}, [Term], [Type], _, Icode) ->
-    generic_hash_primop(?PRIM_CALL_CRYPTO_BLAKE2B, Term, Type, Icode);
-builtin_code(_, {qid, _, ["String", "sha256"]}, [String], _, _, Icode) ->
-    string_hash_primop(?PRIM_CALL_CRYPTO_SHA256_STRING, String, Icode);
-builtin_code(_, {qid, _, ["String", "blake2b"]}, [String], _, _, Icode) ->
-    string_hash_primop(?PRIM_CALL_CRYPTO_BLAKE2B_STRING, String, Icode);
+builtin_code(_, {qid, _, ["Crypto", Op]}, [Term], [Type], _, Icode)
+        when Op == "sha3"; Op == "sha256"; Op == "blake2b" ->
+    generic_hash_primop(list_to_atom(Op), ast_body(Term, Icode), Type, Icode);
+builtin_code(_, {qid, _, ["String", Op]}, [String], _, _, Icode)
+        when Op == "sha3"; Op == "sha256"; Op == "blake2b" ->
+    string_hash_primop(list_to_atom(Op), ast_body(String, Icode));
 
 %% Strings
 %% -- String length
@@ -678,10 +674,6 @@ builtin_code(_, {qid, _, ["String", "length"]}, [String], _, _, Icode) ->
 %% -- String concat
 builtin_code(_, {qid, _, ["String", "concat"]}, [String1, String2], _, _, Icode) ->
     builtin_call(string_concat, [ast_body(String1, Icode), ast_body(String2, Icode)]);
-
-%% -- String hash (sha3)
-builtin_code(_, {qid, _, ["String", "sha3"]}, [String], _, _, Icode) ->
-    #unop{ op = 'sha3', rand = ast_body(String, Icode) };
 
 builtin_code(_, {qid, _, ["Bits", Fun]}, Args, _, _, Icode)
         when Fun == "test"; Fun == "set"; Fun == "clear";
@@ -846,15 +838,29 @@ prim_call(Prim, Amount, Args, ArgTypes, OutType) ->
                          type_hash= #integer{value = TypeHash}
                        }.
 
-generic_hash_primop(PrimOp, Term, Type, Icode) ->
+generic_hash_primop(Op, Arg, {bytes_t, _, N}, _Icode) ->
+    %% Compile hashing bytes to String.hash. Makes it easier for the user to
+    %% predict the result.
+    string_hash_primop(Op, aeso_builtins:bytes_to_raw_string(N, Arg));
+generic_hash_primop(Op, Arg, Type, Icode) ->
+    PrimOp = case Op of
+                 sha3    -> ?PRIM_CALL_CRYPTO_SHA3;
+                 sha256  -> ?PRIM_CALL_CRYPTO_SHA256;
+                 blake2b -> ?PRIM_CALL_CRYPTO_BLAKE2B
+             end,
     ArgType   = ast_type(Type, Icode),
     TypeValue = type_value(ArgType),
     prim_call(PrimOp, #integer{value = 0},
-        [TypeValue, ast_body(Term, Icode)],
-        [typerep, ArgType], word).
+              [TypeValue, Arg], [typerep, ArgType], word).
 
-string_hash_primop(PrimOp, String, Icode) ->
-    prim_call(PrimOp, #integer{value = 0}, [ast_body(String, Icode)], [string], word).
+string_hash_primop(sha3, String) ->
+    #unop{ op = 'sha3', rand = String };
+string_hash_primop(Op, String) ->
+    PrimOp = case Op of
+                 sha256 -> ?PRIM_CALL_CRYPTO_SHA256_STRING;
+                 blake2b -> ?PRIM_CALL_CRYPTO_BLAKE2B_STRING
+             end,
+    prim_call(PrimOp, #integer{value = 0}, [String], [string], word).
 
 make_type_def(Args, Def, Icode = #{ type_vars := TypeEnv }) ->
     TVars = [ X || {tvar, _, X} <- Args ],
