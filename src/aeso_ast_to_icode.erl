@@ -232,6 +232,8 @@ ast_body({bool, _, Bool}, _Icode) ->        %BOOL as ints
     #integer{value = Value};
 ast_body({int, _, Value}, _Icode) ->
     #integer{value = Value};
+ast_body({char, _, Value}, _Icode) ->
+    #integer{value = Value};
 ast_body({bytes, _, Bin}, _Icode) ->
     case aeb_memory:binary_to_words(Bin) of
         [Word] -> #integer{value = Word};
