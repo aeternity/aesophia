@@ -76,8 +76,7 @@ file(File, Options0) ->
         {ok, Bin} -> from_string(Bin, [{src_file, File} | Options]);
         {error, Error} ->
             Msg = lists:flatten([File,": ",file:format_error(Error)]),
-            Pos = aeso_errors:pos(0, 0),
-            {error, [aeso_errors:new(file_error, Pos, Msg)]}
+            {error, [aeso_errors:new(file_error, Msg)]}
     end.
 
 add_include_path(File, Options) ->
@@ -283,14 +282,14 @@ to_sophia_value(_, _, revert, Data, Options) ->
                     {ok, {app, [], {id, [], "abort"}, [{string, [], Err}]}};
                 {error, _} ->
                     Msg = "Could not interpret the revert message\n",
-                    {error, [aeso_errors:new(data_error, aeso_errors:pos(0, 0), Msg)]}
+                    {error, [aeso_errors:new(data_error, Msg)]}
             end;
         fate ->
             try aeb_fate_encoding:deserialize(Data) of
                 Err -> {ok, {app, [], {id, [], "abort"}, [{string, [], Err}]}}
             catch _:_ ->
                 Msg = "Could not deserialize the revert message\n",
-                {error, [aeso_errors:new(data_error, aeso_errors:pos(0, 0), Msg)]}
+                {error, [aeso_errors:new(data_error, Msg)]}
             end
     end;
 to_sophia_value(ContractString, FunName, ok, Data, Options0) ->
@@ -313,11 +312,11 @@ to_sophia_value(ContractString, FunName, ok, Data, Options0) ->
                             Type0Str = prettypr:format(aeso_pretty:type(Type0)),
                             Msg = io_lib:format("Cannot translate VM value ~p\n  of type ~p\n  to Sophia type ~s\n",
                                                 [Data, VmType, Type0Str]),
-                            {error, [aeso_errors:new(type_error, aeso_errors:pos(0, 0), Msg)]}
+                            {error, [aeso_errors:new(data_error, Msg)]}
                         end;
                     {error, _Err} ->
                         Msg = io_lib:format("Failed to decode binary as type ~p\n", [VmType]),
-                        {error, [aeso_errors:new(code_error, aeso_errors:pos(0, 0), Msg)]}
+                        {error, [aeso_errors:new(data_error, Msg)]}
                 end;
             fate ->
                 try
@@ -326,11 +325,11 @@ to_sophia_value(ContractString, FunName, ok, Data, Options0) ->
                         Type1 = prettypr:format(aeso_pretty:type(Type)),
                         Msg = io_lib:format("Cannot translate FATE value ~p\n  of Sophia type ~s\n",
                                             [aeb_fate_encoding:deserialize(Data), Type1]),
-                        {error, [aeso_errors:new(type_error, aeso_errors:pos(0, 0), Msg)]};
+                        {error, [aeso_errors:new(data_error, Msg)]};
                       _:_ ->
                         Type1 = prettypr:format(aeso_pretty:type(Type)),
                         Msg = io_lib:format("Failed to decode binary as type ~s\n", [Type1]),
-                        {error, [aeso_errors:new(code_error, aeso_errors:pos(0, 0), Msg)]}
+                        {error, [aeso_errors:new(data_error, Msg)]}
                end
         end
     catch
@@ -395,11 +394,11 @@ decode_calldata(ContractString, FunName, Calldata, Options0) ->
                             Type0Str = prettypr:format(aeso_pretty:type(Type0)),
                             Msg = io_lib:format("Cannot translate VM value ~p\n  of type ~p\n  to Sophia type ~s\n",
                                                 [VmValue, VmType, Type0Str]),
-                            {error, [aeso_errors:new(type_error, aeso_errors:pos(0, 0), Msg)]}
+                            {error, [aeso_errors:new(data_error, Msg)]}
                         end;
                     {error, _Err} ->
                         Msg = io_lib:format("Failed to decode calldata as type ~p\n", [VmType]),
-                        {error, [aeso_errors:new(code_error, aeso_errors:pos(0, 0), Msg)]}
+                        {error, [aeso_errors:new(data_error, Msg)]}
                 end;
             fate ->
                 case aeb_fate_abi:decode_calldata(FunName, Calldata) of
@@ -411,13 +410,13 @@ decode_calldata(ContractString, FunName, Calldata, Options0) ->
                             {ok, ArgTypes, AstArgs}
                         catch throw:cannot_translate_to_sophia ->
                                 Type0Str = prettypr:format(aeso_pretty:type(Type0)),
-                                Msg = io_lib:format("Cannot translate FATE value ~p\n  of Sophia type ~s\n",
+                                Msg = io_lib:format("Cannot translate FATE value ~p\n  to Sophia type ~s\n",
                                                     [FateArgs, Type0Str]),
-                                {error, [aeso_errors:new(type_error, aeso_errors:pos(0, 0), Msg)]}
+                                {error, [aeso_errors:new(data_error, Msg)]}
                         end;
                     {error, _} ->
                         Msg = io_lib:format("Failed to decode calldata binary\n", []),
-                        {error, [aeso_errors:new(code_error, aeso_errors:pos(0, 0), Msg)]}
+                        {error, [aeso_errors:new(data_error, Msg)]}
                 end
         end
     catch
@@ -433,8 +432,7 @@ get_arg_icode(Funs) ->
 -dialyzer({nowarn_function, error_missing_call_function/0}).
 error_missing_call_function() ->
     Msg = "Internal error: missing '__call'-function",
-    Pos = aeso_errors:pos(0, 0),
-    aeso_errors:throw(aeso_errors:new(internal_error, Pos, Msg)).
+    aeso_errors:throw(aeso_errors:new(internal_error, Msg)).
 
 get_call_type([{contract, _, _, Defs}]) ->
     case [ {lists:last(QFunName), FunType}
@@ -462,7 +460,7 @@ get_decode_type(FunName, [{contract, Ann, _, Defs}]) ->
                  _ ->
                     Msg = io_lib:format("Function '~s' is missing in contract\n", [FunName]),
                     Pos = aeso_code_errors:pos(Ann),
-                    aeso_errors:throw(aeso_errors:new(code_error, Pos, Msg))
+                    aeso_errors:throw(aeso_errors:new(data_error, Pos, Msg))
             end
     end;
 get_decode_type(FunName, [_ | Contracts]) ->

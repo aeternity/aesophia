@@ -30,14 +30,19 @@
 
 -export([ err_msg/1
         , msg/1
+        , new/2
         , new/3
         , new/4
         , pos/2
         , pos/3
         , pp/1
+        , to_json/1
         , throw/1
         , type/1
         ]).
+
+new(Type, Msg) ->
+    new(Type, pos(0, 0), Msg).
 
 new(Type, Pos, Msg) ->
     #err{ type = Type, pos = Pos, message = Msg }.
@@ -71,12 +76,36 @@ str_pos(#pos{file = F, line = L, col = C}) ->
 
 type(#err{ type = Type }) -> Type.
 
-pp(#err{ pos = Pos } = Err) ->
-    lists:flatten(io_lib:format("~s~s", [pp_pos(Pos), msg(Err)])).
+pp(#err{ type = Kind, pos = Pos } = Err) ->
+    lists:flatten(io_lib:format("~s~s:\n~s", [pp_kind(Kind), pp_pos(Pos), msg(Err)])).
+
+pp_kind(type_error)     -> "Type error";
+pp_kind(parse_error)    -> "Parse error";
+pp_kind(code_error)     -> "Code generation error";
+pp_kind(file_error)     -> "File error";
+pp_kind(data_error)     -> "Data error";
+pp_kind(internal_error) -> "Internal error".
 
 pp_pos(#pos{file = no_file, line = 0, col = 0}) ->
     "";
 pp_pos(#pos{file = no_file, line = L, col = C}) ->
-    io_lib:format("At line ~p, col ~p:\n", [L, C]);
+    io_lib:format(" at line ~p, col ~p", [L, C]);
 pp_pos(#pos{file = F, line = L, col = C}) ->
-    io_lib:format("In '~s' at line ~p, col ~p:\n", [F, L, C]).
+    io_lib:format(" in '~s' at line ~p, col ~p", [F, L, C]).
+
+to_json(#err{pos = Pos, type = Type, message = Msg, context = Cxt}) ->
+    Json = #{ pos     => pos_to_json(Pos),
+              type    => atom_to_binary(Type, utf8),
+              message => iolist_to_binary(Msg) },
+    case Cxt of
+        none -> Json;
+        _    -> Json#{ context => iolist_to_binary(Cxt) }
+    end.
+
+pos_to_json(#pos{ file = File, line = Line, col = Col }) ->
+    Json = #{ line => Line, col => Col },
+    case File of
+        no_file -> Json;
+        _       -> Json#{ file => iolist_to_binary(File) }
+    end.
+
