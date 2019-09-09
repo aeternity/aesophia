@@ -81,7 +81,9 @@
 -type type() :: aeso_syntax:type().
 -type name() :: string().
 -type qname() :: [string()].
--type typesig() :: {type_sig, aeso_syntax:ann(), [aeso_syntax:named_arg_t()], [type()], type()}.
+-type typesig() :: {type_sig, aeso_syntax:ann(), type_constraints(), [aeso_syntax:named_arg_t()], [type()], type()}.
+
+-type type_constraints() :: none.
 
 -type fun_info()  :: {aeso_syntax:ann(), typesig() | type()}.
 -type type_info() :: {aeso_syntax:ann(), typedef()}.
@@ -206,7 +208,7 @@ bind_state(Env) ->
             false  -> Unit
         end,
     Env1 = bind_funs([{"state", State},
-                      {"put", {type_sig, [stateful | Ann], [], [State], Unit}}], Env),
+                      {"put", {type_sig, [stateful | Ann], none, [], [State], Unit}}], Env),
 
     case lookup_type(Env, {id, Ann, "event"}) of
         {E, _} ->
@@ -370,16 +372,16 @@ global_env() ->
     Option  = fun(T) -> {app_t, Ann, {id, Ann, "option"}, [T]} end,
     Map     = fun(A, B) -> {app_t, Ann, {id, Ann, "map"}, [A, B]} end,
     Pair    = fun(A, B) -> {tuple_t, Ann, [A, B]} end,
-    Fun     = fun(Ts, T) -> {type_sig, Ann, [], Ts, T} end,
+    Fun     = fun(Ts, T) -> {type_sig, Ann, none, [], Ts, T} end,
     Fun1    = fun(S, T) -> Fun([S], T) end,
     %% Lambda    = fun(Ts, T) -> {fun_t, Ann, [], Ts, T} end,
     %% Lambda1   = fun(S, T) -> Lambda([S], T) end,
-    StateFun  = fun(Ts, T) -> {type_sig, [stateful|Ann], [], Ts, T} end,
+    StateFun  = fun(Ts, T) -> {type_sig, [stateful|Ann], none, [], Ts, T} end,
     TVar      = fun(X) -> {tvar, Ann, "'" ++ X} end,
     SignId    = {id, Ann, "signature"},
     SignDef   = {bytes, Ann, <<0:64/unit:8>>},
     Signature = {named_arg_t, Ann, SignId, SignId, {typed, Ann, SignDef, SignId}},
-    SignFun   = fun(Ts, T) -> {type_sig, [stateful|Ann], [Signature], Ts, T} end,
+    SignFun   = fun(Ts, T) -> {type_sig, [stateful|Ann], none, [Signature], Ts, T} end,
     TTL       = {qid, Ann, ["Chain", "ttl"]},
     Fee       = Int,
     [A, Q, R, K, V] = lists:map(TVar, ["a", "q", "r", "k", "v"]),
@@ -669,7 +671,7 @@ check_typedef_sccs(Env, TypeMap, [{acyclic, Name} | SCCs], Acc) ->
                     check_typedef_sccs(Env2, TypeMap, SCCs, Acc1);
                 {variant_t, Cons} ->
                     Target   = check_type(Env1, app_t(Ann, D, Xs)),
-                    ConType  = fun([]) -> Target; (Args) -> {type_sig, Ann, [], Args, Target} end,
+                    ConType  = fun([]) -> Target; (Args) -> {type_sig, Ann, none, [], Args, Target} end,
                     ConTypes = [ begin
                                     {constr_t, _, {con, _, Con}, Args} = ConDef,
                                     {Con, ConType(Args)}
@@ -842,7 +844,7 @@ check_constructor_overlap(Env, Con = {con, Ann, Name}, NewType) ->
     case lookup_env(Env, term, Ann, Name) of
         false -> ok;
         {_, {Ann, Type}} ->
-            OldType = case Type of {type_sig, _, _, _, T} -> T;
+            OldType = case Type of {type_sig, _, _, _, _, T} -> T;
                                    _ -> Type end,
             OldCon  = {con, Ann, Name},
             type_error({repeated_constructor, [{OldCon, OldType}, {Con, NewType}]})
@@ -884,10 +886,10 @@ check_reserved_entrypoints(Funs) ->
 -spec check_fundecl(env(), aeso_syntax:decl()) -> {{name(), typesig()}, aeso_syntax:decl()}.
 check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type = {fun_t, _, _, _, _}}) ->
     Type1 = {fun_t, _, Named, Args, Ret} = check_type(Env, Type),
-    {{Name, {type_sig, Ann, Named, Args, Ret}}, {fun_decl, Ann, Id, Type1}};
+    {{Name, {type_sig, Ann, none, Named, Args, Ret}}, {fun_decl, Ann, Id, Type1}};
 check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type}) ->
     type_error({fundecl_must_have_funtype, Ann, Id, Type}),
-    {{Name, {type_sig, Ann, [], [], Type}}, check_type(Env, Type)}.
+    {{Name, {type_sig, Ann, none, [], [], Type}}, check_type(Env, Type)}.
 
 infer_nonrec(Env, LetFun) ->
     create_constraints(),
@@ -901,7 +903,7 @@ infer_nonrec(Env, LetFun) ->
 
 %% Currenty only the init function.
 check_special_funs(Env, {{"init", Type}, _}) ->
-    {type_sig, Ann, _Named, _Args, Res} = Type,
+    {type_sig, Ann, _Constr, _Named, _Args, Res} = Type,
     State =
         %% We might have implicit (no) state.
         case lookup_type(Env, {id, [], "state"}) of
@@ -911,7 +913,8 @@ check_special_funs(Env, {{"init", Type}, _}) ->
     unify(Env, Res, State, {checking_init_type, Ann});
 check_special_funs(_, _) -> ok.
 
-typesig_to_fun_t({type_sig, Ann, Named, Args, Res}) -> {fun_t, Ann, Named, Args, Res}.
+typesig_to_fun_t({type_sig, Ann, _Constr, Named, Args, Res}) ->
+    {fun_t, Ann, Named, Args, Res}.
 
 infer_letrec(Env, Defs) ->
     create_constraints(),
@@ -945,7 +948,7 @@ infer_letfun(Env0, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, Bo
     NewArgs = [{arg, A1, {id, A2, ArgName}, T}
                || {{_, T}, {arg, A1, {id, A2, ArgName}, _}} <- lists:zip(ArgTypes, Args)],
     NamedArgs = [],
-    TypeSig = {type_sig, Attrib, NamedArgs, [T || {arg, _, _, T} <- NewArgs], ResultType},
+    TypeSig = {type_sig, Attrib, none, NamedArgs, [T || {arg, _, _, T} <- NewArgs], ResultType},
     {{Name, TypeSig},
      {letfun, Attrib, {id, NameAttrib, Name}, NewArgs, ResultType, NewBody}}.
 
@@ -981,14 +984,14 @@ lookup_name(Env, As, Id, Options) ->
             Freshen = proplists:get_value(freshen, Options, false),
             check_stateful(Env, Id, Ty),
             Ty1 = case Ty of
-                    {type_sig, _, _, _, _} -> freshen_type(As, typesig_to_fun_t(Ty));
-                    _ when Freshen         -> freshen_type(As, Ty);
-                    _                      -> Ty
+                    {type_sig, _, _, _, _, _} -> freshen_type_sig(As, Ty);
+                    _ when Freshen            -> freshen_type(As, Ty);
+                    _                         -> Ty
                   end,
             {set_qname(QId, Id), Ty1}
     end.
 
-check_stateful(#env{ stateful = false, current_function = Fun }, Id, Type = {type_sig, _, _, _, _}) ->
+check_stateful(#env{ stateful = false, current_function = Fun }, Id, Type = {type_sig, _, _, _, _, _}) ->
     case aeso_syntax:get_ann(stateful, Type, false) of
         false -> ok;
         true  ->
@@ -1803,8 +1806,8 @@ unfold_types(Env, {typed, Attr, E, Type}, Options) ->
     {typed, Attr, unfold_types(Env, E, Options), unfold_types_in_type(Env, Type, Options)};
 unfold_types(Env, {arg, Attr, Id, Type}, Options) ->
     {arg, Attr, Id, unfold_types_in_type(Env, Type, Options)};
-unfold_types(Env, {type_sig, Ann, NamedArgs, Args, Ret}, Options) ->
-    {type_sig, Ann,
+unfold_types(Env, {type_sig, Ann, Constr, NamedArgs, Args, Ret}, Options) ->
+    {type_sig, Ann, Constr,
                unfold_types_in_type(Env, NamedArgs, Options),
                unfold_types_in_type(Env, Args, Options),
                unfold_types_in_type(Env, Ret, Options)};
@@ -2031,6 +2034,13 @@ freshen(Ann, [A | B]) ->
     [freshen(Ann, A) | freshen(Ann, B)];
 freshen(_, X) ->
     X.
+
+freshen_type_sig(Ann, TypeSig = {type_sig, _, Constr, _, _, _}) ->
+    FunT = freshen_type(Ann, typesig_to_fun_t(TypeSig)),
+    apply_typesig_constraint(Ann, Constr, FunT),
+    FunT.
+
+apply_typesig_constraint(_Ann, none, _FunT) -> ok.
 
 %% Dereferences all uvars and replaces the uninstantiated ones with a
 %% succession of tvars.
@@ -2443,7 +2453,7 @@ if_branches(If = {'if', Ann, _, Then, Else}) ->
     end;
 if_branches(E) -> [E].
 
-pp_typed(Label, E, T = {type_sig, _, _, _, _}) -> pp_typed(Label, E, typesig_to_fun_t(T));
+pp_typed(Label, E, T = {type_sig, _, _, _, _, _}) -> pp_typed(Label, E, typesig_to_fun_t(T));
 pp_typed(Label, {typed, _, Expr, _}, Type) ->
     pp_typed(Label, Expr, Type);
 pp_typed(Label, Expr, Type) ->
@@ -2475,7 +2485,7 @@ pp_loc(T) ->
 plural(No, _Yes, [_]) -> No;
 plural(_No, Yes, _)   -> Yes.
 
-pp(T = {type_sig, _, _, _, _}) ->
+pp(T = {type_sig, _, _, _, _, _}) ->
     pp(typesig_to_fun_t(T));
 pp([]) ->
     "";
