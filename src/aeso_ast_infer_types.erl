@@ -899,7 +899,6 @@ infer_nonrec(Env, LetFun) ->
     create_constraints(),
     NewLetFun = infer_letfun(Env, LetFun),
     check_special_funs(Env, NewLetFun),
-    solve_constraints(Env),
     destroy_and_report_unsolved_constraints(Env),
     Result = {TypeSig, _} = instantiate(NewLetFun),
     print_typesig(TypeSig),
@@ -1491,12 +1490,10 @@ create_constraints() ->
     create_bytes_constraints(),
     create_field_constraints().
 
-solve_constraints(Env) ->
+destroy_and_report_unsolved_constraints(Env) ->
     solve_named_argument_constraints(Env),
     solve_bytes_constraints(Env),
-    solve_field_constraints(Env).
-
-destroy_and_report_unsolved_constraints(Env) ->
+    solve_field_constraints(Env),
     destroy_and_report_unsolved_field_constraints(Env),
     destroy_and_report_unsolved_bytes_constraints(Env),
     destroy_and_report_unsolved_named_argument_constraints(Env).
