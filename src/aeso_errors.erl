@@ -59,7 +59,8 @@ pos(File, Line, Col) ->
 -spec throw(_) -> ok | no_return().
 throw([]) -> ok;
 throw(Errs) when is_list(Errs) ->
-    erlang:throw({error, Errs});
+    SortedErrs = lists:sort(fun(E1, E2) -> E1#err.pos =< E2#err.pos end, Errs),
+    erlang:throw({error, SortedErrs});
 throw(#err{} = Err) ->
     erlang:throw({error, [Err]}).
 
