@@ -198,7 +198,7 @@ builtins() ->
               {["String"],   [{"length", 1}, {"concat", 2}, {"sha3", 1}, {"sha256", 1}, {"blake2b", 1}]},
               {["Bits"],     [{"set", 2}, {"clear", 2}, {"test", 2}, {"sum", 1}, {"intersection", 2},
                               {"union", 2}, {"difference", 2}, {"none", none}, {"all", none}]},
-              {["Bytes"],    [{"to_int", 1}, {"to_str", 1}]},
+              {["Bytes"],    [{"to_int", 1}, {"to_str", 1}, {"concat", 2}, {"split", 1}]},
               {["Int"],      [{"to_str", 1}]},
               {["Address"],  [{"to_str", 1}, {"is_oracle", 1}, {"is_contract", 1}, {"is_payable", 1}]}
              ],
@@ -427,6 +427,9 @@ expr_to_fcode(Env, Type, {qid, Ann, X}) ->
             validate_aens_resolve_type(Ann, ResType, AensType),
             TypeArgs = [{lit, {typerep, AensType}}],
             {builtin_u, B, Ar, TypeArgs};
+        {builtin_u, B = bytes_split, Ar} ->
+            {fun_t, _, _, _, {tuple_t, _, [{bytes_t, _, N}, _]}} = Type,
+            {builtin_u, B, Ar, [{lit, {int, N}}]};
         Other -> Other
     end;
 
