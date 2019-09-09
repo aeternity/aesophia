@@ -83,7 +83,7 @@
 -type qname() :: [string()].
 -type typesig() :: {type_sig, aeso_syntax:ann(), type_constraints(), [aeso_syntax:named_arg_t()], [type()], type()}.
 
--type type_constraints() :: none.
+-type type_constraints() :: none | bytes_concat | bytes_split.
 
 -type fun_info()  :: {aeso_syntax:ann(), typesig() | type()}.
 -type type_info() :: {aeso_syntax:ann(), typedef()}.
