@@ -90,7 +90,13 @@ option_some(X) -> {tuple, [{integer, 1}, X]}.
 -define(BSL(X, B), op('bsl', ?MUL(B, 8), X)).
 -define(BSR(X, B), op('bsr', ?MUL(B, 8), X)).
 
-op(Op, A, B) -> {binop, Op, operand(A), operand(B)}.
+op(Op, A, B) -> simpl({binop, Op, operand(A), operand(B)}).
+
+%% We generate a lot of B * 8 for integer B from BSL and BSR.
+simpl({binop, '*', {integer, A}, {integer, B}}) when A >= 0, B >= 0, A * B < 1 bsl 256 ->
+    {integer, A * B};
+simpl(Op) -> Op.
+
 
 operand(A) when is_atom(A) -> v(A);
 operand(I) when is_integer(I) -> {integer, I};
@@ -162,6 +168,8 @@ builtin_function(BF) ->
         {baseX_int_encode_, X}     -> bfun(BF, builtin_baseX_int_encode_(X));
         {bytes_to_int, N}          -> bfun(BF, builtin_bytes_to_int(N));
         {bytes_to_str, N}          -> bfun(BF, builtin_bytes_to_str(N));
+        {bytes_concat, A, B}       -> bfun(BF, builtin_bytes_concat(A, B));
+        {bytes_split, A, B}        -> bfun(BF, builtin_bytes_split(A, B));
         bytes_to_str_worker        -> bfun(BF, builtin_bytes_to_str_worker());
         string_reverse             -> bfun(BF, builtin_string_reverse());
         string_reverse_            -> bfun(BF, builtin_string_reverse_())
@@ -576,6 +584,75 @@ builtin_string_reverse_() ->
 builtin_addr_to_str() ->
     {[{"a", word}], ?call({baseX_int, 58}, [?V(a)]), word}.
 
+%% At most one word
+%% | ..... | ========= | ........ |
+%%    Offs ^ ^- Len -^   TotalLen ^
+bytes_slice(Offs, Len, TotalLen, Bytes) when TotalLen =< 32 ->
+    %% Bytes are packed into a single word
+    Masked =
+        case Offs of
+            0 -> Bytes;
+            _ -> ?MOD(Bytes, 1 bsl ((32 - Offs) * 8))
+        end,
+    Unpadded =
+        case 32 - (Offs + Len) of
+            0 -> Masked;
+            N -> ?BSR(Masked, N)
+        end,
+    case Len of
+        32 -> Unpadded;
+        _  -> ?BSL(Unpadded, 32 - Len)
+    end;
+bytes_slice(Offs, Len, TotalLen, Bytes) when TotalLen > 32 ->
+    %% Bytes is a pointer to memory. The VM can read at non-aligned addresses.
+    %% Might read one word more than necessary.
+    Word = op('!', Offs, Bytes),
+    case Len == 32 of
+        true -> Word;
+        _    -> ?BSL(?BSR(Word, 32 - Len), 32 - Len)
+    end.
+
+builtin_bytes_concat(A, B) ->
+    Type     = fun(N) when N =< 32 -> word; (_) -> pointer end,
+    MkBytes  = fun([W]) -> W;
+                  (Ws)  -> {tuple, Ws} end,
+    Words    = fun(N) -> (N + 31) div 32 end,
+    WordsRes = Words(A + B),
+    Word = fun(I) when 32 * (I + 1) =< A -> bytes_slice(I * 32, 32, A, ?V(a));
+              (I) when 32 * I < A ->
+                   Len = A rem 32,
+                   Hi  = bytes_slice(32 * I, Len, A, ?V(a)),
+                   Lo  = bytes_slice(0, min(32 - Len, B), B, ?V(b)),
+                   ?ADD(Hi, ?BSR(Lo, Len));
+              (I) ->
+                   Offs = 32 * I - A,
+                   Len  = min(32, B - Offs),
+                   bytes_slice(Offs, Len, B, ?V(b))
+           end,
+    Body =
+        case {A, B} of
+            {0, _} -> ?V(b);
+            {_, 0} -> ?V(a);
+            _      -> MkBytes([ Word(I) || I <- lists:seq(0, WordsRes - 1) ])
+        end,
+    {[{"a", Type(A)}, {"b", Type(B)}], Body, Type(A + B)}.
+
+builtin_bytes_split(A, B) ->
+    Type    = fun(N) when N =< 32 -> word; (_) -> pointer end,
+    MkBytes = fun([W]) -> W;
+                 (Ws)  -> {tuple, Ws} end,
+    Word    = fun(I, Max) ->
+                bytes_slice(I, min(32, Max - I), A + B, ?V(c))
+              end,
+    Body =
+        case {A, B} of
+            {0, _} -> [?I(0), ?V(c)];
+            {_, 0} -> [?V(c), ?I(0)];
+            _      -> [MkBytes([ Word(I, A)     || I <- lists:seq(0, A - 1, 32) ]),
+                       MkBytes([ Word(I, A + B) || I <- lists:seq(A, A + B - 1, 32) ])]
+        end,
+    {[{"c", Type(A + B)}], {tuple, Body}, {tuple, [Type(A), Type(B)]}}.
+
 bytes_to_raw_string(N, Term) when N =< 32 ->
     {tuple, [?I(N), Term]};
 bytes_to_raw_string(N, Term) when N > 32 ->
@@ -583,3 +660,4 @@ bytes_to_raw_string(N, Term) when N > 32 ->
             end,
     Words = (N + 31) div 32,
     ?LET(bin, Term, {tuple, [?I(N) | [Elem(I) || I <- lists:seq(0, Words - 1)]]}).
+
