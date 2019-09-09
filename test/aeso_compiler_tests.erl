@@ -143,6 +143,7 @@ compilable_contracts() ->
      "address_chain",
      "namespace_bug",
      "bytes_to_x",
+     "bytes_concat",
      "aens",
      "tuple_match",
      "cyclic_include",
