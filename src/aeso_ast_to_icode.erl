@@ -496,6 +496,8 @@ is_builtin_fun({qid, _, ["Address", "is_contract"]}, _Icode)                 -> 
 is_builtin_fun({qid, _, ["Address", "is_payable"]}, _Icode)                  -> true;
 is_builtin_fun({qid, _, ["Bytes", "to_int"]}, _Icode)                        -> true;
 is_builtin_fun({qid, _, ["Bytes", "to_str"]}, _Icode)                        -> true;
+is_builtin_fun({qid, _, ["Bytes", "concat"]}, _Icode)                        -> true;
+is_builtin_fun({qid, _, ["Bytes", "split"]}, _Icode)                         -> true;
 is_builtin_fun(_, _)                                                         -> false.
 
 %% -- Code generation for builtin functions --
@@ -718,6 +720,13 @@ builtin_code(_, {qid, _, ["Bytes", "to_int"]}, [Bytes], _, _, Icode) ->
 builtin_code(_, {qid, _, ["Bytes", "to_str"]}, [Bytes], _, _, Icode) ->
     {typed, _, _, {bytes_t, _, N}} = Bytes,
     builtin_call({bytes_to_str, N}, [ast_body(Bytes, Icode)]);
+builtin_code(_, {qid, _, ["Bytes", "concat"]}, [A, B], [TypeA, TypeB], _, Icode) ->
+    {bytes_t, _, M} = TypeA,
+    {bytes_t, _, N} = TypeB,
+    builtin_call({bytes_concat, M, N}, [ast_body(A, Icode), ast_body(B, Icode)]);
+builtin_code(_, {qid, _, ["Bytes", "split"]}, [A], _, ResType, Icode) ->
+    {tuple_t, _, [{bytes_t, _, M}, {bytes_t, _, N}]} = ResType,
+    builtin_call({bytes_split, M, N}, [ast_body(A, Icode)]);
 builtin_code(_As, Fun, _Args, _ArgsT, _RetT, _Icode) ->
     gen_error({missing_code_for, Fun}).
 

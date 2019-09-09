@@ -106,6 +106,8 @@
      Op =:= 'AUTH_TX_HASH'         orelse
      Op =:= 'BYTES_TO_INT'         orelse
      Op =:= 'BYTES_TO_STR'         orelse
+     Op =:= 'BYTES_CONCAT'         orelse
+     Op =:= 'BYTES_SPLIT'          orelse
      Op =:= 'ORACLE_CHECK'         orelse
      Op =:= 'ORACLE_CHECK_QUERY'   orelse
      Op =:= 'IS_ORACLE'            orelse
@@ -490,6 +492,10 @@ builtin_to_scode(Env, bytes_to_int, [_] = Args) ->
     call_to_scode(Env, aeb_fate_ops:bytes_to_int(?a, ?a), Args);
 builtin_to_scode(Env, bytes_to_str, [_] = Args) ->
     call_to_scode(Env, aeb_fate_ops:bytes_to_str(?a, ?a), Args);
+builtin_to_scode(Env, bytes_concat, [_, _] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:bytes_concat(?a, ?a, ?a), Args);
+builtin_to_scode(Env, bytes_split, [_, _] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:bytes_split(?a, ?a, ?a), Args);
 builtin_to_scode(Env, abort, [_] = Args) ->
     call_to_scode(Env, aeb_fate_ops:abort(?a), Args);
 builtin_to_scode(Env, chain_spend, [_, _] = Args) ->
@@ -846,6 +852,8 @@ attributes(I) ->
         {'AUTH_TX_HASH', A}                   -> Pure(A, []);
         {'BYTES_TO_INT', A, B}                -> Pure(A, [B]);
         {'BYTES_TO_STR', A, B}                -> Pure(A, [B]);
+        {'BYTES_CONCAT', A, B, C}             -> Pure(A, [B, C]);
+        {'BYTES_SPLIT', A, B, C}              -> Pure(A, [B, C]);
         {'ORACLE_CHECK', A, B, C, D}          -> Impure(A, [B, C, D]);
         {'ORACLE_CHECK_QUERY', A, B, C, D, E} -> Impure(A, [B, C, D, E]);
         {'IS_ORACLE', A, B}                   -> Impure(A, [B]);

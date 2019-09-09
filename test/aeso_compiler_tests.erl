@@ -143,6 +143,7 @@ compilable_contracts() ->
      "address_chain",
      "namespace_bug",
      "bytes_to_x",
+     "bytes_concat",
      "aens",
      "tuple_match",
      "cyclic_include",
@@ -511,6 +512,50 @@ failing_contracts() ->
         [<<?Pos(3, 5)
            "Unbound variable Chain.event at line 3, column 5\n"
            "Did you forget to define the event type?">>])
+    , ?TYPE_ERROR(bad_bytes_concat,
+        [<<?Pos(12, 40)
+           "Failed to resolve byte array lengths in call to Bytes.concat with arguments of type\n"
+           "  - 'g  (at line 12, column 20)\n"
+           "  - 'h  (at line 12, column 23)\n"
+           "and result type\n"
+           "  - bytes(10)  (at line 12, column 28)">>,
+         <<?Pos(13, 28)
+           "Failed to resolve byte array lengths in call to Bytes.concat with arguments of type\n"
+           "  - 'd  (at line 13, column 20)\n"
+           "  - 'e  (at line 13, column 23)\n"
+           "and result type\n"
+           "  - 'f  (at line 13, column 14)">>,
+         <<?Pos(15, 5)
+           "Cannot unify bytes(26)\n"
+           "         and bytes(25)\n"
+           "at line 15, column 5">>,
+         <<?Pos(17, 5)
+           "Failed to resolve byte array lengths in call to Bytes.concat with arguments of type\n"
+           "  - bytes(6)  (at line 16, column 24)\n"
+           "  - 'b  (at line 16, column 34)\n"
+           "and result type\n"
+           "  - 'c  (at line 16, column 39)">>,
+         <<?Pos(19, 25)
+           "Cannot resolve length of byte array.">>])
+    , ?TYPE_ERROR(bad_bytes_split,
+         [<<?Pos(13, 5)
+            "Failed to resolve byte array lengths in call to Bytes.split with argument of type\n"
+            "  - 'f  (at line 12, column 20)\n"
+            "and result types\n"
+            "  - 'e  (at line 13, column 5)\n"
+            "  - bytes(20)  (at line 12, column 29)">>,
+          <<?Pos(16, 5)
+            "Failed to resolve byte array lengths in call to Bytes.split with argument of type\n"
+            "  - bytes(15)  (at line 15, column 24)\n"
+            "and result types\n"
+            "  - 'c  (at line 16, column 5)\n"
+            "  - 'd  (at line 16, column 5)">>,
+          <<?Pos(19, 5)
+            "Failed to resolve byte array lengths in call to Bytes.split with argument of type\n"
+            "  - 'b  (at line 18, column 20)\n"
+            "and result types\n"
+            "  - bytes(20)  (at line 18, column 25)\n"
+            "  - 'a  (at line 19, column 5)">>])
     ].
 
 -define(Path(File), "code_errors/" ??File).

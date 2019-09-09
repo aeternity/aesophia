@@ -81,7 +81,9 @@
 -type type() :: aeso_syntax:type().
 -type name() :: string().
 -type qname() :: [string()].
--type typesig() :: {type_sig, aeso_syntax:ann(), [aeso_syntax:named_arg_t()], [type()], type()}.
+-type typesig() :: {type_sig, aeso_syntax:ann(), type_constraints(), [aeso_syntax:named_arg_t()], [type()], type()}.
+
+-type type_constraints() :: none | bytes_concat | bytes_split.
 
 -type fun_info()  :: {aeso_syntax:ann(), typesig() | type()}.
 -type type_info() :: {aeso_syntax:ann(), typedef()}.
@@ -206,7 +208,7 @@ bind_state(Env) ->
             false  -> Unit
         end,
     Env1 = bind_funs([{"state", State},
-                      {"put", {type_sig, [stateful | Ann], [], [State], Unit}}], Env),
+                      {"put", {type_sig, [stateful | Ann], none, [], [State], Unit}}], Env),
 
     case lookup_type(Env, {id, Ann, "event"}) of
         {E, _} ->
@@ -370,16 +372,17 @@ global_env() ->
     Option  = fun(T) -> {app_t, Ann, {id, Ann, "option"}, [T]} end,
     Map     = fun(A, B) -> {app_t, Ann, {id, Ann, "map"}, [A, B]} end,
     Pair    = fun(A, B) -> {tuple_t, Ann, [A, B]} end,
-    Fun     = fun(Ts, T) -> {type_sig, Ann, [], Ts, T} end,
+    FunC    = fun(C, Ts, T) -> {type_sig, Ann, C, [], Ts, T} end,
+    Fun     = fun(Ts, T) -> FunC(none, Ts, T) end,
     Fun1    = fun(S, T) -> Fun([S], T) end,
     %% Lambda    = fun(Ts, T) -> {fun_t, Ann, [], Ts, T} end,
     %% Lambda1   = fun(S, T) -> Lambda([S], T) end,
-    StateFun  = fun(Ts, T) -> {type_sig, [stateful|Ann], [], Ts, T} end,
+    StateFun  = fun(Ts, T) -> {type_sig, [stateful|Ann], none, [], Ts, T} end,
     TVar      = fun(X) -> {tvar, Ann, "'" ++ X} end,
     SignId    = {id, Ann, "signature"},
     SignDef   = {bytes, Ann, <<0:64/unit:8>>},
     Signature = {named_arg_t, Ann, SignId, SignId, {typed, Ann, SignDef, SignId}},
-    SignFun   = fun(Ts, T) -> {type_sig, [stateful|Ann], [Signature], Ts, T} end,
+    SignFun   = fun(Ts, T) -> {type_sig, [stateful|Ann], none, [Signature], Ts, T} end,
     TTL       = {qid, Ann, ["Chain", "ttl"]},
     Fee       = Int,
     [A, Q, R, K, V] = lists:map(TVar, ["a", "q", "r", "k", "v"]),
@@ -508,7 +511,10 @@ global_env() ->
     BytesScope = #scope
         { funs = MkDefs(
                    [{"to_int", Fun1(Bytes(any), Int)},
-                    {"to_str", Fun1(Bytes(any), String)}]) },
+                    {"to_str", Fun1(Bytes(any), String)},
+                    {"concat", FunC(bytes_concat, [Bytes(any), Bytes(any)], Bytes(any))},
+                    {"split",  FunC(bytes_split, [Bytes(any)], Pair(Bytes(any), Bytes(any)))}
+                   ]) },
 
     %% Conversion
     IntScope     = #scope{ funs = MkDefs([{"to_str", Fun1(Int,     String)}]) },
@@ -669,7 +675,7 @@ check_typedef_sccs(Env, TypeMap, [{acyclic, Name} | SCCs], Acc) ->
                     check_typedef_sccs(Env2, TypeMap, SCCs, Acc1);
                 {variant_t, Cons} ->
                     Target   = check_type(Env1, app_t(Ann, D, Xs)),
-                    ConType  = fun([]) -> Target; (Args) -> {type_sig, Ann, [], Args, Target} end,
+                    ConType  = fun([]) -> Target; (Args) -> {type_sig, Ann, none, [], Args, Target} end,
                     ConTypes = [ begin
                                     {constr_t, _, {con, _, Con}, Args} = ConDef,
                                     {Con, ConType(Args)}
@@ -842,7 +848,7 @@ check_constructor_overlap(Env, Con = {con, Ann, Name}, NewType) ->
     case lookup_env(Env, term, Ann, Name) of
         false -> ok;
         {_, {Ann, Type}} ->
-            OldType = case Type of {type_sig, _, _, _, T} -> T;
+            OldType = case Type of {type_sig, _, _, _, _, T} -> T;
                                    _ -> Type end,
             OldCon  = {con, Ann, Name},
             type_error({repeated_constructor, [{OldCon, OldType}, {Con, NewType}]})
@@ -884,16 +890,15 @@ check_reserved_entrypoints(Funs) ->
 -spec check_fundecl(env(), aeso_syntax:decl()) -> {{name(), typesig()}, aeso_syntax:decl()}.
 check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type = {fun_t, _, _, _, _}}) ->
     Type1 = {fun_t, _, Named, Args, Ret} = check_type(Env, Type),
-    {{Name, {type_sig, Ann, Named, Args, Ret}}, {fun_decl, Ann, Id, Type1}};
+    {{Name, {type_sig, Ann, none, Named, Args, Ret}}, {fun_decl, Ann, Id, Type1}};
 check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type}) ->
     type_error({fundecl_must_have_funtype, Ann, Id, Type}),
-    {{Name, {type_sig, Ann, [], [], Type}}, check_type(Env, Type)}.
+    {{Name, {type_sig, Ann, none, [], [], Type}}, check_type(Env, Type)}.
 
 infer_nonrec(Env, LetFun) ->
     create_constraints(),
     NewLetFun = infer_letfun(Env, LetFun),
     check_special_funs(Env, NewLetFun),
-    solve_constraints(Env),
     destroy_and_report_unsolved_constraints(Env),
     Result = {TypeSig, _} = instantiate(NewLetFun),
     print_typesig(TypeSig),
@@ -901,7 +906,7 @@ infer_nonrec(Env, LetFun) ->
 
 %% Currenty only the init function.
 check_special_funs(Env, {{"init", Type}, _}) ->
-    {type_sig, Ann, _Named, _Args, Res} = Type,
+    {type_sig, Ann, _Constr, _Named, _Args, Res} = Type,
     State =
         %% We might have implicit (no) state.
         case lookup_type(Env, {id, [], "state"}) of
@@ -911,7 +916,8 @@ check_special_funs(Env, {{"init", Type}, _}) ->
     unify(Env, Res, State, {checking_init_type, Ann});
 check_special_funs(_, _) -> ok.
 
-typesig_to_fun_t({type_sig, Ann, Named, Args, Res}) -> {fun_t, Ann, Named, Args, Res}.
+typesig_to_fun_t({type_sig, Ann, _Constr, Named, Args, Res}) ->
+    {fun_t, Ann, Named, Args, Res}.
 
 infer_letrec(Env, Defs) ->
     create_constraints(),
@@ -939,13 +945,13 @@ infer_letfun(Env0, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, Bo
     Env = Env0#env{ stateful = aeso_syntax:get_ann(stateful, Attrib, false),
                     current_function = Fun },
     check_unique_arg_names(Fun, Args),
-    ArgTypes  = [{ArgName, check_type(Env, arg_type(T))} || {arg, _, ArgName, T} <- Args],
-    ExpectedType = check_type(Env, arg_type(What)),
+    ArgTypes  = [{ArgName, check_type(Env, arg_type(ArgAnn, T))} || {arg, ArgAnn, ArgName, T} <- Args],
+    ExpectedType = check_type(Env, arg_type(NameAttrib, What)),
     NewBody={typed, _, _, ResultType} = check_expr(bind_vars(ArgTypes, Env), Body, ExpectedType),
     NewArgs = [{arg, A1, {id, A2, ArgName}, T}
                || {{_, T}, {arg, A1, {id, A2, ArgName}, _}} <- lists:zip(ArgTypes, Args)],
     NamedArgs = [],
-    TypeSig = {type_sig, Attrib, NamedArgs, [T || {arg, _, _, T} <- NewArgs], ResultType},
+    TypeSig = {type_sig, Attrib, none, NamedArgs, [T || {arg, _, _, T} <- NewArgs], ResultType},
     {{Name, TypeSig},
      {letfun, Attrib, {id, NameAttrib, Name}, NewArgs, ResultType, NewBody}}.
 
@@ -959,11 +965,14 @@ check_unique_arg_names(Fun, Args) ->
 print_typesig({Name, TypeSig}) ->
     ?PRINT_TYPES("Inferred ~s : ~s\n", [Name, pp(TypeSig)]).
 
-arg_type({id, Attrs, "_"}) ->
-    fresh_uvar(Attrs);
-arg_type({app_t, Attrs, Name, Args}) ->
-    {app_t, Attrs, Name, [arg_type(T) || T <- Args]};
-arg_type(T) ->
+arg_type(ArgAnn, {id, Ann, "_"}) ->
+    case aeso_syntax:get_ann(origin, Ann, user) of
+        system -> fresh_uvar(ArgAnn);
+        user   -> fresh_uvar(Ann)
+    end;
+arg_type(ArgAnn, {app_t, Attrs, Name, Args}) ->
+    {app_t, Attrs, Name, [arg_type(ArgAnn, T) || T <- Args]};
+arg_type(_, T) ->
     T.
 
 app_t(_Ann, Name, [])  -> Name;
@@ -981,14 +990,14 @@ lookup_name(Env, As, Id, Options) ->
             Freshen = proplists:get_value(freshen, Options, false),
             check_stateful(Env, Id, Ty),
             Ty1 = case Ty of
-                    {type_sig, _, _, _, _} -> freshen_type(As, typesig_to_fun_t(Ty));
-                    _ when Freshen         -> freshen_type(As, Ty);
-                    _                      -> Ty
+                    {type_sig, _, _, _, _, _} -> freshen_type_sig(As, Ty);
+                    _ when Freshen            -> freshen_type(As, Ty);
+                    _                         -> Ty
                   end,
             {set_qname(QId, Id), Ty1}
     end.
 
-check_stateful(#env{ stateful = false, current_function = Fun }, Id, Type = {type_sig, _, _, _, _}) ->
+check_stateful(#env{ stateful = false, current_function = Fun }, Id, Type = {type_sig, _, _, _, _, _}) ->
     case aeso_syntax:get_ann(stateful, Type, false) of
         false -> ok;
         true  ->
@@ -1115,7 +1124,7 @@ infer_expr(Env, {list_comp, AttrsL, Yield, [{comprehension_if, AttrsIF, Cond}|Re
     , {list_comp, AttrsL, TypedYield, [{comprehension_if, AttrsIF, NewCond}|TypedRest]}
     , ResType};
 infer_expr(Env, {list_comp, AsLC, Yield, [{letval, AsLV, Pattern, Type, E}|Rest]}) ->
-    NewE = {typed, _, _, PatType} = infer_expr(Env, {typed, AsLV, E, arg_type(Type)}),
+    NewE = {typed, _, _, PatType} = infer_expr(Env, {typed, AsLV, E, arg_type(AsLV, Type)}),
     BlockType = fresh_uvar(AsLV),
     {'case', _, NewPattern, NewRest} =
         infer_case( Env
@@ -1132,7 +1141,7 @@ infer_expr(Env, {list_comp, AsLC, Yield, [{letval, AsLV, Pattern, Type, E}|Rest]
     };
 infer_expr(Env, {list_comp, AsLC, Yield, [Def={letfun, AsLF, _, _, _, _}|Rest]}) ->
     {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
-    FunT = freshen_type(AsLF, typesig_to_fun_t(TypeSig)),
+    FunT = typesig_to_fun_t(TypeSig),
     NewE = bind_var({id, AsLF, Name}, FunT, Env),
     {typed, _, {list_comp, _, TypedYield, TypedRest}, ResType} =
         infer_expr(NewE, {list_comp, AsLC, Yield, Rest}),
@@ -1339,7 +1348,7 @@ infer_block(Env, Attrs, [Def={letfun, Ann, _, _, _, _}|Rest], BlockType) ->
     NewE = bind_var({id, Ann, Name}, FunT, Env),
     [LetFun|infer_block(NewE, Attrs, Rest, BlockType)];
 infer_block(Env, _, [{letval, Attrs, Pattern, Type, E}|Rest], BlockType) ->
-    NewE = {typed, _, _, PatType} = infer_expr(Env, {typed, Attrs, E, arg_type(Type)}),
+    NewE = {typed, _, _, PatType} = infer_expr(Env, {typed, Attrs, E, arg_type(aeso_syntax:get_ann(Pattern), Type)}),
     {'case', _, NewPattern, {typed, _, {block, _, NewRest}, _}} =
         infer_case(Env, Attrs, Pattern, PatType, {block, Attrs, Rest}, BlockType),
     [{letval, Attrs, NewPattern, Type, NewE}|NewRest];
@@ -1481,12 +1490,10 @@ create_constraints() ->
     create_bytes_constraints(),
     create_field_constraints().
 
-solve_constraints(Env) ->
+destroy_and_report_unsolved_constraints(Env) ->
     solve_named_argument_constraints(Env),
     solve_bytes_constraints(Env),
-    solve_field_constraints(Env).
-
-destroy_and_report_unsolved_constraints(Env) ->
+    solve_field_constraints(Env),
     destroy_and_report_unsolved_field_constraints(Env),
     destroy_and_report_unsolved_bytes_constraints(Env),
     destroy_and_report_unsolved_named_argument_constraints(Env).
@@ -1539,7 +1546,8 @@ destroy_and_report_unsolved_named_argument_constraints(Env) ->
 
 %% -- Bytes constraints --
 
--type byte_constraint() :: {is_bytes, utype()}.
+-type byte_constraint() :: {is_bytes, utype()}
+                         | {add_bytes, aeso_syntax:ann(), concat | split, utype(), utype(), utype()}.
 
 create_bytes_constraints() ->
     ets_new(bytes_constraints, [bag]).
@@ -1551,21 +1559,52 @@ get_bytes_constraints() ->
 add_bytes_constraint(Constraint) ->
     ets_insert(bytes_constraints, Constraint).
 
-solve_bytes_constraints(_Env) ->
+solve_bytes_constraints(Env) ->
+    [ solve_bytes_constraint(Env, C) || C <- get_bytes_constraints() ],
     ok.
+
+solve_bytes_constraint(_Env, {is_bytes, _}) -> ok;
+solve_bytes_constraint(Env, {add_bytes, Ann, _, A0, B0, C0}) ->
+    A = unfold_types_in_type(Env, dereference(A0)),
+    B = unfold_types_in_type(Env, dereference(B0)),
+    C = unfold_types_in_type(Env, dereference(C0)),
+    case {A, B, C} of
+        {{bytes_t, _, M}, {bytes_t, _, N}, _} -> unify(Env, {bytes_t, Ann, M + N}, C, {at, Ann});
+        {{bytes_t, _, M}, _, {bytes_t, _, R}} when R >= M -> unify(Env, {bytes_t, Ann, R - M}, B, {at, Ann});
+        {_, {bytes_t, _, N}, {bytes_t, _, R}} when R >= N -> unify(Env, {bytes_t, Ann, R - N}, A, {at, Ann});
+        _ -> ok
+    end.
 
 destroy_bytes_constraints() ->
     ets_delete(bytes_constraints).
 
 destroy_and_report_unsolved_bytes_constraints(Env) ->
-    [ check_bytes_constraint(Env, C) || C <- get_bytes_constraints() ],
+    Constraints     = get_bytes_constraints(),
+    InAddConstraint = [ T || {add_bytes, _, _, A, B, C} <- Constraints,
+                             T <- [A, B, C],
+                             element(1, T) /= bytes_t ],
+    %% Skip is_bytes constraints for types that occur in add_bytes constraints
+    %% (no need to generate error messages for both is_bytes and add_bytes).
+    Skip = fun({is_bytes, T}) -> lists:member(T, InAddConstraint);
+              (_) -> false end,
+    [ check_bytes_constraint(Env, C) || C <- Constraints, not Skip(C) ],
     destroy_bytes_constraints().
 
 check_bytes_constraint(Env, {is_bytes, Type}) ->
     Type1 = unfold_types_in_type(Env, instantiate(Type)),
     case Type1 of
         {bytes_t, _, _} -> ok;
-        _               -> type_error({cannot_unify, Type1, {bytes_t, [], any}, {at, Type}})
+        _               ->
+            type_error({unknown_byte_length, Type})
+    end;
+check_bytes_constraint(Env, {add_bytes, Ann, Fun, A0, B0, C0}) ->
+    A = unfold_types_in_type(Env, instantiate(A0)),
+    B = unfold_types_in_type(Env, instantiate(B0)),
+    C = unfold_types_in_type(Env, instantiate(C0)),
+    case {A, B, C} of
+        {{bytes_t, _, _M}, {bytes_t, _, _N}, {bytes_t, _, _R}} ->
+            ok; %% If all are solved we checked M + N == R in solve_bytes_constraint.
+        _ -> type_error({unsolved_bytes_constraint, Ann, Fun, A, B, C})
     end.
 
 %% -- Field constraints --
@@ -1803,8 +1842,8 @@ unfold_types(Env, {typed, Attr, E, Type}, Options) ->
     {typed, Attr, unfold_types(Env, E, Options), unfold_types_in_type(Env, Type, Options)};
 unfold_types(Env, {arg, Attr, Id, Type}, Options) ->
     {arg, Attr, Id, unfold_types_in_type(Env, Type, Options)};
-unfold_types(Env, {type_sig, Ann, NamedArgs, Args, Ret}, Options) ->
-    {type_sig, Ann,
+unfold_types(Env, {type_sig, Ann, Constr, NamedArgs, Args, Ret}, Options) ->
+    {type_sig, Ann, Constr,
                unfold_types_in_type(Env, NamedArgs, Options),
                unfold_types_in_type(Env, Args, Options),
                unfold_types_in_type(Env, Ret, Options)};
@@ -1996,6 +2035,8 @@ occurs_check1(R, [H | T]) ->
     occurs_check(R, H) orelse occurs_check(R, T);
 occurs_check1(_, []) -> false.
 
+fresh_uvar([{origin, system}]) ->
+    error(oh_no_you_dont);
 fresh_uvar(Attrs) ->
     {uvar, Attrs, make_ref()}.
 
@@ -2031,6 +2072,17 @@ freshen(Ann, [A | B]) ->
     [freshen(Ann, A) | freshen(Ann, B)];
 freshen(_, X) ->
     X.
+
+freshen_type_sig(Ann, TypeSig = {type_sig, _, Constr, _, _, _}) ->
+    FunT = freshen_type(Ann, typesig_to_fun_t(TypeSig)),
+    apply_typesig_constraint(Ann, Constr, FunT),
+    FunT.
+
+apply_typesig_constraint(_Ann, none, _FunT) -> ok;
+apply_typesig_constraint(Ann, bytes_concat, {fun_t, _, [], [A, B], C}) ->
+    add_bytes_constraint({add_bytes, Ann, concat, A, B, C});
+apply_typesig_constraint(Ann, bytes_split, {fun_t, _, [], [C], {tuple_t, _, [A, B]}}) ->
+    add_bytes_constraint({add_bytes, Ann, split, A, B, C}).
 
 %% Dereferences all uvars and replaces the uninstantiated ones with a
 %% succession of tvars.
@@ -2316,6 +2368,21 @@ mk_error({bad_top_level_decl, Decl}) ->
     Msg = io_lib:format("The definition of '~s' must appear inside a ~s.\n",
                         [pp_expr("", Id), What]),
     mk_t_err(pos(Decl), Msg);
+mk_error({unknown_byte_length, Type}) ->
+    Msg = io_lib:format("Cannot resolve length of byte array.\n", []),
+    mk_t_err(pos(Type), Msg);
+mk_error({unsolved_bytes_constraint, Ann, concat, A, B, C}) ->
+    Msg = io_lib:format("Failed to resolve byte array lengths in call to Bytes.concat with arguments of type\n"
+                        "~s  (at ~s)\n~s  (at ~s)\nand result type\n~s  (at ~s)\n",
+                        [pp_type("  - ", A), pp_loc(A), pp_type("  - ", B),
+                         pp_loc(B), pp_type("  - ", C), pp_loc(C)]),
+    mk_t_err(pos(Ann), Msg);
+mk_error({unsolved_bytes_constraint, Ann, split, A, B, C}) ->
+    Msg = io_lib:format("Failed to resolve byte array lengths in call to Bytes.split with argument of type\n"
+                        "~s  (at ~s)\nand result types\n~s  (at ~s)\n~s  (at ~s)\n",
+                        [ pp_type("  - ", C), pp_loc(C), pp_type("  - ", A), pp_loc(A),
+                          pp_type("  - ", B), pp_loc(B)]),
+    mk_t_err(pos(Ann), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p\n", [Err]),
     mk_t_err(pos(0, 0), Msg).
@@ -2443,7 +2510,7 @@ if_branches(If = {'if', Ann, _, Then, Else}) ->
     end;
 if_branches(E) -> [E].
 
-pp_typed(Label, E, T = {type_sig, _, _, _, _}) -> pp_typed(Label, E, typesig_to_fun_t(T));
+pp_typed(Label, E, T = {type_sig, _, _, _, _, _}) -> pp_typed(Label, E, typesig_to_fun_t(T));
 pp_typed(Label, {typed, _, Expr, _}, Type) ->
     pp_typed(Label, Expr, Type);
 pp_typed(Label, Expr, Type) ->
@@ -2475,7 +2542,7 @@ pp_loc(T) ->
 plural(No, _Yes, [_]) -> No;
 plural(_No, Yes, _)   -> Yes.
 
-pp(T = {type_sig, _, _, _, _}) ->
+pp(T = {type_sig, _, _, _, _, _}) ->
     pp(typesig_to_fun_t(T));
 pp([]) ->
     "";
