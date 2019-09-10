@@ -572,6 +572,9 @@ builtin_to_scode(Env, aens_transfer, [_Sign, _From, _To, _Name] = Args) ->
 builtin_to_scode(Env, aens_revoke, [_Sign, _Account, _Name] = Args) ->
     call_to_scode(Env, [aeb_fate_ops:aens_revoke(?a, ?a, ?a),
                         tuple(0)], Args);
+builtin_to_scode(Env, aens_update, [_Sign, _Account, _NameString, _TTL, _ClientTTL, _Pointers] = Args) ->
+    call_to_scode(Env, [aeb_fate_ops:aens_update(?a, ?a, ?a, ?a, ?a, ?a),
+                        tuple(0)], Args);
 builtin_to_scode(_Env, auth_tx_hash, []) ->
     [aeb_fate_ops:auth_tx_hash(?a)].
 
@@ -896,7 +899,7 @@ attributes(I) ->
         {'AENS_RESOLVE', A, B, C, D}          -> Impure(A, [B, C, D]);
         {'AENS_PRECLAIM', A, B, C}            -> Impure(none, [A, B, C]);
         {'AENS_CLAIM', A, B, C, D, E}         -> Impure(none, [A, B, C, D, E]);
-        'AENS_UPDATE'                         -> Impure(none, []);%% TODO
+        {'AENS_UPDATE', A, B, C, D, E, F}     -> Impure(none, [A, B, C, D, E, F]);
         {'AENS_TRANSFER', A, B, C, D}         -> Impure(none, [A, B, C, D]);
         {'AENS_REVOKE', A, B, C}              -> Impure(none, [A, B, C]);
         {'ABORT', A}                          -> Impure(pc, A);
