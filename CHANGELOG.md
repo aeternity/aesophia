@@ -6,9 +6,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- Added the `[a..b]` language construct, returning the list of numbers between
-  `a` and `b` (inclusive). Returns the empty list if `a` > `b`.
 ### Changed
+### Removed
+
+## [4.0.0-rc3] - 2019-09-10
+### Added
+- `Bytes.concat` and `Bytes.split` are added to be able to
+  (de-)construct byte arrays.
+- `[a..b]` language construct, returning the list of numbers between
+  `a` and `b` (inclusive). Returns the empty list if `a` > `b`.
+- [Standard libraries] (https://github.com/aeternity/protocol/blob/master/contracts/sophia_stdlib.md)
+- Checks that `init` is not called from other functions.
+### Changed
+- Error messages are changed into a uniform format, and more helpful
+  messages have been added.
+- `Crypto.<hash_fun>` and `String.<hash_fun>` for byte arrays now only
+  hash the actual byte array - not the internal ABI format.
+- More strict checks for polymorphic oracles and higher order oracles
+  and entrypoints.
+- `AENS.claim` is updated with a `NameFee` field - to be able to do
+  name auctions within contracts.
 ### Removed
 
 ## [4.0.0-rc1] - 2019-08-22
@@ -136,7 +153,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v4.0.0-rc1...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v4.0.0-rc3...HEAD
+[4.0.0-rc3]: https://github.com/aeternity/aesophia/compare/v4.0.0-rc1...v4.0.0-rc3
 [4.0.0-rc1]: https://github.com/aeternity/aesophia/compare/v3.2.0...v4.0.0-rc1
 [3.2.0]: https://github.com/aeternity/aesophia/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/aeternity/aesophia/compare/v3.0.0...v3.1.0
