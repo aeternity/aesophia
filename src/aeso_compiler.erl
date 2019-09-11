@@ -105,7 +105,7 @@ from_string1(aevm, ContractString, Options) ->
     #{icode := Icode} = string_to_code(ContractString, Options),
     TypeInfo  = extract_type_info(Icode),
     Assembler = assemble(Icode, Options),
-    pp_assembler(Assembler, Options),
+    pp_assembler(aevm, Assembler, Options),
     ByteCodeList = to_bytecode(Assembler, Options),
     ByteCode = << << B:8 >> || B <- ByteCodeList >>,
     pp_bytecode(ByteCode, Options),
@@ -120,6 +120,7 @@ from_string1(aevm, ContractString, Options) ->
 from_string1(fate, ContractString, Options) ->
     #{fcode := FCode} = string_to_code(ContractString, Options),
     FateCode = aeso_fcode_to_fate:compile(FCode, Options),
+    pp_assembler(fate, FateCode, Options),
     ByteCode = aeb_fate_code:serialize(FateCode, []),
     {ok, Version} = version(),
     {ok, #{byte_code => ByteCode,
@@ -532,8 +533,10 @@ pp_sophia_code(C, Opts)->  pp(C, Opts, pp_sophia_code, fun(Code) ->
 pp_ast(C, Opts)      ->  pp(C, Opts, pp_ast, fun aeso_ast:pp/1).
 pp_typed_ast(C, Opts)->  pp(C, Opts, pp_typed_ast, fun aeso_ast:pp_typed/1).
 pp_icode(C, Opts)    ->  pp(C, Opts, pp_icode, fun aeso_icode:pp/1).
-pp_assembler(C, Opts)->  pp(C, Opts, pp_assembler, fun aeb_asm:pp/1).
 pp_bytecode(C, Opts) ->  pp(C, Opts, pp_bytecode, fun aeb_disassemble:pp/1).
+
+pp_assembler(aevm, C, Opts) ->  pp(C, Opts, pp_assembler, fun aeb_asm:pp/1);
+pp_assembler(fate, C, Opts) ->  pp(C, Opts, pp_assembler, fun(Asm) -> io:format("~s", [aeb_fate_asm:pp(Asm)]) end).
 
 pp(Code, Options, Option, PPFun) ->
     case proplists:lookup(Option, Options) of
