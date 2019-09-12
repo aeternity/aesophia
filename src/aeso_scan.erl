@@ -95,7 +95,6 @@ parse_char([$', C, $']) -> C.
 
 unescape(Str) -> unescape(Str, []).
 
-%% TODO: numeric escapes
 unescape([$"], Acc) ->
     list_to_binary(lists:reverse(Acc));
 unescape([$\\, $x, D1, D2 | Chars ], Acc) ->
