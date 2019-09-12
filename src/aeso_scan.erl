@@ -98,6 +98,9 @@ unescape(Str) -> unescape(Str, []).
 %% TODO: numeric escapes
 unescape([$"], Acc) ->
     list_to_binary(lists:reverse(Acc));
+unescape([$\\, $x, D1, D2 | Chars ], Acc) ->
+    C = list_to_integer([D1, D2], 16),
+    unescape(Chars, [C | Acc]);
 unescape([$\\, Code | Chars], Acc) ->
     Ok = fun(C) -> unescape(Chars, [C | Acc]) end,
     case Code of

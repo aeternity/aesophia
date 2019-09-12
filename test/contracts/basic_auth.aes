@@ -15,3 +15,5 @@ contract BasicAuth =
   entrypoint to_sign(h : hash, n : int) =
     Crypto.blake2b((h, n))
 
+  entrypoint weird_string() : string =
+    "\x19Weird String\x42\nMore\n"
