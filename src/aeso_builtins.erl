@@ -45,7 +45,7 @@ builtin_deps1(addr_to_str)                -> [{baseX_int, 58}];
 builtin_deps1({baseX_int, X})             -> [{baseX_int_pad, X}];
 builtin_deps1({baseX_int_pad, X})         -> [{baseX_int_encode, X}];
 builtin_deps1({baseX_int_encode, X})      -> [{baseX_int_encode_, X}, {baseX_tab, X}, {baseX_digits, X}];
-builtin_deps1({bytes_to_str, _})          -> [bytes_to_str_worker];
+builtin_deps1({bytes_to_str, _})          -> [bytes_to_str_worker, bytes_to_str_worker_x];
 builtin_deps1(string_reverse)             -> [string_reverse_];
 builtin_deps1(require)                    -> [abort];
 builtin_deps1(_)                          -> [].
@@ -171,6 +171,7 @@ builtin_function(BF) ->
         {bytes_concat, A, B}       -> bfun(BF, builtin_bytes_concat(A, B));
         {bytes_split, A, B}        -> bfun(BF, builtin_bytes_split(A, B));
         bytes_to_str_worker        -> bfun(BF, builtin_bytes_to_str_worker());
+        bytes_to_str_worker_x      -> bfun(BF, builtin_bytes_to_str_worker_x());
         string_reverse             -> bfun(BF, builtin_string_reverse());
         string_reverse_            -> bfun(BF, builtin_string_reverse_())
     end.
@@ -521,40 +522,60 @@ builtin_bytes_to_int(N) when N > 32 ->
            end,
     {[{"b", pointer}], Body, word}.
 
-builtin_bytes_to_str_worker() ->
+%% Two versions of this helper function, worker for sections not even 16 bytes long
+%% and worker_x for the full sized chunks.
+builtin_bytes_to_str_worker_x() ->
     <<Tab:256>> = <<"0123456789ABCDEF________________">>,
     {[{"w", word}, {"offs", word}, {"acc", word}],
-     {seq, [{ifte, ?AND(?GT(offs, 0), ?EQ(0, ?MOD(offs, 16))),
-                    {seq, [?V(acc), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]}]},
-                    {inline_asm, []}},
-            {ifte, ?EQ(offs, 32), {inline_asm, [?A(?MSIZE)]},
-                ?LET(b,  ?BYTE(offs, w),
-                ?LET(lo, ?BYTE(?MOD(b, 16), Tab),
-                ?LET(hi, ?BYTE(op('bsr', 4 , b), Tab),
-                ?call(bytes_to_str_worker,
-                      [?V(w), ?ADD(offs, 1), ?ADD(?BSL(acc, 2), ?ADD(?BSL(hi, 1), lo))]))))
-            }
-           ]},
+     {ifte, ?EQ(offs, 16), {seq, [?V(acc), {inline_asm, [?A(?MSIZE), ?A(?MSTORE), ?A(?MSIZE)]}]},
+         ?LET(b,  ?BYTE(offs, w),
+         ?LET(lo, ?BYTE(?MOD(b, 16), Tab),
+         ?LET(hi, ?BYTE(op('bsr', 4 , b), Tab),
+         ?call(bytes_to_str_worker_x, [?V(w), ?ADD(offs, 1), ?ADD(?BSL(acc, 2), ?ADD(?BSL(hi, 1), lo))]))))
+     },
      word}.
+
+builtin_bytes_to_str_worker() ->
+    <<Tab:256>> = <<"0123456789ABCDEF________________">>,
+    {[{"w", word}, {"offs", word}, {"acc", word}, {"stop", word}],
+     {ifte, ?EQ(stop, offs), {seq, [?BSL(acc, ?MUL(2, ?SUB(16, offs))), {inline_asm, [?A(?MSIZE), ?A(?MSTORE), ?A(?MSIZE)]}]},
+         ?LET(b,  ?BYTE(offs, w),
+         ?LET(lo, ?BYTE(?MOD(b, 16), Tab),
+         ?LET(hi, ?BYTE(op('bsr', 4 , b), Tab),
+         ?call(bytes_to_str_worker, [?V(w), ?ADD(offs, 1), ?ADD(?BSL(acc, 2), ?ADD(?BSL(hi, 1), lo)), ?V(stop)]))))
+     },
+     word}.
+
+builtin_bytes_to_str_body(Var, N) when N < 16 ->
+    [?call(bytes_to_str_worker, [?V(Var), ?I(0), ?I(0), ?I(N)])];
+builtin_bytes_to_str_body(Var, 16) ->
+    [?call(bytes_to_str_worker_x, [?V(Var), ?I(0), ?I(0)])];
+builtin_bytes_to_str_body(Var, N) when N < 32 ->
+    builtin_bytes_to_str_body(Var, 16) ++ [{inline_asm, [?A(?POP)]}] ++
+    [?call(bytes_to_str_worker, [?BSL(Var, 16), ?I(0), ?I(0), ?I(N - 16)])];
+builtin_bytes_to_str_body(Var, 32) ->
+    builtin_bytes_to_str_body(Var, 16) ++ [{inline_asm, [?A(?POP)]}] ++
+    [?call(bytes_to_str_worker_x, [?BSL(Var, 16), ?I(0), ?I(0)])];
+builtin_bytes_to_str_body(Var, N) when N > 32 ->
+    WholeWords = ((N + 31) div 32) - 1,
+    lists:append(
+    [ [?DEREF(w, ?ADD(Var, 32 * I), {seq, builtin_bytes_to_str_body(w, 32)}), {inline_asm, [?A(?POP)]}]
+      || I <- lists:seq(0, WholeWords - 1) ]) ++
+    [ ?DEREF(w, ?ADD(Var, 32 * WholeWords), {seq, builtin_bytes_to_str_body(w, N - WholeWords * 32)}) ].
 
 builtin_bytes_to_str(N) when N =< 32 ->
     {[{"w", word}],
      ?LET(ret, {inline_asm, [?A(?MSIZE)]},
-     {seq, [?I(N * 2), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]},
-            ?call(bytes_to_str_worker, [?V(w), ?I(0), ?I(0)]),
-            {inline_asm, [?A(?POP)]},
-            ?V(ret)]}),
+     {seq, [?I(N * 2), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]}] ++
+            builtin_bytes_to_str_body(w, N) ++
+            [{inline_asm, [?A(?POP)]}, ?V(ret)]}),
      string};
 builtin_bytes_to_str(N) when N > 32 ->
-    Work = fun(I) ->
-            [?DEREF(w, ?ADD(p, 32 * I), ?call(bytes_to_str_worker, [?V(w), ?I(0), ?I(0)])),
-             {inline_asm, [?A(?POP)]}]
-           end,
     {[{"p", pointer}],
      ?LET(ret, {inline_asm, [?A(?MSIZE)]},
      {seq, [?I(N * 2), {inline_asm, [?A(?MSIZE), ?A(?MSTORE)]}] ++
-           lists:append([ Work(I) || I <- lists:seq(0, (N + 31) div 32 - 1) ]) ++
-           [?V(ret)]}),
+            builtin_bytes_to_str_body(p, N) ++
+            [{inline_asm, [?A(?POP)]}, ?V(ret)]}),
      string}.
 
 builtin_string_reverse() ->
