@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 ### Removed
 
-## [4.0.0-rc3] - 2019-09-10
+## [4.0.0-rc3] - 2019-09-12
 ### Added
 - `Bytes.concat` and `Bytes.split` are added to be able to
   (de-)construct byte arrays.
@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and entrypoints.
 - `AENS.claim` is updated with a `NameFee` field - to be able to do
   name auctions within contracts.
+- Fixed a bug in `Bytes.to_str` for AEVM.
 ### Removed
 
 ## [4.0.0-rc1] - 2019-08-22
