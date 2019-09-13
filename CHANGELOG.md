@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Handle numeric escapes, i.e. `"\x19Ethereum Signed Message:\n"`, and similar strings.
 ### Changed
 ### Removed
 
