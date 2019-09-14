@@ -783,7 +783,8 @@ check_type(_Env, Type = {uvar, _, _}, Arity) ->
     ensure_base_type(Type, Arity),
     Type;
 check_type(_Env, {args_t, Ann, Ts}, _) ->
-    type_error({new_tuple_syntax, Ann, Ts}).
+    type_error({new_tuple_syntax, Ann, Ts}),
+    {tuple_t, Ann, Ts}.
 
 ensure_base_type(Type, Arity) ->
     [ type_error({wrong_type_arguments, Type, Arity, 0}) || Arity /= 0 ],
