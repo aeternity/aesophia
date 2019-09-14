@@ -355,6 +355,7 @@ unexpected_token_error(Ts, Expect, T) ->
               {con, _, X}   when ExpectId               -> io_lib:format(" Did you mean ~s?", [mk_lower(X)]);
               {qcon, _, Xs} when ExpectCon              -> io_lib:format(" Did you mean ~s?", [lists:last(Xs)]);
               {qid, _,  Xs} when ExpectId               -> io_lib:format(" Did you mean ~s?", [lists:last(Xs)]);
+              {return, _} -> " [Polite reminder that Sophia is not JavaScript]";
               _ -> ""
           end,
     mk_error(Ts, io_lib:format("Unexpected ~s.~s", [describe(T), Fix])).
