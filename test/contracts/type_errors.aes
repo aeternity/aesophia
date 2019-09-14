@@ -57,3 +57,8 @@ contract Test =
     let f() = 0
     let g() = f()
 
+  function id(x : 'a) : 'a = x
+
+  entrypoint wrong_return(n : int) : bool =
+    id(n)
+

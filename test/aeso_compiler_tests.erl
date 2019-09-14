@@ -301,7 +301,14 @@ failing_contracts() ->
         <<?Pos(54, 5)
           "Let binding at line 54, column 5 must be followed by an expression">>,
         <<?Pos(58, 5)
-          "Let binding at line 58, column 5 must be followed by an expression">>])
+          "Let binding at line 58, column 5 must be followed by an expression">>,
+        <<?Pos(63, 5)
+          "Cannot unify int\n"
+          "         and bool\n"
+          "when checking the type of the expression at line 63, column 5\n"
+          "  id(n) : int\n"
+          "against the expected type\n"
+          "  bool">>])
     , ?TYPE_ERROR(init_type_error,
        [<<?Pos(7, 3)
           "Cannot unify string\n"
