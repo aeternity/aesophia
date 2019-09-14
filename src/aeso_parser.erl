@@ -312,7 +312,7 @@ map_key(Key, {ok, {_, Val}}) -> {map_key, Key, Val}.
 
 elim(E, [])                              -> E;
 elim(E, [{proj, Ann, P} | Es])           -> elim({proj, Ann, E, P}, Es);
-elim(E, [{app, Ann, Args} | Es])         -> elim({app, Ann, E, Args}, Es);
+elim(E, [{app, _Ann, Args} | Es])        -> elim({app, aeso_syntax:get_ann(E), E, Args}, Es);
 elim(E, [{rec_upd, Ann, Flds} | Es])     -> elim(record_update(Ann, E, Flds), Es);
 elim(E, [{map_get, Ann, Key} | Es])      -> elim({map_get, Ann, E, Key}, Es);
 elim(E, [{map_get, Ann, Key, Val} | Es]) -> elim({map_get, Ann, E, Key, Val}, Es).
