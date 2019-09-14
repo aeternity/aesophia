@@ -1155,8 +1155,6 @@ infer_expr(Env, {typed, As, Body, Type}) ->
     {typed, _, NewBody, NewType} = check_expr(Env, Body, Type1),
     {typed, As, NewBody, NewType};
 infer_expr(Env, {app, Ann, Fun, Args0}) ->
-    %% TODO: fix parser to give proper annotation for normal applications!
-    FunAnn     = aeso_syntax:get_ann(Fun),
     NamedArgs  = [ Arg || Arg = {named_arg, _, _, _} <- Args0 ],
     Args       = Args0 -- NamedArgs,
     case aeso_syntax:get_ann(format, Ann) of
@@ -1165,15 +1163,15 @@ infer_expr(Env, {app, Ann, Fun, Args0}) ->
         prefix ->
             infer_op(Env, Ann, Fun, Args, fun infer_prefix/1);
         _ ->
-            NamedArgsVar = fresh_uvar(FunAnn),
+            NamedArgsVar = fresh_uvar(Ann),
             NamedArgs1 = [ infer_named_arg(Env, NamedArgsVar, Arg) || Arg <- NamedArgs ],
             %% TODO: named args constraints
             NewFun={typed, _, _, FunType} = infer_expr(Env, Fun),
             NewArgs = [infer_expr(Env, A) || A <- Args],
             ArgTypes = [T || {typed, _, _, T} <- NewArgs],
-            ResultType = fresh_uvar(FunAnn),
+            ResultType = fresh_uvar(Ann),
             unify(Env, FunType, {fun_t, [], NamedArgsVar, ArgTypes, ResultType}, {infer_app, Fun, Args, FunType, ArgTypes}),
-            {typed, FunAnn, {app, Ann, NewFun, NamedArgs1 ++ NewArgs}, dereference(ResultType)}
+            {typed, Ann, {app, Ann, NewFun, NamedArgs1 ++ NewArgs}, dereference(ResultType)}
     end;
 infer_expr(Env, {'if', Attrs, Cond, Then, Else}) ->
     NewCond = check_expr(Env, Cond, {id, Attrs, "bool"}),
