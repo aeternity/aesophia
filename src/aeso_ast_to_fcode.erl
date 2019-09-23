@@ -134,7 +134,7 @@
                  | {namespace, string()}
                  | {abstract_contract, string()}.
 
--type state_layout() :: default_layout.
+-type state_layout() :: {tuple, [state_layout()]} | {reg, state_reg()}.
 
 -type env() :: #{ type_env     := type_env(),
                   fun_env      := fun_env(),
@@ -156,12 +156,14 @@
 -spec ast_to_fcode(aeso_syntax:ast(), [option()]) -> fcode().
 ast_to_fcode(Code, Options) ->
     Verbose = lists:member(pp_fcode, Options),
+    init_fresh_names(),
     FCode1 = to_fcode(init_env(Options), Code),
     [io:format("-- Before lambda lifting --\n~s\n\n", [format_fcode(FCode1)]) || Verbose],
     FCode2 = optimize_fcode(FCode1),
     [ io:format("-- After optimization --\n~s\n\n", [format_fcode(FCode2)]) || Verbose, FCode2 /= FCode1 ],
     FCode3 = lambda_lift(FCode2),
     [ io:format("-- After lambda lifting --\n~s\n\n", [format_fcode(FCode3)]) || Verbose, FCode3 /= FCode2 ],
+    clear_fresh_names(),
     FCode3.
 
 %% -- Environment ------------------------------------------------------------
@@ -213,7 +215,7 @@ builtins() ->
                      || {NS, Funs} <- Scopes,
                         {Fun, Arity} <- Funs ]).
 
-state_layout(Env) -> maps:get(state_layout, Env, undefined).
+state_layout(Env) -> maps:get(state_layout, Env, {reg, 1}).
 
 -define(type(T),       fun([])     -> T end).
 -define(type(X, T),    fun([X])    -> T end).
@@ -230,7 +232,7 @@ init_type_env() ->
        ["hash"]         => ?type(hash),
        ["signature"]    => ?type(signature),
        ["oracle"]       => ?type(Q, R, {oracle, Q, R}),
-       ["oracle_query"] => ?type(_, _, oracle_query),    %% TODO: not in Fate
+       ["oracle_query"] => ?type(_, _, oracle_query),
        ["list"]         => ?type(T, {list, T}),
        ["map"]          => ?type(K, V, {map, K, V}),
        ["option"]       => ?type(T, {variant, [[], [T]]}),
@@ -238,7 +240,13 @@ init_type_env() ->
      }.
 
 is_no_code(Env) ->
-    proplists:get_value(no_code, maps:get(options, Env, []), false).
+    get_option(no_code, Env).
+
+get_option(Opt, Env) ->
+    get_option(Opt, Env, false).
+
+get_option(Opt, Env, Default) ->
+    proplists:get_value(Opt, maps:get(options, Env, []), Default).
 
 %% -- Compilation ------------------------------------------------------------
 
@@ -253,7 +261,7 @@ to_fcode(Env, [{contract, Attrs, MainCon = {con, _, Main}, Decls}]) ->
         decls_to_fcode(MainEnv, Decls),
     StateType   = lookup_type(Env1, [Main, "state"], [], {tuple, []}),
     EventType   = lookup_type(Env1, [Main, "event"], [], none),
-    StateLayout = maps:get(state_layout, Env1, default_layout),
+    StateLayout = state_layout(Env1),
     Payable     = proplists:get_value(payable, Attrs, false),
     #{ contract_name => Main,
        state_type    => StateType,
@@ -277,9 +285,7 @@ decls_to_fcode(Env, Decls) ->
     %% environment.
     Env1 = add_fun_env(Env, Decls),
     lists:foldl(fun(D, E) ->
-                    init_fresh_names(),
                     R = decl_to_fcode(E, D),
-                    clear_fresh_names(),
                     R
                 end, Env1, Decls).
 
@@ -348,10 +354,29 @@ typedef_to_fcode(Env, Id = {id, _, Name}, Xs, Def) ->
     Env3 = compute_state_layout(Env2, Name, FDef),
     bind_type(Env3, Q, FDef).
 
-compute_state_layout(Env = #{ context := {main_contract, _} }, "state", _Type) ->
-    Layout = default_layout,
+compute_state_layout(Env = #{ context := {main_contract, _} }, "state", Type) ->
+    NoLayout = get_option(no_flatten_state, Env),
+    Layout =
+        case Type([]) of
+            _ when NoLayout -> {reg, 1};
+            T ->
+                {_, L} = compute_state_layout(1, T),
+                L
+        end,
     Env#{ state_layout => Layout };
 compute_state_layout(Env, _, _) -> Env.
+
+compute_state_layout(R, {tuple, Ts}) ->
+    {R1, Ls} = compute_state_layout(R, Ts),
+    {R1, {tuple, Ls}};
+compute_state_layout(R, []) ->
+    {R, []};
+compute_state_layout(R, [H | T]) ->
+    {R1, H1} = compute_state_layout(R, H),
+    {R2, T1} = compute_state_layout(R1, T),
+    {R2, [H1 | T1]};
+compute_state_layout(R, _) ->
+    {R + 1, {reg, R}}.
 
 check_state_and_event_types(#{ context := {main_contract, _} }, Id, [_ | _]) ->
     case Id of
@@ -927,10 +952,23 @@ op_builtins() ->
      crypto_ecverify_secp256k1, crypto_ecrecover_secp256k1
     ].
 
-builtin_to_fcode(default_layout, set_state, [Val]) ->
-    {set_state, 1, Val};
-builtin_to_fcode(default_layout, get_state, []) ->
-    {get_state, 1};
+set_state({reg, R}, Val) ->
+    {set_state, R, Val};
+set_state({tuple, Ls}, Val) ->
+    ?make_let(X, Val,
+    lists:foldr(fun({I, L}, Code) ->
+                    {'let', "_", set_state(L, {proj, X, I - 1}), Code}
+                end, {tuple, []}, indexed(Ls))).
+
+get_state({reg, R}) ->
+    {get_state, R};
+get_state({tuple, Ls}) ->
+    {tuple, [get_state(L) || L <- Ls]}.
+
+builtin_to_fcode(Layout, set_state, [Val]) ->
+    set_state(Layout, Val);
+builtin_to_fcode(Layout, get_state, []) ->
+    get_state(Layout);
 builtin_to_fcode(_Layout, require, [Cond, Msg]) ->
     make_if(Cond, {tuple, []}, {builtin, abort, [Msg]});
 builtin_to_fcode(_Layout, chain_event, [Event]) ->
@@ -962,8 +1000,9 @@ add_init_function(Env, Main, StateType, Funs0) ->
             Funs     = add_default_init_function(Env, Main, StateType, Funs0),
             InitName = {entrypoint, <<"init">>},
             InitFun  = #{ body := InitBody} = maps:get(InitName, Funs),
-            Funs#{ InitName => InitFun#{ return => {tuple, []},
-                                         body   => builtin_to_fcode(state_layout(Env), set_state, [InitBody]) } }
+            Funs1 = Funs#{ InitName => InitFun#{ return => {tuple, []},
+                                                 body   => builtin_to_fcode(state_layout(Env), set_state, [InitBody]) } },
+            Funs1
     end.
 
 add_default_init_function(_Env, Main, StateType, Funs) ->
@@ -1015,11 +1054,9 @@ event_function(_Env = #{event_type := {variant_t, EventCons}}, EventType = {vari
 
 -spec lambda_lift(fcode()) -> fcode().
 lambda_lift(FCode = #{ functions := Funs, state_layout := StateLayout }) ->
-    init_fresh_names(),
     init_lambda_funs(),
     Funs1   = maps:map(fun(_, Body) -> lambda_lift_fun(StateLayout, Body) end, Funs),
     NewFuns = get_lambda_funs(),
-    clear_fresh_names(),
     FCode#{ functions := maps:merge(Funs1, NewFuns) }.
 
 -define(lambda_key, '%lambdalifted').
@@ -1119,7 +1156,11 @@ optimize_fcode(Code = #{ functions := Funs }) ->
 -spec optimize_fun(fcode(), fun_name(), fun_def()) -> fun_def().
 optimize_fun(Fcode, Fun, Def = #{ body := Body }) ->
     %% io:format("Optimizing ~p =\n~s\n", [_Fun, prettypr:format(pp_fexpr(_Body))]),
-    Def#{ body := inliner(Fcode, Fun, Body) }.
+    Def#{ body := drop_unused_lets(
+                  simplifier(
+                  let_floating(
+                  bind_subexpressions(
+                  inliner(Fcode, Fun, Body))))) }.
 
 %% --- Inlining ---
 
@@ -1134,6 +1175,168 @@ inliner(_Fcode, _Fun, E) -> E.
 should_inline(_Fcode, _Fun1) -> false == list_to_atom("true").  %% Dialyzer
 
 inline(_Fcode, Fun, Args) -> {def, Fun, Args}. %% TODO
+
+%% --- Bind subexpressions ---
+
+-define(make_lets(Xs, Es, Body), make_lets(Es, fun(Xs) -> Body end)).
+
+bind_subexpressions(Expr) ->
+    bottom_up(fun bind_subexpressions/2, Expr).
+
+bind_subexpressions(_, {tuple, Es}) ->
+    ?make_lets(Xs, Es, {tuple, Xs});
+bind_subexpressions(_, {set_proj, A, I, B}) ->
+    ?make_lets([X, Y], [A, B], {set_proj, X, I, Y});
+bind_subexpressions(_, E) -> E.
+
+make_lets(Es, Body) -> make_lets(Es, [], Body).
+
+make_lets([], Xs, Body)       -> Body(lists:reverse(Xs));
+make_lets([{var, _} = E | Es], Xs, Body) ->
+    make_lets(Es, [E | Xs], Body);
+make_lets([{lit, _} = E | Es], Xs, Body) ->
+    make_lets(Es, [E | Xs], Body);
+make_lets([E | Es], Xs, Body) ->
+    ?make_let(X, E, make_lets(Es, [X | Xs], Body)).
+
+%% --- Let-floating ---
+
+let_floating(Expr) -> bottom_up(fun let_float/2, Expr).
+
+let_float(_, {'let', X, E, Body}) ->
+    pull_out_let({'let', X, {here, E}, Body});
+let_float(_, {proj, E, I}) ->
+    pull_out_let({proj, {here, E}, I});
+let_float(_, {set_proj, E, I, V}) ->
+    pull_out_let({set_proj, {here, E}, I, {here, V}});
+let_float(_, E) -> E.
+
+pull_out_let(Expr) when is_tuple(Expr) ->
+    {Lets, Es} = pull_out_let(tuple_to_list(Expr)),
+    Inner = list_to_tuple(Es),
+    lists:foldr(fun({Y, E2}, E3) -> {'let', Y, E2, E3} end,
+                Inner, Lets);
+pull_out_let(Es) when is_list(Es) ->
+    case lists:splitwith(fun({here, _}) -> false; (_) -> true end, Es) of
+        {Es0, [{here, E} | Es1]} ->
+            case let_view(E) of
+                {[], _}    ->
+                    {Lets, Es2} = pull_out_let(Es1),
+                    {Lets, Es0 ++ [E] ++ Es2};
+                {Lets, E1} ->
+                    {Lets1, Es2} = pull_out_let(Es1),
+                    {Lets ++ Lets1, Es0 ++ [E1] ++ Es2}
+            end;
+        {_, []} -> {[], Es}
+    end.
+
+%% Also renames the variables to fresh names
+let_view(E) -> let_view(E, [], []).
+
+let_view({'let', X, E, Rest}, Ren, Lets) ->
+    Z = fresh_name(),
+    let_view(Rest, [{X, Z} | Ren], [{Z, rename(Ren, E)} | Lets]);
+let_view(E, Ren, Lets) ->
+    {lists:reverse(Lets), rename(Ren, E)}.
+
+%% --- Simplification ---
+
+-spec simplifier(fexpr()) -> fexpr().
+simplifier(Expr) ->
+    bottom_up(fun simplify/2, Expr).
+
+-spec simplify(#{var_name() => fexpr()}, fexpr()) -> fexpr().
+
+%% (e₀, .., en).i ->
+%% let _ = e₀ in .. let x = ei in .. let _ = en in x
+simplify(_Env, {proj, {tuple, Es}, I}) ->
+    It  = lists:nth(I + 1, Es),
+    X   = fresh_name(),
+    Dup = safe_to_duplicate(It),
+    Val = if Dup -> It; true -> {var, X} end,
+    lists:foldr(
+      fun({J, E}, Rest) when I == J ->
+            case Dup of
+                true  -> Rest;
+                false -> {'let', X, E, Rest}
+            end;
+         ({_, E}, Rest) ->
+            case read_only(E) of
+                true  -> Rest;
+                false -> {'let', "_", E, Rest}
+            end
+        end, Val, indexed(Es));
+
+simplify(Env, {proj, {var, X}, I} = Expr) ->
+    case simpl_proj(Env, I, {var, X}) of
+        false -> Expr;
+        E     -> E
+    end;
+simplify(_, E) ->
+    E.
+
+simpl_proj(Env, I, Expr) ->
+    IfSafe = fun(E) -> case safe_to_duplicate(E) of
+                         true -> E;
+                         false -> false
+                       end end,
+    case Expr of
+        false                 -> false;
+        {var, X}              -> simpl_proj(Env, I, maps:get(X, Env, false));
+        {tuple, Es}           -> IfSafe(lists:nth(I + 1, Es));
+        {set_proj, _, I, Val} -> IfSafe(Val);
+        {set_proj, E, _, _}   -> simpl_proj(Env, I, E);
+        {proj, E, J}          -> simpl_proj(Env, I, simpl_proj(Env, J, E));
+        _                     -> false
+    end.
+
+%% --- Drop unused lets ---
+
+drop_unused_lets(Expr) -> bottom_up(fun drop_unused_lets/2, Expr).
+
+drop_unused_lets(_, {'let', X, E, Body} = Expr) ->
+    case {read_only(E), not lists:member(X, free_vars(Body))} of
+        {true, true}  -> Body;
+        {false, true} -> {'let', "_", E, Body};
+        _             -> Expr
+    end;
+drop_unused_lets(_, Expr) -> Expr.
+
+%% -- Static analysis --------------------------------------------------------
+
+safe_to_duplicate({lit, _})    -> true;
+safe_to_duplicate({var, _})    -> true;
+safe_to_duplicate(nil)         -> true;
+safe_to_duplicate({tuple, []}) -> true;
+safe_to_duplicate(_)           -> false.
+
+-spec read_only(fexpr() | fsplit() | fcase() | [fexpr()] | [fcase()]) -> boolean().
+read_only({lit, _})                -> true;
+read_only({var, _})                -> true;
+read_only(nil)                     -> true;
+read_only({con, _, _, Es})         -> read_only(Es);
+read_only({tuple, Es})             -> read_only(Es);
+read_only({proj, E, _})            -> read_only(E);
+read_only({set_proj, A, _, B})     -> read_only([A, B]);
+read_only({op, _, Es})             -> read_only(Es);
+read_only({get_state, _})          -> true;
+read_only({set_state, _, _})       -> false;
+read_only({def_u, _, _})           -> true;
+read_only({remote_u, _, _, _, _})  -> true;
+read_only({builtin_u, _, _})       -> true;
+read_only({builtin_u, _, _, _})    -> true;
+read_only({lam, _, _})             -> true;
+read_only({def, _, _})             -> false; %% TODO: purity analysis
+read_only({remote, _, _, _, _, _}) -> false;
+read_only({builtin, _, _})         -> false; %% TODO: some builtins are
+read_only({switch, Split})         -> read_only(Split);
+read_only({split, _, _, Cases})    -> read_only(Cases);
+read_only({nosplit, E})            -> read_only(E);
+read_only({'case', _, Split})      -> read_only(Split);
+read_only({'let', _, A, B})        -> read_only([A, B]);
+read_only({funcall, _, _})         -> false;
+read_only({closure, _, _})         -> internal_error(no_closures_here);
+read_only(Es) when is_list(Es)     -> lists:all(fun read_only/1, Es).
 
 %% --- Deadcode elimination ---
 
@@ -1364,6 +1567,40 @@ used_defs(Expr) ->
         {nosplit, A}         -> used_defs(A);
         {'case', _, A}       -> used_defs(A)
     end.
+
+bottom_up(F, Expr) -> bottom_up(F, #{}, Expr).
+
+bottom_up(F, Env, Expr) ->
+    F(Env, case Expr of
+        {lit, _}                         -> Expr;
+        nil                              -> Expr;
+        {var, _}                         -> Expr;
+        {def, D, Es}                     -> {def, D, [bottom_up(F, Env, E) || E <- Es]};
+        {def_u, _, _}                    -> Expr;
+        {builtin, B, Es}                 -> {builtin, B, [bottom_up(F, Env, E) || E <- Es]};
+        {builtin_u, _, _}                -> Expr;
+        {builtin_u, _, _, _}             -> Expr;
+        {remote, ArgsT, RetT, Ct, F, Es} -> {remote,   ArgsT, RetT, bottom_up(F, Env, Ct), F, [bottom_up(F, Env, E) || E <- Es]};
+        {remote_u, ArgsT, RetT, Ct, F}   -> {remote_u, ArgsT, RetT, bottom_up(F, Env, Ct), F};
+        {con, Ar, I, Es}                 -> {con, Ar, I, [bottom_up(F, Env, E) || E <- Es]};
+        {tuple, Es}                      -> {tuple, [bottom_up(F, Env, E) || E <- Es]};
+        {proj, E, I}                     -> {proj, bottom_up(F, Env, E), I};
+        {set_proj, R, I, E}              -> {set_proj, bottom_up(F, Env, R), I, bottom_up(F, Env, E)};
+        {op, Op, Es}                     -> {op, Op, [bottom_up(F, Env, E) || E <- Es]};
+        {funcall, Fun, Es}               -> {funcall, bottom_up(F, Env, Fun), [bottom_up(F, Env, E) || E <- Es]};
+        {set_state, R, E}                -> {set_state, R, bottom_up(F, Env, E)};
+        {get_state, _}                   -> Expr;
+        {closure, F, Env}                -> {closure, F, bottom_up(F, Env, Env)};
+        {switch, Split}                  -> {switch, bottom_up(F, Env, Split)};
+        {lam, Xs, B}                     -> {lam, Xs, bottom_up(F, Env, B)};
+        {'let', X, E, Body}              ->
+            E1   = bottom_up(F, Env, E),
+            Env1 = Env#{ X => E1 },
+            {'let', X, E1, bottom_up(F, Env1, Body)};
+        {split, Type, X, Cases}          -> {split, Type, X, [bottom_up(F, Env, Case) || Case <- Cases]};
+        {nosplit, E}                     -> {nosplit, bottom_up(F, Env, E)};
+        {'case', Pat, Split}             -> {'case', Pat, bottom_up(F, Env, Split)}
+    end).
 
 get_named_args(NamedArgsT, Args) ->
     IsNamed = fun({named_arg, _, _, _}) -> true;
@@ -1609,9 +1846,18 @@ pp_fexpr({op, Op, [A] = Args}) ->
     end;
 pp_fexpr({op, Op, As}) ->
     pp_beside(pp_text(Op), pp_fexpr({tuple, As}));
-pp_fexpr({'let', X, A, B}) ->
-    pp_par([pp_beside([pp_text("let "), pp_text(X), pp_text(" = "), pp_fexpr(A), pp_text(" in")]),
-            pp_fexpr(B)]);
+pp_fexpr({'let', _, _, _} = Expr) ->
+    Lets = fun Lets({'let', Y, C, D}) ->
+                        {Ls, E} = Lets(D),
+                        {[{Y, C} | Ls], E};
+               Lets(E) -> {[], E} end,
+    {Ls, Body} = Lets(Expr),
+    pp_parens(
+      pp_par(
+        [ pp_beside([ pp_text("let "),
+                      pp_above([ pp_par([pp_text(X), pp_text("="), pp_fexpr(A)]) || {X, A} <- Ls ]),
+                      pp_text(" in ") ]),
+          pp_fexpr(Body) ]));
 pp_fexpr({builtin_u, B, N}) ->
     pp_beside([pp_text(B), pp_text("/"), pp_text(N)]);
 pp_fexpr({builtin_u, B, N, TypeArgs}) ->
