@@ -298,6 +298,12 @@ to_scode(Env, {remote, ArgsT, RetT, Ct, Fun, [Gas, Value | Args]}) ->
             call_to_scode(Env, Call, [Ct, Value, Gas | Args])
     end;
 
+to_scode(_Env, {get_state, Reg}) ->
+    [push(?s(Reg))];
+to_scode(Env, {set_state, Reg, Val}) ->
+    call_to_scode(Env, [aeb_fate_ops:store(?s(Reg), ?a),
+                        tuple(0)], [Val]);
+
 to_scode(Env, {closure, Fun, FVs}) ->
     to_scode(Env, {tuple, [{lit, {string, make_function_id(Fun)}}, FVs]});
 
@@ -420,11 +426,6 @@ call_to_scode(Env, CallCode, Args) ->
     [[to_scode(notail(Env), A) || A <- lists:reverse(Args)],
      CallCode].
 
-builtin_to_scode(_Env, get_state, []) ->
-    [push(?s(1))];
-builtin_to_scode(Env, set_state, [_] = Args) ->
-    call_to_scode(Env, [aeb_fate_ops:store(?s(1), ?a),
-                        tuple(0)], Args);
 builtin_to_scode(Env, chain_event, Args) ->
     call_to_scode(Env, [erlang:apply(aeb_fate_ops, log, lists:duplicate(length(Args), ?a)),
                         tuple(0)], Args);
