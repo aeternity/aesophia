@@ -42,7 +42,7 @@
 
 -define(i(X), {immediate, X}).
 -define(a,    {stack, 0}).
--define(s(N), {var, -N}).
+-define(s(N), {store, N}).
 -define(void, {var, 9999}).
 
 -record(env, { contract, vars = [], locals = [], current_function, tailpos = true }).
@@ -646,11 +646,11 @@ pp_op(loop) -> "LOOP";
 pp_op(I)    ->
     aeb_fate_pp:format_op(I, #{}).
 
-pp_arg(?i(I))      -> io_lib:format("~w", [I]);
-pp_arg({arg, N})   -> io_lib:format("arg~p", [N]);
-pp_arg({store, N}) -> io_lib:format("store~p", [N]);
-pp_arg({var, N})   -> io_lib:format("var~p", [N]);
-pp_arg(?a)         -> "a".
+pp_arg(?i(I))    -> io_lib:format("~w", [I]);
+pp_arg({arg, N}) -> io_lib:format("arg~p", [N]);
+pp_arg(?s(N))    -> io_lib:format("store~p", [-N]);
+pp_arg({var, N}) -> io_lib:format("var~p", [N]);
+pp_arg(?a)       -> "a".
 
 %% -- Analysis --
 
@@ -1369,7 +1369,7 @@ desugar_args(I) when is_tuple(I) ->
     list_to_tuple([Op | lists:map(fun desugar_arg/1, Args)]);
 desugar_args(I) -> I.
 
-desugar_arg({store, N}) -> {var, -N};
+desugar_arg(?s(N)) -> {var, -N};
 desugar_arg(A) -> A.
 
 %% -- Phase III --------------------------------------------------------------
