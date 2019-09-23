@@ -1332,7 +1332,7 @@ infer_case(Env, Attrs, Pattern, ExprType, Branch, SwitchType) ->
     end,
     NewEnv = bind_vars([{Var, fresh_uvar(Ann)} || Var = {id, Ann, _} <- Vars], Env#env{ in_pattern = true }),
     NewPattern = {typed, _, _, PatType} = infer_expr(NewEnv, Pattern),
-    NewBranch  = check_expr(NewEnv, Branch, SwitchType),
+    NewBranch  = check_expr(NewEnv#env{ in_pattern = false }, Branch, SwitchType),
     unify(Env, PatType, ExprType, {case_pat, Pattern, PatType, ExprType}),
     {'case', Attrs, NewPattern, NewBranch}.
 
