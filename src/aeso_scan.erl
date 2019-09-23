@@ -13,14 +13,15 @@
                         override/2, push/2, pop/1]).
 
 lexer() ->
+    Number   = fun(Digit) -> [Digit, "+(_", Digit, "+)*"] end,
     DIGIT    = "[0-9]",
     HEXDIGIT = "[0-9a-fA-F]",
     LOWER    = "[a-z_]",
     UPPER    = "[A-Z]",
     CON      = [UPPER, "[a-zA-Z0-9_]*"],
-    INT      = [DIGIT, "+"],
-    HEX      = ["0x", HEXDIGIT, "+"],
-    BYTES    = ["#", HEXDIGIT, "+"],
+    INT      = Number(DIGIT),
+    HEX      = ["0x", Number(HEXDIGIT)],
+    BYTES    = ["#", Number(HEXDIGIT)],
     WS       = "[\\000-\\ ]+",
     ID       = [LOWER, "[a-zA-Z0-9_']*"],
     TVAR     = ["'", ID],
@@ -53,7 +54,7 @@ lexer() ->
         , {CHAR,   token(char,   fun parse_char/1)}
         , {STRING, token(string, fun parse_string/1)}
         , {HEX,    token(hex,    fun parse_hex/1)}
-        , {INT,    token(int,    fun list_to_integer/1)}
+        , {INT,    token(int,    fun parse_int/1)}
         , {BYTES,  token(bytes,  fun parse_bytes/1)}
 
           %% Identifiers (qualified first!)
@@ -117,10 +118,18 @@ unescape([$\\, Code | Chars], Acc) ->
 unescape([C | Chars], Acc) ->
     unescape(Chars, [C | Acc]).
 
-parse_hex("0x" ++ Chars) -> list_to_integer(Chars, 16).
+strip_underscores(S) ->
+    lists:filter(fun(C) -> C /= $_ end, S).
 
-parse_bytes("#" ++ Chars) ->
-    N      = list_to_integer(Chars, 16),
-    Digits = (length(Chars) + 1) div 2,
+parse_hex("0x" ++ S) ->
+    list_to_integer(strip_underscores(S), 16).
+
+parse_int(S) ->
+    list_to_integer(strip_underscores(S)).
+
+parse_bytes("#" ++ S0) ->
+    S      = strip_underscores(S0),
+    N      = list_to_integer(S, 16),
+    Digits = (length(S) + 1) div 2,
     <<N:Digits/unit:8>>.
 

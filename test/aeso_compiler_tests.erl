@@ -152,7 +152,8 @@ compilable_contracts() ->
      "manual_stdlib_include",
      "list_comp",
      "payable",
-     "unapplied_builtins"
+     "unapplied_builtins",
+     "underscore_number_literals"
     ].
 
 not_yet_compilable(fate) -> [];
