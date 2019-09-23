@@ -134,15 +134,18 @@
                  | {namespace, string()}
                  | {abstract_contract, string()}.
 
--type env() :: #{ type_env   := type_env(),
-                  fun_env    := fun_env(),
-                  con_env    := con_env(),
-                  event_type => aeso_syntax:typedef(),
-                  builtins   := builtins(),
-                  options    := [option()],
-                  context    => context(),
-                  vars       => [var_name()],
-                  functions  := #{ fun_name() => fun_def() } }.
+-type state_layout() :: default_layout.
+
+-type env() :: #{ type_env     := type_env(),
+                  fun_env      := fun_env(),
+                  con_env      := con_env(),
+                  event_type   => aeso_syntax:typedef(),
+                  builtins     := builtins(),
+                  options      := [option()],
+                  state_layout => state_layout(),
+                  context      => context(),
+                  vars         => [var_name()],
+                  functions    := #{ fun_name() => fun_def() } }.
 
 -define(HASH_BYTES, 32).
 
@@ -210,6 +213,8 @@ builtins() ->
                      || {NS, Funs} <- Scopes,
                         {Fun, Arity} <- Funs ]).
 
+state_layout(Env) -> maps:get(state_layout, Env, undefined).
+
 -define(type(T),       fun([])     -> T end).
 -define(type(X, T),    fun([X])    -> T end).
 -define(type(X, Y, T), fun([X, Y]) -> T end).
@@ -246,11 +251,13 @@ to_fcode(Env, [{contract, Attrs, MainCon = {con, _, Main}, Decls}]) ->
                                           [Main, "Chain", "event"] => {chain_event, 1}} },
     #{ functions := Funs } = Env1 =
         decls_to_fcode(MainEnv, Decls),
-    StateType = lookup_type(Env1, [Main, "state"], [], {tuple, []}),
-    EventType = lookup_type(Env1, [Main, "event"], [], none),
-    Payable   = proplists:get_value(payable, Attrs, false),
+    StateType   = lookup_type(Env1, [Main, "state"], [], {tuple, []}),
+    EventType   = lookup_type(Env1, [Main, "event"], [], none),
+    StateLayout = maps:get(state_layout, Env1, default_layout),
+    Payable     = proplists:get_value(payable, Attrs, false),
     #{ contract_name => Main,
        state_type    => StateType,
+       state_layout  => StateLayout,
        event_type    => EventType,
        payable       => Payable,
        functions     => add_init_function(Env1, MainCon, StateType,
@@ -338,7 +345,13 @@ typedef_to_fcode(Env, Id = {id, _, Name}, Xs, Def) ->
              "event" -> Env1#{ event_type => Def };
              _       -> Env1
            end,
-    bind_type(Env2, Q, FDef).
+    Env3 = compute_state_layout(Env2, Name, FDef),
+    bind_type(Env3, Q, FDef).
+
+compute_state_layout(Env = #{ context := {main_contract, _} }, "state", _Type) ->
+    Layout = default_layout,
+    Env#{ state_layout => Layout };
+compute_state_layout(Env, _, _) -> Env.
 
 check_state_and_event_types(#{ context := {main_contract, _} }, Id, [_ | _]) ->
     case Id of
@@ -561,8 +574,8 @@ expr_to_fcode(Env, _Type, {app, _, Fun = {typed, _, _, {fun_t, _, NamedArgsT, _,
     Args1 = get_named_args(NamedArgsT, Args),
     FArgs = [expr_to_fcode(Env, Arg) || Arg <- Args1],
     case expr_to_fcode(Env, Fun) of
-        {builtin_u, B, _Ar, TypeArgs}     -> builtin_to_fcode(B, FArgs ++ TypeArgs);
-        {builtin_u, B, _Ar}               -> builtin_to_fcode(B, FArgs);
+        {builtin_u, B, _Ar, TypeArgs}     -> builtin_to_fcode(state_layout(Env), B, FArgs ++ TypeArgs);
+        {builtin_u, B, _Ar}               -> builtin_to_fcode(state_layout(Env), B, FArgs);
         {def_u, F, _Ar}                   -> {def, F, FArgs};
         {remote_u, ArgsT, RetT, Ct, RFun} -> {remote, ArgsT, RetT, Ct, RFun, FArgs};
         FFun ->
@@ -914,27 +927,27 @@ op_builtins() ->
      crypto_ecverify_secp256k1, crypto_ecrecover_secp256k1
     ].
 
-builtin_to_fcode(set_state, [Val]) ->
+builtin_to_fcode(default_layout, set_state, [Val]) ->
     {set_state, 1, Val};
-builtin_to_fcode(get_state, []) ->
+builtin_to_fcode(default_layout, get_state, []) ->
     {get_state, 1};
-builtin_to_fcode(require, [Cond, Msg]) ->
+builtin_to_fcode(_Layout, require, [Cond, Msg]) ->
     make_if(Cond, {tuple, []}, {builtin, abort, [Msg]});
-builtin_to_fcode(chain_event, [Event]) ->
+builtin_to_fcode(_Layout, chain_event, [Event]) ->
     {def, event, [Event]};
-builtin_to_fcode(map_delete, [Key, Map]) ->
+builtin_to_fcode(_Layout, map_delete, [Key, Map]) ->
     {op, map_delete, [Map, Key]};
-builtin_to_fcode(map_member, [Key, Map]) ->
+builtin_to_fcode(_Layout, map_member, [Key, Map]) ->
     {op, map_member, [Map, Key]};
-builtin_to_fcode(map_lookup, [Key0, Map0]) ->
+builtin_to_fcode(_Layout, map_lookup, [Key0, Map0]) ->
     ?make_let(Key, Key0,
     ?make_let(Map, Map0,
      make_if({op, map_member, [Map, Key]},
              {con, [0, 1], 1, [{op, map_get, [Map, Key]}]},
              {con, [0, 1], 0, []})));
-builtin_to_fcode(map_lookup_default, [Key, Map, Def]) ->
+builtin_to_fcode(_Layout, map_lookup_default, [Key, Map, Def]) ->
     {op, map_get_d, [Map, Key, Def]};
-builtin_to_fcode(Builtin, Args) ->
+builtin_to_fcode(_Layout, Builtin, Args) ->
     case lists:member(Builtin, op_builtins()) of
         true  -> {op, Builtin, Args};
         false -> {builtin, Builtin, Args}
@@ -950,7 +963,7 @@ add_init_function(Env, Main, StateType, Funs0) ->
             InitName = {entrypoint, <<"init">>},
             InitFun  = #{ body := InitBody} = maps:get(InitName, Funs),
             Funs#{ InitName => InitFun#{ return => {tuple, []},
-                                         body   => builtin_to_fcode(set_state, [InitBody]) } }
+                                         body   => builtin_to_fcode(state_layout(Env), set_state, [InitBody]) } }
     end.
 
 add_default_init_function(_Env, Main, StateType, Funs) ->
@@ -1001,10 +1014,10 @@ event_function(_Env = #{event_type := {variant_t, EventCons}}, EventType = {vari
 %% the top-level and replace it with a closure.
 
 -spec lambda_lift(fcode()) -> fcode().
-lambda_lift(FCode = #{ functions := Funs }) ->
+lambda_lift(FCode = #{ functions := Funs, state_layout := StateLayout }) ->
     init_fresh_names(),
     init_lambda_funs(),
-    Funs1   = maps:map(fun lambda_lift_fun/2, Funs),
+    Funs1   = maps:map(fun(_, Body) -> lambda_lift_fun(StateLayout, Body) end, Funs),
     NewFuns = get_lambda_funs(),
     clear_fresh_names(),
     FCode#{ functions := maps:merge(Funs1, NewFuns) }.
@@ -1019,8 +1032,8 @@ add_lambda_fun(Def) ->
     put(?lambda_key, Funs#{ Name => Def }),
     Name.
 
-lambda_lift_fun(_, Def = #{ body := Body }) ->
-    Def#{ body := lambda_lift_expr(Body) }.
+lambda_lift_fun(Layout, Def = #{ body := Body }) ->
+    Def#{ body := lambda_lift_expr(Layout, Body) }.
 
 lifted_fun([Z], Xs, Body) ->
     #{ attrs  => [private],
@@ -1041,10 +1054,10 @@ make_closure(FVs, Xs, Body) ->
     Tup = fun([Y]) -> Y; (Ys) -> {tuple, Ys} end,
     {closure, Fun, Tup([{var, Y} || Y <- FVs])}.
 
-lambda_lift_expr({lam, Xs, Body}) ->
+lambda_lift_expr(Layout, {lam, Xs, Body}) ->
     FVs   = free_vars({lam, Xs, Body}),
-    make_closure(FVs, Xs, lambda_lift_expr(Body));
-lambda_lift_expr(UExpr) when element(1, UExpr) == def_u; element(1, UExpr) == builtin_u ->
+    make_closure(FVs, Xs, lambda_lift_expr(Layout, Body));
+lambda_lift_expr(Layout, UExpr) when element(1, UExpr) == def_u; element(1, UExpr) == builtin_u ->
     [Tag, F, Ar | _] = tuple_to_list(UExpr),
     ExtraArgs = case UExpr of
                     {builtin_u, _, _, TypeArgs} -> TypeArgs;
@@ -1053,42 +1066,42 @@ lambda_lift_expr(UExpr) when element(1, UExpr) == def_u; element(1, UExpr) == bu
     Xs   = [ lists:concat(["arg", I]) || I <- lists:seq(1, Ar) ],
     Args = [{var, X} || X <- Xs] ++ ExtraArgs,
     Body = case Tag of
-               builtin_u -> builtin_to_fcode(F, Args);
+               builtin_u -> builtin_to_fcode(Layout, F, Args);
                def_u     -> {def, F, Args}
            end,
     make_closure([], Xs, Body);
-lambda_lift_expr({remote_u, ArgsT, RetT, Ct, F}) ->
+lambda_lift_expr(Layout, {remote_u, ArgsT, RetT, Ct, F}) ->
     FVs  = free_vars(Ct),
-    Ct1  = lambda_lift_expr(Ct),
+    Ct1  = lambda_lift_expr(Layout, Ct),
     GasAndValueArgs = 2,
     Xs   = [ lists:concat(["arg", I]) || I <- lists:seq(1, length(ArgsT) + GasAndValueArgs) ],
     Args = [{var, X} || X <- Xs],
     make_closure(FVs, Xs, {remote, ArgsT, RetT, Ct1, F, Args});
-lambda_lift_expr(Expr) ->
+lambda_lift_expr(Layout, Expr) ->
     case Expr of
         {lit, _}               -> Expr;
         nil                    -> Expr;
         {var, _}               -> Expr;
         {closure, _, _}        -> Expr;
-        {def, D, As}           -> {def, D, lambda_lift_exprs(As)};
-        {builtin, B, As}       -> {builtin, B, lambda_lift_exprs(As)};
-        {remote, ArgsT, RetT, Ct, F, As} -> {remote, ArgsT, RetT, lambda_lift_expr(Ct), F, lambda_lift_exprs(As)};
-        {con, Ar, C, As}       -> {con, Ar, C, lambda_lift_exprs(As)};
-        {tuple, As}            -> {tuple, lambda_lift_exprs(As)};
-        {proj, A, I}           -> {proj, lambda_lift_expr(A), I};
-        {set_proj, A, I, B}    -> {set_proj, lambda_lift_expr(A), I, lambda_lift_expr(B)};
-        {op, Op, As}           -> {op, Op, lambda_lift_exprs(As)};
-        {'let', X, A, B}       -> {'let', X, lambda_lift_expr(A), lambda_lift_expr(B)};
-        {funcall, A, Bs}       -> {funcall, lambda_lift_expr(A), lambda_lift_exprs(Bs)};
-        {set_state, R, A}      -> {set_state, R, lambda_lift_expr(A)};
+        {def, D, As}           -> {def, D, lambda_lift_exprs(Layout, As)};
+        {builtin, B, As}       -> {builtin, B, lambda_lift_exprs(Layout, As)};
+        {remote, ArgsT, RetT, Ct, F, As} -> {remote, ArgsT, RetT, lambda_lift_expr(Layout, Ct), F, lambda_lift_exprs(Layout, As)};
+        {con, Ar, C, As}       -> {con, Ar, C, lambda_lift_exprs(Layout, As)};
+        {tuple, As}            -> {tuple, lambda_lift_exprs(Layout, As)};
+        {proj, A, I}           -> {proj, lambda_lift_expr(Layout, A), I};
+        {set_proj, A, I, B}    -> {set_proj, lambda_lift_expr(Layout, A), I, lambda_lift_expr(Layout, B)};
+        {op, Op, As}           -> {op, Op, lambda_lift_exprs(Layout, As)};
+        {'let', X, A, B}       -> {'let', X, lambda_lift_expr(Layout, A), lambda_lift_expr(Layout, B)};
+        {funcall, A, Bs}       -> {funcall, lambda_lift_expr(Layout, A), lambda_lift_exprs(Layout, Bs)};
+        {set_state, R, A}      -> {set_state, R, lambda_lift_expr(Layout, A)};
         {get_state, _}         -> Expr;
-        {switch, S}            -> {switch, lambda_lift_expr(S)};
-        {split, Type, X, Alts} -> {split, Type, X, lambda_lift_exprs(Alts)};
-        {nosplit, A}           -> {nosplit, lambda_lift_expr(A)};
-        {'case', P, S}         -> {'case', P, lambda_lift_expr(S)}
+        {switch, S}            -> {switch, lambda_lift_expr(Layout, S)};
+        {split, Type, X, Alts} -> {split, Type, X, lambda_lift_exprs(Layout, Alts)};
+        {nosplit, A}           -> {nosplit, lambda_lift_expr(Layout, A)};
+        {'case', P, S}         -> {'case', P, lambda_lift_expr(Layout, S)}
     end.
 
-lambda_lift_exprs(As) -> [lambda_lift_expr(A) || A <- As].
+lambda_lift_exprs(Layout, As) -> [lambda_lift_expr(Layout, A) || A <- As].
 
 %% -- Optimisations ----------------------------------------------------------
 
@@ -1243,10 +1256,10 @@ resolve_var(#{ vars := Vars } = Env, [X]) ->
     end;
 resolve_var(Env, Q) -> resolve_fun(Env, Q).
 
-resolve_fun(#{ fun_env := Funs, builtins := Builtin }, Q) ->
+resolve_fun(#{ fun_env := Funs, builtins := Builtin } = Env, Q) ->
     case {maps:get(Q, Funs, not_found), maps:get(Q, Builtin, not_found)} of
         {not_found, not_found} -> internal_error({unbound_variable, Q});
-        {_, {B, none}}         -> builtin_to_fcode(B, []);
+        {_, {B, none}}         -> builtin_to_fcode(state_layout(Env), B, []);
         {_, {B, Ar}}           -> {builtin_u, B, Ar};
         {{Fun, Ar}, _}         -> {def_u, Fun, Ar}
     end.
