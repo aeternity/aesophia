@@ -741,18 +741,20 @@ ann_reads([{switch, Arg, Type, Alts, Def} | Code], Reads, Acc) ->
 ann_reads([{i, Ann, I} | Code], Reads, Acc) ->
     #{ writes_in := WritesIn, writes_out := WritesOut } = Ann,
     #{ read := Rs, write := W, pure := Pure } = attributes(I),
-    Reads1  =
+    %% If we write it here it's not live in (unless we also read it)
+    Reads1  = Reads -- [W],
+    Reads2  =
         case {W, Pure andalso not ordsets:is_element(W, Reads)} of
             %% This is a little bit dangerous: if writing to a dead variable, we ignore
             %% the reads. Relies on dead writes to be removed by the
             %% optimisations below (r_write_to_dead_var).
-            {{var, _}, true} -> Reads;
-            _                -> ordsets:union(Reads, Rs)
+            {{var, _}, true} -> Reads1;
+            _                -> ordsets:union(Reads1, Rs)
         end,
-    LiveIn  = ordsets:intersection(Reads1, WritesIn),
+    LiveIn  = ordsets:intersection(Reads2, WritesIn),
     LiveOut = ordsets:intersection(Reads, WritesOut),
     Ann1    = #{ live_in => LiveIn, live_out => LiveOut },
-    ann_reads(Code, Reads1, [{i, Ann1, I} | Acc]);
+    ann_reads(Code, Reads2, [{i, Ann1, I} | Acc]);
 ann_reads([], Reads, Acc) -> {Acc, Reads}.
 
 %% Instruction attributes: reads, writes and purity (pure means no side-effects
@@ -922,6 +924,7 @@ independent({i, _, I}, {i, _, J}) ->
     if  WI == pc; WJ == pc   -> false;     %% no jumps
         not (PureI or PureJ) -> false;     %% at least one is pure
         StackI and StackJ    -> false;     %% cannot both use the stack
+        WI == WJ             -> false;     %% cannot write to the same register
         true                 ->
             %% and cannot write to each other's inputs
             not lists:member(WI, RJ) andalso
