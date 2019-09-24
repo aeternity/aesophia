@@ -113,6 +113,7 @@
 
 -type fcode() :: #{ contract_name := string(),
                     state_type    := ftype(),
+                    state_layout  := state_layout(),
                     event_type    := ftype() | none,
                     functions     := #{ fun_name() => fun_def() },
                     payable       := boolean() }.
@@ -1341,6 +1342,7 @@ simpl_switch(Env, E, [{'case', Pat, Body} | Alts]) ->
             end
     end.
 
+-spec match_pat(fsplit_pat(), fexpr()) -> false | [{var_name(), fexpr()}].
 match_pat({tuple, Xs}, {tuple, Es})         -> lists:zip(Xs, Es);
 match_pat({con, _, C, Xs}, {con, _, C, Es}) -> lists:zip(Xs, Es);
 match_pat(L, {lit, L})                      -> [];
@@ -1369,6 +1371,8 @@ constructor_form(Env, Expr) ->
         {con, _, _, _} -> Expr;
         {tuple, _}     -> Expr;
         {lit, _}       -> Expr;
+        nil            -> Expr;
+        {op, '::', _}  -> Expr;
         _              -> false
     end.
 
@@ -1672,7 +1676,7 @@ bottom_up(F, Env, Expr) ->
         {funcall, Fun, Es}               -> {funcall, bottom_up(F, Env, Fun), [bottom_up(F, Env, E) || E <- Es]};
         {set_state, R, E}                -> {set_state, R, bottom_up(F, Env, E)};
         {get_state, _}                   -> Expr;
-        {closure, F, Env}                -> {closure, F, bottom_up(F, Env, Env)};
+        {closure, F, CEnv}               -> {closure, F, bottom_up(F, Env, CEnv)};
         {switch, Split}                  -> {switch, bottom_up(F, Env, Split)};
         {lam, Xs, B}                     -> {lam, Xs, bottom_up(F, Env, B)};
         {'let', X, E, Body}              ->

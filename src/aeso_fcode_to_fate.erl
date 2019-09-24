@@ -304,7 +304,7 @@ to_scode(Env, {remote, ArgsT, RetT, Ct, Fun, [Gas, Value | Args]}) ->
 to_scode(_Env, {get_state, Reg}) ->
     [push(?s(Reg))];
 to_scode(Env, {set_state, Reg, Val}) ->
-    call_to_scode(Env, [aeb_fate_ops:store(?s(Reg), ?a),
+    call_to_scode(Env, [{'STORE', ?s(Reg), ?a},
                         tuple(0)], [Val]);
 
 to_scode(Env, {closure, Fun, FVs}) ->
