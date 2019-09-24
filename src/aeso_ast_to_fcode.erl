@@ -1231,6 +1231,9 @@ let_float(_, {proj, E, I}) ->
     pull_out_let({proj, {here, E}, I});
 let_float(_, {set_proj, E, I, V}) ->
     pull_out_let({set_proj, {here, E}, I, {here, V}});
+let_float(_, {op, Op, Es}) ->
+    {Lets, Es1} = pull_out_let([{here, E} || E <- Es]),
+    let_bind(Lets, {op, Op, Es1});
 let_float(_, E) -> E.
 
 pull_out_let(Expr) when is_tuple(Expr) ->
