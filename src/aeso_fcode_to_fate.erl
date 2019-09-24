@@ -179,42 +179,45 @@ lit_to_fate(L) ->
         {typerep, T}         -> aeb_fate_data:make_typerep(type_to_scode(T))
      end.
 
-term_to_fate({lit, L}) ->
+term_to_fate(E) -> term_to_fate(#{}, E).
+
+term_to_fate(_Env, {lit, L}) ->
     lit_to_fate(L);
 %% negative literals are parsed as 0 - N
-term_to_fate({op, '-', [{lit, {int, 0}}, {lit, {int, N}}]}) ->
+term_to_fate(_Env, {op, '-', [{lit, {int, 0}}, {lit, {int, N}}]}) ->
     aeb_fate_data:make_integer(-N);
-term_to_fate(nil) ->
+term_to_fate(_Env, nil) ->
     aeb_fate_data:make_list([]);
-term_to_fate({op, '::', [Hd, Tl]}) ->
+term_to_fate(Env, {op, '::', [Hd, Tl]}) ->
     %% The Tl will translate into a list, because FATE lists are just lists
-    [term_to_fate(Hd) | term_to_fate(Tl)];
-term_to_fate({tuple, As}) ->
-    aeb_fate_data:make_tuple(list_to_tuple([ term_to_fate(A) || A<-As]));
-term_to_fate({con, Ar, I, As}) ->
-    FateAs = [ term_to_fate(A) || A <- As ],
+    [term_to_fate(Env, Hd) | term_to_fate(Env, Tl)];
+term_to_fate(Env, {tuple, As}) ->
+    aeb_fate_data:make_tuple(list_to_tuple([ term_to_fate(Env, A) || A<-As]));
+term_to_fate(Env, {con, Ar, I, As}) ->
+    FateAs = [ term_to_fate(Env, A) || A <- As ],
     aeb_fate_data:make_variant(Ar, I, list_to_tuple(FateAs));
-term_to_fate({builtin, bits_all, []}) ->
+term_to_fate(_Env, {builtin, bits_all, []}) ->
     aeb_fate_data:make_bits(-1);
-term_to_fate({builtin, bits_none, []}) ->
+term_to_fate(_Env, {builtin, bits_none, []}) ->
     aeb_fate_data:make_bits(0);
-term_to_fate({op, bits_set, [B, I]}) ->
+term_to_fate(_Env, {op, bits_set, [B, I]}) ->
     {bits, N} = term_to_fate(B),
     J         = term_to_fate(I),
     {bits, N bor (1 bsl J)};
-term_to_fate({op, bits_clear, [B, I]}) ->
+term_to_fate(_Env, {op, bits_clear, [B, I]}) ->
     {bits, N} = term_to_fate(B),
     J         = term_to_fate(I),
     {bits, N band bnot (1 bsl J)};
-term_to_fate({builtin, map_empty, []}) ->
+term_to_fate(Env, {'let', X, E, Body}) ->
+    Env1 = Env#{ X => term_to_fate(Env, E) },
+    term_to_fate(Env1, Body);
+term_to_fate(Env, {var, X}) ->
+    maps:get(X, Env);
+term_to_fate(_Env, {builtin, map_empty, []}) ->
     aeb_fate_data:make_map(#{});
-term_to_fate({'let', _, {builtin, map_empty, []}, Set}) ->
-    aeb_fate_data:make_map(map_to_fate(Set)).
-
-map_to_fate({op, map_set, [{var, _}, K, V]}) ->
-    #{term_to_fate(K) => term_to_fate(V)};
-map_to_fate({op, map_set, [Set, K, V]}) ->
-    Map = map_to_fate(Set), Map#{term_to_fate(K) => term_to_fate(V)}.
+term_to_fate(Env, {op, map_set, [M, K, V]}) ->
+    Map = term_to_fate(Env, M),
+    Map#{term_to_fate(Env, K) => term_to_fate(Env, V)}.
 
 to_scode(_Env, {lit, L}) ->
     [push(?i(lit_to_fate(L)))];
