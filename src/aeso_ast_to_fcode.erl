@@ -429,6 +429,13 @@ make_let(Expr, Body) ->
             {'let', X, Expr, Body({var, X})}
     end.
 
+let_bind(X, {var, Y}, Body) -> rename([{X, Y}], Body);
+let_bind(X, Expr, Body)     -> {'let', X, Expr, Body}.
+
+let_bind(Binds, Body) ->
+    lists:foldr(fun({X, E}, Rest) -> let_bind(X, E, Rest) end,
+                Body, Binds).
+
 -spec expr_to_fcode(env(), aeso_syntax:expr()) -> fexpr().
 expr_to_fcode(Env, {typed, _, Expr, Type}) ->
     expr_to_fcode(Env, Type, Expr);
@@ -1160,7 +1167,8 @@ optimize_fun(Fcode, Fun, Def = #{ body := Body }) ->
                   simplifier(
                   let_floating(
                   bind_subexpressions(
-                  inliner(Fcode, Fun, Body))))) }.
+                  inline_local_functions(
+                  inliner(Fcode, Fun, Body)))))) }.
 
 %% --- Inlining ---
 
@@ -1199,6 +1207,19 @@ make_lets([{lit, _} = E | Es], Xs, Body) ->
 make_lets([E | Es], Xs, Body) ->
     ?make_let(X, E, make_lets(Es, [X | Xs], Body)).
 
+%% --- Inline local functions ---
+
+inline_local_functions(Expr) ->
+    bottom_up(fun inline_local_functions/2, Expr).
+
+inline_local_functions(Env, {funcall, {proj, {var, Y}, 0}, [{proj, {var, Y}, 1} | Args]} = Expr) ->
+    %% TODO: Don't always inline local funs?
+    case maps:get(Y, Env, free) of
+        {lam, Xs, Body} -> let_bind(lists:zip(Xs, Args), Body);
+        _               -> Expr
+    end;
+inline_local_functions(_, Expr) -> Expr.
+
 %% --- Let-floating ---
 
 let_floating(Expr) -> bottom_up(fun let_float/2, Expr).
@@ -1214,8 +1235,7 @@ let_float(_, E) -> E.
 pull_out_let(Expr) when is_tuple(Expr) ->
     {Lets, Es} = pull_out_let(tuple_to_list(Expr)),
     Inner = list_to_tuple(Es),
-    lists:foldr(fun({Y, E2}, E3) -> {'let', Y, E2, E3} end,
-                Inner, Lets);
+    let_bind(Lets, Inner);
 pull_out_let(Es) when is_list(Es) ->
     case lists:splitwith(fun({here, _}) -> false; (_) -> true end, Es) of
         {Es0, [{here, E} | Es1]} ->
@@ -1267,11 +1287,23 @@ simplify(_Env, {proj, {tuple, Es}, I}) ->
             end
         end, Val, indexed(Es));
 
+%% let x = e in .. x.i ..
 simplify(Env, {proj, {var, X}, I} = Expr) ->
     case simpl_proj(Env, I, {var, X}) of
         false -> Expr;
         E     -> E
     end;
+
+simplify(Env, {switch, {split, _, X, Alts}} = Expr) ->
+    case constructor_form(Env, {var, X}) of
+        false -> Expr;
+        E     ->
+            case simpl_switch(Env, E, Alts) of
+                false -> Expr;
+                Expr1 -> Expr1
+            end
+    end;
+
 simplify(_, E) ->
     E.
 
@@ -1288,6 +1320,56 @@ simpl_proj(Env, I, Expr) ->
         {set_proj, E, _, _}   -> simpl_proj(Env, I, E);
         {proj, E, J}          -> simpl_proj(Env, I, simpl_proj(Env, J, E));
         _                     -> false
+    end.
+
+simpl_switch(_Env, {nosplit, E}) -> E;
+simpl_switch(Env, {split, _, X, Alts}) ->
+    case constructor_form(Env, {var, X}) of
+        false -> false;
+        E     -> simpl_switch(Env, E, Alts)
+    end.
+
+simpl_switch(_, _, []) -> false;
+simpl_switch(Env, E, [{'case', Pat, Body} | Alts]) ->
+    case match_pat(Pat, E) of
+        false -> simpl_switch(Env, E, Alts);
+        Binds ->
+            Env1 = maps:merge(Env, maps:from_list(Binds)),
+            case simpl_switch(Env1, Body) of
+                false -> false;
+                Body1 -> let_bind(Binds, Body1)
+            end
+    end.
+
+match_pat({tuple, Xs}, {tuple, Es})         -> lists:zip(Xs, Es);
+match_pat({con, _, C, Xs}, {con, _, C, Es}) -> lists:zip(Xs, Es);
+match_pat(L, {lit, L})                      -> [];
+match_pat(nil, nil)                         -> [];
+match_pat({'::', X, Y}, {op, '::', [A, B]}) -> [{X, A}, {Y, B}];
+match_pat({var, X}, E)                      -> [{X, E}];
+match_pat(_, _)                             -> false.
+
+constructor_form(Env, Expr) ->
+    case Expr of
+        {var, X} ->
+            case maps:get(X, Env, free) of
+                free -> false;
+                E    -> constructor_form(Env, E)    %% TODO: shadowing?
+            end;
+        {set_proj, E, I, V} ->
+            case constructor_form(Env, E) of
+                {tuple, Es} -> {tuple, setnth(I + 1, V, Es)};
+                _           -> false
+            end;
+        {proj, E, I} ->
+            case constructor_form(Env, E) of
+                {tuple, Es} -> constructor_form(Env, lists:nth(I + 1, Es));
+                _           -> false
+            end;
+        {con, _, _, _} -> Expr;
+        {tuple, _}     -> Expr;
+        {lit, _}       -> Expr;
+        _              -> false
     end.
 
 %% --- Drop unused lets ---
@@ -1580,8 +1662,8 @@ bottom_up(F, Env, Expr) ->
         {builtin, B, Es}                 -> {builtin, B, [bottom_up(F, Env, E) || E <- Es]};
         {builtin_u, _, _}                -> Expr;
         {builtin_u, _, _, _}             -> Expr;
-        {remote, ArgsT, RetT, Ct, F, Es} -> {remote,   ArgsT, RetT, bottom_up(F, Env, Ct), F, [bottom_up(F, Env, E) || E <- Es]};
-        {remote_u, ArgsT, RetT, Ct, F}   -> {remote_u, ArgsT, RetT, bottom_up(F, Env, Ct), F};
+        {remote, ArgsT, RetT, Ct, Fun, Es} -> {remote,   ArgsT, RetT, bottom_up(F, Env, Ct), Fun, [bottom_up(F, Env, E) || E <- Es]};
+        {remote_u, ArgsT, RetT, Ct, Fun}   -> {remote_u, ArgsT, RetT, bottom_up(F, Env, Ct), Fun};
         {con, Ar, I, Es}                 -> {con, Ar, I, [bottom_up(F, Env, E) || E <- Es]};
         {tuple, Es}                      -> {tuple, [bottom_up(F, Env, E) || E <- Es]};
         {proj, E, I}                     -> {proj, bottom_up(F, Env, E), I};
@@ -1744,6 +1826,10 @@ get_attributes(Ann) ->
 indexed(Xs) ->
     lists:zip(lists:seq(1, length(Xs)), Xs).
 
+setnth(I, X, Xs) ->
+    {Ys, [_ | Zs]} = lists:split(I - 1, Xs),
+    Ys ++ [X] ++ Zs.
+
 -dialyzer({nowarn_function, [fcode_error/1, internal_error/1]}).
 
 fcode_error(Error) ->
@@ -1855,7 +1941,7 @@ pp_fexpr({'let', _, _, _} = Expr) ->
     pp_parens(
       pp_par(
         [ pp_beside([ pp_text("let "),
-                      pp_above([ pp_par([pp_text(X), pp_text("="), pp_fexpr(A)]) || {X, A} <- Ls ]),
+                      pp_above([ pp_par([pp_text(X), pp_text("="), prettypr:nest(2, pp_fexpr(A))]) || {X, A} <- Ls ]),
                       pp_text(" in ") ]),
           pp_fexpr(Body) ]));
 pp_fexpr({builtin_u, B, N}) ->
