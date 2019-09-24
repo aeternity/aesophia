@@ -1579,14 +1579,14 @@ pat_vars({con, _, _, Ps})     -> pat_vars(Ps);
 pat_vars(Ps) when is_list(Ps) -> [X || P <- Ps, X <- pat_vars(P)].
 
 -spec fsplit_pat_vars(fsplit_pat()) -> [var_name()].
-fsplit_pat_vars({var, X})            -> [X || X /= "_"];
-fsplit_pat_vars({bool, _})           -> [];
-fsplit_pat_vars({int, _})            -> [];
-fsplit_pat_vars({string, _})         -> [];
-fsplit_pat_vars(nil)                 -> [];
-fsplit_pat_vars({'::', P, Q})        -> [P, Q];
-fsplit_pat_vars({tuple, Ps})         -> Ps;
-fsplit_pat_vars({con, _, _, Ps})     -> Ps.
+fsplit_pat_vars({var, X})        -> [X || X /= "_"];
+fsplit_pat_vars({bool, _})       -> [];
+fsplit_pat_vars({int, _})        -> [];
+fsplit_pat_vars({string, _})     -> [];
+fsplit_pat_vars(nil)             -> [];
+fsplit_pat_vars({'::', P, Q})    -> [P, Q];
+fsplit_pat_vars({tuple, Ps})     -> Ps;
+fsplit_pat_vars({con, _, _, Ps}) -> Ps.
 
 free_vars(Xs) when is_list(Xs) ->
     lists:umerge([ free_vars(X) || X <- Xs ]);
