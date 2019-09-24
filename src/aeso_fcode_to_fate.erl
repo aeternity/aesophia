@@ -477,7 +477,7 @@ call_to_scode(Env, CallCode, Args) ->
 builtin_to_scode(_Env, get_state, []) ->
     [push(?s)];
 builtin_to_scode(Env, set_state, [_] = Args) ->
-    call_to_scode(Env, [aeb_fate_ops:store(?s, ?a),
+    call_to_scode(Env, [{'STORE', ?s, ?a},
                         tuple(0)], Args);
 builtin_to_scode(Env, chain_event, Args) ->
     call_to_scode(Env, [erlang:apply(aeb_fate_ops, log, lists:duplicate(length(Args), ?a)),
@@ -624,7 +624,7 @@ op_to_scode(string_blake2b)              -> aeb_fate_ops:blake2b(?a, ?a).
 
 %% PUSH and STORE ?a are the same, so we use STORE to make optimizations
 %% easier, and specialize to PUSH (which is cheaper) at the end.
-push(A) -> aeb_fate_ops:store(?a, A).
+push(A) -> {'STORE', ?a, A}.
 
 tuple(0) -> push(?i({tuple, {}}));
 tuple(N) -> aeb_fate_ops:tuple(?a, N).
