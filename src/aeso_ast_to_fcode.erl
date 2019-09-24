@@ -760,7 +760,9 @@ split_tree(Env, Vars, Alts = [{'case', Pats, Body} | _]) ->
         I when is_integer(I) ->
             {Vars0, [{X, Type} | Vars1]} = lists:split(I - 1, Vars),
             SAlts = merge_alts(I, X, [ split_alt(I, A) || A <- Alts ]),
-            Cases = [ {'case', SPat, split_tree(Env, Vars0 ++ split_vars(SPat, Type) ++ Vars1, FAlts)}
+            MakeCase = fun({var, Z}, Split) -> {'case', {var, "_"}, rename_split([{Z, X}], Split)};
+                          (SPat, Split)     -> {'case', SPat, Split} end,
+            Cases = [ MakeCase(SPat, split_tree(Env, Vars0 ++ split_vars(SPat, Type) ++ Vars1, FAlts))
                       || {SPat, FAlts} <- SAlts ],
             {split, Type, X, Cases}
     end.
@@ -1298,14 +1300,11 @@ simplify(Env, {proj, {var, X}, I} = Expr) ->
         E     -> E
     end;
 
-simplify(Env, {switch, {split, _, X, Alts}} = Expr) ->
-    case constructor_form(Env, {var, X}) of
-        false -> Expr;
-        E     ->
-            case simpl_switch(Env, E, Alts) of
-                false -> Expr;
-                Expr1 -> Expr1
-            end
+simplify(Env, {switch, Split}) ->
+    case simpl_switch(Env, Split) of
+        nomatch -> {builtin, abort, [{lit, {string, <<"Incomplete patterns">>}}]};
+        stuck   -> {switch, Split};
+        Expr    -> Expr
     end;
 
 simplify(_, E) ->
@@ -1329,19 +1328,20 @@ simpl_proj(Env, I, Expr) ->
 simpl_switch(_Env, {nosplit, E}) -> E;
 simpl_switch(Env, {split, _, X, Alts}) ->
     case constructor_form(Env, {var, X}) of
-        false -> false;
+        false -> stuck;
         E     -> simpl_switch(Env, E, Alts)
     end.
 
-simpl_switch(_, _, []) -> false;
+simpl_switch(_, _, []) -> nomatch;
 simpl_switch(Env, E, [{'case', Pat, Body} | Alts]) ->
     case match_pat(Pat, E) of
         false -> simpl_switch(Env, E, Alts);
         Binds ->
             Env1 = maps:merge(Env, maps:from_list(Binds)),
             case simpl_switch(Env1, Body) of
-                false -> false;
-                Body1 -> let_bind(Binds, Body1)
+                nomatch -> simpl_switch(Env, E, Alts);
+                stuck   -> stuck;
+                Body1   -> let_bind(Binds, Body1)
             end
     end.
 
@@ -1992,7 +1992,7 @@ pp_ftype({tvar, X}) -> pp_text(X);
 pp_ftype({bytes, N}) -> pp_call(pp_text("bytes"), [{lit, {int, N}}]);
 pp_ftype({oracle, Q, R}) -> pp_call_t("oracle", [Q, R]);
 pp_ftype({tuple, Ts}) ->
-    pp_parens(pp_par(pp_punctuate(pp_text(","), [pp_ftype(T) || T <- Ts])));
+    pp_parens(pp_par(pp_punctuate(pp_text(" *"), [pp_ftype(T) || T <- Ts])));
 pp_ftype({list, T}) ->
     pp_call_t("list", [T]);
 pp_ftype({function, Args, Res}) ->
