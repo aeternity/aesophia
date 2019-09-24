@@ -1680,9 +1680,19 @@ bottom_up(F, Env, Expr) ->
         {switch, Split}                  -> {switch, bottom_up(F, Env, Split)};
         {lam, Xs, B}                     -> {lam, Xs, bottom_up(F, Env, B)};
         {'let', X, E, Body}              ->
-            E1   = bottom_up(F, Env, E),
-            Env1 = Env#{ X => E1 },
-            {'let', X, E1, bottom_up(F, Env1, Body)};
+            E1 = bottom_up(F, Env, E),
+            %% Always freshen user variables to avoid shadowing issues.
+            ShouldFreshen = fun(Y = "%" ++ _) -> maps:is_key(Y, Env);
+                               (_)            -> true end,
+            case ShouldFreshen(X) of
+                true ->
+                    Z = fresh_name(),
+                    Env1 = Env#{ Z => E1 },
+                    {'let', Z, E1, bottom_up(F, Env1, rename([{X, Z}], Body))};
+                false ->
+                    Env1 = Env#{ X => E1 },
+                    {'let', X, E1, bottom_up(F, Env1, Body)}
+            end;
         {split, Type, X, Cases}          -> {split, Type, X, [bottom_up(F, Env, Case) || Case <- Cases]};
         {nosplit, E}                     -> {nosplit, bottom_up(F, Env, E)};
         {'case', Pat, Split}             -> {'case', Pat, bottom_up(F, Env, Split)}
