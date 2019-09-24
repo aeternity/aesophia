@@ -38,7 +38,7 @@
 
 -define(i(X), {immediate, X}).
 -define(a, {stack, 0}).
--define(s, {var, -1}).  %% TODO: until we have state support in FATE
+-define(s, {store, 1}).
 -define(void, {var, 9999}).
 
 -define(IsState(X), (is_tuple(X) andalso tuple_size(X) =:= 2 andalso element(1, X) =:= var andalso element(2, X) < 0)).
@@ -477,7 +477,7 @@ call_to_scode(Env, CallCode, Args) ->
 builtin_to_scode(_Env, get_state, []) ->
     [push(?s)];
 builtin_to_scode(Env, set_state, [_] = Args) ->
-    call_to_scode(Env, [aeb_fate_ops:store(?s, ?a),
+    call_to_scode(Env, [{'STORE', ?s, ?a},
                         tuple(0)], Args);
 builtin_to_scode(Env, chain_event, Args) ->
     call_to_scode(Env, [erlang:apply(aeb_fate_ops, log, lists:duplicate(length(Args), ?a)),
@@ -624,7 +624,7 @@ op_to_scode(string_blake2b)              -> aeb_fate_ops:blake2b(?a, ?a).
 
 %% PUSH and STORE ?a are the same, so we use STORE to make optimizations
 %% easier, and specialize to PUSH (which is cheaper) at the end.
-push(A) -> aeb_fate_ops:store(?a, A).
+push(A) -> {'STORE', ?a, A}.
 
 tuple(0) -> push(?i({tuple, {}}));
 tuple(N) -> aeb_fate_ops:tuple(?a, N).
@@ -689,7 +689,7 @@ pp_ann(Ind, [{i, #{ live_in := In, live_out := Out }, I} | Code]) ->
     Fmt = fun([]) -> "()";
              (Xs) -> string:join([lists:concat(["var", N]) || {var, N} <- Xs], " ")
           end,
-    Op  = [Ind, pp_op(I)],
+    Op  = [Ind, pp_op(desugar_args(I))],
     Ann = [["   % ", Fmt(In), " -> ", Fmt(Out)] || In ++ Out /= []],
     [io_lib:format("~-40s~s\n", [Op, Ann]),
      pp_ann(Ind, Code)];
@@ -701,7 +701,7 @@ pp_op(I)    ->
 
 pp_arg(?i(I))    -> io_lib:format("~w", [I]);
 pp_arg({arg, N}) -> io_lib:format("arg~p", [N]);
-pp_arg({var, N}) when N < 0 -> io_lib:format("store~p", [-N]);
+pp_arg(?s)       -> "store1";
 pp_arg({var, N}) -> io_lib:format("var~p", [N]);
 pp_arg(?a)       -> "a".
 
@@ -1336,18 +1336,26 @@ unannotate({i, _Ann, I}) -> [I].
 
 %% Desugar and specialize
 desugar({'ADD', ?a, ?i(1), ?a}) -> [aeb_fate_ops:inc()];
-desugar({'ADD', A,  ?i(1), A})  -> [aeb_fate_ops:inc(A)];
+desugar({'ADD', A,  ?i(1), A})  -> [aeb_fate_ops:inc(desugar_arg(A))];
 desugar({'ADD', ?a, ?a, ?i(1)}) -> [aeb_fate_ops:inc()];
-desugar({'ADD', A,  A,  ?i(1)}) -> [aeb_fate_ops:inc(A)];
+desugar({'ADD', A,  A,  ?i(1)}) -> [aeb_fate_ops:inc(desugar_arg(A))];
 desugar({'SUB', ?a, ?a, ?i(1)}) -> [aeb_fate_ops:dec()];
-desugar({'SUB', A, A, ?i(1)})   -> [aeb_fate_ops:dec(A)];
-desugar({'STORE', ?a, A})       -> [aeb_fate_ops:push(A)];
+desugar({'SUB', A, A, ?i(1)})   -> [aeb_fate_ops:dec(desugar_arg(A))];
+desugar({'STORE', ?a, A})       -> [aeb_fate_ops:push(desugar_arg(A))];
 desugar({switch, Arg, Type, Alts, Def}) ->
-    [{switch, Arg, Type, [desugar(A) || A <- Alts], desugar(Def)}];
+    [{switch, desugar_arg(Arg), Type, [desugar(A) || A <- Alts], desugar(Def)}];
 desugar(missing) -> missing;
 desugar(Code) when is_list(Code) ->
     lists:flatmap(fun desugar/1, Code);
-desugar(I) -> [I].
+desugar(I) -> [desugar_args(I)].
+
+desugar_args(I) when is_tuple(I) ->
+    [Op | Args] = tuple_to_list(I),
+    list_to_tuple([Op | lists:map(fun desugar_arg/1, Args)]);
+desugar_args(I) -> I.
+
+desugar_arg(?s) -> {var, -1};
+desugar_arg(A) -> A.
 
 %% -- Phase III --------------------------------------------------------------
 %%  Constructing basic blocks
