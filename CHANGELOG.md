@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 ### Removed
 
+## [4.0.0-rc5] - 2019-09-27
+### Added
+### Changed
+- Bug fixes in error reporting.
+- Bug fix in variable liveness analysis for FATE.
+### Removed
+
 ## [4.0.0-rc4] - 2019-09-13
 ### Added
 - Handle numeric escapes, i.e. `"\x19Ethereum Signed Message:\n"`, and similar strings.
@@ -160,7 +167,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v4.0.0-rc4...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v4.0.0-rc5...HEAD
+[4.0.0-rc5]: https://github.com/aeternity/aesophia/compare/v4.0.0-rc4...v4.0.0-rc5
 [4.0.0-rc4]: https://github.com/aeternity/aesophia/compare/v4.0.0-rc3...v4.0.0-rc4
 [4.0.0-rc3]: https://github.com/aeternity/aesophia/compare/v4.0.0-rc1...v4.0.0-rc3
 [4.0.0-rc1]: https://github.com/aeternity/aesophia/compare/v3.2.0...v4.0.0-rc1
