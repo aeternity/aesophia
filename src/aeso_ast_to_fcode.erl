@@ -1333,7 +1333,7 @@ simplify(Env, {proj, {var, X}, I} = Expr) ->
     end;
 
 simplify(Env, {switch, Split}) ->
-    case simpl_switch(Env, Split) of
+    case simpl_switch(Env, [], Split) of
         nomatch -> {builtin, abort, [{lit, {string, <<"Incomplete patterns">>}}]};
         stuck   -> {switch, Split};
         Expr    -> Expr
@@ -1357,21 +1357,51 @@ simpl_proj(Env, I, Expr) ->
         _                     -> false
     end.
 
-simpl_switch(_Env, {nosplit, E}) -> E;
-simpl_switch(Env, {split, _, X, Alts}) ->
-    case constructor_form(Env, {var, X}) of
-        false -> stuck;
-        E     -> simpl_switch(Env, E, Alts)
+get_catchalls(Alts) ->
+    [ C || C = {'case', {var, _}, _} <- Alts ].
+
+%% The scode compiler can't handle multiple catch-alls, so we need to nest them
+%% inside each other. Instead of
+%%    _ => switch(x) ..
+%%    _ => e
+%% we do
+%%    _ => switch(x)
+%%           ..
+%%           _ => e
+add_catchalls(Alts, []) -> Alts;
+add_catchalls(Alts, Catchalls) ->
+    case lists:splitwith(fun({'case', {var, _}, _}) -> false; (_) -> true end,
+                         Alts) of
+        {Alts1, [C]} -> Alts1 ++ [nest_catchalls([C | Catchalls])];
+        {_, []}      -> Alts  ++ [nest_catchalls(Catchalls)]
+        %% NOTE: relies on catchalls always being at the end
     end.
 
-simpl_switch(_, _, []) -> nomatch;
-simpl_switch(Env, E, [{'case', Pat, Body} | Alts]) ->
+nest_catchalls([C = {'case', {var, _}, {nosplit, _}} | _]) -> C;
+nest_catchalls([{'case', P = {var, _}, {split, Type, X, Alts}} | Catchalls]) ->
+    {'case', P, {split, Type, X, add_catchalls(Alts, Catchalls)}}.
+
+simpl_switch(_Env, _, {nosplit, E}) -> E;
+simpl_switch(Env, Catchalls, {split, Type, X, Alts}) ->
+    Alts1 = add_catchalls(Alts, Catchalls),
+    Stuck = {switch, {split, Type, X, Alts1}},
+    case constructor_form(Env, {var, X}) of
+        false -> Stuck;
+        E     ->
+            case simpl_case(Env, E, Alts1) of
+                stuck -> Stuck;
+                Res   -> Res
+            end
+    end.
+
+simpl_case(_, _, []) -> nomatch;
+simpl_case(Env, E, [{'case', Pat, Body} | Alts]) ->
     case match_pat(Pat, E) of
-        false -> simpl_switch(Env, E, Alts);
+        false -> simpl_case(Env, E, Alts);
         Binds ->
             Env1 = maps:merge(Env, maps:from_list(Binds)),
-            case simpl_switch(Env1, Body) of
-                nomatch -> simpl_switch(Env, E, Alts);
+            case simpl_switch(Env1, get_catchalls(Alts), Body) of
+                nomatch -> simpl_case(Env, E, Alts);
                 stuck   -> stuck;
                 Body1   -> let_bind(Binds, Body1)
             end
