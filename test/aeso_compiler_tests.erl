@@ -176,6 +176,8 @@ not_yet_compilable(aevm) -> [].
 -define(PARSE_ERROR(Name, Errs), ?ERROR("Parse", Name, Errs)).
 
 failing_contracts() ->
+    {ok, V} = aeso_compiler:numeric_version(),
+    Version = list_to_binary(string:join([integer_to_list(N) || N <- V], ".")),
     %% Parse errors
     [ ?PARSE_ERROR(field_parse_error,
        [<<?Pos(5, 26)
@@ -564,6 +566,13 @@ failing_contracts() ->
             "and result types\n"
             "  - bytes(20)  (at line 18, column 25)\n"
             "  - 'a  (at line 19, column 5)">>])
+    , ?TYPE_ERROR(wrong_compiler_version,
+        [<<?Pos(1, 1)
+           "Cannot compile with this version of the compiler,\n"
+           "because it does not satisfy the constraint ", Version/binary, " < 1.0">>,
+         <<?Pos(2, 1)
+           "Cannot compile with this version of the compiler,\n"
+           "because it does not satisfy the constraint ", Version/binary, " == 9.9.9">>])
     ].
 
 -define(Path(File), "code_errors/" ??File).

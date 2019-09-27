@@ -15,6 +15,7 @@
         , create_calldata/3  %% deprecated
         , create_calldata/4
         , version/0
+        , numeric_version/0
         , sophia_type_to_typerep/1
         , to_sophia_value/4  %% deprecated, need a backend
         , to_sophia_value/5
@@ -63,6 +64,17 @@ version() ->
             end;
         {_App, _Des, VsnString} ->
             {ok, list_to_binary(VsnString)}
+    end.
+
+-spec numeric_version() -> {ok, [non_neg_integer()]} | {error, term()}.
+numeric_version() ->
+    case version() of
+        {ok, Bin} ->
+            [NoSuf | _] = binary:split(Bin, <<"-">>),
+            Numbers     = binary:split(NoSuf, <<".">>, [global]),
+            {ok, [binary_to_integer(Num) || Num <- Numbers]};
+        {error, _} = Err ->
+            Err
     end.
 
 -spec file(string()) -> {ok, map()} | {error, [aeso_errors:error()]}.

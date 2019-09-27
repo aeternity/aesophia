@@ -591,7 +591,10 @@ infer1(Env, [{namespace, Ann, Name, Code} | Rest], Acc, Options) ->
     check_scope_name_clash(Env, namespace, Name),
     {Env1, Code1} = infer_contract_top(push_scope(namespace, Name, Env), namespace, Code, Options),
     Namespace1 = {namespace, Ann, Name, Code1},
-    infer1(pop_scope(Env1), Rest, [Namespace1 | Acc], Options).
+    infer1(pop_scope(Env1), Rest, [Namespace1 | Acc], Options);
+infer1(Env, [{pragma, _, _} | Rest], Acc, Options) ->
+    %% Pragmas are checked in check_modifiers
+    infer1(Env, Rest, Acc, Options).
 
 check_scope_name_clash(Env, Kind, Name) ->
     case get_scope(Env, qname(Name)) of
@@ -713,9 +716,22 @@ check_modifiers(Env, Contracts) ->
                   _          -> ok
               end;
           {namespace, _, _, Decls} -> check_modifiers1(namespace, Decls);
+          {pragma, Ann, Pragma} -> check_pragma(Env, Ann, Pragma);
           Decl -> type_error({bad_top_level_decl, Decl})
       end || C <- Contracts ],
     destroy_and_report_type_errors(Env).
+
+-spec check_pragma(env(), aeso_syntax:ann(), aeso_syntax:pragma()) -> ok.
+check_pragma(_Env, Ann, {compiler, Op, Ver}) ->
+    case aeso_compiler:numeric_version() of
+        {error, Err}  -> type_error({failed_to_get_compiler_version, Err});
+        {ok, Version} ->
+            Strip = fun(V) -> lists:reverse(lists:dropwhile(fun(X) -> X == 0 end, lists:reverse(V))) end,
+            case apply(erlang, Op, [Strip(Version), Strip(Ver)]) of
+                true  -> ok;
+                false -> type_error({compiler_version_mismatch, Ann, Version, Op, Ver})
+            end
+    end.
 
 -spec check_modifiers1(contract | namespace, [aeso_syntax:decl()] | aeso_syntax:decl()) -> ok.
 check_modifiers1(What, Decls) when is_list(Decls) ->
@@ -2381,6 +2397,15 @@ mk_error({unsolved_bytes_constraint, Ann, split, A, B, C}) ->
                         "~s  (at ~s)\nand result types\n~s  (at ~s)\n~s  (at ~s)\n",
                         [ pp_type("  - ", C), pp_loc(C), pp_type("  - ", A), pp_loc(A),
                           pp_type("  - ", B), pp_loc(B)]),
+    mk_t_err(pos(Ann), Msg);
+mk_error({failed_to_get_compiler_version, Err}) ->
+    Msg = io_lib:format("Failed to get compiler version. Error:\n  ~p\n", [Err]),
+    mk_t_err(pos(0, 0), Msg);
+mk_error({compiler_version_mismatch, Ann, Version, Op, Bound}) ->
+    PrintV = fun(V) -> string:join([integer_to_list(N) || N <- V], ".") end,
+    Msg = io_lib:format("Cannot compile with this version of the compiler,\n"
+                        "because it does not satisfy the constraint"
+                        " ~s ~s ~s\n", [PrintV(Version), Op, PrintV(Bound)]),
     mk_t_err(pos(Ann), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p\n", [Err]),
