@@ -1582,6 +1582,7 @@ tweak_returns(['RETURN', {'PUSH', A} | Code])          -> [{'RETURNR', A} | Code
 tweak_returns(['RETURN' | Code = [{'CALL_T', _} | _]]) -> Code;
 tweak_returns(['RETURN' | Code = [{'ABORT', _} | _]])  -> Code;
 tweak_returns(['RETURN' | Code = [{'EXIT', _} | _]])   -> Code;
+tweak_returns(['RETURN' | Code = [loop | _]])          -> Code;
 tweak_returns(Code) -> Code.
 
 %% -- Split basic blocks at CALL instructions --
@@ -1595,8 +1596,7 @@ split_calls(Ref, [], Acc, Blocks) ->
 split_calls(Ref, [I | Code], Acc, Blocks) when element(1, I) == 'CALL';
                                                element(1, I) == 'CALL_R';
                                                element(1, I) == 'CALL_GR';
-                                               element(1, I) == 'jumpif';
-                                               I == loop ->
+                                               element(1, I) == 'jumpif' ->
     split_calls(make_ref(), Code, [], [{Ref, lists:reverse([I | Acc])} | Blocks]);
 split_calls(Ref, [{'ABORT', _} = I | _Code], Acc, Blocks) ->
     lists:reverse([{Ref, lists:reverse([I | Acc])} | Blocks]);
