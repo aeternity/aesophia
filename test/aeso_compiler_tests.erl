@@ -356,19 +356,19 @@ failing_contracts() ->
     , ?TYPE_ERROR(bad_address_literals,
         [<<?Pos(32, 5)
            "The type bytes(32) is not a contract type\n"
-           "when checking that the contract literal at line 32, column 5\n"
+           "when checking that the contract literal\n"
            "  ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ\n"
            "has the type\n"
            "  bytes(32)">>,
          <<?Pos(30, 5)
            "The type oracle(int, bool) is not a contract type\n"
-           "when checking that the contract literal at line 30, column 5\n"
+           "when checking that the contract literal\n"
            "  ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ\n"
            "has the type\n"
            "  oracle(int, bool)">>,
          <<?Pos(28, 5)
            "The type address is not a contract type\n"
-           "when checking that the contract literal at line 28, column 5\n"
+           "when checking that the contract literal\n"
            "  ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ\n"
            "has the type\n"
            "  address">>,
@@ -440,7 +440,13 @@ failing_contracts() ->
            "when checking the type of the expression at line 7, column 5\n"
            "  ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt : address\n"
            "against the expected type\n"
-           "  bytes(32)">>])
+           "  bytes(32)">>,
+         <<?Pos(34, 5),
+           "The type address is not a contract type\n"
+           "when checking that the call to\n"
+           "  Address.to_contract\n"
+           "has the type\n"
+           "  address">>])
     , ?TYPE_ERROR(stateful,
        [<<?Pos(13, 35)
           "Cannot reference stateful function Chain.spend (at line 13, column 35)\nin the definition of non-stateful function fail1.">>,

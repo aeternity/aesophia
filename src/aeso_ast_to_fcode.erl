@@ -32,7 +32,7 @@
               map_delete | map_member | map_size | string_length |
               string_concat | bits_set | bits_clear | bits_test | bits_sum |
               bits_intersection | bits_union | bits_difference |
-              contract_to_address | crypto_verify_sig | crypto_verify_sig_secp256k1 |
+              contract_to_address | address_to_contract | crypto_verify_sig | crypto_verify_sig_secp256k1 |
               crypto_sha3 | crypto_sha256 | crypto_blake2b |
               crypto_ecverify_secp256k1 | crypto_ecrecover_secp256k1.
 
@@ -200,7 +200,7 @@ builtins() ->
                               {"union", 2}, {"difference", 2}, {"none", none}, {"all", none}]},
               {["Bytes"],    [{"to_int", 1}, {"to_str", 1}, {"concat", 2}, {"split", 1}]},
               {["Int"],      [{"to_str", 1}]},
-              {["Address"],  [{"to_str", 1}, {"is_oracle", 1}, {"is_contract", 1}, {"is_payable", 1}]}
+              {["Address"],  [{"to_str", 1}, {"to_contract", 1}, {"is_oracle", 1}, {"is_contract", 1}, {"is_payable", 1}]}
              ],
     maps:from_list([ {NS ++ [Fun], {MkName(NS, Fun), Arity}}
                      || {NS, Funs} <- Scopes,
@@ -904,6 +904,7 @@ op_builtins() ->
      string_length, string_concat, string_sha3, string_sha256, string_blake2b,
      bits_set, bits_clear, bits_test, bits_sum, bits_intersection, bits_union,
      bits_difference, int_to_str, address_to_str, crypto_verify_sig,
+     address_to_contract,
      crypto_verify_sig_secp256k1, crypto_sha3, crypto_sha256, crypto_blake2b,
      crypto_ecverify_secp256k1, crypto_ecrecover_secp256k1
     ].

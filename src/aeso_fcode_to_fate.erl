@@ -103,6 +103,7 @@
      Op =:= 'ECVERIFY_SECP256K1'   orelse
      Op =:= 'ECRECOVER_SECP256K1'  orelse
      Op =:= 'CONTRACT_TO_ADDRESS'  orelse
+     Op =:= 'ADDRESS_TO_CONTRACT'  orelse
      Op =:= 'AUTH_TX_HASH'         orelse
      Op =:= 'BYTES_TO_INT'         orelse
      Op =:= 'BYTES_TO_STR'         orelse
@@ -611,6 +612,7 @@ op_to_scode(bits_difference)   -> aeb_fate_ops:bits_diff(?a, ?a, ?a);
 op_to_scode(address_to_str)    -> aeb_fate_ops:addr_to_str(?a, ?a);
 op_to_scode(int_to_str)        -> aeb_fate_ops:int_to_str(?a, ?a);
 op_to_scode(contract_to_address)         -> aeb_fate_ops:contract_to_address(?a, ?a);
+op_to_scode(address_to_contract)         -> aeb_fate_ops:address_to_contract(?a, ?a);
 op_to_scode(crypto_verify_sig)           -> aeb_fate_ops:verify_sig(?a, ?a, ?a, ?a);
 op_to_scode(crypto_verify_sig_secp256k1) -> aeb_fate_ops:verify_sig_secp256k1(?a, ?a, ?a, ?a);
 op_to_scode(crypto_ecverify_secp256k1)   -> aeb_fate_ops:ecverify_secp256k1(?a, ?a, ?a, ?a);
@@ -851,6 +853,7 @@ attributes(I) ->
         {'ECVERIFY_SECP256K1', A, B, C, D}    -> Pure(A, [B, C, D]);
         {'ECRECOVER_SECP256K1', A, B, C}      -> Pure(A, [B, C]);
         {'CONTRACT_TO_ADDRESS', A, B}         -> Pure(A, [B]);
+        {'ADDRESS_TO_CONTRACT', A, B}         -> Pure(A, [B]);
         {'AUTH_TX_HASH', A}                   -> Pure(A, []);
         {'BYTES_TO_INT', A, B}                -> Pure(A, [B]);
         {'BYTES_TO_STR', A, B}                -> Pure(A, [B]);

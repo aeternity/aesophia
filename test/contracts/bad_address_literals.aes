@@ -30,4 +30,6 @@ contract AddressLiterals =
     ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ
   entrypoint contr3() : bytes(32) =
     ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ
+  entrypoint contr4() : address =
+    Address.to_contract(Contract.address)
 
