@@ -11,4 +11,6 @@ contract AddressLiterals =
     oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY
   entrypoint contr() : Remote =
     ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ
+  entrypoint contr_addr() : Remote =
+    Address.to_contract(addr())
 

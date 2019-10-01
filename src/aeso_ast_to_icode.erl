@@ -494,6 +494,7 @@ is_builtin_fun({qid, _, ["Address", "to_str"]}, _Icode)                      -> 
 is_builtin_fun({qid, _, ["Address", "is_oracle"]}, _Icode)                   -> true;
 is_builtin_fun({qid, _, ["Address", "is_contract"]}, _Icode)                 -> true;
 is_builtin_fun({qid, _, ["Address", "is_payable"]}, _Icode)                  -> true;
+is_builtin_fun({qid, _, ["Address", "to_contract"]}, _Icode)                 -> true;
 is_builtin_fun({qid, _, ["Bytes", "to_int"]}, _Icode)                        -> true;
 is_builtin_fun({qid, _, ["Bytes", "to_str"]}, _Icode)                        -> true;
 is_builtin_fun({qid, _, ["Bytes", "concat"]}, _Icode)                        -> true;
@@ -713,6 +714,8 @@ builtin_code(_, {qid, _, ["Address", "is_contract"]}, [Addr], _, _, Icode) ->
 builtin_code(_, {qid, _, ["Address", "is_payable"]}, [Addr], _, _, Icode) ->
     prim_call(?PRIM_CALL_ADDR_IS_PAYABLE, #integer{value = 0},
               [ast_body(Addr, Icode)], [word], word);
+builtin_code(_, {qid, _, ["Address", "to_contract"]}, [Addr], _, _, Icode) ->
+    ast_body(Addr, Icode);
 
 builtin_code(_, {qid, _, ["Bytes", "to_int"]}, [Bytes], _, _, Icode) ->
     {typed, _, _, {bytes_t, _, N}} = Bytes,

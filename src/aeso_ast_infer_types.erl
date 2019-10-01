@@ -60,7 +60,8 @@
 
 -record(is_contract_constraint,
     { contract_t :: utype(),
-      context    :: aeso_syntax:expr()  %% The address literal
+      context    :: {contract_literal, aeso_syntax:expr()} |
+                    {address_to_contract, aeso_syntax:ann()}
     }).
 
 -type field_constraint() :: #field_constraint{} | #record_create_constraint{} | #is_contract_constraint{}.
@@ -83,7 +84,7 @@
 -type qname() :: [string()].
 -type typesig() :: {type_sig, aeso_syntax:ann(), type_constraints(), [aeso_syntax:named_arg_t()], [type()], type()}.
 
--type type_constraints() :: none | bytes_concat | bytes_split.
+-type type_constraints() :: none | bytes_concat | bytes_split | address_to_contract.
 
 -type fun_info()  :: {aeso_syntax:ann(), typesig() | type()}.
 -type type_info() :: {aeso_syntax:ann(), typedef()}.
@@ -523,6 +524,7 @@ global_env() ->
     %% Conversion
     IntScope     = #scope{ funs = MkDefs([{"to_str", Fun1(Int,     String)}]) },
     AddressScope = #scope{ funs = MkDefs([{"to_str", Fun1(Address, String)},
+                                          {"to_contract", FunC(address_to_contract, [Address], A)},
                                           {"is_oracle", Fun1(Address, Bool)},
                                           {"is_contract", Fun1(Address, Bool)},
                                           {"is_payable", Fun1(Address, Bool)}]) },
@@ -1117,7 +1119,7 @@ infer_expr(_Env, Body={oracle_query_id, As, _}) ->
 infer_expr(_Env, Body={contract_pubkey, As, _}) ->
     Con = fresh_uvar(As),
     constrain([#is_contract_constraint{ contract_t = Con,
-                                        context    = Body }]),
+                                        context    = {contract_literal, Body} }]),
     {typed, As, Body, Con};
 infer_expr(_Env, Body={id, As, "_"}) ->
     {typed, As, Body, fresh_uvar(As)};
@@ -1689,11 +1691,11 @@ check_record_create_constraints(Env, [C | Cs]) ->
 
 check_is_contract_constraints(_Env, []) -> ok;
 check_is_contract_constraints(Env, [C | Cs]) ->
-    #is_contract_constraint{ contract_t = Type, context = Lit } = C,
+    #is_contract_constraint{ contract_t = Type, context = Cxt } = C,
     Type1 = unfold_types_in_type(Env, instantiate(Type)),
     case lookup_type(Env, record_type_name(Type1)) of
         {_, {_Ann, {[], {contract_t, _}}}} -> ok;
-        _ -> type_error({not_a_contract_type, Type1, Lit})
+        _ -> type_error({not_a_contract_type, Type1, Cxt})
     end,
     check_is_contract_constraints(Env, Cs).
 
@@ -2114,6 +2116,9 @@ freshen_type_sig(Ann, TypeSig = {type_sig, _, Constr, _, _, _}) ->
     FunT.
 
 apply_typesig_constraint(_Ann, none, _FunT) -> ok;
+apply_typesig_constraint(Ann, address_to_contract, {fun_t, _, [], [_], Type}) ->
+    constrain([#is_contract_constraint{ contract_t = Type,
+                                        context    = {address_to_contract, Ann}}]);
 apply_typesig_constraint(Ann, bytes_concat, {fun_t, _, [], [A, B], C}) ->
     add_bytes_constraint({add_bytes, Ann, concat, A, B, C});
 apply_typesig_constraint(Ann, bytes_split, {fun_t, _, [], [C], {tuple_t, _, [A, B]}}) ->
@@ -2212,12 +2217,28 @@ mk_error({not_a_record_type, Type, Why}) ->
     Msg = io_lib:format("~s\n", [pp_type("Not a record type: ", Type)]),
     {Pos, Ctxt} = pp_why_record(Why),
     mk_t_err(Pos, Msg, Ctxt);
-mk_error({not_a_contract_type, Type, Lit}) ->
-    Msg = io_lib:format("The type ~s is not a contract type\n"
-                        "when checking that the contract literal at ~s\n~s\n"
-                        "has the type\n~s\n",
-                        [pp_type("", Type), pp_loc(Lit), pp_expr("  ", Lit), pp_type("  ", Type)]),
-    mk_t_err(pos(Lit), Msg);
+mk_error({not_a_contract_type, Type, Cxt}) ->
+    Msg =
+        case Type of
+            {tvar, _, _} ->
+                "Unresolved contract type\n";
+            _ ->
+                io_lib:format("The type ~s is not a contract type\n", [pp_type("", Type)])
+        end,
+    {Pos, Cxt1} =
+        case Cxt of
+            {contract_literal, Lit} ->
+                {pos(Lit),
+                 io_lib:format("when checking that the contract literal\n~s\n"
+                               "has the type\n~s\n",
+                               [pp_expr("  ", Lit), pp_type("  ", Type)])};
+            {address_to_contract, Ann} ->
+                {pos(Ann),
+                 io_lib:format("when checking that the call to\n  Address.to_contract\n"
+                               "has the type\n~s\n",
+                               [pp_type("  ", Type)])}
+        end,
+    mk_t_err(Pos, Msg, Cxt1);
 mk_error({non_linear_pattern, Pattern, Nonlinear}) ->
     Msg = io_lib:format("Repeated name~s ~s in pattern\n~s (at ~s)\n",
                         [plural("", "s", Nonlinear), string:join(Nonlinear, ", "),
