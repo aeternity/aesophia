@@ -573,6 +573,14 @@ failing_contracts() ->
          <<?Pos(2, 1)
            "Cannot compile with this version of the compiler,\n"
            "because it does not satisfy the constraint ", Version/binary, " == 9.9.9">>])
+    , ?TYPE_ERROR(multiple_contracts,
+         [<<?Pos(2, 3)
+            "Only the main contract can contain defined functions or entrypoints.\n"
+            "Fix: replace the definition of 'foo' by a type signature.">>])
+    , ?TYPE_ERROR(contract_as_namespace,
+         [<<?Pos(5, 28)
+            "Invalid call to contract entrypoint 'Foo.foo'.\n"
+            "It must be called as 'c.foo' for some c : Foo.">>])
     ].
 
 -define(Path(File), "code_errors/" ??File).
