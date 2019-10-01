@@ -13,7 +13,7 @@
 -export_type([ann_line/0, ann_col/0, ann_origin/0, ann_format/0, ann/0]).
 -export_type([name/0, id/0, con/0, qid/0, qcon/0, tvar/0, op/0]).
 -export_type([bin_op/0, un_op/0]).
--export_type([decl/0, letbind/0, typedef/0]).
+-export_type([decl/0, letbind/0, typedef/0, pragma/0]).
 -export_type([arg/0, field_t/0, constructor_t/0, named_arg_t/0]).
 -export_type([type/0, constant/0, expr/0, arg_expr/0, field/1, stmt/0, alt/0, lvalue/0, elim/0, pat/0]).
 -export_type([ast/0]).
@@ -36,10 +36,15 @@
 
 -type decl() :: {contract, ann(), con(), [decl()]}
               | {namespace, ann(), con(), [decl()]}
+              | {pragma, ann(), pragma()}
               | {type_decl, ann(), id(), [tvar()]}
               | {type_def, ann(), id(), [tvar()], typedef()}
               | {fun_decl, ann(), id(), type()}
               | letbind().
+
+-type compiler_version() :: [non_neg_integer()].
+
+-type pragma() :: {compiler, '==' | '<' | '>' | '=<' | '>=', compiler_version()}.
 
 -type letbind()
     :: {letval, ann(), id(), type(), expr()}

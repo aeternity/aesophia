@@ -149,6 +149,7 @@ decl({contract, _, C, Ds}) ->
     block(follow(text("contract"), hsep(name(C), text("="))), decls(Ds));
 decl({namespace, _, C, Ds}) ->
     block(follow(text("namespace"), hsep(name(C), text("="))), decls(Ds));
+decl({pragma, _, Pragma}) -> pragma(Pragma);
 decl({type_decl, _, T, Vars}) -> typedecl(alias_t, T, Vars);
 decl({type_def, _, T, Vars, Def}) ->
     Kind = element(1, Def),
@@ -169,6 +170,10 @@ decl(D = {letfun, Attrs, _, _, _, _}) ->
           end,
     hsep(lists:map(Mod, Attrs) ++ [letdecl(Fun, D)]);
 decl(D = {letval, _, _, _, _}) -> letdecl("let", D).
+
+-spec pragma(aeso_syntax:pragma()) -> doc().
+pragma({compiler, Op, Ver}) ->
+    text("@compiler " ++ atom_to_list(Op) ++ " " ++ string:join([integer_to_list(N) || N <- Ver], ".")).
 
 -spec expr(aeso_syntax:expr(), options()) -> doc().
 expr(E, Options) ->

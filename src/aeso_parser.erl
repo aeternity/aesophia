@@ -87,6 +87,7 @@ decl() ->
     , ?RULE(token(payable),     keyword(contract), con(), tok('='), maybe_block(decl()), add_modifiers([_1], {contract, _2, _3, _5}))
     , ?RULE(keyword(namespace), con(), tok('='), maybe_block(decl()), {namespace, _1, _2, _4})
     , ?RULE(keyword(include),   str(), {include, get_ann(_1), _2})
+    , pragma()
 
       %% Type declarations  TODO: format annotation for "type bla" vs "type bla()"
     , ?RULE(keyword(type),     id(),                                          {type_decl, _1, _2, []})
@@ -103,6 +104,16 @@ decl() ->
     , ?RULE(modifiers(), fun_or_entry(), fundef(),               add_modifiers(_1, _2, set_pos(get_pos(get_ann(_2)), _3)))
     , ?RULE(keyword('let'),    valdef(),                         set_pos(get_pos(_1), _2))
     ])).
+
+pragma() ->
+    Op = choice([token(T) || T <- ['<', '=<', '==', '>=', '>']]),
+    ?RULE(tok('@'), id("compiler"), Op, version(), {pragma, get_ann(_1), {compiler, element(1, _3), _4}}).
+
+version() ->
+    ?RULE(token(int), many({tok('.'), token(int)}), mk_version(_1, _2)).
+
+mk_version({int, _, Maj}, Rest) ->
+    [Maj | [N || {_, {int, _, N}} <- Rest]].
 
 fun_or_entry() ->
     choice([?RULE(keyword(function), {function, _1}),
@@ -406,7 +417,7 @@ token(Tag) ->
 id(Id) ->
     ?LET_P({id, A, X} = Y, id(),
            if X == Id -> Y;
-              true    -> fail({A, "expected 'bytes'"})
+              true    -> fail({A, "expected '" ++ Id ++ "'"})
            end).
 
 id_or_addr() ->
