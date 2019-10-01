@@ -110,7 +110,7 @@
     , in_pattern = false              :: boolean()
     , stateful   = false              :: boolean()
     , current_function = none         :: none | aeso_syntax:id()
-    , what       = top                :: top | namespace | contract
+    , what       = top                :: top | namespace | contract | main_contract
     }).
 
 -type env() :: #env{}.
@@ -175,12 +175,13 @@ bind_fun(X, Type, Env) ->
     end.
 
 -spec force_bind_fun(name(), type() | typesig(), env()) -> env().
-force_bind_fun(X, Type, Env) ->
+force_bind_fun(X, Type, Env = #env{ what = What }) ->
     Ann    = aeso_syntax:get_ann(Type),
     NoCode = get_option(no_code, false),
-    Entry = case X == "init" andalso Env#env.what == contract andalso not NoCode of
-                true  -> {reserved_init, Ann, Type};
-                false -> {Ann, Type}
+    Entry = if X == "init", What == main_contract, not NoCode ->
+                    {reserved_init, Ann, Type};
+               What == contract -> {contract_fun, Ann, Type};
+               true -> {Ann, Type}
             end,
     on_current_scope(Env, fun(Scope = #scope{ funs = Funs }) ->
                             Scope#scope{ funs = [{X, Entry} | Funs] }
@@ -306,6 +307,9 @@ lookup_env1(#env{ namespace = Current, scopes = Scopes }, Kind, Ann, QName) ->
                 {reserved_init, Ann1, Type} ->
                     type_error({cannot_call_init_function, Ann}),
                     {QName, {Ann1, Type}};  %% Return the type to avoid an extra not-in-scope error
+                {contract_fun, Ann1, Type} ->
+                    type_error({contract_treated_as_namespace, Ann, QName}),
+                    {QName, {Ann1, Type}};
                 {Ann1, _} = E ->
                     %% Check that it's not private (or we can see private funs)
                     case not is_private(Ann1) orelse AllowPrivate of
@@ -582,7 +586,8 @@ infer1(Env, [], Acc, _Options) -> {Env, lists:reverse(Acc)};
 infer1(Env, [{contract, Ann, ConName, Code} | Rest], Acc, Options) ->
     %% do type inference on each contract independently.
     check_scope_name_clash(Env, contract, ConName),
-    {Env1, Code1} = infer_contract_top(push_scope(contract, ConName, Env), contract, Code, Options),
+    What = if Rest == [] -> main_contract; true -> contract end,
+    {Env1, Code1} = infer_contract_top(push_scope(contract, ConName, Env), What, Code, Options),
     Contract1 = {contract, Ann, ConName, Code1},
     Env2 = pop_scope(Env1),
     Env3 = bind_contract(Contract1, Env2),
@@ -605,7 +610,7 @@ check_scope_name_clash(Env, Kind, Name) ->
             destroy_and_report_type_errors(Env)
     end.
 
--spec infer_contract_top(env(), contract | namespace, [aeso_syntax:decl()], list(option())) ->
+-spec infer_contract_top(env(), main_contract | contract | namespace, [aeso_syntax:decl()], list(option())) ->
     {env(), [aeso_syntax:decl()]}.
 infer_contract_top(Env, Kind, Defs0, _Options) ->
     Defs = desugar(Defs0),
@@ -613,7 +618,7 @@ infer_contract_top(Env, Kind, Defs0, _Options) ->
 
 %% infer_contract takes a proplist mapping global names to types, and
 %% a list of definitions.
--spec infer_contract(env(), contract | namespace, [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
+-spec infer_contract(env(), main_contract | contract | namespace, [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
 infer_contract(Env0, What, Defs) ->
     Env  = Env0#env{ what = What },
     Kind = fun({type_def, _, _, _, _})  -> type;
@@ -627,8 +632,9 @@ infer_contract(Env0, What, Defs) ->
     check_unexpected(Get(unexpected)),
     Env2 =
         case What of
-            namespace -> Env1;
-            contract  -> bind_state(Env1)   %% bind state and put
+            namespace     -> Env1;
+            contract      -> Env1;
+            main_contract -> bind_state(Env1)   %% bind state and put
         end,
     {ProtoSigs, Decls} = lists:unzip([ check_fundecl(Env1, Decl) || Decl <- Get(prototype) ]),
     Env3      = bind_funs(ProtoSigs, Env2),
@@ -2392,6 +2398,10 @@ mk_error({cannot_call_init_function, Ann}) ->
     Msg = "The 'init' function is called exclusively by the create contract transaction\n"
           "and cannot be called from the contract code.\n",
     mk_t_err(pos(Ann), Msg);
+mk_error({contract_treated_as_namespace, Ann, [Con, Fun] = QName}) ->
+    Msg = io_lib:format("Invalid call to contract entrypoint '~s'.\n", [string:join(QName, ".")]),
+    Cxt = io_lib:format("It must be called as 'c.~s' for some c : ~s.\n", [Fun, Con]),
+    mk_t_err(pos(Ann), Msg, Cxt);
 mk_error({bad_top_level_decl, Decl}) ->
     What = case element(1, Decl) of
                letval -> "function or entrypoint";

@@ -577,6 +577,10 @@ failing_contracts() ->
          [<<?Pos(2, 3)
             "Only the main contract can contain defined functions or entrypoints.\n"
             "Fix: replace the definition of 'foo' by a type signature.">>])
+    , ?TYPE_ERROR(contract_as_namespace,
+         [<<?Pos(5, 28)
+            "Invalid call to contract entrypoint 'Foo.foo'.\n"
+            "It must be called as 'c.foo' for some c : Foo.">>])
     ].
 
 -define(Path(File), "code_errors/" ??File).
