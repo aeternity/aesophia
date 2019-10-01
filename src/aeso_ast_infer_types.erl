@@ -707,19 +707,33 @@ check_unexpected(Xs) ->
 
 check_modifiers(Env, Contracts) ->
     create_type_errors(),
-    [ case C of
-          {contract, _, Con, Decls}  ->
-              check_modifiers1(contract, Decls),
-              case {lists:keymember(letfun, 1, Decls),
-                    [ D || D <- Decls, aeso_syntax:get_ann(entrypoint, D, false) ]} of
-                  {true, []} -> type_error({contract_has_no_entrypoints, Con});
-                  _          -> ok
-              end;
-          {namespace, _, _, Decls} -> check_modifiers1(namespace, Decls);
-          {pragma, Ann, Pragma} -> check_pragma(Env, Ann, Pragma);
-          Decl -> type_error({bad_top_level_decl, Decl})
-      end || C <- Contracts ],
+    check_modifiers_(Env, Contracts),
     destroy_and_report_type_errors(Env).
+
+check_modifiers_(Env, [{contract, _, Con, Decls} | Rest]) ->
+    IsMain = Rest == [],
+    check_modifiers1(contract, Decls),
+    case {lists:keymember(letfun, 1, Decls),
+            [ D || D <- Decls, aeso_syntax:get_ann(entrypoint, D, false) ]} of
+        {true, []} -> type_error({contract_has_no_entrypoints, Con});
+        _ when not IsMain ->
+            case [ {Ann, Id} || {letfun, Ann, Id, _, _, _} <- Decls ] of
+                [{Ann, Id} | _] -> type_error({definition_in_non_main_contract, Ann, Id});
+                [] -> ok
+            end;
+        _ -> ok
+    end,
+    check_modifiers_(Env, Rest);
+check_modifiers_(Env, [{namespace, _, _, Decls} | Rest]) ->
+    check_modifiers1(namespace, Decls),
+    check_modifiers_(Env, Rest);
+check_modifiers_(Env, [{pragma, Ann, Pragma} | Rest]) ->
+    check_pragma(Env, Ann, Pragma),
+    check_modifiers_(Env, Rest);
+check_modifiers_(Env, [Decl | Rest]) ->
+    type_error({bad_top_level_decl, Decl}),
+    check_modifiers_(Env, Rest);
+check_modifiers_(_Env, []) -> ok.
 
 -spec check_pragma(env(), aeso_syntax:ann(), aeso_syntax:pragma()) -> ok.
 check_pragma(_Env, Ann, {compiler, Op, Ver}) ->
@@ -2359,6 +2373,10 @@ mk_error({contract_has_no_entrypoints, Con}) ->
                         "contract functions must be declared with the 'entrypoint' keyword instead of\n"
                         "'function'.\n", [pp_expr("", Con), pp_loc(Con)]),
     mk_t_err(pos(Con), Msg);
+mk_error({definition_in_non_main_contract, Ann, {id, _, Id}}) ->
+    Msg = "Only the main contract can contain defined functions or entrypoints.\n",
+    Cxt = io_lib:format("Fix: replace the definition of '~s' by a type signature.\n", [Id]),
+    mk_t_err(pos(Ann), Msg, Cxt);
 mk_error({unbound_type, Type}) ->
     Msg = io_lib:format("Unbound type ~s (at ~s).\n", [pp_type("", Type), pp_loc(Type)]),
     mk_t_err(pos(Type), Msg);
