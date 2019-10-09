@@ -1785,7 +1785,7 @@ solve_known_record_types(Env, Constraints) ->
                              C
                      end;
                 _ ->
-                    type_error({not_a_record_type, RecType, When}),
+                    type_error({not_a_record_type, instantiate(RecType), When}),
                     not_solved
              end
          end
