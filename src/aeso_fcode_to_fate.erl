@@ -1288,7 +1288,7 @@ r_inline_store(_Acc, _, _, _) -> false.
 %% Shortcut write followed by final read
 r_one_shot_var({i, Ann1, I}, [{i, Ann2, J} | Code]) ->
     case op_view(I) of
-        {Op, R, As} ->
+        {Op, R = {var, _}, As} ->
             Copy = case J of
                        {'STORE', S, R} -> {write_to, S};
                        _               -> false
