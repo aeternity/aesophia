@@ -50,7 +50,8 @@ parse_and_scan(P, S, Opts) ->
     set_current_file(proplists:get_value(src_file, Opts, no_file)),
     case aeso_scan:scan(S) of
         {ok, Tokens} -> aeso_parse_lib:parse(P, Tokens);
-        Error        -> Error
+        {error, {{Input, Pos}, _}} ->
+            {error, {Pos, scan_error, Input}}
     end.
 
 -dialyzer({nowarn_function, parse_error/1}).
@@ -60,8 +61,8 @@ parse_error(Err) ->
 mk_p_err(Pos, Msg) ->
     aeso_errors:new(parse_error, mk_pos(Pos), lists:flatten(Msg)).
 
-mk_error({Pos, ScanE}) when ScanE == scan_error; ScanE == scan_error_no_state ->
-    mk_p_err(Pos, "Scan error\n");
+mk_error({Pos, scan_error, Input}) ->
+    mk_p_err(Pos, io_lib:format("Lexical error on input: ~s\n", [Input]));
 mk_error({Pos, parse_error, Err}) ->
     Msg = io_lib:format("~s\n", [Err]),
     mk_p_err(Pos, Msg);
