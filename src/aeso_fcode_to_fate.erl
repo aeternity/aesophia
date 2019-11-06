@@ -1155,18 +1155,20 @@ r_swap_write(Pre, I, Code0 = [J | Code]) ->
 r_swap_write(_, _, _) -> false.
 
 %% Precompute instructions with known values
-r_constant_propagation(Cons = {i, _, {'CONS', R, _, _}}, [{i, Ann, {'IS_NIL', S, R}} | Code]) ->
+r_constant_propagation(Cons = {i, Ann1, {'CONS', R, X, Xs}}, [{i, Ann, {'IS_NIL', S, R}} | Code]) ->
     Store = {i, Ann, {'STORE', S, ?i(false)}},
-    case R of
-        ?a -> {[Store], Code};
-        _  -> {[Cons, Store], Code}
-    end;
-r_constant_propagation(Cons = {i, _, {'NIL', R}}, [{i, Ann, {'IS_NIL', S, R}} | Code]) ->
+    Cons1 = case R of
+                ?a -> {i, Ann1, {'CONS', ?void, X, Xs}};
+                _  -> Cons
+            end,
+    {[Cons1, Store], Code};
+r_constant_propagation(Nil = {i, Ann1, {'NIL', R}}, [{i, Ann, {'IS_NIL', S, R}} | Code]) ->
     Store = {i, Ann, {'STORE', S, ?i(true)}},
-    case R of
-        ?a -> {[Store], Code};
-        _  -> {[Cons, Store], Code}
-    end;
+    Nil1 = case R of
+               ?a -> {i, Ann1, {'NIL', ?void}};
+               _  -> Nil
+           end,
+    {[Nil1, Store], Code};
 r_constant_propagation({i, Ann, I}, Code) ->
     case op_view(I) of
         false -> false;
