@@ -11,6 +11,10 @@
 
 -export([compile/2, term_to_fate/1]).
 
+-ifdef(TEST).
+-export([optimize_fun/4]).
+-endif.
+
 %% -- Preamble ---------------------------------------------------------------
 
 -type scode()  :: [sinstr()].
