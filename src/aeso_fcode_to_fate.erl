@@ -129,9 +129,12 @@ is_debug(Tag, Options) ->
     Tags = proplists:get_value(debug, Options, []),
     Tags == all orelse lists:member(Tag, Tags).
 
-debug(Tag, Options, Fmt, Args) ->
+-define(debug(Tag, Options, Fmt, Args),
+        debug(Tag, Options, fun() -> io:format(Fmt, Args) end)).
+
+debug(Tag, Options, Fun) ->
     case is_debug(Tag, Options) of
-        true  -> io:format(Fmt, Args);
+        true  -> Fun();
         false -> ok
     end.
 
@@ -144,7 +147,7 @@ compile(FCode, Options) ->
     SFuns  = functions_to_scode(ContractName, Functions, Options),
     SFuns1 = optimize_scode(SFuns, Options),
     FateCode = to_basic_blocks(SFuns1),
-    debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
+    ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
     FateCode.
 
 make_function_id(X) ->
@@ -665,23 +668,23 @@ flatten_s(I) -> I.
 
 optimize_fun(_Funs, Name, {Attrs, Sig, Code}, Options) ->
     Code0 = flatten(Code),
-    debug(opt, Options, "Optimizing ~s\n", [Name]),
+    ?debug(opt, Options, "Optimizing ~s\n", [Name]),
     Code1 = simpl_loop(0, Code0, Options),
     Code2 = desugar(Code1),
     {Attrs, Sig, Code2}.
 
 simpl_loop(N, Code, Options) when N >= ?MAX_SIMPL_ITERATIONS ->
-    debug(opt, Options, "  No simpl_loop fixed_point after ~p iterations.\n\n", [N]),
+    ?debug(opt, Options, "  No simpl_loop fixed_point after ~p iterations.\n\n", [N]),
     Code;
 simpl_loop(N, Code, Options) ->
     ACode = annotate_code(Code),
-    [ debug(opt, Options, "  annotated:\n~s\n", [pp_ann("    ", ACode)]) || N == 0 ],
+    [ ?debug(opt, Options, "  annotated:\n~s\n", [pp_ann("    ", ACode)]) || N == 0 ],
     Code1 = simplify(ACode, Options),
-    [ debug(opt, Options, "  optimized:\n~s\n", [pp_ann("    ", Code1)]) || Code1 /= ACode ],
+    [ ?debug(opt, Options, "  optimized:\n~s\n", [pp_ann("    ", Code1)]) || Code1 /= ACode ],
     Code2 = unannotate(Code1),
     case Code == Code2 of
         true  ->
-            debug(opt, Options, "  Reached simpl_loop fixed point after ~p iteration~s.\n\n",
+            ?debug(opt, Options, "  Reached simpl_loop fixed point after ~p iteration~s.\n\n",
                                 [N, if N /= 1 -> "s"; true -> "" end]),
             Code2;
         false -> simpl_loop(N + 1, Code2, Options)
@@ -1011,7 +1014,7 @@ apply_rules(Fuel, Rules, I, Code, Options) ->
             case is_debug(opt_rules, Options) of
                 true ->
                     {OldCode, NewCode} = drop_common_suffix([I | Code], New ++ Rest),
-                    debug(opt_rules, Options, "  Applied ~p:\n~s  ==>\n~s\n", [RName, pp_ann("    ", OldCode), pp_ann("    ", NewCode)]);
+                    ?debug(opt_rules, Options, "  Applied ~p:\n~s  ==>\n~s\n", [RName, pp_ann("    ", OldCode), pp_ann("    ", NewCode)]);
                 false -> ok
             end,
             lists:foldr(Cons, Rest, New)
