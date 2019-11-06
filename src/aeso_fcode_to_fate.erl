@@ -790,10 +790,10 @@ attributes(I) ->
         loop                                  -> Impure(pc, []);
         'RETURN'                              -> Impure(pc, []);
         {'RETURNR', A}                        -> Impure(pc, A);
-        {'CALL', _}                           -> Impure(?a, []);
+        {'CALL', A}                           -> Impure(?a, [A]);
         {'CALL_R', A, _, B, C, D}             -> Impure(?a, [A, B, C, D]);
         {'CALL_GR', A, _, B, C, D, E}         -> Impure(?a, [A, B, C, D, E]);
-        {'CALL_T', _}                         -> Impure(pc, []);
+        {'CALL_T', A}                         -> Impure(pc, [A]);
         {'CALL_VALUE', A}                     -> Pure(A, []);
         {'JUMP', _}                           -> Impure(pc, []);
         {'JUMPIF', A, _}                      -> Impure(pc, A);
