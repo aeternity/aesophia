@@ -717,11 +717,11 @@ pp_op(loop) -> "LOOP";
 pp_op(I)    ->
     aeb_fate_pp:format_op(I, #{}).
 
-pp_arg(?i(I))    -> io_lib:format("~w", [I]);
-pp_arg({arg, N}) -> io_lib:format("arg~p", [N]);
-pp_arg(?s)       -> "store1";
-pp_arg({var, N}) -> io_lib:format("var~p", [N]);
-pp_arg(?a)       -> "a".
+pp_arg(?i(I))      -> io_lib:format("~w", [I]);
+pp_arg({arg, N})   -> io_lib:format("arg~p", [N]);
+pp_arg({store, N}) -> io_lib:format("store~p", [N]);
+pp_arg({var, N})   -> io_lib:format("var~p", [N]);
+pp_arg(?a)         -> "a".
 
 %% -- Analysis --
 
@@ -1376,7 +1376,7 @@ desugar_args(I) when is_tuple(I) ->
     list_to_tuple([Op | lists:map(fun desugar_arg/1, Args)]);
 desugar_args(I) -> I.
 
-desugar_arg(?s) -> {var, -1};
+desugar_arg({store, N}) -> {var, -N};
 desugar_arg(A) -> A.
 
 %% -- Phase III --------------------------------------------------------------
