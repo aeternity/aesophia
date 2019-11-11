@@ -743,7 +743,7 @@ ann_writes([{switch, Arg, Type, Alts, Def} | Code], Writes, Acc) ->
     Writes1 = ordsets:union(Writes, ordsets:intersection([WritesDef | WritesAlts])),
     ann_writes(Code, Writes1, [{switch, Arg, Type, Alts1, Def1} | Acc]);
 ann_writes([I | Code], Writes, Acc) ->
-    Ws = [ W || W <- var_writes(I), not ?IsState(W) ],
+    Ws = [ W || W <- var_writes(I) ],
     Writes1 = ordsets:union(Writes, Ws),
     Ann = #{ writes_in => Writes, writes_out => Writes1 },
     ann_writes(Code, Writes1, [{i, Ann, I} | Acc]);
@@ -969,7 +969,7 @@ swap_instrs({i, #{ live_in := Live1 }, I}, {i, #{ live_in := Live2, live_out := 
     {{i, #{ live_in => Live1,  live_out => Live2_ }, J},
      {i, #{ live_in => Live2_, live_out => Live3  }, I}}.
 
-live_in(R, _) when ?IsState(R) -> true;
+live_in({store, _}, _) -> true;
 live_in(R, #{ live_in  := LiveIn  }) -> ordsets:is_element(R, LiveIn);
 live_in(R, {i, Ann, _}) -> live_in(R, Ann);
 live_in(R, [I = {i, _, _} | _]) -> live_in(R, I);
@@ -979,7 +979,7 @@ live_in(R, [{switch, A, _, Alts, Def} | _]) ->
 live_in(_, missing) -> false;
 live_in(_, []) -> false.
 
-live_out(R, _) when ?IsState(R) -> true;
+live_out({store, _}, _) -> true;
 live_out(R, #{ live_out := LiveOut }) -> ordsets:is_element(R, LiveOut).
 
 %% -- Optimizations --
