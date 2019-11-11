@@ -1132,20 +1132,21 @@ r_constant_propagation({i, Ann, I}, Code) ->
     end;
 r_constant_propagation(_, _) -> false.
 
-eval_op('ADD', [X, Y]) -> X + Y;
-eval_op('SUB', [X, Y]) -> X - Y;
-eval_op('MUL', [X, Y]) -> X * Y;
-eval_op('DIV', [X, Y]) when Y /= 0 -> X div Y;
-eval_op('MOD', [X, Y]) when Y /= 0 -> X rem Y;
-eval_op('POW', [_, _]) -> no_eval;
-eval_op('LT', [X, Y])  -> X < Y;
-eval_op('GT', [X, Y])  -> X > Y;
-eval_op('EQ', [X, Y])  -> X =:= Y;
-eval_op('ELT', [X, Y]) -> X =< Y;
-eval_op('EGT', [X, Y]) -> X >= Y;
-eval_op('NEQ', [X, Y]) -> X =/= Y;
-eval_op('NOT', [X])    -> not X;
-eval_op(_, _)          -> no_eval.   %% TODO: bits?
+eval_op('ADD', [X, Y]) when is_integer(X), is_integer(Y) -> X + Y;
+eval_op('SUB', [X, Y]) when is_integer(X), is_integer(Y) -> X - Y;
+eval_op('MUL', [X, Y]) when is_integer(X), is_integer(Y) -> X * Y;
+eval_op('DIV', [X, Y]) when is_integer(X), is_integer(Y), Y /= 0 -> X div Y;
+eval_op('MOD', [X, Y]) when is_integer(X), is_integer(Y), Y /= 0 -> X rem Y;
+eval_op('POW', [_, _])  -> no_eval;
+eval_op('LT', [X, Y])   -> X < Y;
+eval_op('GT', [X, Y])   -> X > Y;
+eval_op('EQ', [X, Y])   -> X =:= Y;
+eval_op('ELT', [X, Y])  -> X =< Y;
+eval_op('EGT', [X, Y])  -> X >= Y;
+eval_op('NEQ', [X, Y])  -> X =/= Y;
+eval_op('NOT', [true])  -> false;
+eval_op('NOT', [false]) -> true;
+eval_op(_, _)           -> no_eval.   %% TODO: bits?
 
 %% Prune impossible branches from switches
 r_prune_impossible_branches({switch, ?i(V), Type, Alts, missing}, Code) ->
