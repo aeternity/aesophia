@@ -683,6 +683,8 @@ ann_reads([{switch, Arg, Type, Alts, Def} | Code], Reads, Acc) ->
     {Def1, ReadsDef}   = ann_reads(Def, Reads, []),
     Reads1 = ordsets:union([[Arg], Reads, ReadsDef | ReadsAlts]),
     ann_reads(Code, Reads1, [{switch, Arg, Type, Alts1, Def1} | Acc]);
+ann_reads([{i, _Ann, loop} | Code], _Reads, Acc) ->
+    ann_reads_loop(10, Code, [], Acc);
 ann_reads([{i, _Ann, I} | Code], Reads, Acc) ->
     #{ read := Rs0, write := W, pure := Pure } = attributes(I),
     IsReg   = fun({immediate, _}) -> false;
@@ -704,6 +706,17 @@ ann_reads([{i, _Ann, I} | Code], Reads, Acc) ->
     Ann1    = #{ live_in => LiveIn, live_out => LiveOut },
     ann_reads(Code, Reads2, [{i, Ann1, I} | Acc]);
 ann_reads([], Reads, Acc) -> {Acc, Reads}.
+
+ann_reads_loop(Fuel, Code, Reads, Acc) ->
+    Ann1  = #{ live_in => Reads, live_out => [] },
+    {Acc1, Reads1} = ann_reads(Code, Reads, [{i, Ann1, loop} | Acc]),
+    case Reads1 == Reads of
+        true  -> {Acc1, Reads1};
+        false when Fuel =< 0 ->
+            io:format("WARNING: Loop analysis fuel exhausted!\n"),
+            {Acc1, Reads1};
+        false -> ann_reads_loop(Fuel - 1, Code, Reads1, Acc)
+    end.
 
 %% Instruction attributes: reads, writes and purity (pure means no side-effects
 %% aside from the reads and writes).
@@ -854,8 +867,12 @@ var_writes({i, _, I}) -> var_writes(I);
 var_writes(I) ->
     #{ write := W } = attributes(I),
     case W of
-        {var, _} -> [W];
-        _        -> []
+        {var, _}   -> [W];
+        {arg, _}   -> [W];
+        {store, _} -> [W];
+        {stack, _} -> [];
+        none       -> [];
+        pc         -> []
     end.
 
 -spec independent(sinstr_a(), sinstr_a()) -> boolean().
