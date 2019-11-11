@@ -820,7 +820,7 @@ attributes(I) ->
         {'MICROBLOCK', A}                     -> Pure(A, []);
         {'DIFFICULTY', A}                     -> Pure(A, []);
         {'GASLIMIT', A}                       -> Pure(A, []);
-        {'GAS', A}                            -> Impure(?a, A);
+        {'GAS', A}                            -> Pure(A, []);
         {'LOG0', A}                           -> Impure(none, [A]);
         {'LOG1', A, B}                        -> Impure(none, [A, B]);
         {'LOG2', A, B, C}                     -> Impure(none, [A, B, C]);
