@@ -1200,38 +1200,42 @@ r_inline_store({i, _, {'STORE', R, R}}, Code) ->
 r_inline_store(I = {i, _, {'STORE', R = {var, _}, A}}, Code) ->
     %% Not when A is var unless updating the annotations properly.
     Inline = case A of
-                 {arg, _} -> true;
-                 ?i(_)    -> true;
-                 _        -> false
+                 {arg, _}   -> true;
+                 ?i(_)      -> true;
+                 {store, _} -> true;
+                 _          -> false
              end,
-    if Inline -> r_inline_store([I], R, A, Code);
+    if Inline -> r_inline_store([I], false, R, A, Code);
        true   -> false end;
 r_inline_store(_, _) -> false.
 
-r_inline_store(Acc, R, A, [switch_body | Code]) ->
-    r_inline_store([switch_body | Acc], R, A, Code);
-r_inline_store(Acc, R, A, [{i, Ann, I} | Code]) ->
-    #{ write := W, pure := Pure } = attributes(I),
+r_inline_store(Acc, Progress, R, A, [switch_body | Code]) ->
+    r_inline_store([switch_body | Acc], Progress, R, A, Code);
+r_inline_store(Acc, Progress, R, A, [{i, Ann, I} | Code]) ->
+    #{ write := W } = attributes(I),
     Inl = fun(X) when X == R -> A; (X) -> X end,
-    case not live_in(R, Ann) orelse not Pure orelse lists:member(W, [R, A]) of
-        true  -> false;
-        false ->
-            case op_view(I) of
-                {Op, S, As} ->
-                    case lists:member(R, As) of
-                        true ->
-                            Acc1 = [{i, Ann, from_op_view(Op, S, lists:map(Inl, As))} | Acc],
-                            case r_inline_store(Acc1, R, A, Code) of
-                                false        -> {lists:reverse(Acc1), Code};
-                                {_, _} = Res -> Res
-                            end;
-                        false ->
-                            r_inline_store([{i, Ann, I} | Acc], R, A, Code)
-                    end;
-                _ -> r_inline_store([{i, Ann, I} | Acc], R, A, Code)
+    case live_in(R, Ann) of
+        false -> false;  %% No more reads of R
+        true  ->
+            {I1, Progress1} =
+                case op_view(I) of
+                    {Op, S, As} ->
+                        case lists:member(R, As) of
+                            true  -> {from_op_view(Op, S, lists:map(Inl, As)), true};
+                            false -> {I, Progress}
+                        end;
+                    _ -> {I, Progress}
+                end,
+            Acc1 = [{i, Ann, I1} | Acc],
+            %% Stop if write to R or A
+            case lists:member(W, [R, A]) of
+                true when Progress1 -> {lists:reverse(Acc1), Code};
+                true                -> false;
+                false               -> r_inline_store(Acc1, Progress1, R, A, Code)
             end
     end;
-r_inline_store(_Acc, _, _, _) -> false.
+r_inline_store(Acc, true, _, _, Code) -> {lists:reverse(Acc), Code};
+r_inline_store(_, false, _, _, _) -> false.
 
 %% Shortcut write followed by final read
 r_one_shot_var({i, Ann1, I}, [{i, Ann2, J} | Code]) ->
@@ -1254,7 +1258,7 @@ r_one_shot_var(_, _) -> false.
 r_write_to_dead_var({i, _, {'STORE', ?void, ?a}}, _) -> false; %% Avoid looping
 r_write_to_dead_var({i, Ann, I}, Code) ->
     case op_view(I) of
-        {_Op, R = {var, _}, As} ->
+        {_Op, R, As} when R /= ?a ->
             case live_out(R, Ann) of
                 false ->
                     %% Subtle: we still have to pop the stack if any of the arguments
