@@ -45,82 +45,6 @@
 -define(s, {store, 1}).
 -define(void, {var, 9999}).
 
--define(IsState(X), (is_tuple(X) andalso tuple_size(X) =:= 2 andalso element(1, X) =:= var andalso element(2, X) < 0)).
-
--define(IsOp(Op), (
-     Op =:= 'STORE'           orelse
-     Op =:= 'ADD'             orelse
-     Op =:= 'SUB'             orelse
-     Op =:= 'MUL'             orelse
-     Op =:= 'DIV'             orelse
-     Op =:= 'MOD'             orelse
-     Op =:= 'POW'             orelse
-     Op =:= 'LT'              orelse
-     Op =:= 'GT'              orelse
-     Op =:= 'EQ'              orelse
-     Op =:= 'ELT'             orelse
-     Op =:= 'EGT'             orelse
-     Op =:= 'NEQ'             orelse
-     Op =:= 'AND'             orelse
-     Op =:= 'OR'              orelse
-     Op =:= 'NOT'             orelse
-     Op =:= 'ELEMENT'         orelse
-     Op =:= 'MAP_EMPTY'       orelse
-     Op =:= 'MAP_LOOKUP'      orelse
-     Op =:= 'MAP_LOOKUPD'     orelse
-     Op =:= 'MAP_UPDATE'      orelse
-     Op =:= 'MAP_DELETE'      orelse
-     Op =:= 'MAP_MEMBER'      orelse
-     Op =:= 'MAP_FROM_LIST'   orelse
-     Op =:= 'MAP_TO_LIST'     orelse
-     Op =:= 'MAP_SIZE'        orelse
-     Op =:= 'NIL'             orelse
-     Op =:= 'IS_NIL'          orelse
-     Op =:= 'CONS'            orelse
-     Op =:= 'HD'              orelse
-     Op =:= 'TL'              orelse
-     Op =:= 'LENGTH'          orelse
-     Op =:= 'APPEND'          orelse
-     Op =:= 'STR_JOIN'        orelse
-     Op =:= 'INT_TO_STR'      orelse
-     Op =:= 'ADDR_TO_STR'     orelse
-     Op =:= 'STR_REVERSE'     orelse
-     Op =:= 'STR_LENGTH'      orelse
-     Op =:= 'INT_TO_ADDR'     orelse
-     Op =:= 'VARIANT_TEST'    orelse
-     Op =:= 'VARIANT_ELEMENT' orelse
-     Op =:= 'BITS_NONE'       orelse
-     Op =:= 'BITS_ALL'        orelse
-     Op =:= 'BITS_ALL_N'      orelse
-     Op =:= 'BITS_SET'        orelse
-     Op =:= 'BITS_CLEAR'      orelse
-     Op =:= 'BITS_TEST'       orelse
-     Op =:= 'BITS_SUM'        orelse
-     Op =:= 'BITS_OR'         orelse
-     Op =:= 'BITS_AND'        orelse
-     Op =:= 'BITS_DIFF'       orelse
-     Op =:= 'SHA3'            orelse
-     Op =:= 'SHA256'          orelse
-     Op =:= 'BLAKE2B'         orelse
-     Op =:= 'VERIFY_SIG'           orelse
-     Op =:= 'VERIFY_SIG_SECP256K1' orelse
-     Op =:= 'ECVERIFY_SECP256K1'   orelse
-     Op =:= 'ECRECOVER_SECP256K1'  orelse
-     Op =:= 'CONTRACT_TO_ADDRESS'  orelse
-     Op =:= 'ADDRESS_TO_CONTRACT'  orelse
-     Op =:= 'AUTH_TX_HASH'         orelse
-     Op =:= 'BYTES_TO_INT'         orelse
-     Op =:= 'BYTES_TO_STR'         orelse
-     Op =:= 'BYTES_CONCAT'         orelse
-     Op =:= 'BYTES_SPLIT'          orelse
-     Op =:= 'ORACLE_CHECK'         orelse
-     Op =:= 'ORACLE_CHECK_QUERY'   orelse
-     Op =:= 'IS_ORACLE'            orelse
-     Op =:= 'IS_CONTRACT'          orelse
-     Op =:= 'IS_PAYABLE'           orelse
-     Op =:= 'CREATOR'              orelse
-     false)).
-
 -record(env, { contract, vars = [], locals = [], current_function, tailpos = true }).
 
 %% -- Debugging --------------------------------------------------------------
@@ -1339,10 +1263,11 @@ r_write_to_dead_var({i, Ann, I}, Code) ->
 r_write_to_dead_var(_, _) -> false.
 
 op_view(T) when is_tuple(T) ->
-    case tuple_to_list(T) of
-        [Op, R | As] when ?IsOp(Op) ->
-            {Op, R, As};
-        _ -> false
+    [Op, R | As] = tuple_to_list(T),
+    case attributes(list_to_tuple([Op, dst | [src || _ <- As]])) of
+        #{ write := dst, read := [src] } -> {Op, R, As};
+        #{ write := dst, read := [] }    -> {Op, R, As};
+        _                                -> false
     end;
 op_view(_) -> false.
 
