@@ -619,11 +619,28 @@ read_file(File, Opts) ->
             case maps:get(binary_to_list(File), Files, not_found) of
                 not_found -> {error, not_found};
                 Src       -> {ok, Src}
+            end;
+        escript ->
+            try
+                Escript        = escript:script_name(),
+                {ok, Sections} = escript:extract(Escript, []),
+                Archive        = proplists:get_value(archive, Sections),
+                FileName       = binary_to_list(filename:join([aesophia, priv, stdlib, File])),
+                case zip:extract(Archive, [{file_list, [FileName]}, memory]) of
+                    {ok, [{_, Src}]} -> {ok, Src};
+                    _                -> {error, not_found}
+                end
+            catch _:_ ->
+                {error, not_found}
             end
     end.
 
 stdlib_options() ->
-    [{include, {file_system, [aeso_stdlib:stdlib_include_path()]}}].
+    StdLibDir = aeso_stdlib:stdlib_include_path(),
+    case filelib:is_dir(StdLibDir) of
+        true  -> [{include, {file_system, [StdLibDir]}}];
+        false -> [{include, escript}]
+    end.
 
 get_include_code(File, Ann, Opts) ->
     case {read_file(File, Opts), read_file(File, stdlib_options())} of
