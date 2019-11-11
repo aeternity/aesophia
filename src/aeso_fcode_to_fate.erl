@@ -759,8 +759,7 @@ ann_reads([{switch, Arg, Type, Alts, Def} | Code], Reads, Acc) ->
     {Def1, ReadsDef}   = ann_reads(Def, Reads, []),
     Reads1 = ordsets:union([[Arg], Reads, ReadsDef | ReadsAlts]),
     ann_reads(Code, Reads1, [{switch, Arg, Type, Alts1, Def1} | Acc]);
-ann_reads([{i, Ann, I} | Code], Reads, Acc) ->
-    #{ writes_in := WritesIn, writes_out := WritesOut } = Ann,
+ann_reads([{i, _Ann, I} | Code], Reads, Acc) ->
     #{ read := Rs, write := W, pure := Pure } = attributes(I),
     %% If we write it here it's not live in (unless we also read it)
     Reads1  = Reads -- [W],
@@ -772,8 +771,8 @@ ann_reads([{i, Ann, I} | Code], Reads, Acc) ->
             {{var, _}, true} -> Reads1;
             _                -> ordsets:union(Reads1, Rs)
         end,
-    LiveIn  = ordsets:intersection(Reads2, WritesIn),
-    LiveOut = ordsets:intersection(Reads, WritesOut),
+    LiveIn  = Reads2, % For well-formed code this should be a subset of WritesIn
+    LiveOut = Reads,  % and this of WritesOut,
     Ann1    = #{ live_in => LiveIn, live_out => LiveOut },
     ann_reads(Code, Reads2, [{i, Ann1, I} | Acc]);
 ann_reads([], Reads, Acc) -> {Acc, Reads}.
