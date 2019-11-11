@@ -632,7 +632,7 @@ pp_ann(Ind, [switch_body | Code]) ->
     [Ind, "SWITCH-BODY\n", pp_ann(Ind, Code)];
 pp_ann(Ind, [{i, #{ live_in := In, live_out := Out }, I} | Code]) ->
     Fmt = fun([]) -> "()";
-             (Xs) -> string:join([lists:concat(["var", N]) || {var, N} <- Xs], " ")
+             (Xs) -> string:join([lists:flatten(pp_arg(X)) || X <- Xs], " ")
           end,
     Op  = [Ind, pp_op(desugar_args(I))],
     Ann = [["   % ", Fmt(In), " -> ", Fmt(Out)] || In ++ Out /= []],
@@ -684,7 +684,11 @@ ann_reads([{switch, Arg, Type, Alts, Def} | Code], Reads, Acc) ->
     Reads1 = ordsets:union([[Arg], Reads, ReadsDef | ReadsAlts]),
     ann_reads(Code, Reads1, [{switch, Arg, Type, Alts1, Def1} | Acc]);
 ann_reads([{i, _Ann, I} | Code], Reads, Acc) ->
-    #{ read := Rs, write := W, pure := Pure } = attributes(I),
+    #{ read := Rs0, write := W, pure := Pure } = attributes(I),
+    IsReg   = fun({immediate, _}) -> false;
+                 (?a)             -> false;
+                 (_)              -> true end,
+    Rs      = lists:filter(IsReg, Rs0),
     %% If we write it here it's not live in (unless we also read it)
     Reads1  = Reads -- [W],
     Reads2  =
