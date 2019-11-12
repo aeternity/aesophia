@@ -19,7 +19,6 @@
 
 -type scode()  :: [sinstr()].
 -type sinstr() :: {switch, arg(), stype(), [maybe_scode()], maybe_scode()}  %% last arg is catch-all
-                | switch_body
                 | tuple().    %% FATE instruction
 
 -type arg() :: tuple(). %% Not exported: aeb_fate_ops:fate_arg().
@@ -27,7 +26,6 @@
 %% Annotated scode
 -type scode_a()  :: [sinstr_a()].
 -type sinstr_a() :: {switch, arg(), stype(), [maybe_scode_a()], maybe_scode_a()}  %% last arg is catch-all
-                  | switch_body
                   | {i, ann(), tuple()}.    %% FATE instruction
 
 -type ann() :: #{ live_in := vars(), live_out := vars() }.
@@ -628,8 +626,6 @@ pp_ann(Ind, [{switch, Arg, Type, Alts, Def} | Code]) ->
       || {Tag, Alt} <- lists:zip(Tags, Alts), Alt /= missing],
      [[Ind1, "_ =>\n", pp_ann(Ind2, Def)] || Def /= missing],
      pp_ann(Ind, Code)];
-pp_ann(Ind, [switch_body | Code]) ->
-    [Ind, "SWITCH-BODY\n", pp_ann(Ind, Code)];
 pp_ann(Ind, [{i, #{ live_in := In, live_out := Out }, I} | Code]) ->
     Fmt = fun([]) -> "()";
              (Xs) -> string:join([lists:flatten(pp_arg(X)) || X <- Xs], " ")
@@ -640,6 +636,7 @@ pp_ann(Ind, [{i, #{ live_in := In, live_out := Out }, I} | Code]) ->
      pp_ann(Ind, Code)];
 pp_ann(_, []) -> [].
 
+pp_op(switch_body) -> "SWITCH-BODY";
 pp_op(loop) -> "LOOP";
 pp_op(I)    ->
     aeb_fate_pp:format_op(I, #{}).
@@ -672,7 +669,8 @@ ann_live(LiveTop, [I | Is], LiveOut) ->
     {[I1 | Is1], LiveIn}.
 
 ann_live1(_LiveTop, switch_body, LiveOut) ->
-    {switch_body, LiveOut};
+    Ann = #{ live_in => LiveOut, live_out => LiveOut },
+    {{i, Ann, switch_body}, LiveOut};
 ann_live1(LiveTop, loop, _LiveOut) ->
     Ann = #{ live_in => LiveTop, live_out => [] },
     {{i, Ann, loop}, LiveTop};
@@ -707,6 +705,7 @@ attributes(I) ->
     Impure = fun(W, R) -> Attr(W, R, false) end,
     case I of
         loop                                  -> Impure(pc, []);
+        switch_body                           -> Pure(none, []);
         'RETURN'                              -> Impure(pc, []);
         {'RETURNR', A}                        -> Impure(pc, A);
         {'CALL', A}                           -> Impure(?a, [A]);
@@ -857,8 +856,6 @@ var_writes(I) ->
 -spec independent(sinstr_a(), sinstr_a()) -> boolean().
 %% independent({switch, _, _, _, _}, _) -> false;       %% Commented due to Dialyzer whinging
 independent(_, {switch, _, _, _, _}) -> false;
-%% independent(switch_body, _) -> true;
-independent(_, switch_body) -> true;
 independent({i, _, I}, {i, _, J}) ->
     #{ write := WI, read := RI, pure := PureI } = attributes(I),
     #{ write := WJ, read := RJ, pure := PureJ } = attributes(J),
@@ -880,8 +877,6 @@ merge_ann(#{ live_in := LiveIn }, #{ live_out := LiveOut }) ->
     #{ live_in => LiveIn, live_out => LiveOut }.
 
 %% Swap two instructions. Precondition: the instructions are independent/2.
-swap_instrs(I, switch_body) -> {switch_body, I};
-%% swap_instrs(switch_body, I) -> {I, switch_body};   %% Commented due to Dialyzer whinging
 swap_instrs({i, #{ live_in := Live1 }, I}, {i, #{ live_in := Live2, live_out := Live3 }, J}) ->
     %% Since I and J are independent the J can't read or write anything in
     %% that I writes.
@@ -897,7 +892,6 @@ live_in({store, _}, _) -> true;
 live_in(R, #{ live_in  := LiveIn  }) -> ordsets:is_element(R, LiveIn);
 live_in(R, {i, Ann, _}) -> live_in(R, Ann);
 live_in(R, [I = {i, _, _} | _]) -> live_in(R, I);
-live_in(R, [switch_body | Code]) -> live_in(R, Code);
 live_in(R, [{switch, A, _, Alts, Def} | _]) ->
     R == A orelse lists:any(fun(Code) -> live_in(R, Code) end, [Def | Alts]);
 live_in(_, missing) -> false;
@@ -989,8 +983,8 @@ r_push_consume({i, Ann1, I}, [{i, Ann2, {'STORE', R, ?a}} | Code]) ->
        true   -> false end;
 r_push_consume(_, _) -> false.
 
-inline_push(Ann, Arg, Stack, [switch_body | Code], Acc) ->
-    inline_push(Ann, Arg, Stack, Code, [switch_body | Acc]);
+inline_push(Ann, Arg, Stack, [{i, _, switch_body} = AI | Code], Acc) ->
+    inline_push(Ann, Arg, Stack, Code, [AI | Acc]);
 inline_push(Ann1, Arg, Stack, [{i, Ann2, I} = AI | Code], Acc) ->
     case op_view(I) of
         {Op, R, As} ->
@@ -1064,8 +1058,8 @@ r_swap_write(I = {i, _, _}, [J | Code]) ->
     end;
 r_swap_write(_, _) -> false.
 
-r_swap_write(Pre, I, [switch_body | Code]) ->
-    r_swap_write([switch_body | Pre], I, Code);
+r_swap_write(Pre, I, [{i, _, switch_body} = J | Code]) ->
+    r_swap_write([J | Pre], I, Code);
 r_swap_write(Pre, I, Code0 = [J | Code]) ->
     case apply_rules_once(merge_rules(), I, Code0) of
         {_Rule, New, Rest} ->
@@ -1188,8 +1182,9 @@ r_inline_switch_target(Store = {i, _, {'STORE', R, A}}, [{switch, R, Type, Alts,
 r_inline_switch_target(_, _) -> false.
 
 %% Float switch-body to closest switch
-r_float_switch_body(I = {i, _, _}, [switch_body | Code]) ->
-    {[], [switch_body, I | Code]};
+r_float_switch_body(I = {i, _, _}, [J = {i, _, switch_body} | Code]) ->
+    {J1, I1} = swap_instrs(I, J),
+    {[], [J1, I1 | Code]};
 r_float_switch_body(_, _) -> false.
 
 %% Inline stores
@@ -1207,8 +1202,8 @@ r_inline_store(I = {i, _, {'STORE', R = {var, _}, A}}, Code) ->
        true   -> false end;
 r_inline_store(_, _) -> false.
 
-r_inline_store(Acc, Progress, R, A, [switch_body | Code]) ->
-    r_inline_store([switch_body | Acc], Progress, R, A, Code);
+r_inline_store(Acc, Progress, R, A, [I = {i, _, switch_body} | Code]) ->
+    r_inline_store([I | Acc], Progress, R, A, Code);
 r_inline_store(Acc, Progress, R, A, [{i, Ann, I} | Code]) ->
     #{ write := W } = attributes(I),
     Inl = fun(X) when X == R -> A; (X) -> X end,
@@ -1287,7 +1282,6 @@ from_op_view(Op, R, As) -> list_to_tuple([Op, R | As]).
 -spec unannotate(scode_a())  -> scode();
                 (sinstr_a()) -> sinstr();
                 (missing)    -> missing.
-unannotate(switch_body) -> [switch_body];
 unannotate({switch, Arg, Type, Alts, Def}) ->
     [{switch, Arg, Type, [unannotate(A) || A <- Alts], unannotate(Def)}];
 unannotate(missing) -> missing;
