@@ -164,10 +164,13 @@ init_env(Options) ->
     #{ type_env  => init_type_env(),
        fun_env   => #{},
        builtins  => builtins(),
-       con_env   => #{["None"]        => #con_tag{ tag = 0, arities = [0, 1] },
-                      ["Some"]        => #con_tag{ tag = 1, arities = [0, 1] },
-                      ["RelativeTTL"] => #con_tag{ tag = 0, arities = [1, 1] },
-                      ["FixedTTL"]    => #con_tag{ tag = 1, arities = [1, 1] }
+       con_env   => #{["None"]            => #con_tag{ tag = 0, arities = [0, 1] },
+                      ["Some"]            => #con_tag{ tag = 1, arities = [0, 1] },
+                      ["RelativeTTL"]     => #con_tag{ tag = 0, arities = [1, 1] },
+                      ["FixedTTL"]        => #con_tag{ tag = 1, arities = [1, 1] },
+                      ["AccountPointee"]  => #con_tag{ tag = 0, arities = [1, 1, 1] },
+                      ["OraclePointee"]   => #con_tag{ tag = 1, arities = [1, 1, 1] },
+                      ["ContractPointee"] => #con_tag{ tag = 2, arities = [1, 1, 1] }
                      },
        options   => Options,
        functions => #{} }.
@@ -188,7 +191,7 @@ builtins() ->
                               {"respond", 4}, {"extend", 3}, {"get_answer", 2},
                               {"check", 1}, {"check_query", 2}]},
               {["AENS"],     [{"resolve", 2}, {"preclaim", 3}, {"claim", 5}, {"transfer", 4},
-                              {"revoke", 3}]},
+                              {"revoke", 3}, {"update", 6}]},
               {["Map"],      [{"from_list", 1}, {"to_list", 1}, {"lookup", 2},
                               {"lookup_default", 3}, {"delete", 2}, {"member", 2}, {"size", 1}]},
               {["Crypto"],   [{"verify_sig", 3}, {"verify_sig_secp256k1", 3},
@@ -212,20 +215,21 @@ builtins() ->
 
 -spec init_type_env() -> type_env().
 init_type_env() ->
-    #{ ["int"]          => ?type(integer),
-       ["bool"]         => ?type(boolean),
-       ["bits"]         => ?type(bits),
-       ["char"]         => ?type(integer),
-       ["string"]       => ?type(string),
-       ["address"]      => ?type(address),
-       ["hash"]         => ?type(hash),
-       ["signature"]    => ?type(signature),
-       ["oracle"]       => ?type(Q, R, {oracle, Q, R}),
-       ["oracle_query"] => ?type(_, _, oracle_query),    %% TODO: not in Fate
-       ["list"]         => ?type(T, {list, T}),
-       ["map"]          => ?type(K, V, {map, K, V}),
-       ["option"]       => ?type(T, {variant, [[], [T]]}),
-       ["Chain", "ttl"] => ?type({variant, [[integer], [integer]]})
+    #{ ["int"]             => ?type(integer),
+       ["bool"]            => ?type(boolean),
+       ["bits"]            => ?type(bits),
+       ["char"]            => ?type(integer),
+       ["string"]          => ?type(string),
+       ["address"]         => ?type(address),
+       ["hash"]            => ?type(hash),
+       ["signature"]       => ?type(signature),
+       ["oracle"]          => ?type(Q, R, {oracle, Q, R}),
+       ["oracle_query"]    => ?type(_, _, oracle_query),    %% TODO: not in Fate
+       ["list"]            => ?type(T, {list, T}),
+       ["map"]             => ?type(K, V, {map, K, V}),
+       ["option"]          => ?type(T, {variant, [[], [T]]}),
+       ["Chain", "ttl"]    => ?type({variant, [[integer], [integer]]}),
+       ["AENS", "pointee"] => ?type({variant, [[address], [address], [address]]})
      }.
 
 is_no_code(Env) ->

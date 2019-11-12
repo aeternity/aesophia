@@ -389,6 +389,8 @@ global_env() ->
     Signature = {named_arg_t, Ann, SignId, SignId, {typed, Ann, SignDef, SignId}},
     SignFun   = fun(Ts, T) -> {type_sig, [stateful|Ann], none, [Signature], Ts, T} end,
     TTL       = {qid, Ann, ["Chain", "ttl"]},
+    Pointee   = {qid, Ann, ["AENS", "pointee"]},
+
     Fee       = Int,
     [A, Q, R, K, V] = lists:map(TVar, ["a", "q", "r", "k", "v"]),
 
@@ -402,6 +404,10 @@ global_env() ->
                      %% TTL constructors
                      {"RelativeTTL", Fun1(Int, TTL)},
                      {"FixedTTL",    Fun1(Int, TTL)},
+                     %% AENS pointee constructors
+                     {"AccountPointee", Fun1(Address, Pointee)},
+                     {"OraclePointee", Fun1(Address, Pointee)},
+                     {"ContractPointee", Fun1(Address, Pointee)},
                      %% Abort
                      {"abort", Fun1(String, A)},
                      {"require", Fun([Bool, String], Unit)}])
@@ -462,7 +468,9 @@ global_env() ->
                       {"preclaim", SignFun([Address, Hash], Unit)},
                       {"claim",    SignFun([Address, String, Int, Int], Unit)},
                       {"transfer", SignFun([Address, Address, String], Unit)},
-                      {"revoke",   SignFun([Address, String], Unit)}]) },
+                      {"revoke",   SignFun([Address, String], Unit)},
+                      {"update",   SignFun([Address, String, Option(TTL), Option(TTL), Option(Map(String, Pointee))], Unit)}])
+        , types = MkDefs([{"pointee", 0}]) },
 
     MapScope = #scope
         { funs = MkDefs(

@@ -463,6 +463,7 @@ is_builtin_fun({qid, _, ["AENS", "preclaim"]}, _Icode)                       -> 
 is_builtin_fun({qid, _, ["AENS", "claim"]}, _Icode)                          -> true;
 is_builtin_fun({qid, _, ["AENS", "transfer"]}, _Icode)                       -> true;
 is_builtin_fun({qid, _, ["AENS", "revoke"]}, _Icode)                         -> true;
+is_builtin_fun({qid, _, ["AENS", "update"]}, _Icode)                         -> true;
 is_builtin_fun({qid, _, ["Map", "lookup"]}, _Icode)                          -> true;
 is_builtin_fun({qid, _, ["Map", "lookup_default"]}, _Icode)                  -> true;
 is_builtin_fun({qid, _, ["Map", "member"]}, _Icode)                          -> true;
@@ -617,6 +618,12 @@ builtin_code(_, {qid, _, ["AENS", "revoke"]}, Args, _, _, Icode) ->
     prim_call(?PRIM_CALL_AENS_REVOKE, #integer{value = 0},
               [ast_body(Addr, Icode), ast_body(Name, Icode), ast_body(Sign, Icode)],
               [word, word, sign_t()], {tuple, []});
+
+builtin_code(_, {qid, _, ["AENS", "update"]}, Args, _, _, Icode) ->
+    {Sign, [Addr, Name, TTL, ClientTTL, Pointers]} = get_signature_arg(Args),
+    prim_call(?PRIM_CALL_AENS_UPDATE, #integer{value = 0},
+              [ast_body(Addr, Icode), ast_body(Name, Icode), ast_body(TTL, Icode), ast_body(ClientTTL, Icode), ast_body(Pointers, Icode), ast_body(Sign, Icode)],
+              [word, string, word, word, word, sign_t()], {tuple, []});
 
 %% -- Maps
 %% -- lookup functions
@@ -925,6 +932,9 @@ ast_typerep1({variant_t, Cons}, Icode) ->
 
 ttl_t(Icode) ->
     ast_typerep({qid, [], ["Chain", "ttl"]}, Icode).
+
+%% pointee_t(Icode) ->
+%%     ast_typerep({qid, [], ["AENS", "pointee"]}, Icode).
 
 sign_t() -> bytes_t(64).
 bytes_t(Len) when Len =< 32 -> word;

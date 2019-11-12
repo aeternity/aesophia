@@ -73,28 +73,33 @@ new(Options) ->
 
 builtin_types() ->
     Word = fun([]) -> word end,
-    #{ "bool"         => Word
-     , "int"          => Word
-     , "char"         => Word
-     , "bits"         => Word
-     , "string"       => fun([]) -> string end
-     , "address"      => Word
-     , "hash"         => Word
-     , "unit"         => fun([]) -> {tuple, []} end
-     , "signature"    => fun([]) -> {tuple, [word, word]} end
-     , "oracle"       => fun([_, _]) -> word end
-     , "oracle_query" => fun([_, _]) -> word end
-     , "list"         => fun([A]) -> {list, A} end
-     , "option"       => fun([A]) -> {variant, [[], [A]]} end
-     , "map"          => fun([K, V]) -> map_typerep(K, V) end
-     , ["Chain", "ttl"] => fun([]) -> {variant, [[word], [word]]} end
+    #{ "bool"              => Word
+     , "int"               => Word
+     , "char"              => Word
+     , "bits"              => Word
+     , "string"            => fun([]) -> string end
+     , "address"           => Word
+     , "hash"              => Word
+     , "unit"              => fun([]) -> {tuple, []} end
+     , "signature"         => fun([]) -> {tuple, [word, word]} end
+     , "oracle"            => fun([_, _]) -> word end
+     , "oracle_query"      => fun([_, _]) -> word end
+     , "list"              => fun([A]) -> {list, A} end
+     , "option"            => fun([A]) -> {variant, [[], [A]]} end
+     , "map"               => fun([K, V]) -> map_typerep(K, V) end
+     , ["Chain", "ttl"]    => fun([]) -> {variant, [[word], [word]]} end
+     , ["AENS", "pointee"] => fun([]) -> {variant, [[word], [word], [word]]} end
      }.
 
 builtin_constructors() ->
-    #{ ["RelativeTTL"] => 0
-     , ["FixedTTL"]    => 1
-     , ["None"]        => 0
-     , ["Some"]        => 1 }.
+    #{ ["RelativeTTL"]     => 0
+     , ["FixedTTL"]        => 1
+     , ["None"]            => 0
+     , ["Some"]            => 1
+     , ["AccountPointee"]  => 0
+     , ["OraclePointee"]   => 1
+     , ["ContractPointee"] => 2
+     }.
 
 map_typerep(K, V) ->
     {map, K, V}.
@@ -146,4 +151,3 @@ get_constructor_tag(Name, #{constructors := Constructors}) ->
         undefined -> error({undefined_constructor, Name});
         Tag       -> Tag
     end.
-
