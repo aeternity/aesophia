@@ -1255,8 +1255,9 @@ r_one_shot_var(_, _) -> false.
 %% Remove writes to dead variables
 r_write_to_dead_var({i, _, {'STORE', ?void, ?a}}, _) -> false; %% Avoid looping
 r_write_to_dead_var({i, Ann, I}, Code) ->
+    #{ pure := Pure } = attributes(I),
     case op_view(I) of
-        {_Op, R, As} when R /= ?a ->
+        {_Op, R, As} when R /= ?a, Pure ->
             case live_out(R, Ann) of
                 false ->
                     %% Subtle: we still have to pop the stack if any of the arguments
@@ -1268,15 +1269,18 @@ r_write_to_dead_var({i, Ann, I}, Code) ->
     end;
 r_write_to_dead_var(_, _) -> false.
 
+op_view({'ABORT', R}) -> {'ABORT', none, [R]};
 op_view(T) when is_tuple(T) ->
     [Op, R | As] = tuple_to_list(T),
+    CheckReads = fun(Rs, X) -> case [] == Rs -- [dst, src] of true -> X; false -> false end end,
     case attributes(list_to_tuple([Op, dst | [src || _ <- As]])) of
-        #{ write := dst, read := [src] } -> {Op, R, As};
-        #{ write := dst, read := [] }    -> {Op, R, As};
-        _                                -> false
+        #{ write := dst, read := Rs  } -> CheckReads(Rs, {Op, R, As});
+        #{ write := none, read := Rs } -> CheckReads(Rs, {Op, none, [R | As]});
+        _                              -> false
     end;
 op_view(_) -> false.
 
+from_op_view(Op, none, As) -> list_to_tuple([Op | As]);
 from_op_view(Op, R, As) -> list_to_tuple([Op, R | As]).
 
 %% Desugar and specialize and remove annotations
