@@ -1303,6 +1303,7 @@ desugar({'ADD', A,  A,  ?i(1)}) -> [aeb_fate_ops:inc(desugar_arg(A))];
 desugar({'SUB', ?a, ?a, ?i(1)}) -> [aeb_fate_ops:dec()];
 desugar({'SUB', A, A, ?i(1)})   -> [aeb_fate_ops:dec(desugar_arg(A))];
 desugar({'STORE', ?a, A})       -> [aeb_fate_ops:push(desugar_arg(A))];
+desugar({'STORE', R, ?a})       -> [aeb_fate_ops:pop(desugar_arg(R))];
 desugar({switch, Arg, Type, Alts, Def}) ->
     [{switch, desugar_arg(Arg), Type, [desugar(A) || A <- Alts], desugar(Def)}];
 desugar(missing) -> missing;
