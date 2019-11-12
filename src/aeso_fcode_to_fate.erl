@@ -653,73 +653,52 @@ pp_arg(?a)         -> "a".
 %% -- Analysis --
 
 annotate_code(Code) ->
-    {WCode, _} = ann_writes(Code, ordsets:new(), []),
-    {RCode, _} = ann_reads(WCode, ordsets:new(), []),
-    RCode.
+    annotate_code(5, [], Code).
 
-%% Reverses the code
-ann_writes(missing, Writes, []) -> {missing, Writes};
-ann_writes([switch_body | Code], Writes, Acc) ->
-    ann_writes(Code, Writes, [switch_body | Acc]);
-ann_writes([{switch, Arg, Type, Alts, Def} | Code], Writes, Acc) ->
-    {Alts1, WritesAlts} = lists:unzip([ ann_writes(Alt, Writes, []) || Alt <- Alts ]),
-    {Def1, WritesDef}   = ann_writes(Def, Writes, []),
-    Writes1 = ordsets:union(Writes, ordsets:intersection([WritesDef | WritesAlts])),
-    ann_writes(Code, Writes1, [{switch, Arg, Type, Alts1, Def1} | Acc]);
-ann_writes([I | Code], Writes, Acc) ->
-    Ws = [ W || W <- var_writes(I) ],
-    Writes1 = ordsets:union(Writes, Ws),
-    Ann = #{ writes_in => Writes, writes_out => Writes1 },
-    ann_writes(Code, Writes1, [{i, Ann, I} | Acc]);
-ann_writes([], Writes, Acc) ->
-    {Acc, Writes}.
-
-%% Takes reversed code and unreverses it.
-ann_reads(missing, Reads, []) -> {missing, Reads};
-ann_reads([switch_body | Code], Reads, Acc) ->
-    ann_reads(Code, Reads, [switch_body | Acc]);
-ann_reads([{switch, Arg, Type, Alts, Def} | Code], Reads, Acc) ->
-    {Alts1, ReadsAlts} = lists:unzip([ ann_reads(Alt, Reads, []) || Alt <- Alts ]),
-    {Def1, ReadsDef}   = ann_reads(Def, Reads, []),
-    Reads1 = ordsets:union([[Arg], Reads, ReadsDef | ReadsAlts]),
-    ann_reads(Code, Reads1, [{switch, Arg, Type, Alts1, Def1} | Acc]);
-ann_reads([{i, _Ann, loop} | Code], _Reads, Acc) ->
-    ann_reads_loop(10, Code, [], Acc);
-ann_reads([{i, _Ann, I} | Code], Reads, Acc) ->
-    #{ read := Rs0, write := W, pure := Pure } = attributes(I),
-    IsReg   = fun({immediate, _}) -> false;
-                 (?a)             -> false;
-                 (_)              -> true end,
-    Rs      = lists:filter(IsReg, Rs0),
-    %% If we write it here it's not live in (unless we also read it)
-    Reads1  = Reads -- [W],
-    Reads2  =
-        case {W, Pure andalso not ordsets:is_element(W, Reads)} of
-            %% This is a little bit dangerous: if writing to a dead variable, we ignore
-            %% the reads. Relies on dead writes to be removed by the
-            %% optimisations below (r_write_to_dead_var).
-            {{var, _}, true} -> Reads1;
-            _                -> ordsets:union(Reads1, Rs)
-        end,
-    LiveIn  = Reads2, % For well-formed code this should be a subset of WritesIn
-    LiveOut = Reads,  % and this of WritesOut,
-    Ann1    = #{ live_in => LiveIn, live_out => LiveOut },
-    ann_reads(Code, Reads2, [{i, Ann1, I} | Acc]);
-ann_reads([], Reads, Acc) -> {Acc, Reads}.
-
-ann_reads_loop(Fuel, Code, Reads, Acc) ->
-    Ann1  = #{ live_in => Reads, live_out => [] },
-    {Acc1, Reads1} = ann_reads(Code, Reads, [{i, Ann1, loop} | Acc]),
-    case Reads1 == Reads of
-        true  -> {Acc1, Reads1};
+annotate_code(Fuel, LiveTop, Code) ->
+    {Code1, LiveIn} = ann_live(LiveTop, Code, []),
+    case LiveIn == LiveTop of
+        true  -> Code1;
         false when Fuel =< 0 ->
-            io:format("WARNING: Loop analysis fuel exhausted!\n"),
-            {Acc1, Reads1};
-        false -> ann_reads_loop(Fuel - 1, Code, Reads1, Acc)
+            aeso_errors:throw(aeso_code_errors:format(liveness_analysis_out_of_fuel));
+        false -> annotate_code(Fuel - 1, LiveIn, Code)
     end.
 
-%% Instruction attributes: reads, writes and purity (pure means no side-effects
-%% aside from the reads and writes).
+ann_live(_LiveTop, missing, _LiveOut) -> {missing, []};
+ann_live(_LiveTop, [], LiveOut)       -> {[], LiveOut};
+ann_live(LiveTop, [I | Is], LiveOut) ->
+    {Is1, LiveMid} = ann_live(LiveTop, Is, LiveOut),
+    {I1, LiveIn}   = ann_live1(LiveTop, I, LiveMid),
+    {[I1 | Is1], LiveIn}.
+
+ann_live1(_LiveTop, switch_body, LiveOut) ->
+    {switch_body, LiveOut};
+ann_live1(LiveTop, loop, _LiveOut) ->
+    Ann = #{ live_in => LiveTop, live_out => [] },
+    {{i, Ann, loop}, LiveTop};
+ann_live1(LiveTop, {switch, Arg, Type, Alts, Def}, LiveOut) ->
+    Read              = [Arg || is_reg(Arg)],
+    {Alts1, LiveAlts} = lists:unzip([ ann_live(LiveTop, Alt, LiveOut) || Alt <- Alts ]),
+    {Def1,  LiveDef}  = ann_live(LiveTop, Def, LiveOut),
+    LiveIn = ordsets:union([Read, LiveDef | LiveAlts]),
+    {{switch, Arg, Type, Alts1, Def1}, LiveIn};
+ann_live1(_LiveTop, I, LiveOut) ->
+    #{ read := Reads0, write := W } = attributes(I),
+    Reads   = lists:filter(fun is_reg/1, Reads0),
+    %% If we write it here it's not live in (unless we also read it)
+    LiveIn = ordsets:union(LiveOut -- [W], Reads),
+    Ann = #{ live_in => LiveIn, live_out => LiveOut },
+    {{i, Ann, I}, LiveIn}.
+
+is_reg(?a)             -> false;
+is_reg(none)           -> false;
+is_reg(pc)             -> false;
+is_reg({immediate, _}) -> false;
+is_reg({arg, _})       -> true;
+is_reg({store, _})     -> true;
+is_reg({var, _})       -> true.
+
+%% Instruction attributes: reads, writes and purity (pure means no writing to the chain).
 attributes(I) ->
     Set  = fun(L) when is_list(L) -> ordsets:from_list(L);
               (X)                 -> ordsets:from_list([X]) end,
@@ -1196,6 +1175,7 @@ pick_branch(_Type, _V, _Alts) ->
 r_inline_switch_target(Store = {i, _, {'STORE', R, A}}, [{switch, R, Type, Alts, Def} | Code]) ->
     Switch = {switch, A, Type, Alts, Def},
     case R of
+        A        -> false;
         ?a       -> {[Switch], Code};
         {var, _} ->
             case lists:any(fun(Alt) -> live_in(R, Alt) end, [Def | Alts]) of
