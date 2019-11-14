@@ -1127,7 +1127,7 @@ r_prune_impossible_branches({switch, ?i(V), Type, Alts, missing}, Code) ->
         false -> false;
         Alt   -> {Alt, Code}
     end;
-r_prune_impossible_branches({switch, ?i(V), boolean, [False, True] = Alts, Def}, Code) ->
+r_prune_impossible_branches({switch, ?i(V), boolean, [False, True] = Alts, Def}, Code) when V == true; V == false ->
     Alts1 = [if V -> missing; true -> False   end,
              if V -> True;    true -> missing end],
     case Alts == Alts1 of
@@ -1139,7 +1139,7 @@ r_prune_impossible_branches({switch, ?i(V), boolean, [False, True] = Alts, Def},
             end
     end;
 r_prune_impossible_branches(Variant = {i, _, {'VARIANT', R, ?i(_), ?i(Tag), ?i(_)}},
-                            [{switch, R, Type, Alts, missing} | Code]) ->
+                            [{switch, R, Type = {variant, _}, Alts, missing} | Code]) ->
     case {R, lists:nth(Tag + 1, Alts)} of
         {_, missing} ->
             Alts1 = [missing || _ <- Alts],
@@ -1156,7 +1156,7 @@ r_prune_impossible_branches(Variant = {i, _, {'VARIANT', R, ?i(_), ?i(Tag), ?i(_
     end;
 r_prune_impossible_branches(_, _) -> false.
 
-pick_branch(boolean, V, [False, True]) ->
+pick_branch(boolean, V, [False, True]) when V == true; V == false ->
     Alt = if V -> True; true -> False end,
     case Alt of
         missing -> false;
