@@ -12,6 +12,14 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+run_test(Test) ->
+    TestFun = list_to_atom(lists:concat([Test, "_test_"])),
+    [ begin
+          io:format("~s\n", [Label]),
+          Fun()
+      end || {Label, Fun} <- ?MODULE:TestFun() ],
+    ok.
+
 %%  Very simply test compile the given contracts. Only basic checks
 %%  are made on the output, just that it is a binary which indicates
 %%  that the compilation worked.
@@ -701,4 +709,45 @@ failing_code_gen_contracts() ->
             "  {f : (int) => int}\n"
             "The state cannot contain functions in the AEVM. Use FATE if you need this.")
     ].
+
+validation_test_() ->
+    [{"Validation fail: " ++ C1 ++ " /= " ++ C2,
+      fun() ->
+        Actual = case validate(C1, C2) of
+                    {error, Errs} -> Errs;
+                    ok -> #{}
+                 end,
+        check_errors(Expect, Actual)
+      end} || {C1, C2, Expect} <- validation_fails()] ++
+    [{"Validation of " ++ C,
+      fun() ->
+        ?assertEqual(ok, validate(C, C))
+      end} || C <- compilable_contracts()].
+
+validation_fails() ->
+    [{"deadcode", "nodeadcode",
+      [<<"Data error:\n"
+         "Byte code does not match source code.\n"
+         "- Functions in the source code but not in the byte code:\n"
+         "    .MyList.map2">>]},
+     {"validation_test1", "validation_test2",
+      [<<"Data error:\n"
+         "Byte code does not match source code.\n"
+         "- The implementation of the function code_fail is different.\n"
+         "- The attributes of the function attr_fail differ:\n"
+         "    Byte code:   payable\n"
+         "    Source code: \n"
+         "- The type of the function type_fail differs:\n"
+         "    Byte code:   integer => integer\n"
+         "    Source code: {tvar,0} => {tvar,0}">>]},
+     {"validation_test1", "validation_test3",
+      [<<"Data error:\n"
+         "Byte code contract is not payable, but source code contract is.">>]}].
+
+validate(Contract1, Contract2) ->
+    ByteCode = #{ fate_code := FCode } = compile(fate, Contract1),
+    FCode1   = aeb_fate_code:serialize(aeb_fate_code:strip_init_function(FCode)),
+    Source   = aeso_test_utils:read_contract(Contract2),
+    aeso_compiler:validate_byte_code(ByteCode#{ byte_code := FCode1 }, Source,
+                                     [{backend, fate}, {include, {file_system, [aeso_test_utils:contract_path()]}}]).
 

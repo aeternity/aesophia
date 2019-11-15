@@ -1,0 +1,4 @@
+contract ValidationTest =
+  entrypoint attr_fail() = ()
+  entrypoint type_fail(x) = x
+  entrypoint code_fail(x) = x - 1
