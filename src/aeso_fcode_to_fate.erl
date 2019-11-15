@@ -984,7 +984,8 @@ r_push_consume({i, Ann1, I}, [{i, Ann2, {'STORE', R, ?a}} | Code]) ->
 r_push_consume(_, _) -> false.
 
 inline_push(Ann, Arg, Stack, [{i, _, switch_body} = AI | Code], Acc) ->
-    inline_push(Ann, Arg, Stack, Code, [AI | Acc]);
+    {AI1, {i, Ann1, _}} = swap_instrs({i, Ann, {'STORE', ?a, Arg}}, AI),
+    inline_push(Ann1, Arg, Stack, Code, [AI1 | Acc]);
 inline_push(Ann1, Arg, Stack, [{i, Ann2, I} = AI | Code], Acc) ->
     case op_view(I) of
         {Op, R, As} ->
@@ -1059,7 +1060,8 @@ r_swap_write(I = {i, _, _}, [J | Code]) ->
 r_swap_write(_, _) -> false.
 
 r_swap_write(Pre, I, [{i, _, switch_body} = J | Code]) ->
-    r_swap_write([J | Pre], I, Code);
+    {J1, I1} = swap_instrs(I, J),
+    r_swap_write([J1 | Pre], I1, Code);
 r_swap_write(Pre, I, Code0 = [J | Code]) ->
     case apply_rules_once(merge_rules(), I, Code0) of
         {_Rule, New, Rest} ->
