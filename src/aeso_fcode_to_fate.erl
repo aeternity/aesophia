@@ -1141,7 +1141,7 @@ r_prune_impossible_branches({switch, ?i(V), boolean, [False, True] = Alts, Def},
             end
     end;
 r_prune_impossible_branches(Variant = {i, _, {'VARIANT', R, ?i(_), ?i(Tag), ?i(_)}},
-                            [{switch, R, Type = {variant, _}, Alts, missing} | Code]) ->
+                            [{switch, R, Type = {variant, _}, Alts, missing} | Code]) when is_integer(Tag) ->
     case {R, lists:nth(Tag + 1, Alts)} of
         {_, missing} ->
             Alts1 = [missing || _ <- Alts],
