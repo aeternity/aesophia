@@ -1168,7 +1168,13 @@ pick_branch(_Type, _V, _Alts) ->
     false.
 
 %% STORE R A, SWITCH R --> SWITCH A
-r_inline_switch_target(Store = {i, _, {'STORE', R, A}}, [{switch, R, Type, Alts, Def} | Code]) ->
+r_inline_switch_target({i, Ann, {'STORE', R, A}}, [{switch, R, Type, Alts, Def} | Code]) ->
+    Ann1   =
+        case is_reg(A) of
+            true  -> Ann#{ live_out := ordsets:add_element(A, maps:get(live_out, Ann)) };
+            false -> Ann
+        end,
+    Store  = {i, Ann1, {'STORE', R, A}},
     Switch = {switch, A, Type, Alts, Def},
     case R of
         A        -> false;
