@@ -20,7 +20,7 @@ from_aevm(word, {app_t, _, {id, _, "oracle_query"}, _}, N) -> address_literal(or
 from_aevm(word, {con, _, _Name},                        N) -> address_literal(contract_pubkey, N);
 from_aevm(word, {id, _, "int"}, N0) ->
     <<N:256/signed>> = <<N0:256>>,
-    if N < 0 -> {app, [], {'-', []}, [{int, [], -N}]};
+    if N < 0 -> {app, [{format, prefix}], {'-', []}, [{int, [], -N}]};
        true  -> {int, [], N} end;
 from_aevm(word, {id, _, "bits"}, N0) ->
     <<N:256/signed>> = <<N0:256>>,
@@ -78,7 +78,7 @@ from_fate({con, _, _Name},  ?FATE_CONTRACT(Bin)) -> {contract_pubkey, [], Bin};
 from_fate({bytes_t, _, N},  ?FATE_BYTES(Bin)) when byte_size(Bin) == N -> {bytes, [], Bin};
 from_fate({id, _, "bits"},  ?FATE_BITS(N)) -> make_bits(N);
 from_fate({id, _, "int"},     N) when is_integer(N) ->
-    if N < 0 -> {app, [], {'-', []}, [{int, [], -N}]};
+    if N < 0 -> {app, [{format, prefix}], {'-', []}, [{int, [], -N}]};
        true  -> {int, [], N} end;
 from_fate({id, _, "bool"},    B) when is_boolean(B) -> {bool, [], B};
 from_fate({id, _, "string"}, S) when is_binary(S) -> {string, [], S};
