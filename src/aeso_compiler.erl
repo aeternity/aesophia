@@ -508,6 +508,14 @@ icode_to_term(T = {map, KT, VT}, M) ->
             #{};
         _ -> throw({todo, M})
     end;
+icode_to_term(word, {unop, 'bnot', A}) ->
+    bnot icode_to_term(word, A);
+icode_to_term(word, {binop, 'bor', A, B}) ->
+    icode_to_term(word, A) bor icode_to_term(word, B);
+icode_to_term(word, {binop, 'bsl', A, B}) ->
+    icode_to_term(word, B) bsl icode_to_term(word, A);
+icode_to_term(word, {binop, 'band', A, B}) ->
+    icode_to_term(word, A) band icode_to_term(word, B);
 icode_to_term(typerep, _) ->
     throw({todo, typerep});
 icode_to_term(T, V) ->
