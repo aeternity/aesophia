@@ -1,0 +1,4 @@
+payable contract ValidationTest =
+  payable entrypoint attr_fail() = ()
+  entrypoint type_fail(x : int) = x
+  entrypoint code_fail(x) = x + 1
