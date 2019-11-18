@@ -261,6 +261,18 @@ term_to_fate({tuple, As}) ->
 term_to_fate({con, Ar, I, As}) ->
     FateAs = [ term_to_fate(A) || A <- As ],
     aeb_fate_data:make_variant(Ar, I, list_to_tuple(FateAs));
+term_to_fate({builtin, bits_all, []}) ->
+    aeb_fate_data:make_bits(-1);
+term_to_fate({builtin, bits_none, []}) ->
+    aeb_fate_data:make_bits(0);
+term_to_fate({op, bits_set, [B, I]}) ->
+    {bits, N} = term_to_fate(B),
+    J         = term_to_fate(I),
+    {bits, N bor (1 bsl J)};
+term_to_fate({op, bits_clear, [B, I]}) ->
+    {bits, N} = term_to_fate(B),
+    J         = term_to_fate(I),
+    {bits, N band bnot (1 bsl J)};
 term_to_fate({builtin, map_empty, []}) ->
     aeb_fate_data:make_map(#{});
 term_to_fate({'let', _, {builtin, map_empty, []}, Set}) ->
