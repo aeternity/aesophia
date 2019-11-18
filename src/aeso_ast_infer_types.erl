@@ -469,7 +469,7 @@ global_env() ->
                       {"claim",    SignFun([Address, String, Int, Int], Unit)},
                       {"transfer", SignFun([Address, Address, String], Unit)},
                       {"revoke",   SignFun([Address, String], Unit)},
-                      {"update",   SignFun([Address, String, Option(TTL), Option(TTL), Option(Map(String, Pointee))], Unit)}])
+                      {"update",   SignFun([Address, String, Option(TTL), Option(Int), Option(Map(String, Pointee))], Unit)}])
         , types = MkDefs([{"pointee", 0}]) },
 
     MapScope = #scope
