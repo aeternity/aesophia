@@ -18,9 +18,14 @@ from_aevm(word, {id, _, "address"},                     N) -> address_literal(ac
 from_aevm(word, {app_t, _, {id, _, "oracle"}, _},       N) -> address_literal(oracle_pubkey, N);
 from_aevm(word, {app_t, _, {id, _, "oracle_query"}, _}, N) -> address_literal(oracle_query_id, N);
 from_aevm(word, {con, _, _Name},                        N) -> address_literal(contract_pubkey, N);
-from_aevm(word, {id, _, "int"},     N) -> <<N1:256/signed>> = <<N:256>>, {int, [], N1};
-from_aevm(word, {id, _, "bits"},    N) -> error({todo, bits, N});
-from_aevm(word, {id, _, "bool"},    N) -> {bool, [], N /= 0};
+from_aevm(word, {id, _, "int"}, N0) ->
+    <<N:256/signed>> = <<N0:256>>,
+    if N < 0 -> {app, [], {'-', []}, [{int, [], -N}]};
+       true  -> {int, [], N} end;
+from_aevm(word, {id, _, "bits"}, N0) ->
+    <<N:256/signed>> = <<N0:256>>,
+    make_bits(N);
+from_aevm(word, {id, _, "bool"}, N) -> {bool, [], N /= 0};
 from_aevm(word, {bytes_t, _, Len}, Val) when Len =< 32 ->
     <<Bytes:Len/unit:8, _/binary>> = <<Val:32/unit:8>>,
     {bytes, [], <<Bytes:Len/unit:8>>};
@@ -55,6 +60,7 @@ from_aevm({variant, VmCons}, {variant_t, Cons}, {variant, Tag, Args})
     VmTypes = lists:nth(Tag + 1, VmCons),
     ConType = lists:nth(Tag + 1, Cons),
     from_aevm(VmTypes, ConType, Args);
+from_aevm([], {constr_t, _, Con, []}, []) -> Con;
 from_aevm(VmTypes, {constr_t, _, Con, Types}, Args)
         when length(VmTypes) == length(Types),
              length(VmTypes) == length(Args) ->
@@ -70,8 +76,10 @@ from_fate({app_t, _, {id, _, "oracle"}, _}, ?FATE_ORACLE(Bin)) -> {oracle_pubkey
 from_fate({app_t, _, {id, _, "oracle_query"}, _}, ?FATE_ORACLE_Q(Bin)) -> {oracle_query_id, [], Bin};
 from_fate({con, _, _Name},  ?FATE_CONTRACT(Bin)) -> {contract_pubkey, [], Bin};
 from_fate({bytes_t, _, N},  ?FATE_BYTES(Bin)) when byte_size(Bin) == N -> {bytes, [], Bin};
-from_fate({id, _, "bits"},  ?FATE_BITS(Bin)) -> error({todo, bits, Bin});
-from_fate({id, _, "int"},     N) when is_integer(N) -> {int, [], N};
+from_fate({id, _, "bits"},  ?FATE_BITS(N)) -> make_bits(N);
+from_fate({id, _, "int"},     N) when is_integer(N) ->
+    if N < 0 -> {app, [], {'-', []}, [{int, [], -N}]};
+       true  -> {int, [], N} end;
 from_fate({id, _, "bool"},    B) when is_boolean(B) -> {bool, [], B};
 from_fate({id, _, "string"}, S) when is_binary(S) -> {string, [], S};
 from_fate({app_t, _, {id, _, "list"}, [Type]}, List) when is_list(List) ->
@@ -105,9 +113,23 @@ from_fate({variant_t, Cons}, {variant, Ar, Tag, Args})
             from_fate(ConType, ArgList);
         _ -> throw(cannot_translate_to_sophia)
     end;
+from_fate({constr_t, _, Con, []}, []) -> Con;
 from_fate({constr_t, _, Con, Types}, Args)
         when length(Types) == length(Args) ->
     {app, [], Con, [ from_fate(Type, Arg)
                      || {Type, Arg} <- lists:zip(Types, Args) ]};
 from_fate(_Type, _Data) ->
     throw(cannot_translate_to_sophia).
+
+
+make_bits(N) ->
+    Id = fun(F) -> {qid, [], ["Bits", F]} end,
+    if N < 0 -> make_bits(Id("clear"), Id("all"), 0, bnot N);
+       true  -> make_bits(Id("set"), Id("none"), 0, N) end.
+
+make_bits(_Set, Zero, _I, 0) -> Zero;
+make_bits(Set, Zero, I, N) when 0 == N rem 2 ->
+    make_bits(Set, Zero, I + 1, N div 2);
+make_bits(Set, Zero, I, N) ->
+    {app, [], Set, [make_bits(Set, Zero, I + 1, N div 2), {int, [], I}]}.
+

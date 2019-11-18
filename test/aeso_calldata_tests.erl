@@ -29,11 +29,10 @@ calldata_test_() ->
                   true -> ast_exprs(ContractString, Fun, Args, [{backend, fate}]);
                   false -> undefined
               end,
-           case FateExprs == undefined orelse AevmExprs == undefined of
-               true -> ok;
-               false ->
-                   ?assertEqual(FateExprs, AevmExprs)
-           end
+           ParsedExprs = parse_args(Fun, Args),
+           [ ?assertEqual(ParsedExprs, AevmExprs) || AevmExprs /= undefined ],
+           [ ?assertEqual(ParsedExprs, FateExprs) || FateExprs /= undefined ],
+           ok
         end} || {ContractName, Fun, Args} <- compilable_contracts()].
 
 calldata_aci_test_() ->
@@ -53,19 +52,34 @@ calldata_aci_test_() ->
                   true -> ast_exprs(ContractACI, Fun, Args, [{backend, fate}]);
                   false -> undefined
               end,
-           case FateExprs == undefined orelse AevmExprs == undefined of
-               true -> ok;
-               false ->
-                   ?assertEqual(FateExprs, AevmExprs)
-           end
+           ParsedExprs = parse_args(Fun, Args),
+           [ ?assertEqual(ParsedExprs, AevmExprs) || AevmExprs /= undefined ],
+           [ ?assertEqual(ParsedExprs, FateExprs) || FateExprs /= undefined ],
+           ok
         end} || {ContractName, Fun, Args} <- compilable_contracts()].
 
+parse_args(Fun, Args) ->
+    [{contract, _, _, [{letfun, _, _, _, _, {app, _, _, AST}}]}] =
+        aeso_parser:string("contract Temp = function foo() = " ++ Fun ++ "(" ++ string:join(Args, ", ") ++ ")"),
+    strip_ann(AST).
+
+strip_ann(T) when is_tuple(T) ->
+    strip_ann1(setelement(2, T, []));
+strip_ann(X) -> strip_ann1(X).
+
+strip_ann1({map, [], KVs}) ->
+    {map, [], [{strip_ann(K), strip_ann(V)} || {K, V} <- KVs]};
+strip_ann1(T) when is_tuple(T) ->
+    list_to_tuple(strip_ann1(tuple_to_list(T)));
+strip_ann1(L) when is_list(L) ->
+    lists:map(fun strip_ann/1, L);
+strip_ann1(X) -> X.
 
 ast_exprs(ContractString, Fun, Args, Opts) ->
     {ok, Data} = (catch aeso_compiler:create_calldata(ContractString, Fun, Args, Opts)),
     {ok, _Types, Exprs} = (catch aeso_compiler:decode_calldata(ContractString, Fun, Data, Opts)),
     ?assert(is_list(Exprs)),
-    Exprs.
+    strip_ann(Exprs).
 
 check_errors(Expect, ErrorString) ->
     %% This removes the final single \n as well.
@@ -85,7 +99,9 @@ compilable_contracts() ->
      {"maps", "init", []},
      {"funargs", "menot", ["false"]},
      {"funargs", "append", ["[\"false\", \" is\", \" not\", \" true\"]"]},
-     %% TODO {"funargs", "bitsum", ["Bits.all"]},
+     {"funargs", "bitsum", ["Bits.all"]},
+     {"funargs", "bitsum", ["Bits.clear(Bits.clear(Bits.all, 4), 2)"]}, %% Order matters for test
+     {"funargs", "bitsum", ["Bits.set(Bits.set(Bits.none, 4), 2)"]},
      {"funargs", "read", ["{label = \"question 1\", result = 4}"]},
      {"funargs", "sjutton", ["#0011012003100011012003100011012003"]},
      {"funargs", "sextiosju", ["#01020304050607080910111213141516171819202122232425262728293031323334353637383940"
