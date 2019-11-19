@@ -965,6 +965,7 @@ rules() ->
      ?RULE(r_swap_write),
      ?RULE(r_constant_propagation),
      ?RULE(r_prune_impossible_branches),
+     ?RULE(r_single_successful_branch),
      ?RULE(r_inline_store),
      ?RULE(r_float_switch_body)
     ].
@@ -1170,6 +1171,52 @@ pick_branch(boolean, V, [False, True]) when V == true; V == false ->
     end;
 pick_branch(_Type, _V, _Alts) ->
     false.
+
+%% If there's a single branch that doesn't abort we can push the code for that
+%% out of the switch.
+r_single_successful_branch({switch, R, Type, Alts, Def}, Code) ->
+    case push_code_out_of_switch([Def | Alts]) of
+        {_, none} -> false;
+        {_, many} -> false;
+        {_, []}   -> false;
+        {_, [{i, _, switch_body}]} -> false;
+        {[Def1 | Alts1], PushedOut} ->
+            {[{switch, R, Type, Alts1, Def1} | PushedOut], Code}
+    end;
+r_single_successful_branch(_, _) -> false.
+
+push_code_out_of_switch([]) -> {[], none};
+push_code_out_of_switch([Alt | Alts]) ->
+    {Alt1, PushedAlt}   = push_code_out_of_alt(Alt),
+    {Alts1, PushedAlts} = push_code_out_of_switch(Alts),
+    Pushed =
+        case {PushedAlt, PushedAlts} of
+            {none, _} -> PushedAlts;
+            {_, none} -> PushedAlt;
+            _         -> many
+        end,
+    {[Alt1 | Alts1], Pushed}.
+
+push_code_out_of_alt(missing) -> {missing, none};
+push_code_out_of_alt([Body = {i, _, switch_body} | Code]) ->
+    case does_abort(Code) of
+        true  -> {[Body | Code], none};
+        false -> {[Body], [Body | Code]}  %% Duplicate the switch_body, in case we apply this in the middle of a switch
+    end;
+push_code_out_of_alt([{switch, R, Type, Alts, Def}]) ->
+    {[Def1 | Alts1], Pushed} = push_code_out_of_switch([Def | Alts]),
+    {[{switch, R, Type, Alts1, Def1}], Pushed};
+push_code_out_of_alt(Code) ->
+    {Code, many}. %% Conservative
+
+does_abort([I | Code]) ->
+    does_abort(I) orelse does_abort(Code);
+does_abort({i, _, {'ABORT', _}}) -> true;
+does_abort({i, _, {'EXIT', _}}) -> true;
+does_abort(missing) -> true;
+does_abort({switch, _, _, Alts, Def}) ->
+    lists:all(fun does_abort/1, [Def | Alts]);
+does_abort(_) -> false.
 
 %% STORE R A, SWITCH R --> SWITCH A
 r_inline_switch_target({i, Ann, {'STORE', R, A}}, [{switch, R, Type, Alts, Def} | Code]) ->
@@ -1388,7 +1435,7 @@ block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
     {DefRef, DefBlk} =
         case Default of
             missing when Catchall == none ->
-                FreshBlk([aeb_fate_ops:exit(?i(<<"Incomplete patterns">>))], none);
+                FreshBlk([aeb_fate_ops:abort(?i(<<"Incomplete patterns">>))], none);
             missing -> {Catchall, []};
             _       -> FreshBlk(Default ++ [{jump, RestRef}], Catchall)
                        %% ^ fall-through to the outer catchall
@@ -1453,9 +1500,10 @@ optimize_blocks(Blocks) ->
     RBlockMap = maps:from_list(RBlocks),
     RBlocks1  = reorder_blocks(RBlocks, []),
     RBlocks2  = [ {Ref, inline_block(RBlockMap, Ref, Code)} || {Ref, Code} <- RBlocks1 ],
-    RBlocks3  = remove_dead_blocks(RBlocks2),
-    RBlocks4  = [ {Ref, tweak_returns(Code)} || {Ref, Code} <- RBlocks3 ],
-    Rev(RBlocks4).
+    RBlocks3  = shortcut_jump_chains(RBlocks2),
+    RBlocks4  = remove_dead_blocks(RBlocks3),
+    RBlocks5  = [ {Ref, tweak_returns(Code)} || {Ref, Code} <- RBlocks4 ],
+    Rev(RBlocks5).
 
 %% Choose the next block based on the final jump.
 reorder_blocks([], Acc) ->
@@ -1490,6 +1538,21 @@ inline_block(BlockMap, Ref, [{jump, L} | Code] = Code0) when L /= Ref ->
         _ -> Code0
     end;
 inline_block(_, _, Code) -> Code.
+
+%% Shortcut jumps to blocks with a single jump
+shortcut_jump_chains(RBlocks) ->
+    Subst = lists:foldl(fun({L1, [{jump, L2}]}, Sub) ->
+                            Sub#{ L1 => maps:get(L2, Sub, L2) };
+                           (_, Sub) -> Sub end, #{}, RBlocks),
+    [ {Ref, update_labels(Subst, Code)} || {Ref, Code} <- RBlocks ].
+
+update_labels(Sub, Ref) when is_reference(Ref) ->
+    maps:get(Ref, Sub, Ref);
+update_labels(Sub, L) when is_list(L) ->
+    lists:map(fun(X) -> update_labels(Sub, X) end, L);
+update_labels(Sub, T) when is_tuple(T) ->
+    list_to_tuple(update_labels(Sub, tuple_to_list(T)));
+update_labels(_, X) -> X.
 
 %% Remove unused blocks
 remove_dead_blocks(Blocks = [{Top, _} | _]) ->
