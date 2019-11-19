@@ -1480,11 +1480,15 @@ block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
                     _       -> {Blk#blk{code = Pop ++ AltCode ++ [{jump, RestRef}]}, [], []}
                 end;
             {variant, _Ar} ->
-                MkBlk = fun(missing) -> {DefRef, []};
-                           (ACode)   -> FreshBlk(ACode ++ [{jump, RestRef}], DefRef)
-                        end,
-                {AltRefs, AltBs} = lists:unzip(lists:map(MkBlk, Alts)),
-                {Blk#blk{code = []}, [{switch, Arg, AltRefs}], lists:append(AltBs)}
+                case lists:usort(Alts) == [missing] of
+                    true  -> {Blk#blk{code = Pop ++ [{jump, DefRef}]}, [], []};
+                    false ->
+                        MkBlk = fun(missing) -> {DefRef, []};
+                                   (ACode)   -> FreshBlk(ACode ++ [{jump, RestRef}], DefRef)
+                                end,
+                        {AltRefs, AltBs} = lists:unzip(lists:map(MkBlk, Alts)),
+                        {Blk#blk{code = []}, [{switch, Arg, AltRefs}], lists:append(AltBs)}
+                end
         end,
     Blk2 = Blk1#blk{catchall = DefRef}, %% Update catchall ref
     block(Blk2, Code1 ++ Acc, DefBlk ++ RestBlk ++ AltBlks ++ Blocks, BlockAcc);
