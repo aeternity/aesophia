@@ -19,7 +19,9 @@
 
 -type scode()  :: [sinstr()].
 -type sinstr() :: {switch, arg(), stype(), [maybe_scode()], maybe_scode()}  %% last arg is catch-all
-                | tuple().    %% FATE instruction
+                | switch_body
+                | loop
+                | tuple() | atom().    %% FATE instruction
 
 -type arg() :: tuple(). %% Not exported: aeb_fate_ops:fate_arg().
 
@@ -59,6 +61,10 @@ debug(Tag, Options, Fun) ->
         true  -> Fun();
         false -> ok
     end.
+
+-dialyzer({nowarn_function, [code_error/1]}).
+code_error(Err) ->
+    aeso_errors:throw(aeso_code_errors:format(Err)).
 
 %% -- Main -------------------------------------------------------------------
 
@@ -151,8 +157,6 @@ bind_local(Name, Env) ->
     {I, bind_var(Name, {var, I}, Env)}.
 
 notail(Env) -> Env#env{ tailpos = false }.
-
-code_error(Err) -> error(Err).
 
 lookup_var(#env{vars = Vars}, X) ->
     case lists:keyfind(X, 1, Vars) of
@@ -657,7 +661,7 @@ annotate_code(Fuel, LiveTop, Code) ->
     case LiveIn == LiveTop of
         true  -> Code1;
         false when Fuel =< 0 ->
-            aeso_errors:throw(aeso_code_errors:format(liveness_analysis_out_of_fuel));
+            code_error(liveness_analysis_out_of_fuel);
         false -> annotate_code(Fuel - 1, LiveIn, Code)
     end.
 
@@ -919,7 +923,7 @@ simpl_top(I, Code, Options) ->
     simpl_top(?SIMPL_FUEL, I, Code, Options).
 
 simpl_top(0, I, Code, _Options) ->
-    error({out_of_fuel, I, Code});
+    code_error({optimizer_out_of_fuel, I, Code});
 simpl_top(Fuel, I, Code, Options) ->
     apply_rules(Fuel, rules(), I, Code, Options).
 
