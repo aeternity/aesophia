@@ -1393,6 +1393,8 @@ block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
             _       -> FreshBlk(Default ++ [{jump, RestRef}], Catchall)
                        %% ^ fall-through to the outer catchall
         end,
+    %% If we don't generate a switch, we need to pop the argument if on the stack.
+    Pop = [{'POP', ?void} || Arg == ?a],
     {Blk1, Code1, AltBlks} =
         case Type of
             boolean ->
@@ -1408,7 +1410,7 @@ block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
                         _       -> FalseCode ++ [{jump, RestRef}]
                     end,
                 case lists:usort(Alts) == [missing] of
-                    true  -> {Blk#blk{code = [{jump, DefRef}]}, [], []};
+                    true  -> {Blk#blk{code = Pop ++ [{jump, DefRef}]}, [], []};
                     false ->
                         case Arg of
                             ?i(false) -> {Blk#blk{code = ElseCode}, [], ThenBlk};
@@ -1418,12 +1420,18 @@ block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
                 end;
             tuple ->
                 [TCode] = Alts,
-                {Blk#blk{code = TCode ++ [{jump, RestRef}]}, [], []};
+                case TCode of
+                    missing -> {Blk#blk{code = Pop ++ [{jump, DefRef}]}, [], []};
+                    _       -> {Blk#blk{code = Pop ++ TCode ++ [{jump, RestRef}]}, [], []}
+                end;
             {variant, [_]} ->
                 %% [SINGLE_CON_SWITCH] Single constructor switches don't need a
                 %% switch instruction.
                 [AltCode] = Alts,
-                {Blk#blk{code = AltCode ++ [{jump, RestRef}]}, [], []};
+                case AltCode of
+                    missing -> {Blk#blk{code = Pop ++ [{jump, DefRef}]}, [], []};
+                    _       -> {Blk#blk{code = Pop ++ AltCode ++ [{jump, RestRef}]}, [], []}
+                end;
             {variant, _Ar} ->
                 MkBlk = fun(missing) -> {DefRef, []};
                            (ACode)   -> FreshBlk(ACode ++ [{jump, RestRef}], DefRef)
