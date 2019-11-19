@@ -12,7 +12,7 @@
 -export([compile/2, term_to_fate/1]).
 
 -ifdef(TEST).
--export([optimize_fun/4]).
+-export([optimize_fun/4, to_basic_blocks/1]).
 -endif.
 
 %% -- Preamble ---------------------------------------------------------------
