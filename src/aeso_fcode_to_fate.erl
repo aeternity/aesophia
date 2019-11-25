@@ -1178,7 +1178,6 @@ r_single_successful_branch({switch, R, Type, Alts, Def}, Code) ->
     case push_code_out_of_switch([Def | Alts]) of
         {_, none} -> false;
         {_, many} -> false;
-        {_, []}   -> false;
         {_, [{i, _, switch_body}]} -> false;
         {[Def1 | Alts1], PushedOut} ->
             {[{switch, R, Type, Alts1, Def1} | PushedOut], Code}
