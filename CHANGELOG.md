@@ -13,47 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `Address.to_contract` - casts an address to a (any) contract type.
 - Pragma to check compiler version, e.g. `@compiler >= 4.0`.
-### Changed
-- Nice type error if contract function is called as from a namespace.
-- Fail on function definitions in contracts other than the main contract.
-- Bug fix in variable optimization - don't discard writes to the store/state.
-### Removed
-
-## [4.0.0-rc5] - 2019-09-27
-### Added
-### Changed
-- Bug fixes in error reporting.
-- Bug fix in variable liveness analysis for FATE.
-### Removed
-
-## [4.0.0-rc4] - 2019-09-13
-### Added
 - Handle numeric escapes, i.e. `"\x19Ethereum Signed Message:\n"`, and similar strings.
-### Changed
-### Removed
-
-## [4.0.0-rc3] - 2019-09-12
-### Added
 - `Bytes.concat` and `Bytes.split` are added to be able to
   (de-)construct byte arrays.
 - `[a..b]` language construct, returning the list of numbers between
   `a` and `b` (inclusive). Returns the empty list if `a` > `b`.
 - [Standard libraries] (https://github.com/aeternity/protocol/blob/master/contracts/sophia_stdlib.md)
 - Checks that `init` is not called from other functions.
-### Changed
-- Error messages are changed into a uniform format, and more helpful
-  messages have been added.
-- `Crypto.<hash_fun>` and `String.<hash_fun>` for byte arrays now only
-  hash the actual byte array - not the internal ABI format.
-- More strict checks for polymorphic oracles and higher order oracles
-  and entrypoints.
-- `AENS.claim` is updated with a `NameFee` field - to be able to do
-  name auctions within contracts.
-- Fixed a bug in `Bytes.to_str` for AEVM.
-### Removed
-
-## [4.0.0-rc1] - 2019-08-22
-### Added
 - FATE backend - the compiler is able to produce VM code for both `AEVM` and `FATE`. Many
   of the APIs now take `{backend, aevm | fate}` to decide wich backend to produce artifacts
   for.
@@ -70,6 +36,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that shall be able to receive funds should be marked as payable. `Address.is_payable(a)`
   can be used to check if an (contract) address is payable or not.
 ### Changed
+- Nice type error if contract function is called as from a namespace.
+- Fail on function definitions in contracts other than the main contract.
+- Bug fix in variable optimization - don't discard writes to the store/state.
+- Bug fixes in error reporting.
+- Bug fix in variable liveness analysis for FATE.
+- Error messages are changed into a uniform format, and more helpful
+  messages have been added.
+- `Crypto.<hash_fun>` and `String.<hash_fun>` for byte arrays now only
+  hash the actual byte array - not the internal ABI format.
+- More strict checks for polymorphic oracles and higher order oracles
+  and entrypoints.
+- `AENS.claim` is updated with a `NameFee` field - to be able to do
+  name auctions within contracts.
+- Fixed a bug in `Bytes.to_str` for AEVM.
 - New syntax for tuple types. Now 0-tuple type is encoded as `unit` instead of `()` and
   regular tuples are encoded by interspersing inner types with `*`, for instance `int * string`.
   Parens are not necessary. Note it only affects the types, values remain as their were before,
