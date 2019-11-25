@@ -11,15 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.1.0-rc1] - 2019-11-25
 ### Added
-- Add functionality to check if bytecode from the chain was compiled from given
-  source code. In `aesophia_cli`:
-  ```
-    aesophia_cli --validate cb_... MyContract.aes
-  ```
-  In `aesophia_http`: `validate-byte-code` entrypoint.
 - Support encoding and decoding bit fields in call arguments and results.
 ### Changed
-- Fix bug with standard library includes in `aesophia_cli`.
 - Various improvements to FATE code generator.
 ### Removed
 
