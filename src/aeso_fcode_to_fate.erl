@@ -11,19 +11,23 @@
 
 -export([compile/2, term_to_fate/1]).
 
+-ifdef(TEST).
+-export([optimize_fun/4, to_basic_blocks/1]).
+-endif.
+
 %% -- Preamble ---------------------------------------------------------------
 
 -type scode()  :: [sinstr()].
 -type sinstr() :: {switch, arg(), stype(), [maybe_scode()], maybe_scode()}  %% last arg is catch-all
                 | switch_body
-                | tuple().    %% FATE instruction
+                | loop
+                | tuple() | atom().    %% FATE instruction
 
 -type arg() :: tuple(). %% Not exported: aeb_fate_ops:fate_arg().
 
 %% Annotated scode
 -type scode_a()  :: [sinstr_a()].
 -type sinstr_a() :: {switch, arg(), stype(), [maybe_scode_a()], maybe_scode_a()}  %% last arg is catch-all
-                  | switch_body
                   | {i, ann(), tuple()}.    %% FATE instruction
 
 -type ann() :: #{ live_in := vars(), live_out := vars() }.
@@ -41,82 +45,6 @@
 -define(s, {store, 1}).
 -define(void, {var, 9999}).
 
--define(IsState(X), (is_tuple(X) andalso tuple_size(X) =:= 2 andalso element(1, X) =:= var andalso element(2, X) < 0)).
-
--define(IsOp(Op), (
-     Op =:= 'STORE'           orelse
-     Op =:= 'ADD'             orelse
-     Op =:= 'SUB'             orelse
-     Op =:= 'MUL'             orelse
-     Op =:= 'DIV'             orelse
-     Op =:= 'MOD'             orelse
-     Op =:= 'POW'             orelse
-     Op =:= 'LT'              orelse
-     Op =:= 'GT'              orelse
-     Op =:= 'EQ'              orelse
-     Op =:= 'ELT'             orelse
-     Op =:= 'EGT'             orelse
-     Op =:= 'NEQ'             orelse
-     Op =:= 'AND'             orelse
-     Op =:= 'OR'              orelse
-     Op =:= 'NOT'             orelse
-     Op =:= 'ELEMENT'         orelse
-     Op =:= 'MAP_EMPTY'       orelse
-     Op =:= 'MAP_LOOKUP'      orelse
-     Op =:= 'MAP_LOOKUPD'     orelse
-     Op =:= 'MAP_UPDATE'      orelse
-     Op =:= 'MAP_DELETE'      orelse
-     Op =:= 'MAP_MEMBER'      orelse
-     Op =:= 'MAP_FROM_LIST'   orelse
-     Op =:= 'MAP_TO_LIST'     orelse
-     Op =:= 'MAP_SIZE'        orelse
-     Op =:= 'NIL'             orelse
-     Op =:= 'IS_NIL'          orelse
-     Op =:= 'CONS'            orelse
-     Op =:= 'HD'              orelse
-     Op =:= 'TL'              orelse
-     Op =:= 'LENGTH'          orelse
-     Op =:= 'APPEND'          orelse
-     Op =:= 'STR_JOIN'        orelse
-     Op =:= 'INT_TO_STR'      orelse
-     Op =:= 'ADDR_TO_STR'     orelse
-     Op =:= 'STR_REVERSE'     orelse
-     Op =:= 'STR_LENGTH'      orelse
-     Op =:= 'INT_TO_ADDR'     orelse
-     Op =:= 'VARIANT_TEST'    orelse
-     Op =:= 'VARIANT_ELEMENT' orelse
-     Op =:= 'BITS_NONE'       orelse
-     Op =:= 'BITS_ALL'        orelse
-     Op =:= 'BITS_ALL_N'      orelse
-     Op =:= 'BITS_SET'        orelse
-     Op =:= 'BITS_CLEAR'      orelse
-     Op =:= 'BITS_TEST'       orelse
-     Op =:= 'BITS_SUM'        orelse
-     Op =:= 'BITS_OR'         orelse
-     Op =:= 'BITS_AND'        orelse
-     Op =:= 'BITS_DIFF'       orelse
-     Op =:= 'SHA3'            orelse
-     Op =:= 'SHA256'          orelse
-     Op =:= 'BLAKE2B'         orelse
-     Op =:= 'VERIFY_SIG'           orelse
-     Op =:= 'VERIFY_SIG_SECP256K1' orelse
-     Op =:= 'ECVERIFY_SECP256K1'   orelse
-     Op =:= 'ECRECOVER_SECP256K1'  orelse
-     Op =:= 'CONTRACT_TO_ADDRESS'  orelse
-     Op =:= 'ADDRESS_TO_CONTRACT'  orelse
-     Op =:= 'AUTH_TX_HASH'         orelse
-     Op =:= 'BYTES_TO_INT'         orelse
-     Op =:= 'BYTES_TO_STR'         orelse
-     Op =:= 'BYTES_CONCAT'         orelse
-     Op =:= 'BYTES_SPLIT'          orelse
-     Op =:= 'ORACLE_CHECK'         orelse
-     Op =:= 'ORACLE_CHECK_QUERY'   orelse
-     Op =:= 'IS_ORACLE'            orelse
-     Op =:= 'IS_CONTRACT'          orelse
-     Op =:= 'IS_PAYABLE'           orelse
-     Op =:= 'CREATOR'              orelse
-     false)).
-
 -record(env, { contract, vars = [], locals = [], current_function, tailpos = true }).
 
 %% -- Debugging --------------------------------------------------------------
@@ -125,11 +53,18 @@ is_debug(Tag, Options) ->
     Tags = proplists:get_value(debug, Options, []),
     Tags == all orelse lists:member(Tag, Tags).
 
-debug(Tag, Options, Fmt, Args) ->
+-define(debug(Tag, Options, Fmt, Args),
+        debug(Tag, Options, fun() -> io:format(Fmt, Args) end)).
+
+debug(Tag, Options, Fun) ->
     case is_debug(Tag, Options) of
-        true  -> io:format(Fmt, Args);
+        true  -> Fun();
         false -> ok
     end.
+
+-dialyzer({nowarn_function, [code_error/1]}).
+code_error(Err) ->
+    aeso_errors:throw(aeso_code_errors:format(Err)).
 
 %% -- Main -------------------------------------------------------------------
 
@@ -140,7 +75,7 @@ compile(FCode, Options) ->
     SFuns  = functions_to_scode(ContractName, Functions, Options),
     SFuns1 = optimize_scode(SFuns, Options),
     FateCode = to_basic_blocks(SFuns1),
-    debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
+    ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
     FateCode.
 
 make_function_id(X) ->
@@ -222,8 +157,6 @@ bind_local(Name, Env) ->
     {I, bind_var(Name, {var, I}, Env)}.
 
 notail(Env) -> Env#env{ tailpos = false }.
-
-code_error(Err) -> error(Err).
 
 lookup_var(#env{vars = Vars}, X) ->
     case lists:keyfind(X, 1, Vars) of
@@ -661,23 +594,23 @@ flatten_s(I) -> I.
 
 optimize_fun(_Funs, Name, {Attrs, Sig, Code}, Options) ->
     Code0 = flatten(Code),
-    debug(opt, Options, "Optimizing ~s\n", [Name]),
+    ?debug(opt, Options, "Optimizing ~s\n", [Name]),
     Code1 = simpl_loop(0, Code0, Options),
     Code2 = desugar(Code1),
     {Attrs, Sig, Code2}.
 
 simpl_loop(N, Code, Options) when N >= ?MAX_SIMPL_ITERATIONS ->
-    debug(opt, Options, "  No simpl_loop fixed_point after ~p iterations.\n\n", [N]),
+    ?debug(opt, Options, "  No simpl_loop fixed_point after ~p iterations.\n\n", [N]),
     Code;
 simpl_loop(N, Code, Options) ->
     ACode = annotate_code(Code),
-    [ debug(opt, Options, "  annotated:\n~s\n", [pp_ann("    ", ACode)]) || N == 0 ],
+    [ ?debug(opt, Options, "  annotated:\n~s\n", [pp_ann("    ", ACode)]) || N == 0 ],
     Code1 = simplify(ACode, Options),
-    [ debug(opt, Options, "  optimized:\n~s\n", [pp_ann("    ", Code1)]) || Code1 /= ACode ],
+    [ ?debug(opt, Options, "  optimized:\n~s\n", [pp_ann("    ", Code1)]) || Code1 /= ACode ],
     Code2 = unannotate(Code1),
     case Code == Code2 of
         true  ->
-            debug(opt, Options, "  Reached simpl_loop fixed point after ~p iteration~s.\n\n",
+            ?debug(opt, Options, "  Reached simpl_loop fixed point after ~p iteration~s.\n\n",
                                 [N, if N /= 1 -> "s"; true -> "" end]),
             Code2;
         false -> simpl_loop(N + 1, Code2, Options)
@@ -697,11 +630,9 @@ pp_ann(Ind, [{switch, Arg, Type, Alts, Def} | Code]) ->
       || {Tag, Alt} <- lists:zip(Tags, Alts), Alt /= missing],
      [[Ind1, "_ =>\n", pp_ann(Ind2, Def)] || Def /= missing],
      pp_ann(Ind, Code)];
-pp_ann(Ind, [switch_body | Code]) ->
-    [Ind, "SWITCH-BODY\n", pp_ann(Ind, Code)];
 pp_ann(Ind, [{i, #{ live_in := In, live_out := Out }, I} | Code]) ->
     Fmt = fun([]) -> "()";
-             (Xs) -> string:join([lists:concat(["var", N]) || {var, N} <- Xs], " ")
+             (Xs) -> string:join([lists:flatten(pp_arg(X)) || X <- Xs], " ")
           end,
     Op  = [Ind, pp_op(desugar_args(I))],
     Ann = [["   % ", Fmt(In), " -> ", Fmt(Out)] || In ++ Out /= []],
@@ -709,70 +640,67 @@ pp_ann(Ind, [{i, #{ live_in := In, live_out := Out }, I} | Code]) ->
      pp_ann(Ind, Code)];
 pp_ann(_, []) -> [].
 
+pp_op(switch_body) -> "SWITCH-BODY";
 pp_op(loop) -> "LOOP";
 pp_op(I)    ->
     aeb_fate_pp:format_op(I, #{}).
 
-pp_arg(?i(I))    -> io_lib:format("~w", [I]);
-pp_arg({arg, N}) -> io_lib:format("arg~p", [N]);
-pp_arg(?s)       -> "store1";
-pp_arg({var, N}) -> io_lib:format("var~p", [N]);
-pp_arg(?a)       -> "a".
+pp_arg(?i(I))      -> io_lib:format("~w", [I]);
+pp_arg({arg, N})   -> io_lib:format("arg~p", [N]);
+pp_arg({store, N}) -> io_lib:format("store~p", [N]);
+pp_arg({var, N})   -> io_lib:format("var~p", [N]);
+pp_arg(?a)         -> "a".
 
 %% -- Analysis --
 
 annotate_code(Code) ->
-    {WCode, _} = ann_writes(Code, ordsets:new(), []),
-    {RCode, _} = ann_reads(WCode, ordsets:new(), []),
-    RCode.
+    annotate_code(5, [], Code).
 
-%% Reverses the code
-ann_writes(missing, Writes, []) -> {missing, Writes};
-ann_writes([switch_body | Code], Writes, Acc) ->
-    ann_writes(Code, Writes, [switch_body | Acc]);
-ann_writes([{switch, Arg, Type, Alts, Def} | Code], Writes, Acc) ->
-    {Alts1, WritesAlts} = lists:unzip([ ann_writes(Alt, Writes, []) || Alt <- Alts ]),
-    {Def1, WritesDef}   = ann_writes(Def, Writes, []),
-    Writes1 = ordsets:union(Writes, ordsets:intersection([WritesDef | WritesAlts])),
-    ann_writes(Code, Writes1, [{switch, Arg, Type, Alts1, Def1} | Acc]);
-ann_writes([I | Code], Writes, Acc) ->
-    Ws = [ W || W <- var_writes(I), not ?IsState(W) ],
-    Writes1 = ordsets:union(Writes, Ws),
-    Ann = #{ writes_in => Writes, writes_out => Writes1 },
-    ann_writes(Code, Writes1, [{i, Ann, I} | Acc]);
-ann_writes([], Writes, Acc) ->
-    {Acc, Writes}.
+annotate_code(Fuel, LiveTop, Code) ->
+    {Code1, LiveIn} = ann_live(LiveTop, Code, []),
+    case LiveIn == LiveTop of
+        true  -> Code1;
+        false when Fuel =< 0 ->
+            code_error(liveness_analysis_out_of_fuel);
+        false -> annotate_code(Fuel - 1, LiveIn, Code)
+    end.
 
-%% Takes reversed code and unreverses it.
-ann_reads(missing, Reads, []) -> {missing, Reads};
-ann_reads([switch_body | Code], Reads, Acc) ->
-    ann_reads(Code, Reads, [switch_body | Acc]);
-ann_reads([{switch, Arg, Type, Alts, Def} | Code], Reads, Acc) ->
-    {Alts1, ReadsAlts} = lists:unzip([ ann_reads(Alt, Reads, []) || Alt <- Alts ]),
-    {Def1, ReadsDef}   = ann_reads(Def, Reads, []),
-    Reads1 = ordsets:union([[Arg], Reads, ReadsDef | ReadsAlts]),
-    ann_reads(Code, Reads1, [{switch, Arg, Type, Alts1, Def1} | Acc]);
-ann_reads([{i, Ann, I} | Code], Reads, Acc) ->
-    #{ writes_in := WritesIn, writes_out := WritesOut } = Ann,
-    #{ read := Rs, write := W, pure := Pure } = attributes(I),
+ann_live(_LiveTop, missing, _LiveOut) -> {missing, []};
+ann_live(_LiveTop, [], LiveOut)       -> {[], LiveOut};
+ann_live(LiveTop, [I | Is], LiveOut) ->
+    {Is1, LiveMid} = ann_live(LiveTop, Is, LiveOut),
+    {I1, LiveIn}   = ann_live1(LiveTop, I, LiveMid),
+    {[I1 | Is1], LiveIn}.
+
+ann_live1(_LiveTop, switch_body, LiveOut) ->
+    Ann = #{ live_in => LiveOut, live_out => LiveOut },
+    {{i, Ann, switch_body}, LiveOut};
+ann_live1(LiveTop, loop, _LiveOut) ->
+    Ann = #{ live_in => LiveTop, live_out => [] },
+    {{i, Ann, loop}, LiveTop};
+ann_live1(LiveTop, {switch, Arg, Type, Alts, Def}, LiveOut) ->
+    Read              = [Arg || is_reg(Arg)],
+    {Alts1, LiveAlts} = lists:unzip([ ann_live(LiveTop, Alt, LiveOut) || Alt <- Alts ]),
+    {Def1,  LiveDef}  = ann_live(LiveTop, Def, LiveOut),
+    LiveIn = ordsets:union([Read, LiveDef | LiveAlts]),
+    {{switch, Arg, Type, Alts1, Def1}, LiveIn};
+ann_live1(_LiveTop, I, LiveOut) ->
+    #{ read := Reads0, write := W } = attributes(I),
+    Reads   = lists:filter(fun is_reg/1, Reads0),
     %% If we write it here it's not live in (unless we also read it)
-    Reads1  = Reads -- [W],
-    Reads2  =
-        case {W, Pure andalso not ordsets:is_element(W, Reads)} of
-            %% This is a little bit dangerous: if writing to a dead variable, we ignore
-            %% the reads. Relies on dead writes to be removed by the
-            %% optimisations below (r_write_to_dead_var).
-            {{var, _}, true} -> Reads1;
-            _                -> ordsets:union(Reads1, Rs)
-        end,
-    LiveIn  = ordsets:intersection(Reads2, WritesIn),
-    LiveOut = ordsets:intersection(Reads, WritesOut),
-    Ann1    = #{ live_in => LiveIn, live_out => LiveOut },
-    ann_reads(Code, Reads2, [{i, Ann1, I} | Acc]);
-ann_reads([], Reads, Acc) -> {Acc, Reads}.
+    LiveIn = ordsets:union(LiveOut -- [W], Reads),
+    Ann = #{ live_in => LiveIn, live_out => LiveOut },
+    {{i, Ann, I}, LiveIn}.
 
-%% Instruction attributes: reads, writes and purity (pure means no side-effects
-%% aside from the reads and writes).
+is_reg(?a)             -> false;
+is_reg(none)           -> false;
+is_reg(pc)             -> false;
+is_reg({immediate, _}) -> false;
+is_reg({arg, _})       -> true;
+is_reg({store, _})     -> true;
+is_reg({var, _})       -> true.
+
+%% Instruction attributes: reads, writes and purity (pure means no writing to the chain).
 attributes(I) ->
     Set  = fun(L) when is_list(L) -> ordsets:from_list(L);
               (X)                 -> ordsets:from_list([X]) end,
@@ -781,12 +709,13 @@ attributes(I) ->
     Impure = fun(W, R) -> Attr(W, R, false) end,
     case I of
         loop                                  -> Impure(pc, []);
+        switch_body                           -> Pure(none, []);
         'RETURN'                              -> Impure(pc, []);
         {'RETURNR', A}                        -> Impure(pc, A);
-        {'CALL', _}                           -> Impure(?a, []);
+        {'CALL', A}                           -> Impure(?a, [A]);
         {'CALL_R', A, _, B, C, D}             -> Impure(?a, [A, B, C, D]);
         {'CALL_GR', A, _, B, C, D, E}         -> Impure(?a, [A, B, C, D, E]);
-        {'CALL_T', _}                         -> Impure(pc, []);
+        {'CALL_T', A}                         -> Impure(pc, [A]);
         {'CALL_VALUE', A}                     -> Pure(A, []);
         {'JUMP', _}                           -> Impure(pc, []);
         {'JUMPIF', A, _}                      -> Impure(pc, A);
@@ -871,26 +800,26 @@ attributes(I) ->
         {'BYTES_TO_STR', A, B}                -> Pure(A, [B]);
         {'BYTES_CONCAT', A, B, C}             -> Pure(A, [B, C]);
         {'BYTES_SPLIT', A, B, C}              -> Pure(A, [B, C]);
-        {'ORACLE_CHECK', A, B, C, D}          -> Impure(A, [B, C, D]);
-        {'ORACLE_CHECK_QUERY', A, B, C, D, E} -> Impure(A, [B, C, D, E]);
-        {'IS_ORACLE', A, B}                   -> Impure(A, [B]);
-        {'IS_CONTRACT', A, B}                 -> Impure(A, [B]);
-        {'IS_PAYABLE', A, B}                  -> Impure(A, [B]);
+        {'ORACLE_CHECK', A, B, C, D}          -> Pure(A, [B, C, D]);
+        {'ORACLE_CHECK_QUERY', A, B, C, D, E} -> Pure(A, [B, C, D, E]);
+        {'IS_ORACLE', A, B}                   -> Pure(A, [B]);
+        {'IS_CONTRACT', A, B}                 -> Pure(A, [B]);
+        {'IS_PAYABLE', A, B}                  -> Pure(A, [B]);
         {'CREATOR', A}                        -> Pure(A, []);
         {'ADDRESS', A}                        -> Pure(A, []);
-        {'BALANCE', A}                        -> Impure(A, []);
-        {'BALANCE_OTHER', A, B}               -> Impure(A, [B]);
+        {'BALANCE', A}                        -> Pure(A, []);
+        {'BALANCE_OTHER', A, B}               -> Pure(A, [B]);
         {'ORIGIN', A}                         -> Pure(A, []);
         {'CALLER', A}                         -> Pure(A, []);
         {'GASPRICE', A}                       -> Pure(A, []);
-        {'BLOCKHASH', A, B}                   -> Impure(A, [B]);
+        {'BLOCKHASH', A, B}                   -> Pure(A, [B]);
         {'BENEFICIARY', A}                    -> Pure(A, []);
         {'TIMESTAMP', A}                      -> Pure(A, []);
         {'GENERATION', A}                     -> Pure(A, []);
         {'MICROBLOCK', A}                     -> Pure(A, []);
         {'DIFFICULTY', A}                     -> Pure(A, []);
         {'GASLIMIT', A}                       -> Pure(A, []);
-        {'GAS', A}                            -> Impure(?a, A);
+        {'GAS', A}                            -> Pure(A, []);
         {'LOG0', A}                           -> Impure(none, [A]);
         {'LOG1', A, B}                        -> Impure(none, [A, B]);
         {'LOG2', A, B, C}                     -> Impure(none, [A, B, C]);
@@ -902,10 +831,10 @@ attributes(I) ->
         {'ORACLE_QUERY', A, B, C, D, E, F, G, H} -> Impure(A, [B, C, D, E, F, G, H]);
         {'ORACLE_RESPOND', A, B, C, D, E, F}  -> Impure(none, [A, B, C, D, E, F]);
         {'ORACLE_EXTEND', A, B, C}            -> Impure(none, [A, B, C]);
-        {'ORACLE_GET_ANSWER', A, B, C, D, E}  -> Impure(A, [B, C, D, E]);
-        {'ORACLE_GET_QUESTION', A, B, C, D, E}-> Impure(A, [B, C, D, E]);
-        {'ORACLE_QUERY_FEE', A, B}            -> Impure(A, [B]);
-        {'AENS_RESOLVE', A, B, C, D}          -> Impure(A, [B, C, D]);
+        {'ORACLE_GET_ANSWER', A, B, C, D, E}  -> Pure(A, [B, C, D, E]);
+        {'ORACLE_GET_QUESTION', A, B, C, D, E}-> Pure(A, [B, C, D, E]);
+        {'ORACLE_QUERY_FEE', A, B}            -> Pure(A, [B]);
+        {'AENS_RESOLVE', A, B, C, D}          -> Pure(A, [B, C, D]);
         {'AENS_PRECLAIM', A, B, C}            -> Impure(none, [A, B, C]);
         {'AENS_CLAIM', A, B, C, D, E}         -> Impure(none, [A, B, C, D, E]);
         'AENS_UPDATE'                         -> Impure(none, []);%% TODO
@@ -920,15 +849,17 @@ var_writes({i, _, I}) -> var_writes(I);
 var_writes(I) ->
     #{ write := W } = attributes(I),
     case W of
-        {var, _} -> [W];
-        _        -> []
+        {var, _}   -> [W];
+        {arg, _}   -> [W];
+        {store, _} -> [W];
+        {stack, _} -> [];
+        none       -> [];
+        pc         -> []
     end.
 
 -spec independent(sinstr_a(), sinstr_a()) -> boolean().
 %% independent({switch, _, _, _, _}, _) -> false;       %% Commented due to Dialyzer whinging
 independent(_, {switch, _, _, _, _}) -> false;
-%% independent(switch_body, _) -> true;
-independent(_, switch_body) -> true;
 independent({i, _, I}, {i, _, J}) ->
     #{ write := WI, read := RI, pure := PureI } = attributes(I),
     #{ write := WJ, read := RJ, pure := PureJ } = attributes(J),
@@ -950,8 +881,6 @@ merge_ann(#{ live_in := LiveIn }, #{ live_out := LiveOut }) ->
     #{ live_in => LiveIn, live_out => LiveOut }.
 
 %% Swap two instructions. Precondition: the instructions are independent/2.
-swap_instrs(I, switch_body) -> {switch_body, I};
-%% swap_instrs(switch_body, I) -> {I, switch_body};   %% Commented due to Dialyzer whinging
 swap_instrs({i, #{ live_in := Live1 }, I}, {i, #{ live_in := Live2, live_out := Live3 }, J}) ->
     %% Since I and J are independent the J can't read or write anything in
     %% that I writes.
@@ -963,17 +892,16 @@ swap_instrs({i, #{ live_in := Live1 }, I}, {i, #{ live_in := Live2, live_out := 
     {{i, #{ live_in => Live1,  live_out => Live2_ }, J},
      {i, #{ live_in => Live2_, live_out => Live3  }, I}}.
 
-live_in(R, _) when ?IsState(R) -> true;
+live_in({store, _}, _) -> true;
 live_in(R, #{ live_in  := LiveIn  }) -> ordsets:is_element(R, LiveIn);
 live_in(R, {i, Ann, _}) -> live_in(R, Ann);
 live_in(R, [I = {i, _, _} | _]) -> live_in(R, I);
-live_in(R, [switch_body | Code]) -> live_in(R, Code);
 live_in(R, [{switch, A, _, Alts, Def} | _]) ->
     R == A orelse lists:any(fun(Code) -> live_in(R, Code) end, [Def | Alts]);
 live_in(_, missing) -> false;
 live_in(_, []) -> false.
 
-live_out(R, _) when ?IsState(R) -> true;
+live_out({store, _}, _) -> true;
 live_out(R, #{ live_out := LiveOut }) -> ordsets:is_element(R, LiveOut).
 
 %% -- Optimizations --
@@ -995,7 +923,7 @@ simpl_top(I, Code, Options) ->
     simpl_top(?SIMPL_FUEL, I, Code, Options).
 
 simpl_top(0, I, Code, _Options) ->
-    error({out_of_fuel, I, Code});
+    code_error({optimizer_out_of_fuel, I, Code});
 simpl_top(Fuel, I, Code, Options) ->
     apply_rules(Fuel, rules(), I, Code, Options).
 
@@ -1007,7 +935,7 @@ apply_rules(Fuel, Rules, I, Code, Options) ->
             case is_debug(opt_rules, Options) of
                 true ->
                     {OldCode, NewCode} = drop_common_suffix([I | Code], New ++ Rest),
-                    debug(opt_rules, Options, "  Applied ~p:\n~s  ==>\n~s\n", [RName, pp_ann("    ", OldCode), pp_ann("    ", NewCode)]);
+                    ?debug(opt_rules, Options, "  Applied ~p:\n~s  ==>\n~s\n", [RName, pp_ann("    ", OldCode), pp_ann("    ", NewCode)]);
                 false -> ok
             end,
             lists:foldr(Cons, Rest, New)
@@ -1037,6 +965,7 @@ rules() ->
      ?RULE(r_swap_write),
      ?RULE(r_constant_propagation),
      ?RULE(r_prune_impossible_branches),
+     ?RULE(r_single_successful_branch),
      ?RULE(r_inline_store),
      ?RULE(r_float_switch_body)
     ].
@@ -1059,8 +988,9 @@ r_push_consume({i, Ann1, I}, [{i, Ann2, {'STORE', R, ?a}} | Code]) ->
        true   -> false end;
 r_push_consume(_, _) -> false.
 
-inline_push(Ann, Arg, Stack, [switch_body | Code], Acc) ->
-    inline_push(Ann, Arg, Stack, Code, [switch_body | Acc]);
+inline_push(Ann, Arg, Stack, [{i, _, switch_body} = AI | Code], Acc) ->
+    {AI1, {i, Ann1, _}} = swap_instrs({i, Ann, {'STORE', ?a, Arg}}, AI),
+    inline_push(Ann1, Arg, Stack, Code, [AI1 | Acc]);
 inline_push(Ann1, Arg, Stack, [{i, Ann2, I} = AI | Code], Acc) ->
     case op_view(I) of
         {Op, R, As} ->
@@ -1134,8 +1064,9 @@ r_swap_write(I = {i, _, _}, [J | Code]) ->
     end;
 r_swap_write(_, _) -> false.
 
-r_swap_write(Pre, I, [switch_body | Code]) ->
-    r_swap_write([switch_body | Pre], I, Code);
+r_swap_write(Pre, I, [{i, _, switch_body} = J | Code]) ->
+    {J1, I1} = swap_instrs(I, J),
+    r_swap_write([J1 | Pre], I1, Code);
 r_swap_write(Pre, I, Code0 = [J | Code]) ->
     case apply_rules_once(merge_rules(), I, Code0) of
         {_Rule, New, Rest} ->
@@ -1151,18 +1082,20 @@ r_swap_write(Pre, I, Code0 = [J | Code]) ->
 r_swap_write(_, _, _) -> false.
 
 %% Precompute instructions with known values
-r_constant_propagation(Cons = {i, _, {'CONS', R, _, _}}, [{i, Ann, {'IS_NIL', S, R}} | Code]) ->
+r_constant_propagation(Cons = {i, Ann1, {'CONS', R, X, Xs}}, [{i, Ann, {'IS_NIL', S, R}} | Code]) ->
     Store = {i, Ann, {'STORE', S, ?i(false)}},
-    case R of
-        ?a -> {[Store], Code};
-        _  -> {[Cons, Store], Code}
-    end;
-r_constant_propagation(Cons = {i, _, {'NIL', R}}, [{i, Ann, {'IS_NIL', S, R}} | Code]) ->
+    Cons1 = case R of
+                ?a -> {i, Ann1, {'CONS', ?void, X, Xs}};
+                _  -> Cons
+            end,
+    {[Cons1, Store], Code};
+r_constant_propagation(Nil = {i, Ann1, {'NIL', R}}, [{i, Ann, {'IS_NIL', S, R}} | Code]) ->
     Store = {i, Ann, {'STORE', S, ?i(true)}},
-    case R of
-        ?a -> {[Store], Code};
-        _  -> {[Cons, Store], Code}
-    end;
+    Nil1 = case R of
+               ?a -> {i, Ann1, {'NIL', ?void}};
+               _  -> Nil
+           end,
+    {[Nil1, Store], Code};
 r_constant_propagation({i, Ann, I}, Code) ->
     case op_view(I) of
         false -> false;
@@ -1179,20 +1112,21 @@ r_constant_propagation({i, Ann, I}, Code) ->
     end;
 r_constant_propagation(_, _) -> false.
 
-eval_op('ADD', [X, Y]) -> X + Y;
-eval_op('SUB', [X, Y]) -> X - Y;
-eval_op('MUL', [X, Y]) -> X * Y;
-eval_op('DIV', [X, Y]) when Y /= 0 -> X div Y;
-eval_op('MOD', [X, Y]) when Y /= 0 -> X rem Y;
-eval_op('POW', [_, _]) -> no_eval;
-eval_op('LT', [X, Y])  -> X < Y;
-eval_op('GT', [X, Y])  -> X > Y;
-eval_op('EQ', [X, Y])  -> X =:= Y;
-eval_op('ELT', [X, Y]) -> X =< Y;
-eval_op('EGT', [X, Y]) -> X >= Y;
-eval_op('NEQ', [X, Y]) -> X =/= Y;
-eval_op('NOT', [X])    -> not X;
-eval_op(_, _)          -> no_eval.   %% TODO: bits?
+eval_op('ADD', [X, Y]) when is_integer(X), is_integer(Y) -> X + Y;
+eval_op('SUB', [X, Y]) when is_integer(X), is_integer(Y) -> X - Y;
+eval_op('MUL', [X, Y]) when is_integer(X), is_integer(Y) -> X * Y;
+eval_op('DIV', [X, Y]) when is_integer(X), is_integer(Y), Y /= 0 -> X div Y;
+eval_op('MOD', [X, Y]) when is_integer(X), is_integer(Y), Y /= 0 -> X rem Y;
+eval_op('POW', [_, _])  -> no_eval;
+eval_op('LT', [X, Y])   -> X < Y;
+eval_op('GT', [X, Y])   -> X > Y;
+eval_op('EQ', [X, Y])   -> X =:= Y;
+eval_op('ELT', [X, Y])  -> X =< Y;
+eval_op('EGT', [X, Y])  -> X >= Y;
+eval_op('NEQ', [X, Y])  -> X =/= Y;
+eval_op('NOT', [true])  -> false;
+eval_op('NOT', [false]) -> true;
+eval_op(_, _)           -> no_eval.   %% TODO: bits?
 
 %% Prune impossible branches from switches
 r_prune_impossible_branches({switch, ?i(V), Type, Alts, missing}, Code) ->
@@ -1200,7 +1134,7 @@ r_prune_impossible_branches({switch, ?i(V), Type, Alts, missing}, Code) ->
         false -> false;
         Alt   -> {Alt, Code}
     end;
-r_prune_impossible_branches({switch, ?i(V), boolean, [False, True] = Alts, Def}, Code) ->
+r_prune_impossible_branches({switch, ?i(V), boolean, [False, True] = Alts, Def}, Code) when V == true; V == false ->
     Alts1 = [if V -> missing; true -> False   end,
              if V -> True;    true -> missing end],
     case Alts == Alts1 of
@@ -1212,7 +1146,7 @@ r_prune_impossible_branches({switch, ?i(V), boolean, [False, True] = Alts, Def},
             end
     end;
 r_prune_impossible_branches(Variant = {i, _, {'VARIANT', R, ?i(_), ?i(Tag), ?i(_)}},
-                            [{switch, R, Type, Alts, missing} | Code]) ->
+                            [{switch, R, Type = {variant, _}, Alts, missing} | Code]) when is_integer(Tag) ->
     case {R, lists:nth(Tag + 1, Alts)} of
         {_, missing} ->
             Alts1 = [missing || _ <- Alts],
@@ -1229,7 +1163,7 @@ r_prune_impossible_branches(Variant = {i, _, {'VARIANT', R, ?i(_), ?i(Tag), ?i(_
     end;
 r_prune_impossible_branches(_, _) -> false.
 
-pick_branch(boolean, V, [False, True]) ->
+pick_branch(boolean, V, [False, True]) when V == true; V == false ->
     Alt = if V -> True; true -> False end,
     case Alt of
         missing -> false;
@@ -1238,10 +1172,62 @@ pick_branch(boolean, V, [False, True]) ->
 pick_branch(_Type, _V, _Alts) ->
     false.
 
+%% If there's a single branch that doesn't abort we can push the code for that
+%% out of the switch.
+r_single_successful_branch({switch, R, Type, Alts, Def}, Code) ->
+    case push_code_out_of_switch([Def | Alts]) of
+        {_, none} -> false;
+        {_, many} -> false;
+        {_, [{i, _, switch_body}]} -> false;
+        {[Def1 | Alts1], PushedOut} ->
+            {[{switch, R, Type, Alts1, Def1} | PushedOut], Code}
+    end;
+r_single_successful_branch(_, _) -> false.
+
+push_code_out_of_switch([]) -> {[], none};
+push_code_out_of_switch([Alt | Alts]) ->
+    {Alt1, PushedAlt}   = push_code_out_of_alt(Alt),
+    {Alts1, PushedAlts} = push_code_out_of_switch(Alts),
+    Pushed =
+        case {PushedAlt, PushedAlts} of
+            {none, _} -> PushedAlts;
+            {_, none} -> PushedAlt;
+            _         -> many
+        end,
+    {[Alt1 | Alts1], Pushed}.
+
+push_code_out_of_alt(missing) -> {missing, none};
+push_code_out_of_alt([Body = {i, _, switch_body} | Code]) ->
+    case does_abort(Code) of
+        true  -> {[Body | Code], none};
+        false -> {[Body], [Body | Code]}  %% Duplicate the switch_body, in case we apply this in the middle of a switch
+    end;
+push_code_out_of_alt([{switch, R, Type, Alts, Def}]) ->
+    {[Def1 | Alts1], Pushed} = push_code_out_of_switch([Def | Alts]),
+    {[{switch, R, Type, Alts1, Def1}], Pushed};
+push_code_out_of_alt(Code) ->
+    {Code, many}. %% Conservative
+
+does_abort([I | Code]) ->
+    does_abort(I) orelse does_abort(Code);
+does_abort({i, _, {'ABORT', _}}) -> true;
+does_abort({i, _, {'EXIT', _}}) -> true;
+does_abort(missing) -> true;
+does_abort({switch, _, _, Alts, Def}) ->
+    lists:all(fun does_abort/1, [Def | Alts]);
+does_abort(_) -> false.
+
 %% STORE R A, SWITCH R --> SWITCH A
-r_inline_switch_target(Store = {i, _, {'STORE', R, A}}, [{switch, R, Type, Alts, Def} | Code]) ->
+r_inline_switch_target({i, Ann, {'STORE', R, A}}, [{switch, R, Type, Alts, Def} | Code]) ->
+    Ann1   =
+        case is_reg(A) of
+            true  -> Ann#{ live_out := ordsets:add_element(A, maps:get(live_out, Ann)) };
+            false -> Ann
+        end,
+    Store  = {i, Ann1, {'STORE', R, A}},
     Switch = {switch, A, Type, Alts, Def},
     case R of
+        A        -> false;
         ?a       -> {[Switch], Code};
         {var, _} ->
             case lists:any(fun(Alt) -> live_in(R, Alt) end, [Def | Alts]) of
@@ -1254,8 +1240,9 @@ r_inline_switch_target(Store = {i, _, {'STORE', R, A}}, [{switch, R, Type, Alts,
 r_inline_switch_target(_, _) -> false.
 
 %% Float switch-body to closest switch
-r_float_switch_body(I = {i, _, _}, [switch_body | Code]) ->
-    {[], [switch_body, I | Code]};
+r_float_switch_body(I = {i, _, _}, [J = {i, _, switch_body} | Code]) ->
+    {J1, I1} = swap_instrs(I, J),
+    {[], [J1, I1 | Code]};
 r_float_switch_body(_, _) -> false.
 
 %% Inline stores
@@ -1264,38 +1251,42 @@ r_inline_store({i, _, {'STORE', R, R}}, Code) ->
 r_inline_store(I = {i, _, {'STORE', R = {var, _}, A}}, Code) ->
     %% Not when A is var unless updating the annotations properly.
     Inline = case A of
-                 {arg, _} -> true;
-                 ?i(_)    -> true;
-                 _        -> false
+                 {arg, _}   -> true;
+                 ?i(_)      -> true;
+                 {store, _} -> true;
+                 _          -> false
              end,
-    if Inline -> r_inline_store([I], R, A, Code);
+    if Inline -> r_inline_store([I], false, R, A, Code);
        true   -> false end;
 r_inline_store(_, _) -> false.
 
-r_inline_store(Acc, R, A, [switch_body | Code]) ->
-    r_inline_store([switch_body | Acc], R, A, Code);
-r_inline_store(Acc, R, A, [{i, Ann, I} | Code]) ->
-    #{ write := W, pure := Pure } = attributes(I),
+r_inline_store(Acc, Progress, R, A, [I = {i, _, switch_body} | Code]) ->
+    r_inline_store([I | Acc], Progress, R, A, Code);
+r_inline_store(Acc, Progress, R, A, [{i, Ann, I} | Code]) ->
+    #{ write := W } = attributes(I),
     Inl = fun(X) when X == R -> A; (X) -> X end,
-    case not live_in(R, Ann) orelse not Pure orelse lists:member(W, [R, A]) of
-        true  -> false;
-        false ->
-            case op_view(I) of
-                {Op, S, As} ->
-                    case lists:member(R, As) of
-                        true ->
-                            Acc1 = [{i, Ann, from_op_view(Op, S, lists:map(Inl, As))} | Acc],
-                            case r_inline_store(Acc1, R, A, Code) of
-                                false        -> {lists:reverse(Acc1), Code};
-                                {_, _} = Res -> Res
-                            end;
-                        false ->
-                            r_inline_store([{i, Ann, I} | Acc], R, A, Code)
-                    end;
-                _ -> r_inline_store([{i, Ann, I} | Acc], R, A, Code)
+    case live_in(R, Ann) of
+        false -> false;  %% No more reads of R
+        true  ->
+            {I1, Progress1} =
+                case op_view(I) of
+                    {Op, S, As} ->
+                        case lists:member(R, As) of
+                            true  -> {from_op_view(Op, S, lists:map(Inl, As)), true};
+                            false -> {I, Progress}
+                        end;
+                    _ -> {I, Progress}
+                end,
+            Acc1 = [{i, Ann, I1} | Acc],
+            %% Stop if write to R or A
+            case lists:member(W, [R, A]) of
+                true when Progress1 -> {lists:reverse(Acc1), Code};
+                true                -> false;
+                false               -> r_inline_store(Acc1, Progress1, R, A, Code)
             end
     end;
-r_inline_store(_Acc, _, _, _) -> false.
+r_inline_store(Acc, true, _, _, Code) -> {lists:reverse(Acc), Code};
+r_inline_store(_, false, _, _, _) -> false.
 
 %% Shortcut write followed by final read
 r_one_shot_var({i, Ann1, I}, [{i, Ann2, J} | Code]) ->
@@ -1317,8 +1308,9 @@ r_one_shot_var(_, _) -> false.
 %% Remove writes to dead variables
 r_write_to_dead_var({i, _, {'STORE', ?void, ?a}}, _) -> false; %% Avoid looping
 r_write_to_dead_var({i, Ann, I}, Code) ->
+    #{ pure := Pure } = attributes(I),
     case op_view(I) of
-        {_Op, R = {var, _}, As} ->
+        {_Op, R, As} when R /= ?a, Pure ->
             case live_out(R, Ann) of
                 false ->
                     %% Subtle: we still have to pop the stack if any of the arguments
@@ -1330,21 +1322,24 @@ r_write_to_dead_var({i, Ann, I}, Code) ->
     end;
 r_write_to_dead_var(_, _) -> false.
 
+op_view({'ABORT', R}) -> {'ABORT', none, [R]};
 op_view(T) when is_tuple(T) ->
-    case tuple_to_list(T) of
-        [Op, R | As] when ?IsOp(Op) ->
-            {Op, R, As};
-        _ -> false
+    [Op, R | As] = tuple_to_list(T),
+    CheckReads = fun(Rs, X) -> case [] == Rs -- [dst, src] of true -> X; false -> false end end,
+    case attributes(list_to_tuple([Op, dst | [src || _ <- As]])) of
+        #{ write := dst, read := Rs  } -> CheckReads(Rs, {Op, R, As});
+        #{ write := none, read := Rs } -> CheckReads(Rs, {Op, none, [R | As]});
+        _                              -> false
     end;
 op_view(_) -> false.
 
+from_op_view(Op, none, As) -> list_to_tuple([Op | As]);
 from_op_view(Op, R, As) -> list_to_tuple([Op, R | As]).
 
 %% Desugar and specialize and remove annotations
 -spec unannotate(scode_a())  -> scode();
                 (sinstr_a()) -> sinstr();
                 (missing)    -> missing.
-unannotate(switch_body) -> [switch_body];
 unannotate({switch, Arg, Type, Alts, Def}) ->
     [{switch, Arg, Type, [unannotate(A) || A <- Alts], unannotate(Def)}];
 unannotate(missing) -> missing;
@@ -1360,6 +1355,7 @@ desugar({'ADD', A,  A,  ?i(1)}) -> [aeb_fate_ops:inc(desugar_arg(A))];
 desugar({'SUB', ?a, ?a, ?i(1)}) -> [aeb_fate_ops:dec()];
 desugar({'SUB', A, A, ?i(1)})   -> [aeb_fate_ops:dec(desugar_arg(A))];
 desugar({'STORE', ?a, A})       -> [aeb_fate_ops:push(desugar_arg(A))];
+desugar({'STORE', R, ?a})       -> [aeb_fate_ops:pop(desugar_arg(R))];
 desugar({switch, Arg, Type, Alts, Def}) ->
     [{switch, desugar_arg(Arg), Type, [desugar(A) || A <- Alts], desugar(Def)}];
 desugar(missing) -> missing;
@@ -1372,7 +1368,7 @@ desugar_args(I) when is_tuple(I) ->
     list_to_tuple([Op | lists:map(fun desugar_arg/1, Args)]);
 desugar_args(I) -> I.
 
-desugar_arg(?s) -> {var, -1};
+desugar_arg({store, N}) -> {var, -N};
 desugar_arg(A) -> A.
 
 %% -- Phase III --------------------------------------------------------------
@@ -1438,11 +1434,13 @@ block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
     {DefRef, DefBlk} =
         case Default of
             missing when Catchall == none ->
-                FreshBlk([aeb_fate_ops:exit(?i(<<"Incomplete patterns">>))], none);
+                FreshBlk([aeb_fate_ops:abort(?i(<<"Incomplete patterns">>))], none);
             missing -> {Catchall, []};
             _       -> FreshBlk(Default ++ [{jump, RestRef}], Catchall)
                        %% ^ fall-through to the outer catchall
         end,
+    %% If we don't generate a switch, we need to pop the argument if on the stack.
+    Pop = [{'POP', ?void} || Arg == ?a],
     {Blk1, Code1, AltBlks} =
         case Type of
             boolean ->
@@ -1458,7 +1456,7 @@ block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
                         _       -> FalseCode ++ [{jump, RestRef}]
                     end,
                 case lists:usort(Alts) == [missing] of
-                    true  -> {Blk#blk{code = [{jump, DefRef}]}, [], []};
+                    true  -> {Blk#blk{code = Pop ++ [{jump, DefRef}]}, [], []};
                     false ->
                         case Arg of
                             ?i(false) -> {Blk#blk{code = ElseCode}, [], ThenBlk};
@@ -1468,18 +1466,28 @@ block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
                 end;
             tuple ->
                 [TCode] = Alts,
-                {Blk#blk{code = TCode ++ [{jump, RestRef}]}, [], []};
+                case TCode of
+                    missing -> {Blk#blk{code = Pop ++ [{jump, DefRef}]}, [], []};
+                    _       -> {Blk#blk{code = Pop ++ TCode ++ [{jump, RestRef}]}, [], []}
+                end;
             {variant, [_]} ->
                 %% [SINGLE_CON_SWITCH] Single constructor switches don't need a
                 %% switch instruction.
                 [AltCode] = Alts,
-                {Blk#blk{code = AltCode ++ [{jump, RestRef}]}, [], []};
+                case AltCode of
+                    missing -> {Blk#blk{code = Pop ++ [{jump, DefRef}]}, [], []};
+                    _       -> {Blk#blk{code = Pop ++ AltCode ++ [{jump, RestRef}]}, [], []}
+                end;
             {variant, _Ar} ->
-                MkBlk = fun(missing) -> {DefRef, []};
-                           (ACode)   -> FreshBlk(ACode ++ [{jump, RestRef}], DefRef)
-                        end,
-                {AltRefs, AltBs} = lists:unzip(lists:map(MkBlk, Alts)),
-                {Blk#blk{code = []}, [{switch, Arg, AltRefs}], lists:append(AltBs)}
+                case lists:usort(Alts) == [missing] of
+                    true  -> {Blk#blk{code = Pop ++ [{jump, DefRef}]}, [], []};
+                    false ->
+                        MkBlk = fun(missing) -> {DefRef, []};
+                                   (ACode)   -> FreshBlk(ACode ++ [{jump, RestRef}], DefRef)
+                                end,
+                        {AltRefs, AltBs} = lists:unzip(lists:map(MkBlk, Alts)),
+                        {Blk#blk{code = []}, [{switch, Arg, AltRefs}], lists:append(AltBs)}
+                end
         end,
     Blk2 = Blk1#blk{catchall = DefRef}, %% Update catchall ref
     block(Blk2, Code1 ++ Acc, DefBlk ++ RestBlk ++ AltBlks ++ Blocks, BlockAcc);
@@ -1495,9 +1503,10 @@ optimize_blocks(Blocks) ->
     RBlockMap = maps:from_list(RBlocks),
     RBlocks1  = reorder_blocks(RBlocks, []),
     RBlocks2  = [ {Ref, inline_block(RBlockMap, Ref, Code)} || {Ref, Code} <- RBlocks1 ],
-    RBlocks3  = remove_dead_blocks(RBlocks2),
-    RBlocks4  = [ {Ref, tweak_returns(Code)} || {Ref, Code} <- RBlocks3 ],
-    Rev(RBlocks4).
+    RBlocks3  = shortcut_jump_chains(RBlocks2),
+    RBlocks4  = remove_dead_blocks(RBlocks3),
+    RBlocks5  = [ {Ref, tweak_returns(Code)} || {Ref, Code} <- RBlocks4 ],
+    Rev(RBlocks5).
 
 %% Choose the next block based on the final jump.
 reorder_blocks([], Acc) ->
@@ -1532,6 +1541,21 @@ inline_block(BlockMap, Ref, [{jump, L} | Code] = Code0) when L /= Ref ->
         _ -> Code0
     end;
 inline_block(_, _, Code) -> Code.
+
+%% Shortcut jumps to blocks with a single jump
+shortcut_jump_chains(RBlocks) ->
+    Subst = lists:foldl(fun({L1, [{jump, L2}]}, Sub) ->
+                            Sub#{ L1 => maps:get(L2, Sub, L2) };
+                           (_, Sub) -> Sub end, #{}, RBlocks),
+    [ {Ref, update_labels(Subst, Code)} || {Ref, Code} <- RBlocks ].
+
+update_labels(Sub, Ref) when is_reference(Ref) ->
+    maps:get(Ref, Sub, Ref);
+update_labels(Sub, L) when is_list(L) ->
+    lists:map(fun(X) -> update_labels(Sub, X) end, L);
+update_labels(Sub, T) when is_tuple(T) ->
+    list_to_tuple(update_labels(Sub, tuple_to_list(T)));
+update_labels(_, X) -> X.
 
 %% Remove unused blocks
 remove_dead_blocks(Blocks = [{Top, _} | _]) ->
