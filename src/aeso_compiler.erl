@@ -23,6 +23,7 @@
         , decode_calldata/4
         , parse/2
         , add_include_path/2
+        , validate_byte_code/3
         ]).
 
 -include_lib("aebytecode/include/aeb_opcodes.hrl").
@@ -565,6 +566,87 @@ pp(Code, Options, Option, PPFun) ->
         none ->
             ok
     end.
+
+%% -- Byte code validation ---------------------------------------------------
+
+-define(protect(Tag, Code), fun() -> try Code catch _:Err1 -> throw({Tag, Err1}) end end()).
+
+-spec validate_byte_code(map(), string(), options()) -> ok | {error, [aeso_errors:error()]}.
+validate_byte_code(#{ byte_code := ByteCode, payable := Payable }, Source, Options) ->
+    Fail = fun(Err) -> {error, [aeso_errors:new(data_error, Err)]} end,
+    case proplists:get_value(backend, Options, aevm) of
+        B when B /= fate -> Fail(io_lib:format("Unsupported backend: ~s\n", [B]));
+        fate ->
+            try
+                FCode1 = ?protect(deserialize, aeb_fate_code:strip_init_function(aeb_fate_code:deserialize(ByteCode))),
+                {FCode2, SrcPayable} =
+                    ?protect(compile,
+                             begin
+                               {ok, #{ byte_code := SrcByteCode, payable := SrcPayable }} =
+                                    from_string1(fate, Source, Options),
+                               FCode = aeb_fate_code:deserialize(SrcByteCode),
+                               {aeb_fate_code:strip_init_function(FCode), SrcPayable}
+                             end),
+                case compare_fate_code(FCode1, FCode2) of
+                    ok when SrcPayable /= Payable ->
+                        Not = fun(true) -> ""; (false) -> " not" end,
+                        Fail(io_lib:format("Byte code contract is~s payable, but source code contract is~s.\n",
+                                           [Not(Payable), Not(SrcPayable)]));
+                    ok           -> ok;
+                    {error, Why} -> Fail(io_lib:format("Byte code does not match source code.\n~s", [Why]))
+                end
+            catch
+                throw:{deserialize, _}         -> Fail("Invalid byte code");
+                throw:{compile, {error, Errs}} -> {error, Errs}
+            end
+    end.
+
+compare_fate_code(FCode1, FCode2) ->
+    Funs1 = aeb_fate_code:functions(FCode1),
+    Funs2 = aeb_fate_code:functions(FCode2),
+    Syms1 = aeb_fate_code:symbols(FCode1),
+    Syms2 = aeb_fate_code:symbols(FCode2),
+    FunHashes1 = maps:keys(Funs1),
+    FunHashes2 = maps:keys(Funs2),
+    case FunHashes1 == FunHashes2 of
+        false ->
+            InByteCode   = [ binary_to_list(maps:get(H, Syms1)) || H <- FunHashes1 -- FunHashes2 ],
+            InSourceCode = [ binary_to_list(maps:get(H, Syms2)) || H <- FunHashes2 -- FunHashes1 ],
+            Msg = [ io_lib:format("- Functions in the byte code but not in the source code:\n"
+                                  "    ~s\n", [string:join(InByteCode, ", ")]) || InByteCode /= [] ] ++
+                  [ io_lib:format("- Functions in the source code but not in the byte code:\n"
+                                  "    ~s\n", [string:join(InSourceCode, ", ")]) || InSourceCode /= [] ],
+            {error, Msg};
+        true ->
+            case lists:append([ compare_fate_fun(maps:get(H, Syms1), Fun1, Fun2)
+                                || {{H, Fun1}, {_, Fun2}} <- lists:zip(maps:to_list(Funs1),
+                                                                       maps:to_list(Funs2)) ]) of
+                [] -> ok;
+                Errs -> {error, Errs}
+            end
+    end.
+
+compare_fate_fun(_Name, Fun, Fun) -> [];
+compare_fate_fun(Name, {Attr, Type, _}, {Attr, Type, _}) ->
+    [io_lib:format("- The implementation of the function ~s is different.\n", [Name])];
+compare_fate_fun(Name, {Attr1, Type, _}, {Attr2, Type, _}) ->
+    [io_lib:format("- The attributes of the function ~s differ:\n"
+                   "    Byte code:   ~s\n"
+                   "    Source code: ~s\n",
+                   [Name, string:join([ atom_to_list(A) || A <- Attr1 ], ", "),
+                          string:join([ atom_to_list(A) || A <- Attr2 ], ", ")])];
+compare_fate_fun(Name, {_, Type1, _}, {_, Type2, _}) ->
+    [io_lib:format("- The type of the function ~s differs:\n"
+                   "    Byte code:   ~s\n"
+                   "    Source code: ~s\n",
+                   [Name, pp_fate_sig(Type1), pp_fate_sig(Type2)])].
+
+pp_fate_sig({[Arg], Res}) ->
+    io_lib:format("~s => ~s", [pp_fate_type(Arg), pp_fate_type(Res)]);
+pp_fate_sig({Args, Res}) ->
+    io_lib:format("(~s) => ~s", [string:join([pp_fate_type(Arg) || Arg <- Args], ", "), pp_fate_type(Res)]).
+
+pp_fate_type(T) -> io_lib:format("~w", [T]).
 
 %% -------------------------------------------------------------------
 
