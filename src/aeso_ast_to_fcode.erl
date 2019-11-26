@@ -367,6 +367,8 @@ compute_state_layout(Env = #{ context := {main_contract, _} }, "state", Type) ->
     Env#{ state_layout => Layout };
 compute_state_layout(Env, _, _) -> Env.
 
+compute_state_layout(R, {tuple, [T]}) ->
+    compute_state_layout(R, T);
 compute_state_layout(R, {tuple, Ts}) ->
     {R1, Ls} = compute_state_layout(R, Ts),
     {R1, {tuple, Ls}};
@@ -497,7 +499,7 @@ expr_to_fcode(Env, _Type, {app, _, {typed, _, {C, _, _} = Con, _}, Args}) when C
 
 %% Tuples
 expr_to_fcode(Env, _Type, {tuple, _, Es}) ->
-    {tuple, [expr_to_fcode(Env, E) || E <- Es]};
+    make_tuple([expr_to_fcode(Env, E) || E <- Es]);
 
 %% Records
 expr_to_fcode(Env, Type, {proj, _Ann, Rec = {typed, _, _, RecType}, {id, _, X}}) ->
@@ -509,18 +511,28 @@ expr_to_fcode(Env, Type, {proj, _Ann, Rec = {typed, _, _, RecType}, {id, _, X}})
             FArgs = [type_to_fcode(Env, Arg) || Arg <- Args],
             {remote_u, FArgs, type_to_fcode(Env, Ret), expr_to_fcode(Env, Rec),
                        {entrypoint, list_to_binary(X)}};
+        {record_t, [_]} -> expr_to_fcode(Env, Rec); %% Singleton record
         {record_t, _} ->
             {proj, expr_to_fcode(Env, Rec), field_index(Rec, X)}
     end;
 
+expr_to_fcode(Env, {record_t, [FieldT]}, {record, _Ann, [_] = Fields}) ->
+    {set, E} = field_value(FieldT, Fields),
+    expr_to_fcode(Env, E);
 expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Fields}) ->
     FVal = fun(F) ->
              %% All fields are present and no updates
              {set, E} = field_value(F, Fields),
              expr_to_fcode(Env, E)
            end,
-    {tuple, lists:map(FVal, FieldTypes)};
+    make_tuple(lists:map(FVal, FieldTypes));
 
+expr_to_fcode(Env, {record_t, [FieldT]}, {record, _Ann, Rec, Fields}) ->
+    case field_value(FieldT, Fields) of
+        false       -> expr_to_fcode(Env, Rec);
+        {set, E}    -> expr_to_fcode(Env, E);
+        {upd, Z, E} -> {'let', Z, expr_to_fcode(Env, Rec), expr_to_fcode(bind_var(Env, Z), E)}
+    end;
 expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Rec, Fields}) ->
     X    = fresh_name(),
     Proj = fun(I) -> {proj, {var, X}, I - 1} end,
@@ -672,6 +684,13 @@ make_if(Cond, Then, Else) ->
     X = fresh_name(),
     {'let', X, Cond, make_if({var, X}, Then, Else)}.
 
+-spec make_tuple([fexpr()]) -> fexpr().
+make_tuple([E]) -> E;
+make_tuple(Es) -> {tuple, Es}.
+
+-spec strip_singleton_tuples(ftype()) -> ftype().
+strip_singleton_tuples({tuple, [T]}) -> strip_singleton_tuples(T);
+strip_singleton_tuples(T) -> T.
 
 get_oracle_type(oracle_register,     {fun_t, _, _, _, OType})       -> OType;
 get_oracle_type(oracle_query,        {fun_t, _, _, [OType | _], _}) -> OType;
@@ -759,12 +778,13 @@ split_tree(Env, Vars, Alts = [{'case', Pats, Body} | _]) ->
             {nosplit, rename(Ren, Body)};
         I when is_integer(I) ->
             {Vars0, [{X, Type} | Vars1]} = lists:split(I - 1, Vars),
+            Type1 = strip_singleton_tuples(Type),
             SAlts = merge_alts(I, X, [ split_alt(I, A) || A <- Alts ]),
             MakeCase = fun({var, Z}, Split) -> {'case', {var, "_"}, rename_split([{Z, X}], Split)};
                           (SPat, Split)     -> {'case', SPat, Split} end,
-            Cases = [ MakeCase(SPat, split_tree(Env, Vars0 ++ split_vars(SPat, Type) ++ Vars1, FAlts))
+            Cases = [ MakeCase(SPat, split_tree(Env, Vars0 ++ split_vars(SPat, Type1) ++ Vars1, FAlts))
                       || {SPat, FAlts} <- SAlts ],
-            {split, Type, X, Cases}
+            {split, Type1, X, Cases}
     end.
 
 -spec merge_alts(integer(), var_name(), [{fsplit_pat(), falt()}]) -> [{fsplit_pat(), [falt()]}].
@@ -887,7 +907,7 @@ pat_to_fcode(Env, _Type, {app, _, {typed, _, {C, _, _} = Con, _}, Pats}) when C 
     #con_tag{tag = I, arities = As} = lookup_con(Env, Con),
     {con, As, I, [pat_to_fcode(Env, Pat) || Pat <- Pats]};
 pat_to_fcode(Env, _Type, {tuple, _, Pats}) ->
-    {tuple, [ pat_to_fcode(Env, Pat) || Pat <- Pats ]};
+    make_tuple([ pat_to_fcode(Env, Pat) || Pat <- Pats ]);
 pat_to_fcode(_Env, _Type, {bool, _, B})   -> {bool, B};
 pat_to_fcode(_Env, _Type, {int, _, N})    -> {int, N};
 pat_to_fcode(_Env, _Type, {char, _, N})   -> {int, N};
@@ -905,8 +925,8 @@ pat_to_fcode(Env, {record_t, Fields}, {record, _, FieldPats}) ->
                         {set, Pat} -> Pat
                         %% {upd, _, _} is impossible in patterns
                     end end,
-    {tuple, [pat_to_fcode(Env, FieldPat(Field))
-             || Field <- Fields]};
+    make_tuple([pat_to_fcode(Env, FieldPat(Field))
+                || Field <- Fields]);
 
 pat_to_fcode(_Env, Type, Pat) ->
     error({todo, Pat, ':', Type}).

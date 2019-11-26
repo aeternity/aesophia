@@ -120,9 +120,10 @@ type_to_scode(name)            -> name;
 type_to_scode(channel)         -> channel;
 type_to_scode(bits)            -> bits;
 type_to_scode(any)             -> any;
-type_to_scode({variant, Cons}) -> {variant, lists:map(fun(T) -> type_to_scode({tuple, T}) end, Cons)};
+type_to_scode({variant, Cons}) -> {variant, [{tuple, types_to_scode(Con)} || Con <- Cons]};
 type_to_scode({list, Type})    -> {list, type_to_scode(Type)};
-type_to_scode({tuple, Types})  -> {tuple, lists:map(fun type_to_scode/1, Types)};
+type_to_scode({tuple, [Type]}) -> type_to_scode(Type);
+type_to_scode({tuple, Types})  -> {tuple, types_to_scode(Types)};
 type_to_scode({map, Key, Val}) -> {map, type_to_scode(Key), type_to_scode(Val)};
 type_to_scode({function, _Args, _Res}) -> {tuple, [string, any]};
 type_to_scode({tvar, X}) ->
@@ -133,6 +134,8 @@ type_to_scode({tvar, X}) ->
             {tvar, I};
         J -> {tvar, J}
     end.
+
+types_to_scode(Ts) -> lists:map(fun type_to_scode/1, Ts).
 
 %% -- Phase I ----------------------------------------------------------------
 %%  Icode to structured assembly
