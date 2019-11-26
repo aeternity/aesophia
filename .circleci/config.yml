@@ -44,3 +44,10 @@ jobs:
             - _build/default/rebar3_20.3.8_plt
       - store_artifacts:
           path: _build/test/logs
+
+workflows:
+  version: 2
+  build_test:
+    jobs:
+      - build
+      - verify_rebar_lock
