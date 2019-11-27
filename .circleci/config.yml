@@ -8,6 +8,15 @@ executors:
     working_directory: ~/aesophia
 
 jobs:
+  verify_rebar_lock:
+    executor: aebuilder
+    steps:
+      - checkout
+      - run:
+          name: Ensure lock file is up-to-date
+          command: |
+            ./rebar3 upgrade
+            git diff --quiet -- rebar.lock || (echo "rebar.lock is not up-to-date" && exit 1)
   build:
     executor: aebuilder
     steps:
@@ -35,3 +44,10 @@ jobs:
             - _build/default/rebar3_20.3.8_plt
       - store_artifacts:
           path: _build/test/logs
+
+workflows:
+  version: 2
+  build_test:
+    jobs:
+      - build
+      - verify_rebar_lock
