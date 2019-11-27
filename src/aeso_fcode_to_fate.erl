@@ -570,7 +570,31 @@ op_to_scode(crypto_sha256)               -> aeb_fate_ops:sha256(?a, ?a);
 op_to_scode(crypto_blake2b)              -> aeb_fate_ops:blake2b(?a, ?a);
 op_to_scode(string_sha3)                 -> aeb_fate_ops:sha3(?a, ?a);
 op_to_scode(string_sha256)               -> aeb_fate_ops:sha256(?a, ?a);
-op_to_scode(string_blake2b)              -> aeb_fate_ops:blake2b(?a, ?a).
+op_to_scode(string_blake2b)              -> aeb_fate_ops:blake2b(?a, ?a);
+op_to_scode(mcl_bls12_381_g1_neg)        -> aeb_fate_ops:bls12_381_g1_neg(?a, ?a);
+op_to_scode(mcl_bls12_381_g1_norm)       -> aeb_fate_ops:bls12_381_g1_norm(?a, ?a);
+op_to_scode(mcl_bls12_381_g1_valid)      -> aeb_fate_ops:bls12_381_g1_valid(?a, ?a);
+op_to_scode(mcl_bls12_381_g1_is_zero)    -> aeb_fate_ops:bls12_381_g1_is_zero(?a, ?a);
+op_to_scode(mcl_bls12_381_g1_add)        -> aeb_fate_ops:bls12_381_g1_add(?a, ?a, ?a);
+op_to_scode(mcl_bls12_381_g1_mul)        -> aeb_fate_ops:bls12_381_g1_mul(?a, ?a, ?a);
+op_to_scode(mcl_bls12_381_g2_neg)        -> aeb_fate_ops:bls12_381_g2_neg(?a, ?a);
+op_to_scode(mcl_bls12_381_g2_norm)       -> aeb_fate_ops:bls12_381_g2_norm(?a, ?a);
+op_to_scode(mcl_bls12_381_g2_valid)      -> aeb_fate_ops:bls12_381_g2_valid(?a, ?a);
+op_to_scode(mcl_bls12_381_g2_is_zero)    -> aeb_fate_ops:bls12_381_g2_is_zero(?a, ?a);
+op_to_scode(mcl_bls12_381_g2_add)        -> aeb_fate_ops:bls12_381_g2_add(?a, ?a, ?a);
+op_to_scode(mcl_bls12_381_g2_mul)        -> aeb_fate_ops:bls12_381_g2_mul(?a, ?a, ?a);
+op_to_scode(mcl_bls12_381_gt_inv)        -> aeb_fate_ops:bls12_381_gt_inv(?a, ?a);
+op_to_scode(mcl_bls12_381_gt_add)        -> aeb_fate_ops:bls12_381_gt_add(?a, ?a, ?a);
+op_to_scode(mcl_bls12_381_gt_mul)        -> aeb_fate_ops:bls12_381_gt_mul(?a, ?a, ?a);
+op_to_scode(mcl_bls12_381_gt_pow)        -> aeb_fate_ops:bls12_381_gt_pow(?a, ?a, ?a);
+op_to_scode(mcl_bls12_381_gt_is_one)     -> aeb_fate_ops:bls12_381_gt_is_one(?a, ?a);
+op_to_scode(mcl_bls12_381_pairing)       -> aeb_fate_ops:bls12_381_pairing(?a, ?a, ?a);
+op_to_scode(mcl_bls12_381_miller_loop)   -> aeb_fate_ops:bls12_381_miller_loop(?a, ?a, ?a);
+op_to_scode(mcl_bls12_381_final_exp)     -> aeb_fate_ops:bls12_381_final_exp(?a, ?a);
+op_to_scode(mcl_bls12_381_int_to_fr)     -> aeb_fate_ops:bls12_381_int_to_fr(?a, ?a);
+op_to_scode(mcl_bls12_381_int_to_fp)     -> aeb_fate_ops:bls12_381_int_to_fp(?a, ?a);
+op_to_scode(mcl_bls12_381_fr_to_int)     -> aeb_fate_ops:bls12_381_fr_to_int(?a, ?a);
+op_to_scode(mcl_bls12_381_fp_to_int)     -> aeb_fate_ops:bls12_381_fp_to_int(?a, ?a).
 
 %% PUSH and STORE ?a are the same, so we use STORE to make optimizations
 %% easier, and specialize to PUSH (which is cheaper) at the end.
@@ -843,6 +867,30 @@ attributes(I) ->
         {'AENS_UPDATE', A, B, C, D, E, F}     -> Impure(none, [A, B, C, D, E, F]);
         {'AENS_TRANSFER', A, B, C, D}         -> Impure(none, [A, B, C, D]);
         {'AENS_REVOKE', A, B, C}              -> Impure(none, [A, B, C]);
+        {'BLS12_381_G1_NEG', A, B}            -> Pure(A, [B]);
+        {'BLS12_381_G1_NORM', A, B}           -> Pure(A, [B]);
+        {'BLS12_381_G1_VALID', A, B}          -> Pure(A, [B]);
+        {'BLS12_381_G1_IS_ZERO', A, B}        -> Pure(A, [B]);
+        {'BLS12_381_G1_ADD', A, B, C}         -> Pure(A, [B, C]);
+        {'BLS12_381_G1_MUL', A, B, C}         -> Pure(A, [B, C]);
+        {'BLS12_381_G2_NEG', A, B}            -> Pure(A, [B]);
+        {'BLS12_381_G2_NORM', A, B}           -> Pure(A, [B]);
+        {'BLS12_381_G2_VALID', A, B}          -> Pure(A, [B]);
+        {'BLS12_381_G2_IS_ZERO', A, B}        -> Pure(A, [B]);
+        {'BLS12_381_G2_ADD', A, B, C}         -> Pure(A, [B, C]);
+        {'BLS12_381_G2_MUL', A, B, C}         -> Pure(A, [B, C]);
+        {'BLS12_381_GT_INV', A, B}            -> Pure(A, [B]);
+        {'BLS12_381_GT_ADD', A, B, C}         -> Pure(A, [B, C]);
+        {'BLS12_381_GT_MUL', A, B, C}         -> Pure(A, [B, C]);
+        {'BLS12_381_GT_POW', A, B, C}         -> Pure(A, [B, C]);
+        {'BLS12_381_GT_IS_ONE', A, B}         -> Pure(A, [B]);
+        {'BLS12_381_PAIRING', A, B, C}        -> Pure(A, [B, C]);
+        {'BLS12_381_MILLER_LOOP', A, B, C}    -> Pure(A, [B, C]);
+        {'BLS12_381_FINAL_EXP', A, B}         -> Pure(A, [B]);
+        {'BLS12_381_INT_TO_FR', A, B}         -> Pure(A, [B]);
+        {'BLS12_381_INT_TO_FP', A, B}         -> Pure(A, [B]);
+        {'BLS12_381_FR_TO_INT', A, B}         -> Pure(A, [B]);
+        {'BLS12_381_FP_TO_INT', A, B}         -> Pure(A, [B]);
         {'ABORT', A}                          -> Impure(pc, A);
         {'EXIT', A}                           -> Impure(pc, A);
         'NOP'                                 -> Pure(none, [])

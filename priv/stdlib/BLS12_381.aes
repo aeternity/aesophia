@@ -1,0 +1,68 @@
+namespace BLS12_381 =
+  type fr    = MCL_BLS12_381.fr
+  type fp    = MCL_BLS12_381.fp
+  record fp2 = { x1 : fp, x2 : fp }
+  record g1  = { x : fp, y : fp, z : fp }
+  record g2  = { x : fp2, y : fp2, z : fp2 }
+  record gt  = { x1 : fp, x2 : fp, x3 : fp, x4 : fp, x5 : fp, x6 : fp,
+                 x7 : fp, x8 : fp, x9 : fp, x10 : fp, x11 : fp, x12 : fp }
+
+  function pairing_check(xs : list(g1), ys : list(g2)) =
+    switch((xs, ys))
+      ([], []) => true
+      (x :: xs, y :: ys) => pairing_check_(pairing(x, y), xs, ys)
+
+  function pairing_check_(acc : gt, xs : list(g1), ys : list(g2)) =
+    switch((xs, ys))
+      ([], []) => gt_is_one(acc)
+      (x :: xs, y :: ys) =>
+        pairing_check_(gt_mul(acc, pairing(x, y)), xs, ys)
+
+  function int_to_fr(x : int) = MCL_BLS12_381.int_to_fr(x)
+  function int_to_fp(x : int) = MCL_BLS12_381.int_to_fp(x)
+  function fr_to_int(x : fr)  = MCL_BLS12_381.fr_to_int(x)
+  function fp_to_int(x : fp)  = MCL_BLS12_381.fp_to_int(x)
+
+  function mk_g1(x : int, y : int, z : int) : g1 =
+    { x = int_to_fp(x), y = int_to_fp(y), z = int_to_fp(z) }
+
+  function mk_g2(x1 : int, x2 : int, y1 : int, y2 : int, z1 : int, z2 : int) : g2 =
+    { x = {x1 = int_to_fp(x1), x2 = int_to_fp(x2)},
+      y = {x1 = int_to_fp(y1), x2 = int_to_fp(y2)},
+      z = {x1 = int_to_fp(z1), x2 = int_to_fp(z2)} }
+
+  function pack_g1(t) = switch(t)
+                          (x, y, z) => {x = x, y = y, z = z} : g1
+  function pack_g2(t) = switch(t)
+                          ((x1, x2), (y1, y2), (z1, z2)) =>
+                            {x = {x1 = x1, x2 = x2}, y = {x1 = y1, x2 = y2}, z = {x1 = z1, x2 = z2}} : g2
+  function pack_gt(t) = switch(t)
+                          (x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12) =>
+                            {x1 = x1, x2 = x2, x3 = x3, x4 = x4, x5 = x5, x6 = x6,
+                             x7 = x7, x8 = x8, x9 = x9, x10 = x10, x11 = x11, x12 = x12} : gt
+
+  function g1_neg(p : g1)         = pack_g1(MCL_BLS12_381.g1_neg((p.x, p.y, p.z)))
+  function g1_norm(p : g1)        = pack_g1(MCL_BLS12_381.g1_norm((p.x, p.y, p.z)))
+  function g1_valid(p : g1)       = MCL_BLS12_381.g1_valid((p.x, p.y, p.z))
+  function g1_is_zero(p : g1)     = MCL_BLS12_381.g1_is_zero((p.x, p.y, p.z))
+  function g1_add(p : g1, q : g1) = pack_g1(MCL_BLS12_381.g1_add((p.x, p.y, p.z), (q.x, q.y, q.z)))
+  function g1_mul(k : fr, p : g1) = pack_g1(MCL_BLS12_381.g1_mul(k, (p.x, p.y, p.z)))
+
+  function g2_neg(p : g2)         = pack_g2(MCL_BLS12_381.g2_neg(((p.x.x1, p.x.x2), (p.y.x1, p.y.x2), (p.z.x1, p.z.x2))))
+  function g2_norm(p : g2)        = pack_g2(MCL_BLS12_381.g2_norm(((p.x.x1, p.x.x2), (p.y.x1, p.y.x2), (p.z.x1, p.z.x2))))
+  function g2_valid(p : g2)       = MCL_BLS12_381.g2_valid(((p.x.x1, p.x.x2), (p.y.x1, p.y.x2), (p.z.x1, p.z.x2)))
+  function g2_is_zero(p : g2)     = MCL_BLS12_381.g2_is_zero(((p.x.x1, p.x.x2), (p.y.x1, p.y.x2), (p.z.x1, p.z.x2)))
+  function g2_add(p : g2, q : g2) = pack_g2(MCL_BLS12_381.g2_add(((p.x.x1, p.x.x2), (p.y.x1, p.y.x2), (p.z.x1, p.z.x2)),
+                                                                 ((q.x.x1, q.x.x2), (q.y.x1, q.y.x2), (q.z.x1, q.z.x2))))
+  function g2_mul(k : fr, p : g2) = pack_g2(MCL_BLS12_381.g2_mul(k, ((p.x.x1, p.x.x2), (p.y.x1, p.y.x2), (p.z.x1, p.z.x2))))
+
+  function gt_inv(p : gt)              = pack_gt(MCL_BLS12_381.gt_inv((p.x1, p.x2, p.x3, p.x4, p.x5, p.x6, p.x7, p.x8, p.x9, p.x10, p.x11, p.x12)))
+  function gt_add(p : gt, q : gt)      = pack_gt(MCL_BLS12_381.gt_add((p.x1, p.x2, p.x3, p.x4, p.x5, p.x6, p.x7, p.x8, p.x9, p.x10, p.x11, p.x12),
+                                                                      (q.x1, q.x2, q.x3, q.x4, q.x5, q.x6, q.x7, q.x8, q.x9, q.x10, q.x11, q.x12)))
+  function gt_mul(p : gt, q : gt)      = pack_gt(MCL_BLS12_381.gt_mul((p.x1, p.x2, p.x3, p.x4, p.x5, p.x6, p.x7, p.x8, p.x9, p.x10, p.x11, p.x12),
+                                                                      (q.x1, q.x2, q.x3, q.x4, q.x5, q.x6, q.x7, q.x8, q.x9, q.x10, q.x11, q.x12)))
+  function gt_pow(p : gt, k : fr)      = pack_gt(MCL_BLS12_381.gt_pow((p.x1, p.x2, p.x3, p.x4, p.x5, p.x6, p.x7, p.x8, p.x9, p.x10, p.x11, p.x12), k))
+  function gt_is_one(p : gt)           = MCL_BLS12_381.gt_is_one((p.x1, p.x2, p.x3, p.x4, p.x5, p.x6, p.x7, p.x8, p.x9, p.x10, p.x11, p.x12))
+  function pairing(p : g1, q : g2)     = pack_gt(MCL_BLS12_381.pairing((p.x, p.y, p.z), ((q.x.x1, q.x.x2), (q.y.x1, q.y.x2), (q.z.x1, q.z.x2))))
+  function miller_loop(p : g1, q : g2) = pack_gt(MCL_BLS12_381.miller_loop((p.x, p.y, p.z), ((q.x.x1, q.x.x2), (q.y.x1, q.y.x2), (q.z.x1, q.z.x2))))
+  function final_exp(p : gt)           = pack_gt(MCL_BLS12_381.final_exp((p.x1, p.x2, p.x3, p.x4, p.x5, p.x6, p.x7, p.x8, p.x9, p.x10, p.x11, p.x12)))
