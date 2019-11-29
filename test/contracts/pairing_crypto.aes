@@ -1,0 +1,30 @@
+include "BLS12_381.aes"
+
+contract GrothVerify =
+  type fr = BLS12_381.fr
+  type g1 = BLS12_381.g1
+  type g2 = BLS12_381.g2
+
+  record proof = { a : g1, b : g2, c : g1 }
+  record verify_key = { a : g1, b : g2, c : g2, d : g2, ic : list(g1) }
+
+  record state = { vk : verify_key }
+
+  entrypoint init(vk0 : verify_key) = {vk = vk0}
+
+  entrypoint verify_proof(p : proof, input : list(fr)) =
+    let vk = state.vk
+    let vk_x = calc_vk_x(vk.ic, input)
+
+    BLS12_381.pairing_check([BLS12_381.g1_neg(p.a), vk.a, vk_x, p.c],
+                            [p.b, vk.b, vk.c, vk.d])
+
+  function calc_vk_x(ics : list(g1), xs : list(fr)) =
+    switch(ics)
+      (ic :: ics) => calc_vk_x_(ic, ics, xs)
+
+  function calc_vk_x_(vk_x : g1, ics : list(g1), xs : list(fr)) =
+    switch((ics, xs))
+      ([], []) => vk_x
+      (ic :: ics, x :: xs) => calc_vk_x_(BLS12_381.g1_add(vk_x, BLS12_381.g1_mul(x, ic)), ics, xs)
+

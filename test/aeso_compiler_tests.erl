@@ -161,11 +161,12 @@ compilable_contracts() ->
      "list_comp",
      "payable",
      "unapplied_builtins",
-     "underscore_number_literals"
+     "underscore_number_literals",
+     "pairing_crypto"
     ].
 
 not_yet_compilable(fate) -> [];
-not_yet_compilable(aevm) -> [].
+not_yet_compilable(aevm) -> ["pairing_crypto"].
 
 %% Contracts that should produce type errors
 

@@ -34,7 +34,14 @@
               bits_intersection | bits_union | bits_difference |
               contract_to_address | address_to_contract | crypto_verify_sig | crypto_verify_sig_secp256k1 |
               crypto_sha3 | crypto_sha256 | crypto_blake2b |
-              crypto_ecverify_secp256k1 | crypto_ecrecover_secp256k1.
+              crypto_ecverify_secp256k1 | crypto_ecrecover_secp256k1 |
+              mcl_bls12_381_g1_neg | mcl_bls12_381_g1_norm | mcl_bls12_381_g1_valid |
+              mcl_bls12_381_g1_is_zero | mcl_bls12_381_g1_add | mcl_bls12_381_g1_mul |
+              mcl_bls12_381_g2_neg | mcl_bls12_381_g2_norm | mcl_bls12_381_g2_valid |
+              mcl_bls12_381_g2_is_zero | mcl_bls12_381_g2_add | mcl_bls12_381_g2_mul |
+              mcl_bls12_381_gt_inv | mcl_bls12_381_gt_add | mcl_bls12_381_gt_mul | mcl_bls12_381_gt_pow |
+              mcl_bls12_381_gt_is_one | mcl_bls12_381_pairing | mcl_bls12_381_miller_loop | mcl_bls12_381_final_exp |
+              mcl_bls12_381_int_to_fr | mcl_bls12_381_int_to_fp | mcl_bls12_381_fr_to_int | mcl_bls12_381_fp_to_int.
 
 -type flit() :: {int, integer()}
               | {string, binary()}
@@ -197,6 +204,11 @@ builtins() ->
               {["Crypto"],   [{"verify_sig", 3}, {"verify_sig_secp256k1", 3},
                               {"ecverify_secp256k1", 3}, {"ecrecover_secp256k1", 2},
                               {"sha3", 1}, {"sha256", 1}, {"blake2b", 1}]},
+              {["MCL_BLS12_381"], [{"g1_neg", 1}, {"g1_norm", 1}, {"g1_valid", 1}, {"g1_is_zero", 1}, {"g1_add", 2}, {"g1_mul", 2},
+                                   {"g2_neg", 1}, {"g2_norm", 1}, {"g2_valid", 1}, {"g2_is_zero", 1}, {"g2_add", 2}, {"g2_mul", 2},
+                                   {"gt_inv", 1}, {"gt_add", 2}, {"gt_mul", 2}, {"gt_pow", 2}, {"gt_is_one", 1},
+                                   {"pairing", 2}, {"miller_loop", 2}, {"final_exp", 1},
+                                   {"int_to_fr", 1}, {"int_to_fp", 1}, {"fr_to_int", 1}, {"fp_to_int", 1}]},
               {["Auth"],     [{"tx_hash", none}]},
               {["String"],   [{"length", 1}, {"concat", 2}, {"sha3", 1}, {"sha256", 1}, {"blake2b", 1}]},
               {["Bits"],     [{"set", 2}, {"clear", 2}, {"test", 2}, {"sum", 1}, {"intersection", 2},
@@ -229,7 +241,9 @@ init_type_env() ->
        ["map"]             => ?type(K, V, {map, K, V}),
        ["option"]          => ?type(T, {variant, [[], [T]]}),
        ["Chain", "ttl"]    => ?type({variant, [[integer], [integer]]}),
-       ["AENS", "pointee"] => ?type({variant, [[address], [address], [address]]})
+       ["AENS", "pointee"] => ?type({variant, [[address], [address], [address]]}),
+       ["MCL_BLS12_381", "fr"]  => ?type({bytes, 32}),
+       ["MCL_BLS12_381", "fp"]  => ?type({bytes, 48})
      }.
 
 is_no_code(Env) ->
@@ -910,7 +924,14 @@ op_builtins() ->
      bits_difference, int_to_str, address_to_str, crypto_verify_sig,
      address_to_contract,
      crypto_verify_sig_secp256k1, crypto_sha3, crypto_sha256, crypto_blake2b,
-     crypto_ecverify_secp256k1, crypto_ecrecover_secp256k1
+     crypto_ecverify_secp256k1, crypto_ecrecover_secp256k1,
+     mcl_bls12_381_g1_neg, mcl_bls12_381_g1_norm, mcl_bls12_381_g1_valid,
+     mcl_bls12_381_g1_is_zero, mcl_bls12_381_g1_add, mcl_bls12_381_g1_mul,
+     mcl_bls12_381_g2_neg, mcl_bls12_381_g2_norm, mcl_bls12_381_g2_valid,
+     mcl_bls12_381_g2_is_zero, mcl_bls12_381_g2_add, mcl_bls12_381_g2_mul,
+     mcl_bls12_381_gt_inv, mcl_bls12_381_gt_add, mcl_bls12_381_gt_mul, mcl_bls12_381_gt_pow,
+     mcl_bls12_381_gt_is_one, mcl_bls12_381_pairing, mcl_bls12_381_miller_loop, mcl_bls12_381_final_exp,
+     mcl_bls12_381_int_to_fr, mcl_bls12_381_int_to_fp, mcl_bls12_381_fr_to_int, mcl_bls12_381_fp_to_int
     ].
 
 builtin_to_fcode(require, [Cond, Msg]) ->

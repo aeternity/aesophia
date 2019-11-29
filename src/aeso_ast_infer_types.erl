@@ -390,6 +390,12 @@ global_env() ->
     SignFun   = fun(Ts, T) -> {type_sig, [stateful|Ann], none, [Signature], Ts, T} end,
     TTL       = {qid, Ann, ["Chain", "ttl"]},
     Pointee   = {qid, Ann, ["AENS", "pointee"]},
+    Fr        = {qid, Ann, ["MCL_BLS12_381", "fr"]},
+    Fp        = {qid, Ann, ["MCL_BLS12_381", "fp"]},
+    Fp2       = {tuple_t, Ann, [Fp, Fp]},
+    G1        = {tuple_t, Ann, [Fp, Fp, Fp]},
+    G2        = {tuple_t, Ann, [Fp2, Fp2, Fp2]},
+    GT        = {tuple_t, Ann, lists:duplicate(12, Fp)},
 
     Fee       = Int,
     [A, Q, R, K, V] = lists:map(TVar, ["a", "q", "r", "k", "v"]),
@@ -493,6 +499,40 @@ global_env() ->
                       {"sha256",   Fun1(A, Hash)},
                       {"blake2b",  Fun1(A, Hash)}]) },
 
+    %% Fancy BLS12-381 crypto operations
+    MCL_BLS12_381_Scope = #scope
+        { funs = MkDefs(
+                     [{"g1_neg",     Fun1(G1, G1)},
+                      {"g1_norm",    Fun1(G1, G1)},
+                      {"g1_valid",   Fun1(G1, Bool)},
+                      {"g1_is_zero", Fun1(G1, Bool)},
+                      {"g1_add",     Fun ([G1, G1], G1)},
+                      {"g1_mul",     Fun ([Fr, G1], G1)},
+
+                      {"g2_neg",     Fun1(G2, G2)},
+                      {"g2_norm",    Fun1(G2, G2)},
+                      {"g2_valid",   Fun1(G2, Bool)},
+                      {"g2_is_zero", Fun1(G2, Bool)},
+                      {"g2_add",     Fun ([G2, G2], G2)},
+                      {"g2_mul",     Fun ([Fr, G2], G2)},
+
+                      {"gt_inv",      Fun1(GT, GT)},
+                      {"gt_add",      Fun ([GT, GT], GT)},
+                      {"gt_mul",      Fun ([GT, GT], GT)},
+                      {"gt_pow",      Fun ([GT, Fr], GT)},
+                      {"gt_is_one",   Fun1(GT, Bool)},
+                      {"pairing",     Fun ([G1, G2], GT)},
+                      {"miller_loop", Fun ([G1, G2], GT)},
+                      {"final_exp",   Fun1(GT, GT)},
+
+                      {"int_to_fr", Fun1(Int, Fr)},
+                      {"int_to_fp", Fun1(Int, Fp)},
+                      {"fr_to_int", Fun1(Fr, Int)},
+                      {"fp_to_int", Fun1(Fp, Int)}
+                     ]),
+          types = MkDefs(
+                     [{"fr",  0}, {"fp",  0}]) },
+
     %% Authentication
     AuthScope = #scope
         { funs = MkDefs(
@@ -547,12 +587,15 @@ global_env() ->
              , ["Map"]      => MapScope
              , ["Auth"]     => AuthScope
              , ["Crypto"]   => CryptoScope
+             , ["MCL_BLS12_381"] => MCL_BLS12_381_Scope
              , ["String"]   => StringScope
              , ["Bits"]     => BitsScope
              , ["Bytes"]    => BytesScope
              , ["Int"]      => IntScope
              , ["Address"]  => AddressScope
-             } }.
+             }
+        }.
+
 
 option_t(As, T) -> {app_t, As, {id, As, "option"}, [T]}.
 map_t(As, K, V) -> {app_t, As, {id, As, "map"}, [K, V]}.
