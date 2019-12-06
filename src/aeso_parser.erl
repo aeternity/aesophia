@@ -349,7 +349,9 @@ record(Fs) ->
                         bad_expr_err("Cannot use '@' in map construction", infix({lvalue, FAnn, LV}, {'@', Ann}, Id));
                     ({field, FAnn, LV, _}) ->
                         bad_expr_err("Cannot use nested fields or keys in map construction", {lvalue, FAnn, LV}) end,
-            {map, Ann, lists:map(KV, Fs)}
+            {map, Ann, lists:map(KV, Fs)};
+        record_or_map_error ->
+            {record_or_map_error, get_ann(hd(Fs)), Fs}
     end.
 
 record_or_map(Fields) ->
@@ -361,9 +363,7 @@ record_or_map(Fields) ->
     case lists:usort(lists:map(Kind, Fields)) of
         [proj]    -> record;
         [map_get] -> map;
-        _         ->
-            [{field, Ann, _, _} | _] = Fields,
-            bad_expr_err("Mixed record fields and map keys in", {record, Ann, Fields})
+        _         -> record_or_map_error %% Defer error until type checking
     end.
 
 field_assignment() ->
