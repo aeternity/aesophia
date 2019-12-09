@@ -100,9 +100,8 @@
      | {list, ann(), [expr()]}
      | {list_comp, ann(), expr(), [comprehension_exp()]}
      | {typed, ann(), expr(), type()}
-     | {record, ann(), [field(expr())]}
-     | {record, ann(), expr(), [field(expr())]} %% record update
-     | {map, ann(), expr(), [field(expr())]}    %% map update
+     | {record_or_map(), ann(), [field(expr())]}
+     | {record_or_map(), ann(), expr(), [field(expr())]} %% record/map update
      | {map, ann(), [{expr(), expr()}]}
      | {map_get, ann(), expr(), expr()}
      | {map_get, ann(), expr(), expr(), expr()}
@@ -110,6 +109,8 @@
      | {op(), ann()}
      | id() | qid() | con() | qcon()
      | constant().
+
+-type record_or_map() :: record | map | record_or_map_error.
 
 -type comprehension_exp() :: [ {comprehension_bind, id(), expr()}
                              | {comprehension_if, ann(), expr()}

@@ -1290,6 +1290,16 @@ infer_expr(Env, {block, Attrs, Stmts}) ->
     BlockType = fresh_uvar(Attrs),
     NewStmts = infer_block(Env, Attrs, Stmts, BlockType),
     {typed, Attrs, {block, Attrs, NewStmts}, BlockType};
+infer_expr(_Env, {record_or_map_error, Attrs, Fields}) ->
+    type_error({mixed_record_and_map, {record, Attrs, Fields}}),
+    Type = fresh_uvar(Attrs),
+    {typed, Attrs, {record, Attrs, []}, Type};
+infer_expr(Env, {record_or_map_error, Attrs, Expr, []}) ->
+    type_error({empty_record_or_map_update, {record, Attrs, Expr, []}}),
+    infer_expr(Env, Expr);
+infer_expr(Env, {record_or_map_error, Attrs, Expr, Fields}) ->
+    type_error({mixed_record_and_map, {record, Attrs, Expr, Fields}}),
+    infer_expr(Env, Expr);
 infer_expr(Env, {lam, Attrs, Args, Body}) ->
     ArgTypes = [fresh_uvar(As) || {arg, As, _, _} <- Args],
     ArgPatterns = [{typed, As, Pat, check_type(Env, T)} || {arg, As, Pat, T} <- Args],
@@ -2456,6 +2466,14 @@ mk_error({compiler_version_mismatch, Ann, Version, Op, Bound}) ->
                         "because it does not satisfy the constraint"
                         " ~s ~s ~s\n", [PrintV(Version), Op, PrintV(Bound)]),
     mk_t_err(pos(Ann), Msg);
+mk_error({empty_record_or_map_update, Expr}) ->
+    Msg = io_lib:format("Empty record/map update\n~s",
+                        [pp_expr("  ", Expr)]),
+    mk_t_err(pos(Expr), Msg);
+mk_error({mixed_record_and_map, Expr}) ->
+    Msg = io_lib:format("Mixed record fields and map keys in\n~s",
+                        [pp_expr("  ", Expr)]),
+    mk_t_err(pos(Expr), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p\n", [Err]),
     mk_t_err(pos(0, 0), Msg).
