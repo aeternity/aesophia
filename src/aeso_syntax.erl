@@ -47,7 +47,7 @@
 -type pragma() :: {compiler, '==' | '<' | '>' | '=<' | '>=', compiler_version()}.
 
 -type letbind()
-    :: {letval, ann(), id(), type(), expr()}
+    :: {letval, ann(), pat(), expr()}
      | {letfun, ann(), id(), [arg()], type(), expr()}.
 
 -type arg() :: {arg, ann(), id(), type()}.
@@ -112,7 +112,7 @@
 
 -type record_or_map() :: record | map | record_or_map_error.
 
--type comprehension_exp() :: [ {comprehension_bind, id(), expr()}
+-type comprehension_exp() :: [ {comprehension_bind, pat(), expr()}
                              | {comprehension_if, ann(), expr()}
                              | letbind() ].
 
@@ -140,6 +140,7 @@
 -type pat() :: {app, ann(), con() | op(), [pat()]}
              | {tuple, ann(), [pat()]}
              | {list, ann(), [pat()]}
+             | {typed, ann(), pat(), type()}
              | {record, ann(), [field(pat())]}
              | constant()
              | con()

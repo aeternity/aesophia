@@ -318,19 +318,23 @@ ast_body({app, As, Fun, Args}, Icode) ->
     end;
 ast_body({list_comp, _, Yield, []}, Icode) ->
     #list{elems = [ast_body(Yield, Icode)]};
-ast_body({list_comp, As, Yield, [{comprehension_bind, {typed, Arg, ArgType}, BindExpr}|Rest]}, Icode) ->
+ast_body({list_comp, As, Yield, [{comprehension_bind, {typed, _, Pat, ArgType}, BindExpr}|Rest]}, Icode) ->
+    Arg  = "%lc",
+    Body = {switch, As, {typed, As, {id, As, Arg}, ArgType},
+                [{'case', As, Pat, {list_comp, As, Yield, Rest}},
+                 {'case', As, {id, As, "_"}, {list, As, []}}]},
     #funcall
         { function = #var_ref{ name = ["ListInternal", "flat_map"] }
         , args =
-              [ #lambda{ args=[#arg{name = ast_id(Arg), type = ast_type(ArgType, Icode)}]
-                       , body = ast_body({list_comp, As, Yield, Rest}, Icode)
+              [ #lambda{ args=[#arg{name = Arg, type = ast_type(ArgType, Icode)}]
+                       , body = ast_body(Body, Icode)
                        }
               , ast_body(BindExpr, Icode)
               ]
         };
 ast_body({list_comp, As, Yield, [{comprehension_if, AsIF, Cond}|Rest]}, Icode) ->
     ast_body({'if', AsIF, Cond, {list_comp, As, Yield, Rest}, {list, As, []}}, Icode);
-ast_body({list_comp, As, Yield, [LV = {letval, _, _, _, _}|Rest]}, Icode) ->
+ast_body({list_comp, As, Yield, [LV = {letval, _, _, _}|Rest]}, Icode) ->
     ast_body({block, As, [LV, {list_comp, As, Yield, Rest}]}, Icode);
 ast_body({list_comp, As, Yield, [LF = {letfun, _, _, _, _, _}|Rest]}, Icode) ->
     ast_body({block, As, [LF, {list_comp, As, Yield, Rest}]}, Icode);
@@ -344,14 +348,14 @@ ast_body({switch,_,A,Cases}, Icode) ->
     #switch{expr=ast_body(A, Icode),
             cases=[{ast_body(Pat, Icode),ast_body(Body, Icode)}
               || {'case',_,Pat,Body} <- Cases]};
-ast_body({block, As, [{letval, _, Pat, _, E} | Rest]}, Icode) ->
+ast_body({block, As, [{letval, _, Pat, E} | Rest]}, Icode) ->
     E1    = ast_body(E, Icode),
     Pat1  = ast_body(Pat, Icode),
     Rest1 = ast_body({block, As, Rest}, Icode),
     #switch{expr  = E1,
             cases = [{Pat1, Rest1}]};
 ast_body({block, As, [{letfun, Ann, F, Args, _Type, Expr} | Rest]}, Icode) ->
-    ast_body({block, As, [{letval, Ann, F, unused, {lam, Ann, Args, Expr}} | Rest]}, Icode);
+    ast_body({block, As, [{letval, Ann, F, {lam, Ann, Args, Expr}} | Rest]}, Icode);
 ast_body({block,_,[]}, _Icode) ->
     #tuple{cpts=[]};
 ast_body({block,_,[E]}, Icode) ->

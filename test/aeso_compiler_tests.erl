@@ -163,7 +163,8 @@ compilable_contracts() ->
      "payable",
      "unapplied_builtins",
      "underscore_number_literals",
-     "qualified_constructor"
+     "qualified_constructor",
+     "let_patterns"
     ].
 
 not_yet_compilable(fate) -> [];

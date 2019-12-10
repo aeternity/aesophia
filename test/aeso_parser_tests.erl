@@ -78,7 +78,7 @@ parse_string(Text, Opts) ->
     aeso_parser:string(Text, Opts).
 
 parse_expr(Text) ->
-    [{letval, _, _, _, Expr}] =
+    [{letval, _, _, Expr}] =
         parse_string("let _ = " ++ Text),
     Expr.
 
