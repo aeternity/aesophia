@@ -164,9 +164,7 @@ letdecl() ->
 letdef() -> choice(valdef(), fundef()).
 
 valdef() ->
-    choice(
-        ?RULE(id(),                   tok('='), body(), {letval, [], _1, type_wildcard(), _3}),
-        ?RULE(id(), tok(':'), type(), tok('='), body(), {letval, [], _1, _3, _5})).
+    ?RULE(pattern(), tok('='), body(), {letval, [], _1, _3}).
 
 fundef() ->
     choice(
@@ -238,7 +236,7 @@ branch() ->
     ?RULE(pattern(), keyword('=>'), body(), {'case', _2, _1, _3}).
 
 pattern() ->
-    ?LET_P(E, expr500(), parse_pattern(E)).
+    ?LET_P(E, expr(), parse_pattern(E)).
 
 %% -- Expressions ------------------------------------------------------------
 
@@ -297,7 +295,7 @@ comprehension_if() ->
     ?RULE(keyword('if'), parens(expr()), {comprehension_if, _1, _2}).
 
 comprehension_bind() ->
-    ?RULE(id(), tok('<-'), expr(), {comprehension_bind, _1, _3}).
+    ?RULE(pattern(), tok('<-'), expr(), {comprehension_bind, _1, _3}).
 
 arg_expr() ->
     ?LAZY_P(
@@ -553,6 +551,8 @@ parse_pattern({list, Ann, Es}) ->
     {list, Ann, lists:map(fun parse_pattern/1, Es)};
 parse_pattern({record, Ann, Fs}) ->
     {record, Ann, lists:map(fun parse_field_pattern/1, Fs)};
+parse_pattern({typed, Ann, E, Type}) ->
+    {typed, Ann, parse_pattern(E), Type};
 parse_pattern(E = {con, _, _})    -> E;
 parse_pattern(E = {qcon, _, _})   -> E;
 parse_pattern(E = {id, _, _})     -> E;

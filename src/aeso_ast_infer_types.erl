@@ -1140,19 +1140,18 @@ infer_expr(Env, {list, As, Elems}) ->
 infer_expr(Env, {list_comp, As, Yield, []}) ->
     {typed, _, _, Type} = TypedYield = infer_expr(Env, Yield),
     {typed, As, {list_comp, As, TypedYield, []}, {app_t, As, {id, As, "list"}, [Type]}};
-infer_expr(Env, {list_comp, As, Yield, [{comprehension_bind, Arg, BExpr}|Rest]}) ->
-    BindVarType = fresh_uvar(As),
+infer_expr(Env, {list_comp, As, Yield, [{comprehension_bind, Pat, BExpr}|Rest]}) ->
     TypedBind = {typed, As2, _, TypeBExpr} = infer_expr(Env, BExpr),
+    {NewE, TypedPat = {typed, _, _, PatType}} = infer_pattern(Env, Pat),
     unify( Env
          , TypeBExpr
-         , {app_t, As, {id, As, "list"}, [BindVarType]}
-         , {list_comp, TypedBind, TypeBExpr, {app_t, As2, {id, As, "list"}, [BindVarType]}}),
-    NewE = bind_var(Arg, BindVarType, Env),
+         , {app_t, As, {id, As, "list"}, [PatType]}
+         , {list_comp, TypedBind, TypeBExpr, {app_t, As2, {id, As, "list"}, [PatType]}}),
     {typed, _, {list_comp, _, TypedYield, TypedRest}, ResType} =
         infer_expr(NewE, {list_comp, As, Yield, Rest}),
     { typed
     , As
-    , {list_comp, As, TypedYield, [{comprehension_bind, {typed, Arg, BindVarType}, TypedBind}|TypedRest]}
+    , {list_comp, As, TypedYield, [{comprehension_bind, TypedPat, TypedBind}|TypedRest]}
     , ResType};
 infer_expr(Env, {list_comp, AttrsL, Yield, [{comprehension_if, AttrsIF, Cond}|Rest]}) ->
     NewCond = check_expr(Env, Cond, {id, AttrsIF, "bool"}),
@@ -1162,8 +1161,8 @@ infer_expr(Env, {list_comp, AttrsL, Yield, [{comprehension_if, AttrsIF, Cond}|Re
     , AttrsL
     , {list_comp, AttrsL, TypedYield, [{comprehension_if, AttrsIF, NewCond}|TypedRest]}
     , ResType};
-infer_expr(Env, {list_comp, AsLC, Yield, [{letval, AsLV, Pattern, Type, E}|Rest]}) ->
-    NewE = {typed, _, _, PatType} = infer_expr(Env, {typed, AsLV, E, arg_type(AsLV, Type)}),
+infer_expr(Env, {list_comp, AsLC, Yield, [{letval, AsLV, Pattern, E}|Rest]}) ->
+    NewE = {typed, _, _, PatType} = infer_expr(Env, E),
     BlockType = fresh_uvar(AsLV),
     {'case', _, NewPattern, NewRest} =
         infer_case( Env
@@ -1175,7 +1174,7 @@ infer_expr(Env, {list_comp, AsLC, Yield, [{letval, AsLV, Pattern, Type, E}|Rest]
     {typed, _, {list_comp, _, TypedYield, TypedRest}, ResType} = NewRest,
     { typed
     , AsLC
-    , {list_comp, AsLC, TypedYield, [{letval, AsLV, NewPattern, Type, NewE}|TypedRest]}
+    , {list_comp, AsLC, TypedYield, [{letval, AsLV, NewPattern, NewE}|TypedRest]}
     , ResType
     };
 infer_expr(Env, {list_comp, AsLC, Yield, [Def={letfun, AsLF, _, _, _, _}|Rest]}) ->
@@ -1308,7 +1307,7 @@ infer_expr(Env, {lam, Attrs, Args, Body}) ->
         infer_case(Env, Attrs, {tuple, Attrs, ArgPatterns}, {tuple_t, Attrs, ArgTypes}, Body, ResultType),
     NewArgs = [{arg, As, NewPat, NewT} || {typed, As, NewPat, NewT} <- NewArgPatterns],
     {typed, Attrs, {lam, Attrs, NewArgs, NewBody}, {fun_t, Attrs, [], ArgTypes, ResultType}};
-infer_expr(Env, Let = {letval, Attrs, _, _, _}) ->
+infer_expr(Env, Let = {letval, Attrs, _, _}) ->
     type_error({missing_body_for_let, Attrs}),
     infer_expr(Env, {block, Attrs, [Let, abort_expr(Attrs, "missing body")]});
 infer_expr(Env, Let = {letfun, Attrs, _, _, _, _}) ->
@@ -1371,15 +1370,19 @@ infer_op(Env, As, Op, Args, InferOp) ->
     unify(Env, ArgTypes, OperandTypes, {infer_app, Op, Args, Inferred, ArgTypes}),
     {typed, As, {app, As, Op, TypedArgs}, ResultType}.
 
-infer_case(Env, Attrs, Pattern, ExprType, Branch, SwitchType) ->
+infer_pattern(Env, Pattern) ->
     Vars = free_vars(Pattern),
     Names = [N || {id, _, N} <- Vars, N /= "_"],
     case Names -- lists:usort(Names) of
         [] -> ok;
         Nonlinear -> type_error({non_linear_pattern, Pattern, lists:usort(Nonlinear)})
     end,
-    NewEnv = bind_vars([{Var, fresh_uvar(Ann)} || Var = {id, Ann, _} <- Vars], Env#env{ in_pattern = true }),
-    NewPattern = {typed, _, _, PatType} = infer_expr(NewEnv, Pattern),
+    NewEnv = bind_vars([{Var, fresh_uvar(Ann1)} || Var = {id, Ann1, _} <- Vars], Env#env{ in_pattern = true }),
+    NewPattern = infer_expr(NewEnv, Pattern),
+    {NewEnv, NewPattern}.
+
+infer_case(Env, Attrs, Pattern, ExprType, Branch, SwitchType) ->
+    {NewEnv, NewPattern = {typed, _, _, PatType}} = infer_pattern(Env, Pattern),
     NewBranch  = check_expr(NewEnv#env{ in_pattern = false }, Branch, SwitchType),
     unify(Env, PatType, ExprType, {case_pat, Pattern, PatType, ExprType}),
     {'case', Attrs, NewPattern, NewBranch}.
@@ -1394,11 +1397,11 @@ infer_block(Env, Attrs, [Def={letfun, Ann, _, _, _, _}|Rest], BlockType) ->
     FunT = typesig_to_fun_t(TypeSig),
     NewE = bind_var({id, Ann, Name}, FunT, Env),
     [LetFun|infer_block(NewE, Attrs, Rest, BlockType)];
-infer_block(Env, _, [{letval, Attrs, Pattern, Type, E}|Rest], BlockType) ->
-    NewE = {typed, _, _, PatType} = infer_expr(Env, {typed, Attrs, E, arg_type(aeso_syntax:get_ann(Pattern), Type)}),
+infer_block(Env, _, [{letval, Attrs, Pattern, E}|Rest], BlockType) ->
+    NewE = {typed, _, _, PatType} = infer_expr(Env, E),
     {'case', _, NewPattern, {typed, _, {block, _, NewRest}, _}} =
         infer_case(Env, Attrs, Pattern, PatType, {block, Attrs, Rest}, BlockType),
-    [{letval, Attrs, NewPattern, Type, NewE}|NewRest];
+    [{letval, Attrs, NewPattern, NewE}|NewRest];
 infer_block(Env, Attrs, [E|Rest], BlockType) ->
     [infer_expr(Env, E)|infer_block(Env, Attrs, Rest, BlockType)].
 

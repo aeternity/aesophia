@@ -1,0 +1,13 @@
+contract LetPatterns =
+
+  record r = {x : int, y : int, b : bool}
+
+  entrypoint test() = foo([1, 0], (2, 3), Some(4), {x = 5, y = 6, b = false})
+
+  entrypoint foo(xs : list(int), p : int * int, some : option(int), r : r) =
+    let x :: _  = xs
+    let (a, b)  = p
+    let Some(n) = some
+    let {x = i, y = j} = r
+    x + a + b + n + i + j
+

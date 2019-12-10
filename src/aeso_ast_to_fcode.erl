@@ -564,9 +564,12 @@ expr_to_fcode(Env, _Type, {app, _, {'..', _}, [A, B]}) ->
 
 expr_to_fcode(Env, _Type, {list_comp, _, Yield, []}) ->
     {op, '::', [expr_to_fcode(Env, Yield), nil]};
-expr_to_fcode(Env, _Type, {list_comp, As, Yield, [{comprehension_bind, {typed, {id, _, Arg}, _}, BindExpr}|Rest]}) ->
+expr_to_fcode(Env, _Type, {list_comp, As, Yield, [{comprehension_bind, Pat = {typed, _, _, PatType}, BindExpr}|Rest]}) ->
+    Arg  = fresh_name(),
     Env1 = bind_var(Env, Arg),
-    Bind = {lam, [Arg], expr_to_fcode(Env1, {list_comp, As, Yield, Rest})},
+    Bind = {lam, [Arg], expr_to_fcode(Env1, {switch, As, {typed, As, {id, As, Arg}, PatType},
+                                                [{'case', As, Pat, {list_comp, As, Yield, Rest}},
+                                                 {'case', As, {id, As, "_"}, {list, As, []}}]})},
     {def_u, FlatMap, _} = resolve_fun(Env, ["ListInternal", "flat_map"]),
     {def, FlatMap, [Bind, expr_to_fcode(Env, BindExpr)]};
 expr_to_fcode(Env, Type, {list_comp, As, Yield, [{comprehension_if, _, Cond}|Rest]}) ->
@@ -574,7 +577,7 @@ expr_to_fcode(Env, Type, {list_comp, As, Yield, [{comprehension_if, _, Cond}|Res
             expr_to_fcode(Env, Type, {list_comp, As, Yield, Rest}),
             nil
            );
-expr_to_fcode(Env, Type, {list_comp, As, Yield, [LV = {letval, _, _, _, _}|Rest]}) ->
+expr_to_fcode(Env, Type, {list_comp, As, Yield, [LV = {letval, _, _, _}|Rest]}) ->
     expr_to_fcode(Env, Type, {block, As, [LV, {list_comp, As, Yield, Rest}]});
 expr_to_fcode(Env, Type, {list_comp, As, Yield, [LF = {letfun, _, _, _, _, _}|Rest]}) ->
     expr_to_fcode(Env, Type, {block, As, [LF, {list_comp, As, Yield, Rest}]});
@@ -960,8 +963,10 @@ decision_tree_to_fcode({'if', A, Then, Else}) ->
 %% -- Statements --
 
 -spec stmts_to_fcode(env(), [aeso_syntax:stmt()]) -> fexpr().
-stmts_to_fcode(Env, [{letval, _, {typed, _, {id, _, X}, _}, _, Expr} | Stmts]) ->
+stmts_to_fcode(Env, [{letval, _, {typed, _, {id, _, X}, _}, Expr} | Stmts]) ->
     {'let', X, expr_to_fcode(Env, Expr), stmts_to_fcode(bind_var(Env, X), Stmts)};
+stmts_to_fcode(Env, [{letval, Ann, Pat, Expr} | Stmts]) ->
+    expr_to_fcode(Env, {switch, Ann, Expr, [{'case', Ann, Pat, {block, Ann, Stmts}}]});
 stmts_to_fcode(Env, [{letfun, Ann, {id, _, X}, Args, _Type, Expr} | Stmts]) ->
     {'let', X, expr_to_fcode(Env, {lam, Ann, Args, Expr}),
                stmts_to_fcode(bind_var(Env, X), Stmts)};
