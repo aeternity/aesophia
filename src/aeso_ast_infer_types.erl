@@ -1440,18 +1440,13 @@ infer_prefix({IntOp,As}) when IntOp =:= '-' ->
 abort_expr(Ann, Str) ->
     {app, Ann, {id, Ann, "abort"}, [{string, Ann, Str}]}.
 
-free_vars({int, _, _}) ->
-    [];
-free_vars({char, _, _}) ->
-    [];
-free_vars({string, _, _}) ->
-    [];
-free_vars({bool, _, _}) ->
-    [];
-free_vars(Id={id, _, _}) ->
-    [Id];
-free_vars({con, _, _}) ->
-    [];
+free_vars({int, _, _})    -> [];
+free_vars({char, _, _})   -> [];
+free_vars({string, _, _}) -> [];
+free_vars({bool, _, _})   -> [];
+free_vars(Id={id, _, _})  -> [Id];
+free_vars({con, _, _})    -> [];
+free_vars({qcon, _, _})   -> [];
 free_vars({tuple, _, Cpts}) ->
     free_vars(Cpts);
 free_vars({list, _, Elems}) ->
@@ -1459,6 +1454,8 @@ free_vars({list, _, Elems}) ->
 free_vars({app, _, {'::', _}, Args}) ->
     free_vars(Args);
 free_vars({app, _, {con, _, _}, Args}) ->
+    free_vars(Args);
+free_vars({app, _, {qcon, _, _}, Args}) ->
     free_vars(Args);
 free_vars({record, _, Fields}) ->
     free_vars([E || {field, _, _, E} <- Fields]);

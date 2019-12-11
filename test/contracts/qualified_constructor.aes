@@ -1,0 +1,8 @@
+namespace Foo =
+  datatype x = A | B(int)
+
+contract Bar =
+  entrypoint f(a : Foo.x) =
+    switch(a)
+      Foo.A     => 0
+      Foo.B(n)  => n
