@@ -545,7 +545,7 @@ list_comp_e(Ann, Expr, Binds) -> {list_comp, Ann, Expr, Binds}.
 -spec parse_pattern(aeso_syntax:expr()) -> aeso_parse_lib:parser(aeso_syntax:pat()).
 parse_pattern({app, Ann, Con = {'::', _}, Es}) ->
     {app, Ann, Con, lists:map(fun parse_pattern/1, Es)};
-parse_pattern({app, Ann, Con = {con, _, _}, Es}) ->
+parse_pattern({app, Ann, Con = {Tag, _, _}, Es}) when Tag == con; Tag == qcon ->
     {app, Ann, Con, lists:map(fun parse_pattern/1, Es)};
 parse_pattern({tuple, Ann, Es}) ->
     {tuple, Ann, lists:map(fun parse_pattern/1, Es)};
@@ -554,6 +554,7 @@ parse_pattern({list, Ann, Es}) ->
 parse_pattern({record, Ann, Fs}) ->
     {record, Ann, lists:map(fun parse_field_pattern/1, Fs)};
 parse_pattern(E = {con, _, _})    -> E;
+parse_pattern(E = {qcon, _, _})   -> E;
 parse_pattern(E = {id, _, _})     -> E;
 parse_pattern(E = {int, _, _})    -> E;
 parse_pattern(E = {bool, _, _})   -> E;
