@@ -41,8 +41,8 @@
 -define(TODO(What), error({todo, ?FILE, ?LINE, ?FUNCTION_NAME, What})).
 
 -define(i(X), {immediate, X}).
--define(a, {stack, 0}).
--define(s, {store, 1}).
+-define(a,    {stack, 0}).
+-define(s(N), {store, N}).
 -define(void, {var, 9999}).
 
 -record(env, { contract, vars = [], locals = [], current_function, tailpos = true }).
@@ -120,9 +120,10 @@ type_to_scode(name)            -> name;
 type_to_scode(channel)         -> channel;
 type_to_scode(bits)            -> bits;
 type_to_scode(any)             -> any;
-type_to_scode({variant, Cons}) -> {variant, lists:map(fun(T) -> type_to_scode({tuple, T}) end, Cons)};
+type_to_scode({variant, Cons}) -> {variant, [{tuple, types_to_scode(Con)} || Con <- Cons]};
 type_to_scode({list, Type})    -> {list, type_to_scode(Type)};
-type_to_scode({tuple, Types})  -> {tuple, lists:map(fun type_to_scode/1, Types)};
+type_to_scode({tuple, [Type]}) -> type_to_scode(Type);
+type_to_scode({tuple, Types})  -> {tuple, types_to_scode(Types)};
 type_to_scode({map, Key, Val}) -> {map, type_to_scode(Key), type_to_scode(Val)};
 type_to_scode({function, _Args, _Res}) -> {tuple, [string, any]};
 type_to_scode({tvar, X}) ->
@@ -133,6 +134,8 @@ type_to_scode({tvar, X}) ->
             {tvar, I};
         J -> {tvar, J}
     end.
+
+types_to_scode(Ts) -> lists:map(fun type_to_scode/1, Ts).
 
 %% -- Phase I ----------------------------------------------------------------
 %%  Icode to structured assembly
@@ -179,42 +182,45 @@ lit_to_fate(L) ->
         {typerep, T}         -> aeb_fate_data:make_typerep(type_to_scode(T))
      end.
 
-term_to_fate({lit, L}) ->
+term_to_fate(E) -> term_to_fate(#{}, E).
+
+term_to_fate(_Env, {lit, L}) ->
     lit_to_fate(L);
 %% negative literals are parsed as 0 - N
-term_to_fate({op, '-', [{lit, {int, 0}}, {lit, {int, N}}]}) ->
+term_to_fate(_Env, {op, '-', [{lit, {int, 0}}, {lit, {int, N}}]}) ->
     aeb_fate_data:make_integer(-N);
-term_to_fate(nil) ->
+term_to_fate(_Env, nil) ->
     aeb_fate_data:make_list([]);
-term_to_fate({op, '::', [Hd, Tl]}) ->
+term_to_fate(Env, {op, '::', [Hd, Tl]}) ->
     %% The Tl will translate into a list, because FATE lists are just lists
-    [term_to_fate(Hd) | term_to_fate(Tl)];
-term_to_fate({tuple, As}) ->
-    aeb_fate_data:make_tuple(list_to_tuple([ term_to_fate(A) || A<-As]));
-term_to_fate({con, Ar, I, As}) ->
-    FateAs = [ term_to_fate(A) || A <- As ],
+    [term_to_fate(Env, Hd) | term_to_fate(Env, Tl)];
+term_to_fate(Env, {tuple, As}) ->
+    aeb_fate_data:make_tuple(list_to_tuple([ term_to_fate(Env, A) || A<-As]));
+term_to_fate(Env, {con, Ar, I, As}) ->
+    FateAs = [ term_to_fate(Env, A) || A <- As ],
     aeb_fate_data:make_variant(Ar, I, list_to_tuple(FateAs));
-term_to_fate({builtin, bits_all, []}) ->
+term_to_fate(_Env, {builtin, bits_all, []}) ->
     aeb_fate_data:make_bits(-1);
-term_to_fate({builtin, bits_none, []}) ->
+term_to_fate(_Env, {builtin, bits_none, []}) ->
     aeb_fate_data:make_bits(0);
-term_to_fate({op, bits_set, [B, I]}) ->
+term_to_fate(_Env, {op, bits_set, [B, I]}) ->
     {bits, N} = term_to_fate(B),
     J         = term_to_fate(I),
     {bits, N bor (1 bsl J)};
-term_to_fate({op, bits_clear, [B, I]}) ->
+term_to_fate(_Env, {op, bits_clear, [B, I]}) ->
     {bits, N} = term_to_fate(B),
     J         = term_to_fate(I),
     {bits, N band bnot (1 bsl J)};
-term_to_fate({builtin, map_empty, []}) ->
+term_to_fate(Env, {'let', X, E, Body}) ->
+    Env1 = Env#{ X => term_to_fate(Env, E) },
+    term_to_fate(Env1, Body);
+term_to_fate(Env, {var, X}) ->
+    maps:get(X, Env);
+term_to_fate(_Env, {builtin, map_empty, []}) ->
     aeb_fate_data:make_map(#{});
-term_to_fate({'let', _, {builtin, map_empty, []}, Set}) ->
-    aeb_fate_data:make_map(map_to_fate(Set)).
-
-map_to_fate({op, map_set, [{var, _}, K, V]}) ->
-    #{term_to_fate(K) => term_to_fate(V)};
-map_to_fate({op, map_set, [Set, K, V]}) ->
-    Map = map_to_fate(Set), Map#{term_to_fate(K) => term_to_fate(V)}.
+term_to_fate(Env, {op, map_set, [M, K, V]}) ->
+    Map = term_to_fate(Env, M),
+    Map#{term_to_fate(Env, K) => term_to_fate(Env, V)}.
 
 to_scode(_Env, {lit, L}) ->
     [push(?i(lit_to_fate(L)))];
@@ -297,6 +303,12 @@ to_scode(Env, {remote, ArgsT, RetT, Ct, Fun, [Gas, Value | Args]}) ->
             Call = aeb_fate_ops:call_gr(?a, Lbl, ArgType, RetType, ?a, ?a),
             call_to_scode(Env, Call, [Ct, Value, Gas | Args])
     end;
+
+to_scode(_Env, {get_state, Reg}) ->
+    [push(?s(Reg))];
+to_scode(Env, {set_state, Reg, Val}) ->
+    call_to_scode(Env, [{'STORE', ?s(Reg), ?a},
+                        tuple(0)], [Val]);
 
 to_scode(Env, {closure, Fun, FVs}) ->
     to_scode(Env, {tuple, [{lit, {string, make_function_id(Fun)}}, FVs]});
@@ -420,11 +432,6 @@ call_to_scode(Env, CallCode, Args) ->
     [[to_scode(notail(Env), A) || A <- lists:reverse(Args)],
      CallCode].
 
-builtin_to_scode(_Env, get_state, []) ->
-    [push(?s)];
-builtin_to_scode(Env, set_state, [_] = Args) ->
-    call_to_scode(Env, [{'STORE', ?s, ?a},
-                        tuple(0)], Args);
 builtin_to_scode(Env, chain_event, Args) ->
     call_to_scode(Env, [erlang:apply(aeb_fate_ops, log, lists:duplicate(length(Args), ?a)),
                         tuple(0)], Args);
@@ -645,11 +652,11 @@ pp_op(loop) -> "LOOP";
 pp_op(I)    ->
     aeb_fate_pp:format_op(I, #{}).
 
-pp_arg(?i(I))      -> io_lib:format("~w", [I]);
-pp_arg({arg, N})   -> io_lib:format("arg~p", [N]);
-pp_arg({store, N}) -> io_lib:format("store~p", [N]);
-pp_arg({var, N})   -> io_lib:format("var~p", [N]);
-pp_arg(?a)         -> "a".
+pp_arg(?i(I))    -> io_lib:format("~w", [I]);
+pp_arg({arg, N}) -> io_lib:format("arg~p", [N]);
+pp_arg(?s(N))    -> io_lib:format("store~p", [N]);
+pp_arg({var, N}) -> io_lib:format("var~p", [N]);
+pp_arg(?a)       -> "a".
 
 %% -- Analysis --
 
@@ -1368,7 +1375,7 @@ desugar_args(I) when is_tuple(I) ->
     list_to_tuple([Op | lists:map(fun desugar_arg/1, Args)]);
 desugar_args(I) -> I.
 
-desugar_arg({store, N}) -> {var, -N};
+desugar_arg(?s(N)) -> {var, -N};
 desugar_arg(A) -> A.
 
 %% -- Phase III --------------------------------------------------------------
@@ -1578,6 +1585,7 @@ tweak_returns(['RETURN', {'PUSH', A} | Code])          -> [{'RETURNR', A} | Code
 tweak_returns(['RETURN' | Code = [{'CALL_T', _} | _]]) -> Code;
 tweak_returns(['RETURN' | Code = [{'ABORT', _} | _]])  -> Code;
 tweak_returns(['RETURN' | Code = [{'EXIT', _} | _]])   -> Code;
+tweak_returns(['RETURN' | Code = [loop | _]])          -> Code;
 tweak_returns(Code) -> Code.
 
 %% -- Split basic blocks at CALL instructions --
@@ -1591,8 +1599,7 @@ split_calls(Ref, [], Acc, Blocks) ->
 split_calls(Ref, [I | Code], Acc, Blocks) when element(1, I) == 'CALL';
                                                element(1, I) == 'CALL_R';
                                                element(1, I) == 'CALL_GR';
-                                               element(1, I) == 'jumpif';
-                                               I == loop ->
+                                               element(1, I) == 'jumpif' ->
     split_calls(make_ref(), Code, [], [{Ref, lists:reverse([I | Acc])} | Blocks]);
 split_calls(Ref, [{'ABORT', _} = I | _Code], Acc, Blocks) ->
     lists:reverse([{Ref, lists:reverse([I | Acc])} | Blocks]);

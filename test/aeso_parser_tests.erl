@@ -4,6 +4,8 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+id(X) -> X.
+
 simple_contracts_test_() ->
     {foreach,
      fun() -> ok end,
@@ -30,7 +32,7 @@ simple_contracts_test_() ->
                     end,
             Parse = fun(S) ->
                     try remove_line_numbers(parse_expr(S))
-                    catch _:_ -> ?assertMatch(ok, {parse_fail, S}) end
+                    catch _:_ -> ?assertMatch(ok, id({parse_fail, S})) end
                 end,
             CheckParens = fun(Expr) ->
                     ?assertEqual(Parse(NoPar(Expr)), Parse(Par(Expr)))
@@ -38,7 +40,6 @@ simple_contracts_test_() ->
             LeftAssoc  = fun(Op) -> CheckParens({{a, Op, b}, Op, c}) end,
             RightAssoc = fun(Op) -> CheckParens({a, Op, {b, Op, c}}) end,
             NonAssoc   = fun(Op) ->
-                            OpAtom = list_to_atom(Op),
                             ?assertThrow({error, [_]},
                                          parse_expr(NoPar({a, Op, {b, Op, c}}))) end,
             Stronger = fun(Op1, Op2) ->
