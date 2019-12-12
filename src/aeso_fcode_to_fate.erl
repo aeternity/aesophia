@@ -654,7 +654,7 @@ pp_op(I)    ->
 
 pp_arg(?i(I))    -> io_lib:format("~w", [I]);
 pp_arg({arg, N}) -> io_lib:format("arg~p", [N]);
-pp_arg(?s(N))    -> io_lib:format("store~p", [-N]);
+pp_arg(?s(N))    -> io_lib:format("store~p", [N]);
 pp_arg({var, N}) -> io_lib:format("var~p", [N]);
 pp_arg(?a)       -> "a".
 
