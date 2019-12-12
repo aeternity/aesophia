@@ -1138,7 +1138,7 @@ infer_expr(Env, {list, As, Elems}) ->
     NewElems = [check_expr(Env, X, ElemType) || X <- Elems],
     {typed, As, {list, As, NewElems}, {app_t, As, {id, As, "list"}, [ElemType]}};
 infer_expr(Env, {list_comp, As, Yield, []}) ->
-    {typed, _, TypedYield, Type} = infer_expr(Env, Yield),
+    {typed, _, _, Type} = TypedYield = infer_expr(Env, Yield),
     {typed, As, {list_comp, As, TypedYield, []}, {app_t, As, {id, As, "list"}, [Type]}};
 infer_expr(Env, {list_comp, As, Yield, [{comprehension_bind, Arg, BExpr}|Rest]}) ->
     BindVarType = fresh_uvar(As),
