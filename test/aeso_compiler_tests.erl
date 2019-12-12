@@ -138,6 +138,7 @@ compilable_contracts() ->
      "test",
      "builtin_bug",
      "builtin_map_get_bug",
+     "lc_record_bug",
      "nodeadcode",
      "deadcode",
      "variant_types",
