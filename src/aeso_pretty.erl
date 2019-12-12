@@ -305,6 +305,8 @@ expr_p(_, {tuple, _, Es}) ->
     tuple(lists:map(fun expr/1, Es));
 expr_p(_, {list, _, Es}) ->
     list(lists:map(fun expr/1, Es));
+expr_p(_, {list_comp, _, E, Binds}) ->
+    list([follow(expr(E), hsep(text("|"), par(punctuate(text(","), lists:map(fun lc_bind/1, Binds)), 0)), 0)]);
 expr_p(_, {record, _, Fs}) ->
     record(lists:map(fun field/1, Fs));
 expr_p(_, {map, Ann, KVs}) ->
@@ -386,6 +388,13 @@ stmt_p({else, Else}) ->
         system when HideGenerated -> empty();
         _ -> block_expr(200, text("else"), Else)
     end.
+
+lc_bind({comprehension_bind, P, E}) ->
+    follow(hsep(expr(P), text("<-")), expr(E));
+lc_bind({comprehension_if, _, E}) ->
+    beside([text("if("), expr(E), text(")")]);
+lc_bind(Let) ->
+    letdecl("let", Let).
 
 -spec bin_prec(aeso_syntax:bin_op()) -> {integer(), integer(), integer()}.
 bin_prec('..')   -> {  0,   0,   0};  %% Always printed inside '[ ]'
