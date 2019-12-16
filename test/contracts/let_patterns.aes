@@ -11,3 +11,5 @@ contract LetPatterns =
     let {x = i, y = j} = r
     x + a + b + n + i + j
 
+  entrypoint lc(xs : list(option(int))) : list(int) =
+    [ x | Some(x) <- xs ]
