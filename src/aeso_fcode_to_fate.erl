@@ -215,54 +215,66 @@ term_to_fate(Env, {'let', X, E, Body}) ->
     Env1 = Env#{ X => term_to_fate(Env, E) },
     term_to_fate(Env1, Body);
 term_to_fate(Env, {var, X}) ->
-    maps:get(X, Env);
+    case maps:get(X, Env, undefined) of
+        undefined -> throw(not_a_fate_value);
+        V         -> V
+    end;
 term_to_fate(_Env, {builtin, map_empty, []}) ->
     aeb_fate_data:make_map(#{});
 term_to_fate(Env, {op, map_set, [M, K, V]}) ->
     Map = term_to_fate(Env, M),
-    Map#{term_to_fate(Env, K) => term_to_fate(Env, V)}.
+    Map#{term_to_fate(Env, K) => term_to_fate(Env, V)};
+term_to_fate(_Env, _) ->
+    throw(not_a_fate_value).
 
-to_scode(_Env, {lit, L}) ->
+to_scode(Env, T) ->
+    try term_to_fate(T) of
+        V -> [push(?i(V))]
+    catch throw:not_a_fate_value ->
+        to_scode1(Env, T)
+    end.
+
+to_scode1(_Env, {lit, L}) ->
     [push(?i(lit_to_fate(L)))];
 
-to_scode(_Env, nil) ->
+to_scode1(_Env, nil) ->
     [aeb_fate_ops:nil(?a)];
 
-to_scode(Env, {var, X}) ->
+to_scode1(Env, {var, X}) ->
     [push(lookup_var(Env, X))];
 
-to_scode(Env, {con, Ar, I, As}) ->
+to_scode1(Env, {con, Ar, I, As}) ->
     N = length(As),
     [[to_scode(notail(Env), A) || A <- As],
      aeb_fate_ops:variant(?a, ?i(Ar), ?i(I), ?i(N))];
 
-to_scode(Env, {tuple, As}) ->
+to_scode1(Env, {tuple, As}) ->
     N = length(As),
     [[ to_scode(notail(Env), A) || A <- As ],
      tuple(N)];
 
-to_scode(Env, {proj, E, I}) ->
+to_scode1(Env, {proj, E, I}) ->
     [to_scode(notail(Env), E),
      aeb_fate_ops:element_op(?a, ?i(I), ?a)];
 
-to_scode(Env, {set_proj, R, I, E}) ->
+to_scode1(Env, {set_proj, R, I, E}) ->
     [to_scode(notail(Env), E),
      to_scode(notail(Env), R),
      aeb_fate_ops:setelement(?a, ?i(I), ?a, ?a)];
 
-to_scode(Env, {op, Op, Args}) ->
+to_scode1(Env, {op, Op, Args}) ->
     call_to_scode(Env, op_to_scode(Op), Args);
 
-to_scode(Env, {'let', X, {var, Y}, Body}) ->
+to_scode1(Env, {'let', X, {var, Y}, Body}) ->
     Env1 = bind_var(X, lookup_var(Env, Y), Env),
     to_scode(Env1, Body);
-to_scode(Env, {'let', X, Expr, Body}) ->
+to_scode1(Env, {'let', X, Expr, Body}) ->
     {I, Env1} = bind_local(X, Env),
     [ to_scode(notail(Env), Expr),
       aeb_fate_ops:store({var, I}, {stack, 0}),
       to_scode(Env1, Body) ];
 
-to_scode(Env = #env{ current_function = Fun, tailpos = true }, {def, Fun, Args}) ->
+to_scode1(Env = #env{ current_function = Fun, tailpos = true }, {def, Fun, Args}) ->
     %% Tail-call to current function, f(e0..en). Compile to
     %%      [ let xi = ei ]
     %%      [ STORE argi xi ]
@@ -280,17 +292,17 @@ to_scode(Env = #env{ current_function = Fun, tailpos = true }, {def, Fun, Args})
         || {I, J} <- lists:zip(lists:seq(0, length(Vars) - 1),
                                lists:reverse(Vars)) ],
       loop ];
-to_scode(Env, {def, Fun, Args}) ->
+to_scode1(Env, {def, Fun, Args}) ->
     FName = make_function_id(Fun),
     Lbl   = aeb_fate_data:make_string(FName),
     call_to_scode(Env, local_call(Env, ?i(Lbl)), Args);
-to_scode(Env, {funcall, Fun, Args}) ->
+to_scode1(Env, {funcall, Fun, Args}) ->
     call_to_scode(Env, [to_scode(Env, Fun), local_call(Env, ?a)], Args);
 
-to_scode(Env, {builtin, B, Args}) ->
+to_scode1(Env, {builtin, B, Args}) ->
     builtin_to_scode(Env, B, Args);
 
-to_scode(Env, {remote, ArgsT, RetT, Ct, Fun, [Gas, Value | Args]}) ->
+to_scode1(Env, {remote, ArgsT, RetT, Ct, Fun, [Gas, Value | Args]}) ->
     Lbl = make_function_id(Fun),
     {ArgTypes, RetType0} = typesig_to_scode([{"_", T} || T <- ArgsT], RetT),
     ArgType = ?i(aeb_fate_data:make_typerep({tuple, ArgTypes})),
@@ -304,16 +316,16 @@ to_scode(Env, {remote, ArgsT, RetT, Ct, Fun, [Gas, Value | Args]}) ->
             call_to_scode(Env, Call, [Ct, Value, Gas | Args])
     end;
 
-to_scode(_Env, {get_state, Reg}) ->
+to_scode1(_Env, {get_state, Reg}) ->
     [push(?s(Reg))];
-to_scode(Env, {set_state, Reg, Val}) ->
+to_scode1(Env, {set_state, Reg, Val}) ->
     call_to_scode(Env, [{'STORE', ?s(Reg), ?a},
                         tuple(0)], [Val]);
 
-to_scode(Env, {closure, Fun, FVs}) ->
+to_scode1(Env, {closure, Fun, FVs}) ->
     to_scode(Env, {tuple, [{lit, {string, make_function_id(Fun)}}, FVs]});
 
-to_scode(Env, {switch, Case}) ->
+to_scode1(Env, {switch, Case}) ->
     split_to_scode(Env, Case).
 
 local_call( Env, Fun) when Env#env.tailpos -> aeb_fate_ops:call_t(Fun);
