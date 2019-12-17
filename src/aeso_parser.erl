@@ -101,10 +101,18 @@ decl() ->
     , ?RULE(keyword(datatype), id(), type_vars(), tok('='), typedef(variant), {type_def, _1, _2, _3, _5})
 
       %% Function declarations
-    , ?RULE(modifiers(), fun_or_entry(), id(), tok(':'), type(), add_modifiers(_1, _2, {fun_decl, get_ann(_2), _3, _5}))
-    , ?RULE(modifiers(), fun_or_entry(), fundef(),               add_modifiers(_1, _2, set_pos(get_pos(get_ann(_2)), _3)))
-    , ?RULE(keyword('let'),    valdef(),                         set_pos(get_pos(_1), _2))
+    , ?RULE(modifiers(), fun_or_entry(), maybe_block(fundef_or_decl()), fun_block(_1, _2, _3))
+    , ?RULE(keyword('let'), valdef(),set_pos(get_pos(_1), _2))
     ])).
+
+fun_block(Mods, Kind, [Decl]) ->
+    add_modifiers(Mods, Kind, set_pos(get_pos(Kind), Decl));
+fun_block(Mods, Kind, Decls) ->
+    {block, get_ann(Kind), [ add_modifiers(Mods, Kind, Decl) || Decl <- Decls ]}.
+
+fundef_or_decl() ->
+    choice([?RULE(id(), tok(':'), type(), {fun_decl, get_ann(_1), _1, _3}),
+            fundef()]).
 
 pragma() ->
     Op = choice([token(T) || T <- ['<', '=<', '==', '>=', '>']]),
@@ -117,7 +125,7 @@ mk_version({int, _, Maj}, Rest) ->
     [Maj | [N || {_, {int, _, N}} <- Rest]].
 
 fun_or_entry() ->
-    choice([?RULE(keyword(function), {function, _1}),
+    choice([?RULE(keyword(function),   {function,   _1}),
             ?RULE(keyword(entrypoint), {entrypoint, _1})]).
 
 modifiers() ->
@@ -168,8 +176,8 @@ valdef() ->
 
 fundef() ->
     choice(
-    [ ?RULE(id(), args(),                   tok('='), body(), {letfun, [], _1, _2, type_wildcard(), _4})
-    , ?RULE(id(), args(), tok(':'), type(), tok('='), body(), {letfun, [], _1, _2, _4, _6})
+    [ ?RULE(id(), args(),                   tok('='), body(), {letfun, get_ann(_1), _1, _2, type_wildcard(), _4})
+    , ?RULE(id(), args(), tok(':'), type(), tok('='), body(), {letfun, get_ann(_1), _1, _2, _4, _6})
     ]).
 
 args() -> paren_list(arg()).

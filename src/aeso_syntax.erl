@@ -40,6 +40,8 @@
               | {type_decl, ann(), id(), [tvar()]}
               | {type_def, ann(), id(), [tvar()], typedef()}
               | {fun_decl, ann(), id(), type()}
+              | {fun_clauses, ann(), id(), type(), [letbind()]}
+              | {block, ann(), [decl()]}
               | letbind().
 
 -type compiler_version() :: [non_neg_integer()].
