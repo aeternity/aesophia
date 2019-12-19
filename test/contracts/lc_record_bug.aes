@@ -1,0 +1,4 @@
+contract Foo =
+  record r = {x : int}
+  // Crashed in the backend due to missing type annotation on the lc body.
+  entrypoint lc(xs) = [ {x = x} | x <- xs ]

@@ -47,7 +47,7 @@
 -type pragma() :: {compiler, '==' | '<' | '>' | '=<' | '>=', compiler_version()}.
 
 -type letbind()
-    :: {letval, ann(), id(), type(), expr()}
+    :: {letval, ann(), pat(), expr()}
      | {letfun, ann(), id(), [arg()], type(), expr()}.
 
 -type arg() :: {arg, ann(), id(), type()}.
@@ -100,9 +100,8 @@
      | {list, ann(), [expr()]}
      | {list_comp, ann(), expr(), [comprehension_exp()]}
      | {typed, ann(), expr(), type()}
-     | {record, ann(), [field(expr())]}
-     | {record, ann(), expr(), [field(expr())]} %% record update
-     | {map, ann(), expr(), [field(expr())]}    %% map update
+     | {record_or_map(), ann(), [field(expr())]}
+     | {record_or_map(), ann(), expr(), [field(expr())]} %% record/map update
      | {map, ann(), [{expr(), expr()}]}
      | {map_get, ann(), expr(), expr()}
      | {map_get, ann(), expr(), expr(), expr()}
@@ -111,7 +110,9 @@
      | id() | qid() | con() | qcon()
      | constant().
 
--type comprehension_exp() :: [ {comprehension_bind, id(), expr()}
+-type record_or_map() :: record | map | record_or_map_error.
+
+-type comprehension_exp() :: [ {comprehension_bind, pat(), expr()}
                              | {comprehension_if, ann(), expr()}
                              | letbind() ].
 
@@ -139,6 +140,7 @@
 -type pat() :: {app, ann(), con() | op(), [pat()]}
              | {tuple, ann(), [pat()]}
              | {list, ann(), [pat()]}
+             | {typed, ann(), pat(), type()}
              | {record, ann(), [field(pat())]}
              | constant()
              | con()
