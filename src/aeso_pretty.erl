@@ -169,7 +169,7 @@ decl(D = {letfun, Attrs, _, _, _, _}) ->
               false -> "function"
           end,
     hsep(lists:map(Mod, Attrs) ++ [letdecl(Fun, D)]);
-decl(D = {letval, _, _, _, _}) -> letdecl("let", D).
+decl(D = {letval, _, _, _}) -> letdecl("let", D).
 
 -spec pragma(aeso_syntax:pragma()) -> doc().
 pragma({compiler, Op, Ver}) ->
@@ -193,8 +193,8 @@ name({tvar, _, Name})  -> text(Name);
 name({typed, _, Name, _}) -> name(Name).
 
 -spec letdecl(string(), aeso_syntax:letbind()) -> doc().
-letdecl(Let, {letval, _, F, T, E}) ->
-    block_expr(0, hsep([text(Let), typed(name(F), T), text("=")]), E);
+letdecl(Let, {letval, _, P, E}) ->
+    block_expr(0, hsep([text(Let), expr(P), text("=")]), E);
 letdecl(Let, {letfun, _, F, Args, T, E}) ->
     block_expr(0, hsep([text(Let), typed(beside(name(F), args(Args)), T), text("=")]), E).
 
@@ -305,6 +305,8 @@ expr_p(_, {tuple, _, Es}) ->
     tuple(lists:map(fun expr/1, Es));
 expr_p(_, {list, _, Es}) ->
     list(lists:map(fun expr/1, Es));
+expr_p(_, {list_comp, _, E, Binds}) ->
+    list([follow(expr(E), hsep(text("|"), par(punctuate(text(","), lists:map(fun lc_bind/1, Binds)), 0)), 0)]);
 expr_p(_, {record, _, Fs}) ->
     record(lists:map(fun field/1, Fs));
 expr_p(_, {map, Ann, KVs}) ->
@@ -387,6 +389,13 @@ stmt_p({else, Else}) ->
         _ -> block_expr(200, text("else"), Else)
     end.
 
+lc_bind({comprehension_bind, P, E}) ->
+    follow(hsep(expr(P), text("<-")), expr(E));
+lc_bind({comprehension_if, _, E}) ->
+    beside([text("if("), expr(E), text(")")]);
+lc_bind(Let) ->
+    letdecl("let", Let).
+
 -spec bin_prec(aeso_syntax:bin_op()) -> {integer(), integer(), integer()}.
 bin_prec('..')   -> {  0,   0,   0};  %% Always printed inside '[ ]'
 bin_prec('=')    -> {  0,   0,   0};  %% Always printed inside '[ ]'
@@ -450,7 +459,7 @@ elim1(Get={map_get, _, _})    -> elim(Get);
 elim1(Get={map_get, _, _, _}) -> elim(Get).
 
 alt({'case', _, Pat, Body}) ->
-    block_expr(0, hsep(expr_p(500, Pat), text("=>")), Body).
+    block_expr(0, hsep(expr(Pat), text("=>")), Body).
 
 block_expr(_, Header, {block, _, Ss}) ->
     block(Header, statements(Ss));
@@ -460,7 +469,7 @@ block_expr(P, Header, E) ->
 statements(Stmts) ->
     above([ statement(S) || S <- Stmts ]).
 
-statement(S = {letval, _, _, _, _})    -> letdecl("let", S);
+statement(S = {letval, _, _, _})       -> letdecl("let", S);
 statement(S = {letfun, _, _, _, _, _}) -> letdecl("let", S);
 statement(E) -> expr(E).
 

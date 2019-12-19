@@ -106,7 +106,7 @@ aci_test_contract(Name) ->
     ok.
 
 check_stub(Stub, Options) ->
-    case aeso_parser:string(binary_to_list(Stub), Options) of
+    try aeso_parser:string(binary_to_list(Stub), Options) of
         Ast ->
             try
                 %% io:format("AST: ~120p\n", [Ast]),
@@ -117,9 +117,9 @@ check_stub(Stub, Options) ->
                   _:R ->
                 io:format("Error: ~p\n", [R]),
                 error(R)
-            end;
-        {error, E} ->
-            io:format("Error: ~p\n", [E]),
-            error({parse_error, E})
+            end
+    catch throw:{error, Errs} ->
+        _ = [ io:format("~s\n", [aeso_errors:pp(E)]) || E <- Errs ],
+        error({parse_errors, Errs})
     end.
 

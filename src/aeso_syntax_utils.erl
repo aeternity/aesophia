@@ -48,7 +48,7 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
             {type_decl, _, I, _}     -> BindType(I);
             {type_def, _, I, _, D}   -> Plus(BindType(I), Decl(D));
             {fun_decl, _, _, T}      -> Type(T);
-            {letval, _, F, T, E}     -> Sum([BindExpr(F), Type(T), Expr(E)]);
+            {letval, _, P, E}        -> Scoped(BindExpr(P), Expr(E));
             {letfun, _, F, Xs, T, E} -> Sum([BindExpr(F), Type(T), Expr(Xs ++ [E])]);
             %% typedef()
             {alias_t, T}    -> Type(T);
@@ -76,8 +76,8 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
                 Plus(Expr(E), Scoped(BindExpr(I), Expr({list_comp, A, Y, R})));
             {list_comp, A, Y, [{comprehension_if, _, E}|R]} ->
                 Plus(Expr(E), Expr({list_comp, A, Y, R}));
-            {list_comp, A, Y, [D = {letval, _, F, _, _} | R]} ->
-                Plus(Decl(D), Scoped(BindExpr(F), Expr({list_comp, A, Y, R})));
+            {list_comp, A, Y, [D = {letval, _, Pat, _} | R]} ->
+                Plus(Decl(D), Scoped(BindExpr(Pat), Expr({list_comp, A, Y, R})));
             {list_comp, A, Y, [D = {letfun, _, F, _, _, _} | R]} ->
                 Plus(Decl(D), Scoped(BindExpr(F), Expr({list_comp, A, Y, R})));
             {typed, _, E, T}       -> Plus(Expr(E), Type(T));

@@ -138,6 +138,7 @@ compilable_contracts() ->
      "test",
      "builtin_bug",
      "builtin_map_get_bug",
+     "lc_record_bug",
      "nodeadcode",
      "deadcode",
      "variant_types",
@@ -162,7 +163,9 @@ compilable_contracts() ->
      "payable",
      "unapplied_builtins",
      "underscore_number_literals",
-     "pairing_crypto"
+     "pairing_crypto",
+     "qualified_constructor",
+     "let_patterns"
     ].
 
 not_yet_compilable(fate) -> [];
@@ -596,6 +599,17 @@ failing_contracts() ->
          [<<?Pos(5, 28)
             "Invalid call to contract entrypoint 'Foo.foo'.\n"
             "It must be called as 'c.foo' for some c : Foo.">>])
+    , ?TYPE_ERROR(bad_records,
+        [<<?Pos(3, 16)
+           "Mixed record fields and map keys in\n"
+           "  {x = 0, [0] = 1}">>,
+         <<?Pos(4, 6)
+           "Mixed record fields and map keys in\n"
+           "  r {x = 0, [0] = 1}">>,
+         <<?Pos(5, 6)
+           "Empty record/map update\n"
+           "  r {}">>
+        ])
     ].
 
 -define(Path(File), "code_errors/" ??File).

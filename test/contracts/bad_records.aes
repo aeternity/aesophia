@@ -1,0 +1,5 @@
+contract BadRecord =
+  entrypoint foo() =
+    let r = {x = 0, [0] = 1}
+    r{x = 0, [0] = 1}
+    r{}

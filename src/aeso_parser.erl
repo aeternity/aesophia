@@ -164,9 +164,7 @@ letdecl() ->
 letdef() -> choice(valdef(), fundef()).
 
 valdef() ->
-    choice(
-        ?RULE(id(),                   tok('='), body(), {letval, [], _1, type_wildcard(), _3}),
-        ?RULE(id(), tok(':'), type(), tok('='), body(), {letval, [], _1, _3, _5})).
+    ?RULE(pattern(), tok('='), body(), {letval, [], _1, _3}).
 
 fundef() ->
     choice(
@@ -238,7 +236,7 @@ branch() ->
     ?RULE(pattern(), keyword('=>'), body(), {'case', _2, _1, _3}).
 
 pattern() ->
-    ?LET_P(E, expr500(), parse_pattern(E)).
+    ?LET_P(E, expr(), parse_pattern(E)).
 
 %% -- Expressions ------------------------------------------------------------
 
@@ -297,7 +295,7 @@ comprehension_if() ->
     ?RULE(keyword('if'), parens(expr()), {comprehension_if, _1, _2}).
 
 comprehension_bind() ->
-    ?RULE(id(), tok('<-'), expr(), {comprehension_bind, _1, _3}).
+    ?RULE(pattern(), tok('<-'), expr(), {comprehension_bind, _1, _3}).
 
 arg_expr() ->
     ?LAZY_P(
@@ -349,7 +347,9 @@ record(Fs) ->
                         bad_expr_err("Cannot use '@' in map construction", infix({lvalue, FAnn, LV}, {'@', Ann}, Id));
                     ({field, FAnn, LV, _}) ->
                         bad_expr_err("Cannot use nested fields or keys in map construction", {lvalue, FAnn, LV}) end,
-            {map, Ann, lists:map(KV, Fs)}
+            {map, Ann, lists:map(KV, Fs)};
+        record_or_map_error ->
+            {record_or_map_error, get_ann(hd(Fs)), Fs}
     end.
 
 record_or_map(Fields) ->
@@ -361,9 +361,7 @@ record_or_map(Fields) ->
     case lists:usort(lists:map(Kind, Fields)) of
         [proj]    -> record;
         [map_get] -> map;
-        _         ->
-            [{field, Ann, _, _} | _] = Fields,
-            bad_expr_err("Mixed record fields and map keys in", {record, Ann, Fields})
+        _         -> record_or_map_error %% Defer error until type checking
     end.
 
 field_assignment() ->
@@ -545,7 +543,9 @@ list_comp_e(Ann, Expr, Binds) -> {list_comp, Ann, Expr, Binds}.
 -spec parse_pattern(aeso_syntax:expr()) -> aeso_parse_lib:parser(aeso_syntax:pat()).
 parse_pattern({app, Ann, Con = {'::', _}, Es}) ->
     {app, Ann, Con, lists:map(fun parse_pattern/1, Es)};
-parse_pattern({app, Ann, Con = {con, _, _}, Es}) ->
+parse_pattern({app, Ann, {'-', _}, [{int, _, N}]}) ->
+    {int, Ann, -N};
+parse_pattern({app, Ann, Con = {Tag, _, _}, Es}) when Tag == con; Tag == qcon ->
     {app, Ann, Con, lists:map(fun parse_pattern/1, Es)};
 parse_pattern({tuple, Ann, Es}) ->
     {tuple, Ann, lists:map(fun parse_pattern/1, Es)};
@@ -553,7 +553,10 @@ parse_pattern({list, Ann, Es}) ->
     {list, Ann, lists:map(fun parse_pattern/1, Es)};
 parse_pattern({record, Ann, Fs}) ->
     {record, Ann, lists:map(fun parse_field_pattern/1, Fs)};
+parse_pattern({typed, Ann, E, Type}) ->
+    {typed, Ann, parse_pattern(E), Type};
 parse_pattern(E = {con, _, _})    -> E;
+parse_pattern(E = {qcon, _, _})   -> E;
 parse_pattern(E = {id, _, _})     -> E;
 parse_pattern(E = {int, _, _})    -> E;
 parse_pattern(E = {bool, _, _})   -> E;
