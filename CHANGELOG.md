@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     function somes(xs : list(option('a))) : list('a) =
       [ x | Some(x) <- xs ]
   ```
+- Allow pattern matching in let-bindings (aborting on match failures):
+  ```
+    function test(m : map(int, int)) =
+        let Some(x) = Map.lookup(m, 0)
+        x
+  ```
 ### Changed
 - FATE code generator improvements.
 ### Removed
