@@ -415,7 +415,7 @@ type_to_fcode(Env, Sub, {fun_t, _, Named, Args, Res}) ->
 type_to_fcode(_Env, _Sub, Type) ->
     error({todo, Type}).
 
--spec args_to_fcode(env(), [aeso_syntax:pattern()]) -> [{var_name(), ftype()}].
+-spec args_to_fcode(env(), [aeso_syntax:pat()]) -> [{var_name(), ftype()}].
 args_to_fcode(Env, Args) ->
     [ case Arg of
           {id, _, Name} -> {Name, type_to_fcode(Env, Type)};
