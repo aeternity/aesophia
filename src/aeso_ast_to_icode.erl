@@ -131,7 +131,7 @@ contract_to_icode([Decl | Code], Icode) ->
 ast_id({id, _, Id}) -> Id;
 ast_id({qid, _, Id}) -> Id.
 
-ast_args([{arg, _, Name, Type}|Rest], Acc, Icode) ->
+ast_args([{typed, _, Name, Type}|Rest], Acc, Icode) ->
     ast_args(Rest, [{ast_id(Name), ast_typerep1(Type, Icode)}| Acc], Icode);
 ast_args([], Acc, _Icode) -> lists:reverse(Acc).
 
@@ -355,7 +355,9 @@ ast_body({block, As, [{letval, _, Pat, E} | Rest]}, Icode) ->
     #switch{expr  = E1,
             cases = [{Pat1, Rest1}]};
 ast_body({block, As, [{letfun, Ann, F, Args, _Type, Expr} | Rest]}, Icode) ->
-    ast_body({block, As, [{letval, Ann, F, {lam, Ann, Args, Expr}} | Rest]}, Icode);
+    ToArg   = fun({typed, Ann1, Id, T}) -> {arg, Ann1, Id, T} end,    %% Pattern matching has been desugared
+    LamArgs = lists:map(ToArg, Args),
+    ast_body({block, As, [{letval, Ann, F, {lam, Ann, LamArgs, Expr}} | Rest]}, Icode);
 ast_body({block,_,[]}, _Icode) ->
     #tuple{cpts=[]};
 ast_body({block,_,[E]}, Icode) ->
@@ -804,10 +806,10 @@ check_entrypoint_type(Ann, Name, Args, Ret) ->
                     true  -> ok
                 end end,
     [ CheckFirstOrder(T, {invalid_entrypoint, higher_order, Ann1, Name, {argument, X, T}})
-      || {arg, Ann1, X, T} <- Args ],
+      || {typed, Ann1, X, T} <- Args ],
     CheckFirstOrder(Ret, {invalid_entrypoint, higher_order, Ann, Name, {result, Ret}}),
     [ CheckMonomorphic(T, {invalid_entrypoint, polymorphic, Ann1, Name, {argument, X, T}})
-      || {arg, Ann1, X, T} <- Args ],
+      || {typed, Ann1, X, T} <- Args ],
     CheckMonomorphic(Ret, {invalid_entrypoint, polymorphic, Ann, Name, {result, Ret}}).
 
 check_oracle_type(Ann, Type = ?oracle_t(QType, RType)) ->

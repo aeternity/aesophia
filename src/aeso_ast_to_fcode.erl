@@ -415,9 +415,12 @@ type_to_fcode(Env, Sub, {fun_t, _, Named, Args, Res}) ->
 type_to_fcode(_Env, _Sub, Type) ->
     error({todo, Type}).
 
--spec args_to_fcode(env(), [aeso_syntax:arg()]) -> [{var_name(), ftype()}].
+-spec args_to_fcode(env(), [aeso_syntax:pattern()]) -> [{var_name(), ftype()}].
 args_to_fcode(Env, Args) ->
-    [ {Name, type_to_fcode(Env, Type)} || {arg, _, {id, _, Name}, Type} <- Args ].
+    [ case Arg of
+          {id, _, Name} -> {Name, type_to_fcode(Env, Type)};
+          _ -> internal_error({bad_arg, Arg})   %% Pattern matching has been moved to the rhs at this point
+      end || {typed, _, Arg, Type} <- Args ].
 
 -define(make_let(X, Expr, Body),
         make_let(Expr, fun(X) -> Body end)).
@@ -722,7 +725,7 @@ validate_aens_resolve_type(Ann, {app_t, _, _, [Type]}, {variant, [[], [FType]]})
 
 ensure_first_order_entrypoint(Ann, Id = {id, _, Name}, Args, Ret, FArgs, FRet) ->
     [ ensure_first_order(FT, {invalid_entrypoint, higher_order, Ann1, Id, {argument, X, T}})
-      || {{arg, Ann1, X, T}, {_, FT}} <- lists:zip(Args, FArgs) ],
+      || {{typed, Ann1, X, T}, {_, FT}} <- lists:zip(Args, FArgs) ],
     [ ensure_first_order(FRet, {invalid_entrypoint, higher_order, Ann, Id, {result, Ret}})
       || Name /= "init" ],  %% init can return higher-order values, since they're written to the store
                             %% rather than being returned.
@@ -968,7 +971,11 @@ stmts_to_fcode(Env, [{letval, _, {typed, _, {id, _, X}, _}, Expr} | Stmts]) ->
 stmts_to_fcode(Env, [{letval, Ann, Pat, Expr} | Stmts]) ->
     expr_to_fcode(Env, {switch, Ann, Expr, [{'case', Ann, Pat, {block, Ann, Stmts}}]});
 stmts_to_fcode(Env, [{letfun, Ann, {id, _, X}, Args, _Type, Expr} | Stmts]) ->
-    {'let', X, expr_to_fcode(Env, {lam, Ann, Args, Expr}),
+    LamArgs = [ case Arg of
+                    {typed, Ann1, Id, T} -> {arg, Ann1, Id, T};
+                    _ -> internal_error({bad_arg, Arg})   %% pattern matching has been desugared
+                end || Arg <- Args ],
+    {'let', X, expr_to_fcode(Env, {lam, Ann, LamArgs, Expr}),
                stmts_to_fcode(bind_var(Env, X), Stmts)};
 stmts_to_fcode(Env, [Expr]) ->
     expr_to_fcode(Env, Expr);

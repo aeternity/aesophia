@@ -1,0 +1,22 @@
+contract LHSMatching =
+
+  function from_some(Some(x)) = x
+
+  function
+    length : list('a) => int
+    length([])      = 0
+    length(_ :: xs) = 1 + length(xs)
+
+  function
+    append([], ys)      = ys
+    append(x :: xs, ys) = x :: append(xs, ys)
+
+  function local_match(xs : list('a)) =
+    let null([])     = true
+    let null(_ :: _) = false
+    !null(xs)
+
+  entrypoint main() =
+    from_some(Some([0]))
+      ++ append([length([true]), 2, 3], [4, 5, 6])
+      ++ [7 | if (local_match([false]))]

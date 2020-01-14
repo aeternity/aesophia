@@ -200,7 +200,7 @@ name({typed, _, Name, _}) -> name(Name).
 letdecl(Let, {letval, _, P, E}) ->
     block_expr(0, hsep([text(Let), expr(P), text("=")]), E);
 letdecl(Let, {letfun, _, F, Args, T, E}) ->
-    block_expr(0, hsep([text(Let), typed(beside(name(F), args(Args)), T), text("=")]), E).
+    block_expr(0, hsep([text(Let), typed(beside(name(F), expr({tuple, [], Args})), T), text("=")]), E).
 
 -spec args([aeso_syntax:arg()]) -> doc().
 args(Args) ->

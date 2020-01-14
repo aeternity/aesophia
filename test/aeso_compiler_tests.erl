@@ -164,7 +164,8 @@ compilable_contracts() ->
      "unapplied_builtins",
      "underscore_number_literals",
      "qualified_constructor",
-     "let_patterns"
+     "let_patterns",
+     "lhs_matching"
     ].
 
 not_yet_compilable(fate) -> [];
@@ -299,9 +300,22 @@ failing_contracts() ->
           "Repeated name x in pattern\n"
           "  x :: x (at line 26, column 7)">>,
         <<?Pos(44, 14)
-          "Repeated argument x to function repeated_arg (at line 44, column 14).">>,
-        <<?Pos(44, 14)
-          "Repeated argument y to function repeated_arg (at line 44, column 14).">>,
+          "Repeated names x, y in pattern\n"
+          "  (x : int, y, x : string, y : bool) (at line 44, column 14)">>,
+        <<?Pos(44, 39)
+          "Cannot unify int\n"
+          "         and string\n"
+          "when checking the type of the expression at line 44, column 39\n"
+          "  x : int\n"
+          "against the expected type\n"
+          "  string">>,
+        <<?Pos(44, 72)
+          "Cannot unify int\n"
+          "         and string\n"
+          "when checking the type of the expression at line 44, column 72\n"
+          "  x : int\n"
+          "against the expected type\n"
+          "  string">>,
         <<?Pos(14, 24)
           "No record type with fields y, z (at line 14, column 24)">>,
         <<?Pos(15, 26)
@@ -367,73 +381,7 @@ failing_contracts() ->
          <<?Pos(3, 13)
            "Nested namespace not allowed\nNamespace 'Foo' at line 3, column 13 not defined at top level.">>])
     , ?TYPE_ERROR(bad_address_literals,
-        [<<?Pos(32, 5)
-           "The type bytes(32) is not a contract type\n"
-           "when checking that the contract literal\n"
-           "  ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ\n"
-           "has the type\n"
-           "  bytes(32)">>,
-         <<?Pos(30, 5)
-           "The type oracle(int, bool) is not a contract type\n"
-           "when checking that the contract literal\n"
-           "  ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ\n"
-           "has the type\n"
-           "  oracle(int, bool)">>,
-         <<?Pos(28, 5)
-           "The type address is not a contract type\n"
-           "when checking that the contract literal\n"
-           "  ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ\n"
-           "has the type\n"
-           "  address">>,
-         <<?Pos(25, 5)
-           "Cannot unify oracle_query('a, 'b)\n"
-           "         and Remote\n"
-           "when checking the type of the expression at line 25, column 5\n"
-           "  oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY :\n"
-           "    oracle_query('a, 'b)\n"
-           "against the expected type\n"
-           "  Remote">>,
-         <<?Pos(23, 5)
-           "Cannot unify oracle_query('c, 'd)\n"
-           "         and bytes(32)\n"
-           "when checking the type of the expression at line 23, column 5\n"
-           "  oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY :\n"
-           "    oracle_query('c, 'd)\n"
-           "against the expected type\n"
-           "  bytes(32)">>,
-         <<?Pos(21, 5)
-           "Cannot unify oracle_query('e, 'f)\n"
-           "         and oracle(int, bool)\n"
-           "when checking the type of the expression at line 21, column 5\n"
-           "  oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY :\n"
-           "    oracle_query('e, 'f)\n"
-           "against the expected type\n"
-           "  oracle(int, bool)">>,
-         <<?Pos(18, 5)
-           "Cannot unify oracle('g, 'h)\n"
-           "         and Remote\n"
-           "when checking the type of the expression at line 18, column 5\n"
-           "  ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5 :\n"
-           "    oracle('g, 'h)\n"
-           "against the expected type\n"
-           "  Remote">>,
-         <<?Pos(16, 5)
-           "Cannot unify oracle('i, 'j)\n"
-           "         and bytes(32)\n"
-           "when checking the type of the expression at line 16, column 5\n"
-           "  ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5 :\n"
-           "    oracle('i, 'j)\n"
-           "against the expected type\n"
-           "  bytes(32)">>,
-         <<?Pos(14, 5)
-           "Cannot unify oracle('k, 'l)\n"
-           "         and oracle_query(int, bool)\n"
-           "when checking the type of the expression at line 14, column 5\n"
-           "  ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5 :\n"
-           "    oracle('k, 'l)\n"
-           "against the expected type\n"
-           "  oracle_query(int, bool)">>,
-         <<?Pos(11, 5)
+        [<<?Pos(11, 5)
            "Cannot unify address\n"
            "         and oracle(int, bool)\n"
            "when checking the type of the expression at line 11, column 5\n"
@@ -453,6 +401,72 @@ failing_contracts() ->
            "when checking the type of the expression at line 7, column 5\n"
            "  ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt : address\n"
            "against the expected type\n"
+           "  bytes(32)">>,
+         <<?Pos(14, 5)
+           "Cannot unify oracle('a, 'b)\n"
+           "         and oracle_query(int, bool)\n"
+           "when checking the type of the expression at line 14, column 5\n"
+           "  ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5 :\n"
+           "    oracle('a, 'b)\n"
+           "against the expected type\n"
+           "  oracle_query(int, bool)">>,
+         <<?Pos(16, 5)
+           "Cannot unify oracle('c, 'd)\n"
+           "         and bytes(32)\n"
+           "when checking the type of the expression at line 16, column 5\n"
+           "  ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5 :\n"
+           "    oracle('c, 'd)\n"
+           "against the expected type\n"
+           "  bytes(32)">>,
+         <<?Pos(18, 5)
+           "Cannot unify oracle('e, 'f)\n"
+           "         and Remote\n"
+           "when checking the type of the expression at line 18, column 5\n"
+           "  ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5 :\n"
+           "    oracle('e, 'f)\n"
+           "against the expected type\n"
+           "  Remote">>,
+         <<?Pos(21, 5)
+           "Cannot unify oracle_query('g, 'h)\n"
+           "         and oracle(int, bool)\n"
+           "when checking the type of the expression at line 21, column 5\n"
+           "  oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY :\n"
+           "    oracle_query('g, 'h)\n"
+           "against the expected type\n"
+           "  oracle(int, bool)">>,
+         <<?Pos(23, 5)
+           "Cannot unify oracle_query('i, 'j)\n"
+           "         and bytes(32)\n"
+           "when checking the type of the expression at line 23, column 5\n"
+           "  oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY :\n"
+           "    oracle_query('i, 'j)\n"
+           "against the expected type\n"
+           "  bytes(32)">>,
+         <<?Pos(25, 5)
+           "Cannot unify oracle_query('k, 'l)\n"
+           "         and Remote\n"
+           "when checking the type of the expression at line 25, column 5\n"
+           "  oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY :\n"
+           "    oracle_query('k, 'l)\n"
+           "against the expected type\n"
+           "  Remote">>,
+         <<?Pos(28, 5)
+           "The type address is not a contract type\n"
+           "when checking that the contract literal\n"
+           "  ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ\n"
+           "has the type\n"
+           "  address">>,
+         <<?Pos(30, 5)
+           "The type oracle(int, bool) is not a contract type\n"
+           "when checking that the contract literal\n"
+           "  ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ\n"
+           "has the type\n"
+           "  oracle(int, bool)">>,
+         <<?Pos(32, 5)
+           "The type bytes(32) is not a contract type\n"
+           "when checking that the contract literal\n"
+           "  ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ\n"
+           "has the type\n"
            "  bytes(32)">>,
          <<?Pos(34, 5),
            "The type address is not a contract type\n"
@@ -569,7 +583,7 @@ failing_contracts() ->
             "Failed to resolve byte array lengths in call to Bytes.split with argument of type\n"
             "  - 'f  (at line 12, column 20)\n"
             "and result types\n"
-            "  - 'e  (at line 13, column 5)\n"
+            "  - 'e  (at line 12, column 25)\n"
             "  - bytes(20)  (at line 12, column 29)">>,
           <<?Pos(16, 5)
             "Failed to resolve byte array lengths in call to Bytes.split with argument of type\n"
@@ -582,7 +596,7 @@ failing_contracts() ->
             "  - 'b  (at line 18, column 20)\n"
             "and result types\n"
             "  - bytes(20)  (at line 18, column 25)\n"
-            "  - 'a  (at line 19, column 5)">>])
+            "  - 'a  (at line 18, column 37)">>])
     , ?TYPE_ERROR(wrong_compiler_version,
         [<<?Pos(1, 1)
            "Cannot compile with this version of the compiler,\n"

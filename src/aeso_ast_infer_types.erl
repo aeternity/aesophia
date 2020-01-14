@@ -679,7 +679,7 @@ process_block(Ann, [Decl | Decls]) ->
              process_block(Ann, Rest)];
         {letfun, Ann1, Id = {id, _, Name}, _, _, _} ->
             {Clauses, Rest} = lists:splitwith(IsThis(Name), [Decl | Decls]),
-            [{fun_clauses, Ann1, Id, {id, [{origin, system}], "_"}, Clauses} |
+            [{fun_clauses, Ann1, Id, {id, [{origin, system} | Ann1], "_"}, Clauses} |
              process_block(Ann, Rest)]
     end.
 
@@ -815,9 +815,9 @@ check_type(Env, T) ->
 check_type(Env, T = {tvar, _, _}, Arity) ->
     [ type_error({higher_kinded_typevar, T}) || Arity /= 0 ],
     check_tvar(Env, T);
-check_type(_Env, X = {id, _, "_"}, Arity) ->
+check_type(_Env, X = {id, Ann, "_"}, Arity) ->
     ensure_base_type(X, Arity),
-    X;
+    fresh_uvar(Ann);
 check_type(Env, X = {Tag, _, _}, Arity) when Tag == con; Tag == qcon; Tag == id; Tag == qid ->
     case lookup_type(Env, X) of
         {Q, {_, Def}} ->
@@ -1011,44 +1011,49 @@ infer_letrec(Env, Defs) ->
 
 infer_letfun(Env, {fun_clauses, Ann, Fun = {id, _, Name}, Type, Clauses}) ->
     Type1 = check_type(Env, Type),
-    {NameSigs, Clauses1} = lists:unzip([ infer_letfun(Env, Clause) || Clause <- Clauses ]),
+    {NameSigs, Clauses1} = lists:unzip([ infer_letfun1(Env, Clause) || Clause <- Clauses ]),
     {_, Sigs = [Sig | _]} = lists:unzip(NameSigs),
     _ = [ begin
             ClauseT = typesig_to_fun_t(ClauseSig),
             unify(Env, ClauseT, Type1, {check_typesig, Name, ClauseT, Type1})
           end || ClauseSig <- Sigs ],
     {{Name, Sig}, desugar_clauses(Ann, Fun, Sig, Clauses1)};
-infer_letfun(Env0, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, Body}) ->
+infer_letfun(Env, LetFun = {letfun, Ann, Fun, _, _, _}) ->
+    {{Name, Sig}, Clause} = infer_letfun1(Env, LetFun),
+    {{Name, Sig}, desugar_clauses(Ann, Fun, Sig, [Clause])}.
+
+infer_letfun1(Env0, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, Body}) ->
     Env = Env0#env{ stateful = aeso_syntax:get_ann(stateful, Attrib, false),
                     current_function = Fun },
-    check_unique_arg_names(Fun, Args),
-    ArgTypes  = [{ArgName, check_type(Env, arg_type(ArgAnn, T))} || {arg, ArgAnn, ArgName, T} <- Args],
+    {NewEnv, {typed, _, {tuple, _, TypedArgs}, {tuple_t, _, ArgTypes}}} = infer_pattern(Env, {tuple, [{origin, system} | NameAttrib], Args}),
     ExpectedType = check_type(Env, arg_type(NameAttrib, What)),
-    NewBody={typed, _, _, ResultType} = check_expr(bind_vars(ArgTypes, Env), Body, ExpectedType),
-    NewArgs = [{arg, A1, {id, A2, ArgName}, T}
-               || {{_, T}, {arg, A1, {id, A2, ArgName}, _}} <- lists:zip(ArgTypes, Args)],
+    NewBody={typed, _, _, ResultType} = check_expr(NewEnv, Body, ExpectedType),
     NamedArgs = [],
-    TypeSig = {type_sig, Attrib, none, NamedArgs, [T || {arg, _, _, T} <- NewArgs], ResultType},
+    TypeSig = {type_sig, Attrib, none, NamedArgs, ArgTypes, ResultType},
     {{Name, TypeSig},
-     {letfun, Attrib, {id, NameAttrib, Name}, NewArgs, ResultType, NewBody}}.
+     {letfun, Attrib, {id, NameAttrib, Name}, TypedArgs, ResultType, NewBody}}.
 
 desugar_clauses(Ann, Fun, {type_sig, _, _, _, ArgTypes, RetType}, Clauses) ->
-    NoAnn = [{origin, system}],
-    Args = [ {arg, NoAnn, {id, NoAnn, "x#" ++ integer_to_list(I)}, Type}
-             || {I, Type} <- indexed(1, ArgTypes) ],
-    ArgTuple = {tuple, NoAnn, [X || {arg, _, X, _} <- Args]},
-    ArgType  = {tuple_t, NoAnn, ArgTypes},
-    {letfun, Ann, Fun, Args, RetType,
-     {switch, NoAnn, {typed, NoAnn, ArgTuple, ArgType},
-      [ {'case', AnnC, {tuple, AnnC, [ {typed, AnnA, Pat, PatT} || {arg, AnnA, Pat, PatT} <- ArgsC ]}, Body}
-        || {letfun, AnnC, _, ArgsC, _, Body} <- Clauses ]}}.
-
-check_unique_arg_names(Fun, Args) ->
-    Name = fun({arg, _, {id, _, X}, _}) -> X end,
-    Names = lists:map(Name, Args),
-    Dups = lists:usort(Names -- lists:usort(Names)),
-    [ type_error({repeated_arg, Fun, Arg}) || Arg <- Dups ],
-    ok.
+    NeedDesugar =
+        case Clauses of
+            [{letfun, _, _, As, _, _}] -> lists:any(fun({typed, _, {id, _, _}, _}) -> false; (_) -> true end, As);
+            _                          -> true
+        end,
+    case NeedDesugar of
+        false -> [Clause] = Clauses, Clause;
+        true  ->
+            NoAnn = [{origin, system}],
+            Args = [ {typed, NoAnn, {id, NoAnn, "x#" ++ integer_to_list(I)}, Type}
+                     || {I, Type} <- indexed(1, ArgTypes) ],
+            Tuple = fun([X]) -> X;
+                       (As) -> {typed, NoAnn, {tuple, NoAnn, As}, {tuple_t, NoAnn, ArgTypes}}
+                    end,
+            {letfun, Ann, Fun, Args, RetType,
+             {typed, NoAnn,
+              {switch, NoAnn, Tuple(Args),
+                [ {'case', AnnC, Tuple(ArgsC), Body}
+                || {letfun, AnnC, _, ArgsC, _, Body} <- Clauses ]}, RetType}}
+    end.
 
 print_typesig({Name, TypeSig}) ->
     ?PRINT_TYPES("Inferred ~s : ~s\n", [Name, pp(TypeSig)]).
@@ -1141,9 +1146,9 @@ get_call_chains(Graph, Visited, Queue, Stop, Acc) ->
     end.
 
 check_expr(Env, Expr, Type) ->
-    E = {typed, _, _, Type1} = infer_expr(Env, Expr),
+    {typed, Ann, Expr1, Type1} = infer_expr(Env, Expr),
     unify(Env, Type1, Type, {check_expr, Expr, Type1, Type}),
-    E.
+    {typed, Ann, Expr1, Type}.  %% Keep the user-given type
 
 infer_expr(_Env, Body={bool, As, _}) ->
     {typed, As, Body, {id, As, "bool"}};
@@ -1428,7 +1433,7 @@ infer_pattern(Env, Pattern) ->
     end,
     NewEnv = bind_vars([{Var, fresh_uvar(Ann1)} || Var = {id, Ann1, _} <- Vars], Env#env{ in_pattern = true }),
     NewPattern = infer_expr(NewEnv, Pattern),
-    {NewEnv, NewPattern}.
+    {NewEnv#env{ in_pattern = Env#env.in_pattern }, NewPattern}.
 
 infer_case(Env, Attrs, Pattern, ExprType, Branch, SwitchType) ->
     {NewEnv, NewPattern = {typed, _, _, PatType}} = infer_pattern(Env, Pattern),

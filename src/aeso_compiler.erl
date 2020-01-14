@@ -389,8 +389,8 @@ decode_calldata(ContractString, FunName, Calldata, Options0) ->
         #{ typed_ast := TypedAst, type_env  := TypeEnv} = Code,
 
         {ok, Args, _} = get_decode_type(FunName, TypedAst),
-        DropArg       = fun({arg, _, _, T}) -> T; (T) -> T end,
-        ArgTypes      = lists:map(DropArg, Args),
+        GetType       = fun({typed, _, _, T}) -> T; (T) -> T end,
+        ArgTypes      = lists:map(GetType, Args),
         Type0         = {tuple_t, [], ArgTypes},
         %% user defined data types such as variants needed to match against
         Type          = aeso_ast_infer_types:unfold_types_in_type(TypeEnv, Type0, [unfold_record_types, unfold_variant_types]),
