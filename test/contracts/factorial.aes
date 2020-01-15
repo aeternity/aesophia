@@ -11,7 +11,7 @@ contract Factorial =
 
   stateful entrypoint set_worker(worker) = put(state{worker = worker})
 
-  entrypoint fac(x : int) : int =
-    if(x == 0) 1
-    else x * state.worker.fac(x - 1)
-
+  entrypoint
+    fac : int => int
+    fac(0) = 1
+    fac(x) = x * state.worker.fac(x - 1)

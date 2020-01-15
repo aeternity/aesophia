@@ -129,7 +129,7 @@ encode_anon_args(Types) ->
 
 encode_args(Args) -> [ encode_arg(A) || A <- Args ].
 
-encode_arg({arg, _, Id, T}) ->
+encode_arg({typed, _, Id, T}) ->
     #{name => encode_type(Id),
       type => encode_type(T)}.
 
