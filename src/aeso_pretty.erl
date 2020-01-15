@@ -169,7 +169,11 @@ decl(D = {letfun, Attrs, _, _, _, _}) ->
               false -> "function"
           end,
     hsep(lists:map(Mod, Attrs) ++ [letdecl(Fun, D)]);
-decl(D = {letval, _, _, _}) -> letdecl("let", D).
+decl({fun_clauses, Ann, Name, Type, Clauses}) ->
+    above([ decl(D) || D <- [{fun_decl, Ann, Name, Type} | Clauses] ]);
+decl(D = {letval, _, _, _}) -> letdecl("let", D);
+decl({block, _, Ds}) ->
+    above([ decl(D) || D <- Ds ]).
 
 -spec pragma(aeso_syntax:pragma()) -> doc().
 pragma({compiler, Op, Ver}) ->
@@ -196,7 +200,7 @@ name({typed, _, Name, _}) -> name(Name).
 letdecl(Let, {letval, _, P, E}) ->
     block_expr(0, hsep([text(Let), expr(P), text("=")]), E);
 letdecl(Let, {letfun, _, F, Args, T, E}) ->
-    block_expr(0, hsep([text(Let), typed(beside(name(F), args(Args)), T), text("=")]), E).
+    block_expr(0, hsep([text(Let), typed(beside(name(F), expr({tuple, [], Args})), T), text("=")]), E).
 
 -spec args([aeso_syntax:arg()]) -> doc().
 args(Args) ->

@@ -8,10 +8,9 @@ contract Stack =
 
   entrypoint init(ss : list(string)) = { stack = ss, size = length(ss) }
 
-  function length(xs) =
-    switch(xs)
-      [] => 0
-      _ :: xs => length(xs) + 1
+  function
+    length([])      = 0
+    length(_ :: xs) = length(xs) + 1
 
   stateful entrypoint pop() : string =
     switch(state.stack)
