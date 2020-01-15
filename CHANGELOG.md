@@ -7,7 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
+### Removed
+
+## [4.2.0] - 2020-01-15
+### Added
+- Allow separate entrypoint/function type signature and definition, and pattern
+  matching in left-hand sides:
+  ```
+    function
+      length : list('a) => int
+      length([])      = 0
+      length(x :: xs) = 1 + length(xs)
+  ```
+- Allow pattern matching in list comprehension generators (filtering out match
+  failures):
+  ```
+    function somes(xs : list(option('a))) : list('a) =
+      [ x | Some(x) <- xs ]
+  ```
+- Allow pattern matching in let-bindings (aborting on match failures):
+  ```
+    function test(m : map(int, int)) =
+        let Some(x) = Map.lookup(m, 0)
+        x
+  ```
+### Changed
 - FATE code generator improvements.
+- Bug fix: Handle qualified constructors in patterns.
+- Bug fix: Allow switching also on negative numbers.
 ### Removed
 
 ## [4.1.0] - 2019-11-26
@@ -165,12 +192,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v4.0.0...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v4.2.0...HEAD
+[4.2.0]: https://github.com/aeternity/aesophia/compare/v4.2.0...v4.1.0
+[4.1.0]: https://github.com/aeternity/aesophia/compare/v4.1.0...v4.0.0
 [4.0.0]: https://github.com/aeternity/aesophia/compare/v4.0.0...v3.2.0
-[4.0.0-rc5]: https://github.com/aeternity/aesophia/compare/v4.0.0-rc4...v4.0.0-rc5
-[4.0.0-rc4]: https://github.com/aeternity/aesophia/compare/v4.0.0-rc3...v4.0.0-rc4
-[4.0.0-rc3]: https://github.com/aeternity/aesophia/compare/v4.0.0-rc1...v4.0.0-rc3
-[4.0.0-rc1]: https://github.com/aeternity/aesophia/compare/v3.2.0...v4.0.0-rc1
 [3.2.0]: https://github.com/aeternity/aesophia/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/aeternity/aesophia/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/aeternity/aesophia/compare/v2.1.0...v3.0.0

@@ -433,9 +433,12 @@ type_to_fcode(Env, Sub, {fun_t, _, Named, Args, Res}) ->
 type_to_fcode(_Env, _Sub, Type) ->
     error({todo, Type}).
 
--spec args_to_fcode(env(), [aeso_syntax:arg()]) -> [{var_name(), ftype()}].
+-spec args_to_fcode(env(), [aeso_syntax:pat()]) -> [{var_name(), ftype()}].
 args_to_fcode(Env, Args) ->
-    [ {Name, type_to_fcode(Env, Type)} || {arg, _, {id, _, Name}, Type} <- Args ].
+    [ case Arg of
+          {id, _, Name} -> {Name, type_to_fcode(Env, Type)};
+          _ -> internal_error({bad_arg, Arg})   %% Pattern matching has been moved to the rhs at this point
+      end || {typed, _, Arg, Type} <- Args ].
 
 -define(make_let(X, Expr, Body),
         make_let(Expr, fun(X) -> Body end)).
@@ -740,7 +743,7 @@ validate_aens_resolve_type(Ann, {app_t, _, _, [Type]}, {variant, [[], [FType]]})
 
 ensure_first_order_entrypoint(Ann, Id = {id, _, Name}, Args, Ret, FArgs, FRet) ->
     [ ensure_first_order(FT, {invalid_entrypoint, higher_order, Ann1, Id, {argument, X, T}})
-      || {{arg, Ann1, X, T}, {_, FT}} <- lists:zip(Args, FArgs) ],
+      || {{typed, Ann1, X, T}, {_, FT}} <- lists:zip(Args, FArgs) ],
     [ ensure_first_order(FRet, {invalid_entrypoint, higher_order, Ann, Id, {result, Ret}})
       || Name /= "init" ],  %% init can return higher-order values, since they're written to the store
                             %% rather than being returned.
@@ -986,7 +989,11 @@ stmts_to_fcode(Env, [{letval, _, {typed, _, {id, _, X}, _}, Expr} | Stmts]) ->
 stmts_to_fcode(Env, [{letval, Ann, Pat, Expr} | Stmts]) ->
     expr_to_fcode(Env, {switch, Ann, Expr, [{'case', Ann, Pat, {block, Ann, Stmts}}]});
 stmts_to_fcode(Env, [{letfun, Ann, {id, _, X}, Args, _Type, Expr} | Stmts]) ->
-    {'let', X, expr_to_fcode(Env, {lam, Ann, Args, Expr}),
+    LamArgs = [ case Arg of
+                    {typed, Ann1, Id, T} -> {arg, Ann1, Id, T};
+                    _ -> internal_error({bad_arg, Arg})   %% pattern matching has been desugared
+                end || Arg <- Args ],
+    {'let', X, expr_to_fcode(Env, {lam, Ann, LamArgs, Expr}),
                stmts_to_fcode(bind_var(Env, X), Stmts)};
 stmts_to_fcode(Env, [Expr]) ->
     expr_to_fcode(Env, Expr);
@@ -1351,7 +1358,7 @@ simplify(Env, {proj, {var, X}, I} = Expr) ->
     end;
 
 simplify(Env, {switch, Split}) ->
-    case simpl_switch(Env, Split) of
+    case simpl_switch(Env, [], Split) of
         nomatch -> {builtin, abort, [{lit, {string, <<"Incomplete patterns">>}}]};
         stuck   -> {switch, Split};
         Expr    -> Expr
@@ -1375,21 +1382,51 @@ simpl_proj(Env, I, Expr) ->
         _                     -> false
     end.
 
-simpl_switch(_Env, {nosplit, E}) -> E;
-simpl_switch(Env, {split, _, X, Alts}) ->
-    case constructor_form(Env, {var, X}) of
-        false -> stuck;
-        E     -> simpl_switch(Env, E, Alts)
+get_catchalls(Alts) ->
+    [ C || C = {'case', {var, _}, _} <- Alts ].
+
+%% The scode compiler can't handle multiple catch-alls, so we need to nest them
+%% inside each other. Instead of
+%%    _ => switch(x) ..
+%%    _ => e
+%% we do
+%%    _ => switch(x)
+%%           ..
+%%           _ => e
+add_catchalls(Alts, []) -> Alts;
+add_catchalls(Alts, Catchalls) ->
+    case lists:splitwith(fun({'case', {var, _}, _}) -> false; (_) -> true end,
+                         Alts) of
+        {Alts1, [C]} -> Alts1 ++ [nest_catchalls([C | Catchalls])];
+        {_, []}      -> Alts  ++ [nest_catchalls(Catchalls)]
+        %% NOTE: relies on catchalls always being at the end
     end.
 
-simpl_switch(_, _, []) -> nomatch;
-simpl_switch(Env, E, [{'case', Pat, Body} | Alts]) ->
+nest_catchalls([C = {'case', {var, _}, {nosplit, _}} | _]) -> C;
+nest_catchalls([{'case', P = {var, _}, {split, Type, X, Alts}} | Catchalls]) ->
+    {'case', P, {split, Type, X, add_catchalls(Alts, Catchalls)}}.
+
+simpl_switch(_Env, _, {nosplit, E}) -> E;
+simpl_switch(Env, Catchalls, {split, Type, X, Alts}) ->
+    Alts1 = add_catchalls(Alts, Catchalls),
+    Stuck = {switch, {split, Type, X, Alts1}},
+    case constructor_form(Env, {var, X}) of
+        false -> Stuck;
+        E     ->
+            case simpl_case(Env, E, Alts1) of
+                stuck -> Stuck;
+                Res   -> Res
+            end
+    end.
+
+simpl_case(_, _, []) -> nomatch;
+simpl_case(Env, E, [{'case', Pat, Body} | Alts]) ->
     case match_pat(Pat, E) of
-        false -> simpl_switch(Env, E, Alts);
+        false -> simpl_case(Env, E, Alts);
         Binds ->
             Env1 = maps:merge(Env, maps:from_list(Binds)),
-            case simpl_switch(Env1, Body) of
-                nomatch -> simpl_switch(Env, E, Alts);
+            case simpl_switch(Env1, get_catchalls(Alts), Body) of
+                nomatch -> simpl_case(Env, E, Alts);
                 stuck   -> stuck;
                 Body1   -> let_bind(Binds, Body1)
             end
