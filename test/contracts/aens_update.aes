@@ -1,0 +1,17 @@
+contract AENSUpdate =
+  stateful entrypoint update_name(owner : address, name : string) =
+    let p1 : AENS.pointee = AENS.AccountPt(Call.caller)
+    let p2 : AENS.pointee = AENS.OraclePt(Call.caller)
+    let p3 : AENS.pointee = AENS.ContractPt(Call.caller)
+    let p4 : AENS.pointee = AENS.ChannelPt(Call.caller)
+    AENS.update(owner, name, None, None,
+                Some({ ["account_pubkey"] = p1, ["oracle_pubkey"] = p2,
+                       ["contract_pubkey"] = p3, ["misc"] = p4 }))
+
+  entrypoint get_ttl(name : string) =
+    switch(AENS.lookup(name))
+     Some(AENS.Name(_, FixedTTL(ttl), _)) => ttl
+
+  entrypoint expiry(o : oracle(int, int)) : int =
+    Oracle.expiry(o)
+

@@ -154,6 +154,7 @@ compilable_contracts() ->
      "bytes_to_x",
      "bytes_concat",
      "aens",
+     "aens_update",
      "tuple_match",
      "cyclic_include",
      "stdlib_include",
@@ -170,7 +171,7 @@ compilable_contracts() ->
     ].
 
 not_yet_compilable(fate) -> [];
-not_yet_compilable(aevm) -> ["pairing_crypto"].
+not_yet_compilable(aevm) -> ["pairing_crypto", "aens_update"].
 
 %% Contracts that should produce type errors
 

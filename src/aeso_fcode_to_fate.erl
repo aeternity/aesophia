@@ -498,6 +498,8 @@ builtin_to_scode(_Env, call_gas_left, []) ->
     [aeb_fate_ops:gas(?a)];
 builtin_to_scode(Env, oracle_register, [_Sign,_Account,_QFee,_TTL,_QType,_RType] = Args) ->
     call_to_scode(Env, aeb_fate_ops:oracle_register(?a, ?a, ?a, ?a, ?a, ?a, ?a), Args);
+builtin_to_scode(Env, oracle_expiry, [_Oracle] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:oracle_expiry(?a, ?a), Args);
 builtin_to_scode(Env, oracle_query_fee, [_Oracle] = Args) ->
     call_to_scode(Env, aeb_fate_ops:oracle_query_fee(?a, ?a), Args);
 builtin_to_scode(Env, oracle_query, [_Oracle, _Question, _QFee, _QTTL, _RTTL, _QType, _RType] = Args) ->
@@ -539,6 +541,8 @@ builtin_to_scode(Env, aens_revoke, [_Sign, _Account, _Name] = Args) ->
 builtin_to_scode(Env, aens_update, [_Sign, _Account, _NameString, _TTL, _ClientTTL, _Pointers] = Args) ->
     call_to_scode(Env, [aeb_fate_ops:aens_update(?a, ?a, ?a, ?a, ?a, ?a),
                         tuple(0)], Args);
+builtin_to_scode(Env, aens_lookup, [_Name] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:aens_lookup(?a, ?a), Args);
 builtin_to_scode(_Env, auth_tx_hash, []) ->
     [aeb_fate_ops:auth_tx_hash(?a)].
 
@@ -880,12 +884,14 @@ attributes(I) ->
         {'ORACLE_GET_ANSWER', A, B, C, D, E}  -> Pure(A, [B, C, D, E]);
         {'ORACLE_GET_QUESTION', A, B, C, D, E}-> Pure(A, [B, C, D, E]);
         {'ORACLE_QUERY_FEE', A, B}            -> Pure(A, [B]);
-        {'AENS_RESOLVE', A, B, C, D}          -> Pure(A, [B, C, D]);
+        {'ORACLE_EXPIRY', A, B}               -> Impure(A, [B]);
+        {'AENS_RESOLVE', A, B, C, D}          -> Impure(A, [B, C, D]);
         {'AENS_PRECLAIM', A, B, C}            -> Impure(none, [A, B, C]);
         {'AENS_CLAIM', A, B, C, D, E}         -> Impure(none, [A, B, C, D, E]);
         {'AENS_UPDATE', A, B, C, D, E, F}     -> Impure(none, [A, B, C, D, E, F]);
         {'AENS_TRANSFER', A, B, C, D}         -> Impure(none, [A, B, C, D]);
         {'AENS_REVOKE', A, B, C}              -> Impure(none, [A, B, C]);
+        {'AENS_LOOKUP', A, B}                 -> Impure(A, [B]);
         {'BLS12_381_G1_NEG', A, B}            -> Pure(A, [B]);
         {'BLS12_381_G1_NORM', A, B}           -> Pure(A, [B]);
         {'BLS12_381_G1_VALID', A, B}          -> Pure(A, [B]);
