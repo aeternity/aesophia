@@ -880,7 +880,7 @@ attributes(I) ->
         {'ORACLE_GET_ANSWER', A, B, C, D, E}  -> Pure(A, [B, C, D, E]);
         {'ORACLE_GET_QUESTION', A, B, C, D, E}-> Pure(A, [B, C, D, E]);
         {'ORACLE_QUERY_FEE', A, B}            -> Pure(A, [B]);
-        {'AENS_RESOLVE', A, B, C, D}          -> Pure(A, [B, C, D]);
+        {'AENS_RESOLVE', A, B, C, D}          -> Impure(A, [B, C, D]);
         {'AENS_PRECLAIM', A, B, C}            -> Impure(none, [A, B, C]);
         {'AENS_CLAIM', A, B, C, D, E}         -> Impure(none, [A, B, C, D, E]);
         {'AENS_UPDATE', A, B, C, D, E, F}     -> Impure(none, [A, B, C, D, E, F]);
