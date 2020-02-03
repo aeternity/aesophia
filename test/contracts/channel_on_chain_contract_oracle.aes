@@ -17,13 +17,16 @@ contract ChannelOnChainContractOracle =
       bets     = {}
       }
 
-  public stateful function place_bet(answer: string) = 
+  public stateful function place_bet(answer: string) =
     switch(Map.lookup(answer, state.bets))
       None =>
         put(state{ bets = state.bets{[answer] = Call.caller}})
         "ok"
       Some(_value) =>
         "bet_already_taken"
+
+  public function expiry() =
+    Oracle.expiry(state.oracle)
 
   public function query_fee() =
     Oracle.query_fee(state.oracle)
@@ -35,7 +38,7 @@ contract ChannelOnChainContractOracle =
     switch(Oracle.get_answer(state.oracle, q))
       None         =>
         "no response"
-      Some(result) => 
+      Some(result) =>
         if(state.question == Oracle.get_question(state.oracle, q))
             switch(Map.lookup(result, state.bets))
               None         =>

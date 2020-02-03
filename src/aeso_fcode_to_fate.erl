@@ -498,6 +498,8 @@ builtin_to_scode(_Env, call_gas_left, []) ->
     [aeb_fate_ops:gas(?a)];
 builtin_to_scode(Env, oracle_register, [_Sign,_Account,_QFee,_TTL,_QType,_RType] = Args) ->
     call_to_scode(Env, aeb_fate_ops:oracle_register(?a, ?a, ?a, ?a, ?a, ?a, ?a), Args);
+builtin_to_scode(Env, oracle_expiry, [_Oracle] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:oracle_expiry(?a, ?a), Args);
 builtin_to_scode(Env, oracle_query_fee, [_Oracle] = Args) ->
     call_to_scode(Env, aeb_fate_ops:oracle_query_fee(?a, ?a), Args);
 builtin_to_scode(Env, oracle_query, [_Oracle, _Question, _QFee, _QTTL, _RTTL, _QType, _RType] = Args) ->
@@ -880,6 +882,7 @@ attributes(I) ->
         {'ORACLE_GET_ANSWER', A, B, C, D, E}  -> Pure(A, [B, C, D, E]);
         {'ORACLE_GET_QUESTION', A, B, C, D, E}-> Pure(A, [B, C, D, E]);
         {'ORACLE_QUERY_FEE', A, B}            -> Pure(A, [B]);
+        {'ORACLE_EXPIRY', A, B}               -> Impure(A, [B]);
         {'AENS_RESOLVE', A, B, C, D}          -> Impure(A, [B, C, D]);
         {'AENS_PRECLAIM', A, B, C}            -> Impure(none, [A, B, C]);
         {'AENS_CLAIM', A, B, C, D, E}         -> Impure(none, [A, B, C, D, E]);

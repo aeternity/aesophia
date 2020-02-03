@@ -459,6 +459,7 @@ global_env() ->
     OracleScope = #scope
         { funs = MkDefs(
                     [{"register",     SignFun([Address, Fee, TTL], Oracle(Q, R))},
+                     {"expiry",       Fun([Oracle(Q, R)], Fee)},
                      {"query_fee",    Fun([Oracle(Q, R)], Fee)},
                      {"query",        StateFun([Oracle(Q, R), Q, Fee, TTL, TTL], Query(Q, R))},
                      {"get_question", Fun([Oracle(Q, R), Query(Q, R)], Q)},

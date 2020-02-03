@@ -21,6 +21,7 @@ contract UnappliedBuiltins =
   function b_abort()                     = abort
   function b_require()                   = require
   function oracle_query_fee()            = Oracle.query_fee
+  function oracle_expiry()               = Oracle.expiry
   stateful function oracle_query()       = Oracle.query        : (o, _, _, _, _) => _
   function oracle_get_question()         = Oracle.get_question : (o, _) => _
   function oracle_get_answer()           = Oracle.get_answer   : (o, _) => _

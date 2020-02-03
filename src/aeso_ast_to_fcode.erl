@@ -204,7 +204,7 @@ builtins() ->
               {["Contract"], [{"address", none}, {"balance", none}, {"creator", none}]},
               {["Call"],     [{"origin", none}, {"caller", none}, {"value", none}, {"gas_price", none},
                               {"gas_left", 0}]},
-              {["Oracle"],   [{"register", 4}, {"query_fee", 1}, {"query", 5}, {"get_question", 2},
+              {["Oracle"],   [{"register", 4}, {"expiry", 1}, {"query_fee", 1}, {"query", 5}, {"get_question", 2},
                               {"respond", 4}, {"extend", 3}, {"get_answer", 2},
                               {"check", 1}, {"check_query", 2}]},
               {["AENS"],     [{"resolve", 2}, {"preclaim", 3}, {"claim", 5}, {"transfer", 4},
