@@ -53,17 +53,17 @@ namespace Option =
     None => []
     Some(x) => [x]
 
-  function filter_options(l : list(option('a))) : list('a) = filter_options_(l, [])
-  private function filter_options_(l : list (option('a)), acc : list('a)) : list('a) = switch(l)
-    []         => List.reverse(acc)
-    None::t    => filter_options_(t, acc)
-    Some(x)::t => filter_options_(t, x::acc)
+  function filter_options(l : list(option('a))) : list('a) = switch(l)
+    []         => []
+    None::t    => filter_options(t)
+    Some(x)::t => x::filter_options(t)
 
-  function seq_options(l : list (option('a))) : option (list('a)) = seq_options_(l, [])
-  private function seq_options_(l : list (option('a)), acc : list('a)) : option(list('a)) = switch(l)
-    []         => Some(List.reverse(acc))
-    None::t    => None
-    Some(x)::t => seq_options_(t, x::acc)
+  function seq_options(l : list (option('a))) : option (list('a)) = switch(l)
+    []         => Some([])
+    None::_    => None
+    Some(x)::t => switch(seq_options(t))
+      None => None
+      Some(st) => Some(x::st)
 
 
   function choose(o1 : option('a), o2 : option('a)) : option('a) =
