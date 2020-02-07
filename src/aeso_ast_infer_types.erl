@@ -1469,12 +1469,16 @@ infer_infix({IntOp, As})
     Int = {id, As, "int"},
     {fun_t, As, [], [Int, Int], Int};
 infer_infix({RelOp, As})
-  when RelOp == '=='; RelOp == '!=';
-       RelOp == '<';  RelOp == '>';
-       RelOp == '<='; RelOp == '=<'; RelOp == '>=' ->
+  when RelOp == '=='; RelOp == '!=' ->
     T = fresh_uvar(As),     %% allow any type here, check in ast_to_icode that we have comparison for it
     Bool = {id, As, "bool"},
     {fun_t, As, [], [T, T], Bool};
+infer_infix({RelOp, As})
+  when RelOp == '<';  RelOp == '>';
+       RelOp == '<='; RelOp == '=<'; RelOp == '>=' ->
+    Int = {id, As, "int"},
+    Bool = {id, As, "bool"},
+    {fun_t, As, [], [Int, Int], Bool};
 infer_infix({'..', As}) ->
     Int = {id, As, "int"},
     {fun_t, As, [], [Int, Int], {app_t, As, {id, As, "list"}, [Int]}};
