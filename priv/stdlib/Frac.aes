@@ -38,11 +38,14 @@ namespace Frac =
     Zero      => "0"
 
   function simplify(f : frac) : frac =
-    let cd = gcd(num(f), den(f))
     switch(f)
-      Neg(n, d) => Neg(n / cd, d / cd)
+      Neg(n, d) =>
+        let cd = gcd(n, d)
+        Neg(n / cd, d / cd)
       Zero  => Zero
-      Pos(n, d)  => Pos(n / cd, d / cd)
+      Pos(n, d)  =>
+        let cd = gcd(n, d)
+        Pos(n / cd, d / cd)
 
   function make_frac(n : int, d : int): frac =
     if (d == 0) abort("Division by zero")
@@ -83,7 +86,7 @@ namespace Frac =
 
   function from_int(n : int) : frac =
     if   (n > 0) Pos(n, 1)
-    elif (n < 0) Neg(n, 1)
+    elif (n < 0) Neg(-n, 1)
     else Zero
 
   function floor(f : frac) : int = switch(f)
@@ -111,8 +114,8 @@ namespace Frac =
     let cl = ceil(f)
     let dif_fl = abs(sub(f, from_int(fl)))
     let dif_cl = abs(sub(f, from_int(cl)))
-    if   (dif_fl > dif_cl) cl
-    elif (dif_cl > dif_fl) fl
+    if   (gt(dif_fl, dif_cl)) cl
+    elif (gt(dif_cl, dif_fl)) fl
     elif (fl mod 2 == 0) fl
     else cl
 
