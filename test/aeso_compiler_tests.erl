@@ -146,6 +146,7 @@ compilable_contracts() ->
      "events",
      "include",
      "basic_auth",
+     "basic_auth_tx",
      "bitcoin_auth",
      "address_literals",
      "bytes_equality",
@@ -171,7 +172,7 @@ compilable_contracts() ->
     ].
 
 not_yet_compilable(fate) -> [];
-not_yet_compilable(aevm) -> ["pairing_crypto", "aens_update"].
+not_yet_compilable(aevm) -> ["pairing_crypto", "aens_update", "basic_auth_tx"].
 
 %% Contracts that should produce type errors
 

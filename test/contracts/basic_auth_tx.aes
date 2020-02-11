@@ -1,0 +1,74 @@
+// namespace Chain =
+//   record tx = { paying_for : option(Chain.paying_for_tx)
+//               , ga_metas : list(Chain.ga_meta_tx)
+//               , actor : address
+//               , fee   : int
+//               , ttl   : int
+//               , tx    : Chain.base_tx }
+
+//   datatype ga_meta_tx = GAMetaTx(address, int)
+//   datatype paying_for_tx = PayingForTx(address, int)
+//   datatype base_tx = SpendTx(address, int, string)
+//                    | OracleRegisterTx | OracleQueryTx | OracleResponseTx | OracleExtendTx
+//                    | NamePreclaimTx | NameClaimTx(hash) | NameUpdateTx(string)
+//                    | NameRevokeTx(hash) | NameTransferTx(address, string)
+//                    | ChannelCreateTx(address) | ChannelDepositTx(address, int) | ChannelWithdrawTx(address, int) |
+//                    | ChannelForceProgressTx(address) | ChannelCloseMutualTx(address) | ChannelCloseSoloTx(address)
+//                    | ChannelSlashTx(address) | ChannelSettleTx(address) | ChannelSnapshotSoloTx(address)
+//                    | ContractCreateTx(int) | ContractCallTx(address, int)
+//                    | GAAttachTx
+
+
+// Contract replicating "normal" Aeternity authentication
+contract BasicAuthTx =
+  record state = { nonce : int, owner : address }
+  datatype foo = Bar | Baz()
+
+  entrypoint init() = { nonce = 1, owner = Call.caller }
+
+  stateful entrypoint authorize(n : int, s : signature) : bool =
+    require(n >= state.nonce, "Nonce too low")
+    require(n =< state.nonce, "Nonce too high")
+    put(state{ nonce = n + 1 })
+    switch(Auth.tx_hash)
+      None          => abort("Not in Auth context")
+      Some(tx_hash) =>
+        let Some(tx0) = Auth.tx
+        let x : option(Chain.paying_for_tx) = tx0.paying_for
+        let x : list(Chain.ga_meta_tx) = tx0.ga_metas
+        let x : int = tx0.fee + tx0.ttl
+        let x : address = tx0.actor
+        let x : Chain.tx = { tx = Chain.NamePreclaimTx, paying_for = None, ga_metas = [],
+                             fee = 123, ttl = 0, actor = Call.caller }
+        switch(tx0.tx)
+          Chain.SpendTx(receiver, amount, payload) => verify(tx_hash, n, s)
+          Chain.OracleRegisterTx                   => false
+          Chain.OracleQueryTx                      => false
+          Chain.OracleResponseTx                   => false
+          Chain.OracleExtendTx                     => false
+          Chain.NamePreclaimTx                     => false
+          Chain.NameClaimTx(name)                  => false
+          Chain.NameUpdateTx(name)                 => false
+          Chain.NameRevokeTx(name)                 => false
+          Chain.NameTransferTx(to, name)           => false
+          Chain.ChannelCreateTx(other_party)       => false
+          Chain.ChannelDepositTx(channel, amount)  => false
+          Chain.ChannelWithdrawTx(channel, amount) => false
+          Chain.ChannelForceProgressTx(channel)    => false
+          Chain.ChannelCloseMutualTx(channel)      => false
+          Chain.ChannelCloseSoloTx(channel)        => false
+          Chain.ChannelSlashTx(channel)            => false
+          Chain.ChannelSettleTx(channel)           => false
+          Chain.ChannelSnapshotSoloTx(channel)     => false
+          Chain.ContractCreateTx(amount)           => false
+          Chain.ContractCallTx(ct_address, amount) => false
+          Chain.GAAttachTx                         => false
+
+  function verify(tx_hash, n, s) =
+    Crypto.verify_sig(to_sign(tx_hash, n), state.owner, s)
+
+  entrypoint to_sign(h : hash, n : int) =
+    Crypto.blake2b((h, n))
+
+  entrypoint weird_string() : string =
+    "\x19Weird String\x42\nMore\n"
