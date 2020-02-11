@@ -397,6 +397,15 @@ global_env() ->
     G1        = {tuple_t, Ann, [Fp, Fp, Fp]},
     G2        = {tuple_t, Ann, [Fp2, Fp2, Fp2]},
     GT        = {tuple_t, Ann, lists:duplicate(12, Fp)},
+    Tx        = {qid, Ann, ["Chain", "tx"]},
+    GAMetaTx  = {qid, Ann, ["Chain", "ga_meta_tx"]},
+    BaseTx    = {qid, Ann, ["Chain", "base_tx"]},
+    PayForTx  = {qid, Ann, ["Chain", "paying_for_tx"]},
+
+    FldT      = fun(Id, T) -> {field_t, Ann, {id, Ann, Id}, T} end,
+    TxFlds    = [{"paying_for", Option(PayForTx)}, {"ga_metas", List(GAMetaTx)},
+                 {"actor", Address}, {"fee", Int}, {"ttl", Int}, {"tx", BaseTx}],
+    TxType    = {record_t, [FldT(N, T) || {N, T} <- TxFlds ]},
 
     Fee       = Int,
     [A, Q, R, K, V] = lists:map(TVar, ["a", "q", "r", "k", "v"]),
@@ -435,8 +444,36 @@ global_env() ->
                      {"timestamp",    Int},
                      {"block_height", Int},
                      {"difficulty",   Int},
-                     {"gas_limit",    Int}])
-        , types = MkDefs([{"ttl", 0}]) },
+                     {"gas_limit",    Int},
+                     %% Tx constructors
+                     {"GAMetaTx",     Fun([Address, Int], GAMetaTx)},
+                     {"PayingForTx",  Fun([Address, Int], PayForTx)},
+                     {"SpendTx",      Fun([Address, Int, String], BaseTx)},
+                     {"OracleRegisterTx",       BaseTx},
+                     {"OracleQueryTx",          BaseTx},
+                     {"OracleResponseTx",       BaseTx},
+                     {"OracleExtendTx",         BaseTx},
+                     {"NamePreclaimTx",         BaseTx},
+                     {"NameClaimTx",            Fun([String], BaseTx)},
+                     {"NameUpdateTx",           Fun([Hash], BaseTx)},
+                     {"NameRevokeTx",           Fun([Hash], BaseTx)},
+                     {"NameTransferTx",         Fun([Address, Hash], BaseTx)},
+                     {"ChannelCreateTx",        Fun([Address], BaseTx)},
+                     {"ChannelDepositTx",       Fun([Address, Int], BaseTx)},
+                     {"ChannelWithdrawTx",      Fun([Address, Int], BaseTx)},
+                     {"ChannelForceProgressTx", Fun([Address], BaseTx)},
+                     {"ChannelCloseMutualTx",   Fun([Address], BaseTx)},
+                     {"ChannelCloseSoloTx",     Fun([Address], BaseTx)},
+                     {"ChannelSlashTx",         Fun([Address], BaseTx)},
+                     {"ChannelSettleTx",        Fun([Address], BaseTx)},
+                     {"ChannelSnapshotSoloTx",  Fun([Address], BaseTx)},
+                     {"ContractCreateTx",       Fun([Int], BaseTx)},
+                     {"ContractCallTx",         Fun([Address, Int], BaseTx)},
+                     {"GAAttachTx",             BaseTx}
+                    ])
+        , types = MkDefs([{"ttl", 0}, {"tx", {[], TxType}},
+                          {"base_tx", 0},
+                          {"paying_for_tx", 0}, {"ga_meta_tx", 0}]) },
 
     ContractScope = #scope
         { funs = MkDefs(
@@ -543,7 +580,8 @@ global_env() ->
     %% Authentication
     AuthScope = #scope
         { funs = MkDefs(
-                     [{"tx_hash", Option(Hash)}]) },
+                     [{"tx_hash", Option(Hash)},
+                      {"tx",      Option(Tx)}  ]) },
 
     %% Strings
     StringScope = #scope
@@ -584,6 +622,7 @@ global_env() ->
                                           {"is_contract", Fun1(Address, Bool)},
                                           {"is_payable", Fun1(Address, Bool)}]) },
 
+
     #env{ scopes =
             #{ []           => TopScope
              , ["Chain"]    => ChainScope
@@ -601,6 +640,9 @@ global_env() ->
              , ["Int"]      => IntScope
              , ["Address"]  => AddressScope
              }
+          , fields =
+             maps:from_list([{N, [#field_info{ ann = [], field_t = T, record_t = Tx, kind = record }]}
+                             || {N, T} <- TxFlds ])
         }.
 
 

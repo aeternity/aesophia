@@ -544,7 +544,9 @@ builtin_to_scode(Env, aens_update, [_Sign, _Account, _NameString, _TTL, _ClientT
 builtin_to_scode(Env, aens_lookup, [_Name] = Args) ->
     call_to_scode(Env, aeb_fate_ops:aens_lookup(?a, ?a), Args);
 builtin_to_scode(_Env, auth_tx_hash, []) ->
-    [aeb_fate_ops:auth_tx_hash(?a)].
+    [aeb_fate_ops:auth_tx_hash(?a)];
+builtin_to_scode(_Env, auth_tx, []) ->
+    [aeb_fate_ops:auth_tx(?a)].
 
 %% -- Operators --
 
@@ -846,6 +848,7 @@ attributes(I) ->
         {'CONTRACT_TO_ADDRESS', A, B}         -> Pure(A, [B]);
         {'ADDRESS_TO_CONTRACT', A, B}         -> Pure(A, [B]);
         {'AUTH_TX_HASH', A}                   -> Pure(A, []);
+        {'AUTH_TX', A}                        -> Pure(A, []);
         {'BYTES_TO_INT', A, B}                -> Pure(A, [B]);
         {'BYTES_TO_STR', A, B}                -> Pure(A, [B]);
         {'BYTES_CONCAT', A, B, C}             -> Pure(A, [B, C]);

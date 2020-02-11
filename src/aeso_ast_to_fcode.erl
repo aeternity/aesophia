@@ -178,6 +178,7 @@ ast_to_fcode(Code, Options) ->
 
 -spec init_env([option()]) -> env().
 init_env(Options) ->
+    ChainTxArities = [3, 0, 0, 0, 0, 0, 1, 1, 1, 2, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2, 0],
     #{ type_env  => init_type_env(),
        fun_env   => #{},
        builtins  => builtins(),
@@ -189,7 +190,31 @@ init_env(Options) ->
                       ["AENS", "OraclePt"]   => #con_tag{ tag = 1, arities = [1, 1, 1, 1] },
                       ["AENS", "ContractPt"] => #con_tag{ tag = 2, arities = [1, 1, 1, 1] },
                       ["AENS", "ChannelPt"]  => #con_tag{ tag = 3, arities = [1, 1, 1, 1] },
-                      ["AENS", "Name"]       => #con_tag{ tag = 0, arities = [3] }
+                      ["AENS", "Name"]       => #con_tag{ tag = 0, arities = [3] },
+                      ["Chain", "GAMetaTx"]               => #con_tag{ tag = 0, arities = [2] },
+                      ["Chain", "PayingForTx"]            => #con_tag{ tag = 0, arities = [2] },
+                      ["Chain", "SpendTx"]                => #con_tag{ tag = 0, arities = ChainTxArities },
+                      ["Chain", "OracleRegisterTx"]       => #con_tag{ tag = 1, arities = ChainTxArities },
+                      ["Chain", "OracleQueryTx"]          => #con_tag{ tag = 2, arities = ChainTxArities },
+                      ["Chain", "OracleResponseTx"]       => #con_tag{ tag = 3, arities = ChainTxArities },
+                      ["Chain", "OracleExtendTx"]         => #con_tag{ tag = 4, arities = ChainTxArities },
+                      ["Chain", "NamePreclaimTx"]         => #con_tag{ tag = 5, arities = ChainTxArities },
+                      ["Chain", "NameClaimTx"]            => #con_tag{ tag = 6, arities = ChainTxArities },
+                      ["Chain", "NameUpdateTx"]           => #con_tag{ tag = 7, arities = ChainTxArities },
+                      ["Chain", "NameRevokeTx"]           => #con_tag{ tag = 8, arities = ChainTxArities },
+                      ["Chain", "NameTransferTx"]         => #con_tag{ tag = 9, arities = ChainTxArities },
+                      ["Chain", "ChannelCreateTx"]        => #con_tag{ tag = 10, arities = ChainTxArities },
+                      ["Chain", "ChannelDepositTx"]       => #con_tag{ tag = 11, arities = ChainTxArities },
+                      ["Chain", "ChannelWithdrawTx"]      => #con_tag{ tag = 12, arities = ChainTxArities },
+                      ["Chain", "ChannelForceProgressTx"] => #con_tag{ tag = 13, arities = ChainTxArities },
+                      ["Chain", "ChannelCloseMutualTx"]   => #con_tag{ tag = 14, arities = ChainTxArities },
+                      ["Chain", "ChannelCloseSoloTx"]     => #con_tag{ tag = 15, arities = ChainTxArities },
+                      ["Chain", "ChannelSlashTx"]         => #con_tag{ tag = 16, arities = ChainTxArities },
+                      ["Chain", "ChannelSettleTx"]        => #con_tag{ tag = 17, arities = ChainTxArities },
+                      ["Chain", "ChannelSnapshotSoloTx"]  => #con_tag{ tag = 18, arities = ChainTxArities },
+                      ["Chain", "ContractCreateTx"]       => #con_tag{ tag = 19, arities = ChainTxArities },
+                      ["Chain", "ContractCallTx"]         => #con_tag{ tag = 20, arities = ChainTxArities },
+                      ["Chain", "GAAttachTx"]             => #con_tag{ tag = 21, arities = ChainTxArities }
                      },
        options   => Options,
        functions => #{} }.
@@ -221,7 +246,7 @@ builtins() ->
                                    {"gt_inv", 1}, {"gt_add", 2}, {"gt_mul", 2}, {"gt_pow", 2}, {"gt_is_one", 1},
                                    {"pairing", 2}, {"miller_loop", 2}, {"final_exp", 1},
                                    {"int_to_fr", 1}, {"int_to_fp", 1}, {"fr_to_int", 1}, {"fp_to_int", 1}]},
-              {["Auth"],     [{"tx_hash", none}]},
+              {["Auth"],     [{"tx_hash", none}, {"tx", none}]},
               {["String"],   [{"length", 1}, {"concat", 2}, {"sha3", 1}, {"sha256", 1}, {"blake2b", 1}]},
               {["Bits"],     [{"set", 2}, {"clear", 2}, {"test", 2}, {"sum", 1}, {"intersection", 2},
                               {"union", 2}, {"difference", 2}, {"none", none}, {"all", none}]},
@@ -241,6 +266,11 @@ state_layout(Env) -> maps:get(state_layout, Env, {reg, 1}).
 
 -spec init_type_env() -> type_env().
 init_type_env() ->
+    BaseTx = {variant, [[address, integer, string], [], [], [], [], [], [string],
+                        [hash], [hash], [address, hash], [address],
+                        [address, integer], [address, integer], [address],
+                        [address], [address], [address], [address], [address],
+                        [integer], [address, integer], []]},
     #{ ["int"]             => ?type(integer),
        ["bool"]            => ?type(boolean),
        ["bits"]            => ?type(bits),
@@ -257,6 +287,9 @@ init_type_env() ->
        ["Chain", "ttl"]    => ?type({variant, [[integer], [integer]]}),
        ["AENS", "pointee"] => ?type({variant, [[address], [address], [address], [address]]}),
        ["AENS", "name"]    => ?type({variant, [[address, {variant, [[integer], [integer]]}, {map, string, {variant, [[address], [address], [address], [address]]}}]]}),
+       ["Chain", "ga_meta_tx"]    => ?type({variant, [[address, integer]]}),
+       ["Chain", "paying_for_tx"] => ?type({variant, [[address, integer]]}),
+       ["Chain", "base_tx"]       => ?type(BaseTx),
        ["MCL_BLS12_381", "fr"]  => ?type({bytes, 32}),
        ["MCL_BLS12_381", "fp"]  => ?type({bytes, 48})
      }.
