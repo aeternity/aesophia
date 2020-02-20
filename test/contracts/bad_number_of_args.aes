@@ -3,3 +3,4 @@ contract Test =
   entrypoint g(x : int, y : string) = f(1)
   entrypoint h() = g(1)
   entrypoint i() = g("Litwo, ojczyzno moja")
+  
