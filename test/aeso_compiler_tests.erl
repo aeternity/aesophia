@@ -623,6 +623,28 @@ failing_contracts() ->
            "Empty record/map update\n"
            "  r {}">>
         ])
+    , ?TYPE_ERROR(bad_number_of_args,
+                  [<<?Pos(3, 39)
+                     "Cannot unify () => unit\n"
+                     "         and (int) => 'a\n",
+                     "when checking the application at line 3, column 39 of\n"
+                     "  f : () => unit\n"
+                     "to arguments\n"
+                     "  1 : int">>,
+                   <<?Pos(4, 20)
+                     "Cannot unify (int, string) => 'e\n"
+                     "         and (int) => 'd\n"
+                     "when checking the application at line 4, column 20 of\n"
+                     "  g : (int, string) => 'e\n"
+                     "to arguments\n"
+                     "  1 : int">>,
+                   <<?Pos(5, 20)
+                     "Cannot unify (int, string) => 'c\n"
+                     "         and (string) => 'b\n"
+                     "when checking the application at line 5, column 20 of\n"
+                     "  g : (int, string) => 'c\nto arguments\n"
+                     "  \"Litwo, ojczyzno moja\" : string">>
+                  ])
     ].
 
 -define(Path(File), "code_errors/" ??File).
