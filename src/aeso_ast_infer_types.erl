@@ -2072,7 +2072,8 @@ unify1(_Env, {qcon, _, Name}, {qcon, _, Name}, _When) ->
     true;
 unify1(_Env, {bytes_t, _, Len}, {bytes_t, _, Len}, _When) ->
     true;
-unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, When) ->
+unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, When)
+    when length(Args1) == length(Args2) ->
     unify(Env, Named1, Named2, When) andalso
     unify(Env, Args1, Args2, When) andalso unify(Env, Result1, Result2, When);
 unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, When)
