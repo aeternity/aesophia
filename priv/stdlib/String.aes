@@ -1,0 +1,86 @@
+include "List.aes"
+namespace String =
+  function sha3(s : string) : hash = StringInternal.sha3(s)
+  function sha256(s : string) : hash = StringInternal.sha256(s)
+  function blake2b(s : string) : hash = StringInternal.blake2b(s)
+
+  function length(s : string) : int = StringInternal.length(s)
+  function concat(s1 : string, s2 : string) : string = StringInternal.concat(s1, s2)
+
+  function from_list(cs : list(char)) : string = StringInternal.from_list(cs)
+  function to_list(s : string) : list(char) = StringInternal.to_list(s)
+
+  function split(i : int, s : string) : string * string =
+    let cs = StringInternal.to_list(s)
+    (StringInternal.from_list(List.take(i, cs)), StringInternal.from_list(List.drop(i, cs)))
+
+  function at(ix : int, s : string) =
+    switch(List.drop(ix - 1, StringInternal.to_list(s)))
+      []     => None
+      x :: _ => Some(x)
+
+  function tokens(s : string, pat : string) =
+    let pat_len = StringInternal.length(pat)
+    tokens_(StringInternal.to_list(pat), StringInternal.to_list(s), [])
+
+  function to_upper(s : string) =
+    StringInternal.from_list([ Char.to_upper(c) | c <- StringInternal.to_list(s) ])
+
+  function to_lower(s : string) =
+    StringInternal.from_list([ Char.to_lower(c) | c <- StringInternal.to_list(s) ])
+
+  function contains(str : string, substr : string) : option(int) =
+    let last_ix = StringInternal.length(str) - (StringInternal.length(substr) - 1)
+    contains_(1, last_ix, StringInternal.to_list(str), StringInternal.to_list(substr))
+
+  function
+    to_int : (string, int) => option(int)
+    to_int(s, 10) = to_int_(List.reverse(StringInternal.to_list(s)), ch_to_int_10, 0, 1, 10)
+    to_int(s, 16) = to_int_(List.reverse(StringInternal.to_list(s)), ch_to_int_16, 0, 1, 16)
+
+  function
+    tokens_(_, [], acc) = [StringInternal.from_list(List.reverse(acc))]
+    tokens_(pat, str, acc) =
+      switch(is_prefix(pat, str))
+        Some(str') =>
+          StringInternal.from_list(List.reverse(acc)) :: tokens_(pat, str', [])
+        None =>
+          let c :: cs = str
+          tokens_(pat, cs, c :: acc)
+
+  function contains_(ix, lix, str, substr) =
+    if(ix > lix) None
+    else
+      switch(is_prefix(substr, str))
+        None =>
+          let _ :: str = str
+          contains_(ix + 1, lix, str, substr)
+        Some(_) =>
+          Some(ix)
+
+  function
+    is_prefix([], ys) = Some(ys)
+    is_prefix(_, [])  = None
+    is_prefix(x :: xs, y :: ys) =
+      if(x == y) is_prefix(xs, ys)
+      else       None
+
+  function
+    to_int_([], _, x, _, _) = Some(x)
+    to_int_(i :: is, c, x, t, f) =
+      switch(c(i))
+        None => None
+        Some(i) => to_int_(is, c, x + t * i, t * f, f)
+
+  function ch_to_int_10(c) =
+    let c = Char.to_int(c)
+    if(c >= 48 && c =< 57) Some(c - 48)
+    else None
+
+  function ch_to_int_16(c) =
+    let c = Char.to_int(c)
+    if(c >= 48 && c =< 57)    Some(c - 48)
+    elif(c >= 65 && c =< 70)  Some(c - 55)
+    elif(c >= 97 && c =< 102) Some(c - 87)
+    else None
+

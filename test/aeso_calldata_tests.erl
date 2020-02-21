@@ -142,4 +142,4 @@ compilable_contracts() ->
 not_yet_compilable(fate) ->
     [];
 not_yet_compilable(aevm) ->
-    [].
+    ["funargs", "strings"].

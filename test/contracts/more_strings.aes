@@ -1,0 +1,14 @@
+include "String.aes"
+contract StringX =
+  entrypoint test() =
+    let s1 = "a string"
+    let s2 = "another string"
+    let s  = String.concat(s1, s2)
+    String.sha256(s)
+    String.length(s1)
+    String.from_list(String.to_list(s))
+    String.split(4, s1)
+    String.at(2, s2)
+    String.tokens(s, ",")
+    String.to_upper(s1)
+    String.to_lower(s2)

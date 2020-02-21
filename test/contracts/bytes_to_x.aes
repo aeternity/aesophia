@@ -1,4 +1,4 @@
-
+include "String.aes"
 contract BytesToX =
 
   entrypoint to_int(b : bytes(42)) : int = Bytes.to_int(b)
