@@ -468,6 +468,8 @@ type_to_fcode(Env, Sub, {fun_t, _, Named, Args, Res}) ->
     FNamed = [type_to_fcode(Env, Sub, Arg) || {named_arg_t, _, _, Arg, _} <- Named],
     FArgs  = [type_to_fcode(Env, Sub, Arg) || Arg <- Args],
     {function, FNamed ++ FArgs, type_to_fcode(Env, Sub, Res)};
+type_to_fcode(Env, Sub, {if_t, _, _, _, Else}) ->
+    type_to_fcode(Env, Sub, Else);  %% Hacky: this is only for remote calls, in which case we want the unprotected type
 type_to_fcode(_Env, _Sub, Type) ->
     error({todo, Type}).
 
