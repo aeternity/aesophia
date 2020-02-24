@@ -302,18 +302,27 @@ to_scode1(Env, {funcall, Fun, Args}) ->
 to_scode1(Env, {builtin, B, Args}) ->
     builtin_to_scode(Env, B, Args);
 
-to_scode1(Env, {remote, ArgsT, RetT, Ct, Fun, [Gas, Value | Args]}) ->
+to_scode1(Env, {remote, ArgsT, RetT, Ct, Fun, [Gas, Value, Protected | Args]}) ->
     Lbl = make_function_id(Fun),
     {ArgTypes, RetType0} = typesig_to_scode([{"_", T} || T <- ArgsT], RetT),
     ArgType = ?i(aeb_fate_data:make_typerep({tuple, ArgTypes})),
     RetType = ?i(aeb_fate_data:make_typerep(RetType0)),
-    case Gas of
-        {builtin, call_gas_left, _} ->
-            Call = aeb_fate_ops:call_r(?a, Lbl, ArgType, RetType, ?a),
-            call_to_scode(Env, Call, [Ct, Value | Args]);
+    case Protected of
+        {lit, {bool, false}} ->
+            case Gas of
+                {builtin, call_gas_left, _} ->
+                    Call = aeb_fate_ops:call_r(?a, Lbl, ArgType, RetType, ?a),
+                    call_to_scode(Env, Call, [Ct, Value | Args]);
+                _ ->
+                    Call = aeb_fate_ops:call_gr(?a, Lbl, ArgType, RetType, ?a, ?a),
+                    call_to_scode(Env, Call, [Ct, Value, Gas | Args])
+            end;
+        {lit, {bool, true}} ->
+            Call = aeb_fate_ops:call_pgr(?a, Lbl, ArgType, RetType, ?a, ?a, ?i(true)),
+            call_to_scode(Env, Call, [Ct, Value, Gas | Args]);
         _ ->
-            Call = aeb_fate_ops:call_gr(?a, Lbl, ArgType, RetType, ?a, ?a),
-            call_to_scode(Env, Call, [Ct, Value, Gas | Args])
+            Call = aeb_fate_ops:call_pgr(?a, Lbl, ArgType, RetType, ?a, ?a, ?a),
+            call_to_scode(Env, Call, [Ct, Value, Gas, Protected | Args])
     end;
 
 to_scode1(_Env, {get_state, Reg}) ->
@@ -773,6 +782,7 @@ attributes(I) ->
         {'CALL', A}                           -> Impure(?a, [A]);
         {'CALL_R', A, _, B, C, D}             -> Impure(?a, [A, B, C, D]);
         {'CALL_GR', A, _, B, C, D, E}         -> Impure(?a, [A, B, C, D, E]);
+        {'CALL_PGR', A, _, B, C, D, E, F}     -> Impure(?a, [A, B, C, D, E, F]);
         {'CALL_T', A}                         -> Impure(pc, [A]);
         {'CALL_VALUE', A}                     -> Pure(A, []);
         {'JUMP', _}                           -> Impure(pc, []);
@@ -1683,6 +1693,7 @@ split_calls(Ref, [], Acc, Blocks) ->
 split_calls(Ref, [I | Code], Acc, Blocks) when element(1, I) == 'CALL';
                                                element(1, I) == 'CALL_R';
                                                element(1, I) == 'CALL_GR';
+                                               element(1, I) == 'CALL_PGR';
                                                element(1, I) == 'jumpif' ->
     split_calls(make_ref(), Code, [], [{Ref, lists:reverse([I | Acc])} | Blocks]);
 split_calls(Ref, [{'ABORT', _} = I | _Code], Acc, Blocks) ->

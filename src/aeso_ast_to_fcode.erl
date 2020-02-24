@@ -1219,8 +1219,8 @@ lambda_lift_expr(Layout, UExpr) when element(1, UExpr) == def_u; element(1, UExp
 lambda_lift_expr(Layout, {remote_u, ArgsT, RetT, Ct, F}) ->
     FVs  = free_vars(Ct),
     Ct1  = lambda_lift_expr(Layout, Ct),
-    GasAndValueArgs = 2,
-    Xs   = [ lists:concat(["arg", I]) || I <- lists:seq(1, length(ArgsT) + GasAndValueArgs) ],
+    NamedArgCount = 3,
+    Xs   = [ lists:concat(["arg", I]) || I <- lists:seq(1, length(ArgsT) + NamedArgCount) ],
     Args = [{var, X} || X <- Xs],
     make_closure(FVs, Xs, {remote, ArgsT, RetT, Ct1, F, Args});
 lambda_lift_expr(Layout, Expr) ->

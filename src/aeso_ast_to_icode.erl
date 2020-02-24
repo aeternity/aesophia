@@ -934,7 +934,9 @@ ast_typerep1({variant_t, Cons}, Icode) ->
     {variant, [ begin
                   {constr_t, _, _, Args} = Con,
                   [ ast_typerep1(Arg, Icode) || Arg <- Args ]
-                end || Con <- Cons ]}.
+                end || Con <- Cons ]};
+ast_typerep1({if_t, _, _, _, Else}, Icode) ->
+    ast_typerep1(Else, Icode). %% protected remote calls are not in AEVM
 
 ttl_t(Icode) ->
     ast_typerep({qid, [], ["Chain", "ttl"]}, Icode).
