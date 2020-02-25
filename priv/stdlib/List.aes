@@ -19,10 +19,15 @@ namespace List =
     [x] => Some(x)
     _::t => last(t)
 
+/** Finds first element of `l` fulfilling predicate `p` as `Some` or `None`
+ * if no such element exists.
+ */
   function find(p : 'a => bool, l : list('a)) : option('a) = switch(l)
     []   => None
     h::t => if(p(h)) Some(h) else find(p, t)
 
+/** Returns list of all indices of elements from `l` that fulfill the predicate `p`.
+ */
   function find_indices(p : 'a => bool, l : list('a)) : list(int) = find_indices_(p, l, 0, [])
   private function find_indices_( p : 'a => bool
                                 , l : list('a)
@@ -50,14 +55,22 @@ namespace List =
     _::t => length_(t, acc + 1)
 
 
+/** Creates an ascending sequence of all integer numbers
+ * between `a` and `b` (including `a` and `b`)
+ */
   function from_to(a : int, b : int) : list(int) = [a..b]
 
+/** Creates an ascending sequence of integer numbers betweeen
+ * `a` and `b` jumping by given `step`. Includes `a` and takes
+ * `b` only if `(b - a) mod step == 0`. `step` should be bigger than 0.
+ */
   function from_to_step(a : int, b : int, s : int) : list(int) = from_to_step_(a, b, s, [])
   private function from_to_step_(a, b, s, acc) =
     if (a > b) reverse(acc) else from_to_step_(a + s, b, s, a :: acc)
 
 
-  /* Unsafe. Replaces `n`th element of `l` with `e`. Crashes on over/underflow */
+/** Unsafe. Replaces `n`th element of `l` with `e`. Crashes on over/underflow
+ */
   function replace_at(n : int, e : 'a, l : list('a)) : list('a) =
     if(n<0) abort("insert_at underflow") else replace_at_(n, e, l, [])
   private function replace_at_(n : int, e : 'a, l : list('a), acc : list('a)) : list('a) =
@@ -66,7 +79,8 @@ namespace List =
      h::t => if (n == 0) reverse(e::acc) ++ t
              else replace_at_(n-1, e, t, h::acc)
 
-  /* Unsafe. Adds `e` to `l` to be its `n`th element. Crashes on over/underflow */
+/** Unsafe. Adds `e` to `l` to be its `n`th element. Crashes on over/underflow
+ */
   function insert_at(n : int, e : 'a, l : list('a)) : list('a) =
     if(n<0) abort("insert_at underflow") else insert_at_(n, e, l, [])
   private function insert_at_(n : int, e : 'a, l : list('a), acc : list('a)) : list('a) =
@@ -75,6 +89,9 @@ namespace List =
      []   => abort("insert_at overflow")
      h::t => insert_at_(n-1, e, t, h::acc)
 
+/** Assuming that cmp represents `<` comparison, inserts `x` before
+ * the first element in the list `l` which is greater than it
+ */
   function insert_by(cmp : (('a, 'a) => bool), x : 'a, l : list('a)) : list('a) =
     insert_by_(cmp, x, l, [])
   private function insert_by_(cmp : (('a, 'a) => bool), x : 'a, l : list('a), acc : list('a)) : list('a) =
@@ -109,6 +126,8 @@ namespace List =
     []   => reverse(acc)
     h::t => map_(f, t, f(h)::acc)
 
+/** Effectively composition of `map` and `flatten`
+ */
   function flat_map(f : 'a => list('b), l : list('a)) : list('b) =
     ListInternal.flat_map(f, l)
 
@@ -117,7 +136,8 @@ namespace List =
     []   => reverse(acc)
     h::t => filter_(p, t, if(p(h)) h::acc else acc)
 
-  /* Take `n` first elements */
+/** Take `n` first elements
+ */
   function take(n : int, l : list('a)) : list('a) =
     if(n < 0) abort("Take negative number of elements") else take_(n, l, [])
   private function take_(n : int, l : list('a), acc : list('a)) : list('a) =
@@ -126,7 +146,8 @@ namespace List =
       []   => reverse(acc)
       h::t => take_(n-1, t, h::acc)
 
-  /* Drop `n` first elements */
+/** Drop `n` first elements
+ */
   function drop(n : int, l : list('a)) : list('a) =
    if(n < 0) abort("Drop negative number of elements")
    elif (n == 0) l
@@ -134,18 +155,23 @@ namespace List =
       []   => []
       h::t => drop(n-1, t)
 
-  /* Get the longest prefix of a list in which every element matches predicate `p` */
+/** Get the longest prefix of a list in which every element
+ * matches predicate `p`
+ */
   function take_while(p : 'a => bool, l : list('a)) : list('a) = take_while_(p, l, [])
   private function take_while_(p : 'a => bool, l : list('a), acc : list('a)) : list('a) = switch(l)
     []   => reverse(acc)
     h::t => if(p(h)) take_while_(p, t, h::acc) else reverse(acc)
 
-  /* Drop elements from `l` until `p` holds */
+/** Drop elements from `l` until `p` holds
+ */
   function drop_while(p : 'a => bool, l : list('a)) : list('a) = switch(l)
     []   => []
     h::t => if(p(h)) drop_while(p, t) else l
 
-  /* Splits list into two lists of elements that respectively match and don't match predicate `p` */
+/** Splits list into two lists of elements that respectively
+ * match and don't match predicate `p`
+ */
   function partition(p : 'a => bool, l : list('a)) : (list('a) * list('a)) = partition_(p, l, [], [])
   private function partition_( p : 'a => bool
                              , l : list('a)
@@ -155,7 +181,8 @@ namespace List =
     []   => (reverse(acc_t), reverse(acc_f))
     h::t => if(p(h)) partition_(p, t, h::acc_t, acc_f) else partition_(p, t, acc_t, h::acc_f)
 
-
+/** Flattens list of lists into a single list
+ */
   function flatten(ll : list(list('a))) : list('a) = foldr((l1, l2) => l1 ++ l2, [], ll)
 
   function all(p : 'a => bool, l : list('a)) : bool = switch(l)
@@ -171,7 +198,9 @@ namespace List =
   function product(l : list(int)) : int = foldl((a, b) => a * b, 1, l)
 
 
-  /* Zips two list by applying bimapping function on respective elements. Drops longer tail. */
+/** Zips two list by applying bimapping function on respective elements.
+ * Drops longer tail.
+ */
   function zip_with(f : ('a, 'b) => 'c, l1 : list('a), l2 : list('b)) : list('c) = zip_with_(f, l1, l2, [])
   private function zip_with_( f : ('a, 'b) => 'c
                             , l1 : list('a)
@@ -181,7 +210,8 @@ namespace List =
     (h1::t1, h2::t2) => zip_with_(f, t1, t2, f(h1, h2)::acc)
     _ => reverse(acc)
 
-  /* Zips two lists into list of pairs. Drops longer tail. */
+/** Zips two lists into list of pairs. Drops longer tail.
+ */
   function zip(l1 : list('a), l2 : list('b)) : list('a * 'b) = zip_with((a, b) => (a, b), l1, l2)
 
   function unzip(l : list('a * 'b)) : list('a) * list('b) = unzip_(l, [], [])
@@ -199,7 +229,8 @@ namespace List =
     h::t => switch (partition((x) => lesser_cmp(x, h), t))
       (lesser, bigger) => sort(lesser_cmp, lesser) ++ h::sort(lesser_cmp, bigger)
 
-
+/** Puts `delim` between every two members of the list
+ */
   function intersperse(delim : 'a, l : list('a)) : list('a) = intersperse_(delim, l, [])
   private function intersperse_(delim : 'a, l : list('a), acc : list('a)) : list('a) = switch(l)
     []   => reverse(acc)
@@ -207,6 +238,8 @@ namespace List =
     h::t => intersperse_(delim, t, delim::h::acc)
 
 
+/** Effectively a zip with an infinite sequence of natural numbers
+ */
   function enumerate(l : list('a)) : list(int * 'a) = enumerate_(l, 0, [])
   private function enumerate_(l : list('a), n : int, acc : list(int * 'a)) : list(int * 'a) = switch(l)
     []   => reverse(acc)
