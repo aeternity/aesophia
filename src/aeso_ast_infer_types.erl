@@ -1372,7 +1372,7 @@ infer_expr(Env, {typed, As, Body, Type}) ->
     Type1 = check_type(Env, Type),
     {typed, _, NewBody, NewType} = check_expr(Env, Body, Type1),
     {typed, As, NewBody, NewType};
-infer_expr(Env, {app, Ann, Fun, Args0}) ->
+infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
     NamedArgs  = [ Arg || Arg = {named_arg, _, _, _} <- Args0 ],
     Args       = Args0 -- NamedArgs,
     case aeso_syntax:get_ann(format, Ann) of
@@ -1396,7 +1396,7 @@ infer_expr(Env, {app, Ann, Fun, Args0}) ->
                                            named_args   = NamedArgs1,
                                            general_type = GeneralResultType,
                                            specialized_type = ResultType,
-                                           context = When }]),
+                                           context = {check_return, App} }]),
             {typed, Ann, {app, Ann, NewFun, NamedArgs1 ++ NewArgs}, dereference(ResultType)}
     end;
 infer_expr(Env, {'if', Attrs, Cond, Then, Else}) ->
@@ -1777,7 +1777,7 @@ check_named_argument_constraint(Env,
                                     named_args = NamedArgs,
                                     general_type = GenType,
                                     specialized_type = SpecType,
-                                    context = When }) ->
+                                    context = {check_return, App} }) ->
     NamedArgsT = dereference(NamedArgsT0),
     case dereference(NamedArgsT0) of
         [_ | _] = NamedArgsT ->
@@ -1787,9 +1787,10 @@ check_named_argument_constraint(Env,
                      end,
             ArgEnv = maps:from_list([ {Name, GetVal(Name, Default)}
                                       || {named_arg_t, _, {id, _, Name}, _, Default} <- NamedArgsT ]),
-            unify(Env, specialize_dependent_type(ArgEnv, GenType), SpecType, When),
+            GenType1 = specialize_dependent_type(ArgEnv, GenType),
+            unify(Env, GenType1, SpecType, {check_expr, App, GenType1, SpecType}),
             true;
-        _ -> unify(Env, GenType, SpecType, When), true
+        _ -> unify(Env, GenType, SpecType, {check_expr, App, GenType, SpecType}), true
     end.
 
 specialize_dependent_type(Env, Type) ->
@@ -2110,7 +2111,8 @@ unfold_record_types(Env, T) ->
     unfold_types(Env, T, [unfold_record_types]).
 
 unfold_types(Env, {typed, Attr, E, Type}, Options) ->
-    {typed, Attr, unfold_types(Env, E, Options), unfold_types_in_type(Env, Type, Options)};
+    Options1 = [{ann, Attr} | lists:keydelete(ann, 1, Options)],
+    {typed, Attr, unfold_types(Env, E, Options), unfold_types_in_type(Env, Type, Options1)};
 unfold_types(Env, {arg, Attr, Id, Type}, Options) ->
     {arg, Attr, Id, unfold_types_in_type(Env, Type, Options)};
 unfold_types(Env, {type_sig, Ann, Constr, NamedArgs, Args, Ret}, Options) ->
@@ -2136,7 +2138,8 @@ unfold_types_in_type(Env, T) ->
 
 unfold_types_in_type(Env, {app_t, Ann, Id = {id, _, "map"}, Args = [KeyType0, _]}, Options) ->
     Args1 = [KeyType, _] = unfold_types_in_type(Env, Args, Options),
-    [ type_error({map_in_map_key, KeyType0}) || has_maps(KeyType) ],
+    Ann1 = proplists:get_value(ann, Options, aeso_syntax:get_ann(KeyType0)),
+    [ type_error({map_in_map_key, Ann1, KeyType0}) || has_maps(KeyType) ],
     {app_t, Ann, Id, Args1};
 unfold_types_in_type(Env, {app_t, Ann, Id, Args}, Options) when ?is_type_id(Id) ->
     UnfoldRecords  = proplists:get_value(unfold_record_types, Options, false),
@@ -2210,8 +2213,13 @@ subst_tvars1(_Env, X) ->
 unify(_, {id, _, "_"}, _, _When) -> true;
 unify(_, _, {id, _, "_"}, _When) -> true;
 unify(Env, A, B, When) ->
-    A1 = dereference(unfold_types_in_type(Env, A)),
-    B1 = dereference(unfold_types_in_type(Env, B)),
+    Options =
+        case When of    %% Improve source location for map_in_map_key errors
+            {check_expr, E, _, _} -> [{ann, aeso_syntax:get_ann(E)}];
+            _                     -> []
+        end,
+    A1 = dereference(unfold_types_in_type(Env, A, Options)),
+    B1 = dereference(unfold_types_in_type(Env, B, Options)),
     unify1(Env, A1, B1, When).
 
 unify1(_Env, {uvar, _, R}, {uvar, _, R}, _When) ->
@@ -2650,10 +2658,10 @@ mk_error({new_tuple_syntax, Ann, Ts}) ->
     Msg = io_lib:format("Invalid type\n~s  (at ~s)\nThe syntax of tuple types changed in Sophia version 4.0. Did you mean\n~s\n",
                         [pp_type("  ", {args_t, Ann, Ts}), pp_loc(Ann), pp_type("  ", {tuple_t, Ann, Ts})]),
     mk_t_err(pos(Ann), Msg);
-mk_error({map_in_map_key, KeyType}) ->
+mk_error({map_in_map_key, Ann, KeyType}) ->
     Msg = io_lib:format("Invalid key type\n~s\n", [pp_type("  ", KeyType)]),
     Cxt = "Map keys cannot contain other maps.\n",
-    mk_t_err(pos(KeyType), Msg, Cxt);
+    mk_t_err(pos(Ann), Msg, Cxt);
 mk_error({cannot_call_init_function, Ann}) ->
     Msg = "The 'init' function is called exclusively by the create contract transaction\n"
           "and cannot be called from the contract code.\n",
