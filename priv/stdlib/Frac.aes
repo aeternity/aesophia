@@ -7,7 +7,10 @@ namespace Frac =
 
   datatype frac = Pos(int, int) | Zero | Neg(int, int)
 
-  // Checks if internal representation is correct. Numerator and denominator must be positive.
+/** Checks if the internal representation is correct.
+  * Numerator and denominator must be positive.
+  * Exposed for debug purposes
+  */
   function is_sane(f : frac) : bool = switch(f)
     Pos(n, d) => n > 0 && d > 0
     Zero => true
@@ -38,7 +41,8 @@ namespace Frac =
     Neg(n, d) => String.concat("-", to_str(Pos(n, d)))
     Zero      => "0"
 
-  // Reduce fraction to normal form
+/** Reduce fraction to normal form
+ */
   function simplify(f : frac) : frac =
     switch(f)
       Neg(n, d) =>
@@ -49,6 +53,8 @@ namespace Frac =
         let cd = gcd(n, d)
         Pos(n / cd, d / cd)
 
+/** Integer to rational division
+ */
   function make_frac(n : int, d : int) : frac =
     if (d == 0) abort("Division by zero")
     elif (n == 0) Zero
@@ -111,7 +117,9 @@ namespace Frac =
     Zero      => 0
     Neg(n, d) => -(n + d - 1) / d
 
-  // Round towards nearest integer. If two integers are in the same distance, choose the even one.
+/** Round towards nearest integer. If two integers are in the same
+ * distance, choose the even one.
+ */
   function round(f : frac) : int =
     let fl = floor(f)
     let cl = ceil(f)
@@ -146,6 +154,8 @@ namespace Frac =
 
   function div(a : frac, b : frac) : frac = mul(a, inv(b))
 
+/** `b` to the power of `e`
+ */
   function int_exp(b : frac, e : int) : frac =
     if (sign(b) == 0 && e == 0) abort("Zero to the zero exponentation")
     elif (e < 0) inv(int_exp_(b, -e))
@@ -158,8 +168,9 @@ namespace Frac =
         if (e mod 2 == 1) mul(mul(half, half), b)
         else mul(half, half)
 
-  // Reduces the fraction's in-memory size by dividing its components by two until the
-  // the error is bigger than `loss` value
+/** Reduces the fraction's in-memory size by dividing its components by two until the
+ * the error is bigger than `loss` value
+ */
   function optimize(f : frac, loss : frac) : frac =
     require(geq(loss, Zero), "negative loss optimize")
     let s = sign(f)
