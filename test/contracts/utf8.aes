@@ -1,0 +1,21 @@
+contract UTF8 =
+  entrypoint f1() : char = '1'
+  entrypoint f2() : char = '+'
+  entrypoint f3() : char = 'd'
+  entrypoint f4() : char = 'X'
+  entrypoint f5() : char = 'å'
+  entrypoint f6() : char = 'Ä'
+  entrypoint f7() : char = 'æ'
+  entrypoint f8() : char = 'ë'
+  entrypoint f9() : char = 'ẻ'
+  entrypoint f10() : char = '\x27'
+  entrypoint f11() : char = '\x{2200}'
+  entrypoint f12() : char = '💩'
+  entrypoint f13() : char = '\n'
+
+
+
+  // entrypoint f13() : char = 'e̊'
+  // entrypoint f14() : char = '\Ì'
+
+  // '💩' vs. map('a,'b)

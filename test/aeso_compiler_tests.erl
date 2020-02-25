@@ -168,11 +168,13 @@ compilable_contracts() ->
      "pairing_crypto",
      "qualified_constructor",
      "let_patterns",
-     "lhs_matching"
+     "lhs_matching",
+     "more_strings"
     ].
 
 not_yet_compilable(fate) -> [];
-not_yet_compilable(aevm) -> ["pairing_crypto", "aens_update", "basic_auth_tx"].
+not_yet_compilable(aevm) -> ["pairing_crypto", "aens_update", "basic_auth_tx", "more_strings",
+                             "unapplied_builtins", "bytes_to_x", "state_handling"].
 
 %% Contracts that should produce type errors
 

@@ -7,7 +7,7 @@
 %%%-------------------------------------------------------------------
 -module(aeso_scan).
 
--export([scan/1]).
+-export([scan/1, utf8_encode/1]).
 
 -import(aeso_scan_lib, [token/1, token/2, symbol/0, skip/0,
                         override/2, push/2, pop/1]).
@@ -28,7 +28,13 @@ lexer() ->
     QID      = ["(", CON, "\\.)+", ID],
     QCON     = ["(", CON, "\\.)+", CON],
     OP       = "[=!<>+\\-*/:&|?~@^]+",
-    CHAR     = "'([^'\\\\]|(\\\\.))'",
+    %% Five cases for a character
+    %%  * 1 7-bit ascii, not \ or '
+    %%  * 2-4 8-bit values (UTF8)
+    %%  * \ followed by a known modifier [aernrtv]
+    %%  * \xhh
+    %%  * \x{hhh...}
+    CHAR     = "'(([\\x00-\\x26\\x28-\\x5b\\x5d-\\x7f])|([\\x00-\\xff][\\x80-\\xff]{1,3})|(\\\\[befnrtv'\\\\])|(\\\\x[0-9a-fA-F]{2,2})|(\\\\x\\{[0-9a-fA-F]*\\}))'",
     STRING   = "\"([^\"\\\\]|(\\\\.))*\"",
 
     CommentStart = {"/\\*", push(comment, skip())},
@@ -77,34 +83,34 @@ scan(String) ->
 %% -- Helpers ----------------------------------------------------------------
 
 parse_string([$" | Chars]) ->
-    unescape(Chars).
+    unicode:characters_to_nfc_binary(unescape(Chars)).
 
-parse_char([$', $\\, Code, $']) ->
-    case Code of
-        $'  -> $';
-        $\\ -> $\\;
-        $b  -> $\b;
-        $e  -> $\e;
-        $f  -> $\f;
-        $n  -> $\n;
-        $r  -> $\r;
-        $t  -> $\t;
-        $v  -> $\v;
-        _   -> {error, "Bad control sequence: \\" ++ [Code]}
-    end;
-parse_char([$', C, $']) -> C.
+parse_char([$' | Chars]) ->
+    case unicode:characters_to_nfc_list(unescape($', Chars, [])) of
+        [Char] -> Char;
+        _Bad   -> {error, "Bad character literal: '" ++ Chars}
+    end.
 
-unescape(Str) -> unescape(Str, []).
+utf8_encode(Cs) ->
+    binary_to_list(unicode:characters_to_binary(Cs)).
 
-unescape([$"], Acc) ->
+unescape(Str) -> unescape($", Str, []).
+
+unescape(Delim, [Delim], Acc) ->
     list_to_binary(lists:reverse(Acc));
-unescape([$\\, $x, D1, D2 | Chars ], Acc) ->
+unescape(Delim, [$\\, $x, ${ | Chars ], Acc) ->
+    {Ds, [_ | Cs]} = lists:splitwith(fun($}) -> false ; (_) -> true end, Chars),
+    C = list_to_integer(Ds, 16),
+    Utf8Cs = binary_to_list(unicode:characters_to_binary([C])),
+    unescape(Delim, Cs, [Utf8Cs | Acc]);
+unescape(Delim, [$\\, $x, D1, D2 | Chars ], Acc) ->
     C = list_to_integer([D1, D2], 16),
-    unescape(Chars, [C | Acc]);
-unescape([$\\, Code | Chars], Acc) ->
-    Ok = fun(C) -> unescape(Chars, [C | Acc]) end,
+    Utf8Cs = binary_to_list(unicode:characters_to_binary([C])),
+    unescape(Delim, Chars, [Utf8Cs | Acc]);
+unescape(Delim, [$\\, Code | Chars], Acc) ->
+    Ok = fun(C) -> unescape(Delim, Chars, [C | Acc]) end,
     case Code of
-        $"  -> Ok($");
+        Delim -> Ok(Delim);
         $\\ -> Ok($\\);
         $b  -> Ok($\b);
         $e  -> Ok($\e);
@@ -115,8 +121,8 @@ unescape([$\\, Code | Chars], Acc) ->
         $v  -> Ok($\v);
         _   -> error("Bad control sequence: \\" ++ [Code])  %% TODO
     end;
-unescape([C | Chars], Acc) ->
-    unescape(Chars, [C | Acc]).
+unescape(Delim, [C | Chars], Acc) ->
+    unescape(Delim, Chars, [C | Acc]).
 
 strip_underscores(S) ->
     lists:filter(fun(C) -> C /= $_ end, S).

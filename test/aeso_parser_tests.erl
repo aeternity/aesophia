@@ -63,7 +63,8 @@ simple_contracts_test_() ->
      %% Parse tests of example contracts
      [ {lists:concat(["Parse the ", Contract, " contract."]),
         fun() -> roundtrip_contract(Contract) end}
-        || Contract <- [counter, voting, all_syntax, '05_greeter', aeproof, multi_sig, simple_storage, fundme, dutch_auction] ]
+        || Contract <- [counter, voting, all_syntax, '05_greeter', aeproof,
+                        multi_sig, simple_storage, fundme, dutch_auction, utf8] ]
     }.
 
 parse_contract(Name) ->
@@ -85,7 +86,7 @@ parse_expr(Text) ->
 round_trip(Text) ->
     Contract  = parse_string(Text),
     Text1     = prettypr:format(aeso_pretty:decls(strip_stdlib(Contract))),
-    Contract1 = parse_string(Text1),
+    Contract1 = parse_string(aeso_scan:utf8_encode(Text1)),
     NoSrcLoc  = remove_line_numbers(Contract),
     NoSrcLoc1 = remove_line_numbers(Contract1),
     ?assertMatch(NoSrcLoc, diff(NoSrcLoc, NoSrcLoc1)).

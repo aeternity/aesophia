@@ -1,0 +1,97 @@
+include "List.aes"
+namespace String =
+  function sha3(s : string) : hash = StringInternal.sha3(s)
+  function sha256(s : string) : hash = StringInternal.sha256(s)
+  function blake2b(s : string) : hash = StringInternal.blake2b(s)
+
+  function length(s : string) : int = StringInternal.length(s)
+  function concat(s1 : string, s2 : string) : string = StringInternal.concat(s1, s2)
+
+  function from_list(cs : list(char)) : string = StringInternal.from_list(cs)
+  function to_list(s : string) : list(char) = StringInternal.to_list(s)
+
+  function split(i : int, s : string) : string * string =
+    let cs = StringInternal.to_list(s)
+    (StringInternal.from_list(List.take(i, cs)), StringInternal.from_list(List.drop(i, cs)))
+
+  function at(ix : int, s : string) =
+    switch(List.drop(ix, StringInternal.to_list(s)))
+      []     => None
+      x :: _ => Some(x)
+
+  function to_upper(s : string) =
+    StringInternal.from_list(List.map(Char.to_upper, StringInternal.to_list(s)))
+
+  function to_lower(s : string) =
+    StringInternal.from_list(List.map(Char.to_lower, StringInternal.to_list(s)))
+
+  function contains(str : string, substr : string) : option(int) =
+    if(substr == "") Some(0)
+    else
+      contains_(0, StringInternal.to_list(str), StringInternal.to_list(substr))
+
+  function tokens(s : string, pat : string) =
+    require(pat != "", "String.tokens: empty pattern")
+    tokens_(StringInternal.to_list(pat), StringInternal.to_list(s), [])
+
+  function to_int(s : string) : option(int) =
+    let s = StringInternal.to_list(s)
+    switch(is_prefix(['-'], s))
+      None    => to_int_pos(s)
+      Some(s) => switch(to_int_pos(s))
+                   None => None
+                   Some(x) => Some(-x)
+
+  private function to_int_pos(s : list(char)) =
+    switch(is_prefix(['0', 'x'], s))
+      None =>
+        to_int_(s, ch_to_int_10, 0, 10)
+      Some(s) =>
+        to_int_(s, ch_to_int_16, 0, 16)
+
+  private function
+    tokens_(_, [], acc) = [StringInternal.from_list(List.reverse(acc))]
+    tokens_(pat, str, acc) =
+      switch(is_prefix(pat, str))
+        Some(str') =>
+          StringInternal.from_list(List.reverse(acc)) :: tokens_(pat, str', [])
+        None =>
+          let c :: cs = str
+          tokens_(pat, cs, c :: acc)
+
+  private function
+    contains_(_, [], _) = None
+    contains_(ix, str, substr) =
+      switch(is_prefix(substr, str))
+        None =>
+          let _ :: str = str
+          contains_(ix + 1, str, substr)
+        Some(_) =>
+          Some(ix)
+
+  private function
+    is_prefix([], ys) = Some(ys)
+    is_prefix(_, [])  = None
+    is_prefix(x :: xs, y :: ys) =
+      if(x == y) is_prefix(xs, ys)
+      else       None
+
+  private function
+    to_int_([], _, x, _) = Some(x)
+    to_int_(i :: is, value, x, b) =
+      switch(value(i))
+        None => None
+        Some(i) => to_int_(is, value, x * b + i, b)
+
+  private function ch_to_int_10(c) =
+    let c = Char.to_int(c)
+    if(c >= 48 && c =< 57) Some(c - 48)
+    else None
+
+  private function ch_to_int_16(c) =
+    let c = Char.to_int(c)
+    if(c >= 48 && c =< 57)    Some(c - 48)
+    elif(c >= 65 && c =< 70)  Some(c - 55)
+    elif(c >= 97 && c =< 102) Some(c - 87)
+    else None
+

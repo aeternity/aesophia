@@ -369,8 +369,13 @@ expr_p(_, {char, _, C}) ->
     case C of
         $' -> text("'\\''");
         $" -> text("'\"'");
-        _  -> S = lists:flatten(io_lib:format("~p", [[C]])),
-              text("'" ++ tl(lists:droplast(S)) ++ "'")
+        _ when C < 16#80 ->
+            S = lists:flatten(io_lib:format("~p", [[C]])),
+            text("'" ++ tl(lists:droplast(S)) ++ "'");
+        _  ->
+            S = lists:flatten(
+                  io_lib:format("'~ts'", [list_to_binary(aeso_scan:utf8_encode([C]))])),
+            text(S)
     end;
 %% -- Names
 expr_p(_, E = {id, _, _})   -> name(E);

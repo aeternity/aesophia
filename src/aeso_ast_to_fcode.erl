@@ -246,8 +246,10 @@ builtins() ->
                                    {"gt_inv", 1}, {"gt_add", 2}, {"gt_mul", 2}, {"gt_pow", 2}, {"gt_is_one", 1},
                                    {"pairing", 2}, {"miller_loop", 2}, {"final_exp", 1},
                                    {"int_to_fr", 1}, {"int_to_fp", 1}, {"fr_to_int", 1}, {"fp_to_int", 1}]},
+              {["StringInternal"], [{"length", 1}, {"concat", 2}, {"to_list", 1}, {"from_list", 1},
+                                    {"sha3", 1}, {"sha256", 1}, {"blake2b", 1}]},
+              {["Char"],     [{"to_int", 1}, {"from_int", 1}, {"to_lower", 1}, {"to_upper", 1}]},
               {["Auth"],     [{"tx_hash", none}, {"tx", none}]},
-              {["String"],   [{"length", 1}, {"concat", 2}, {"sha3", 1}, {"sha256", 1}, {"blake2b", 1}]},
               {["Bits"],     [{"set", 2}, {"clear", 2}, {"test", 2}, {"sum", 1}, {"intersection", 2},
                               {"union", 2}, {"difference", 2}, {"none", none}, {"all", none}]},
               {["Bytes"],    [{"to_int", 1}, {"to_str", 1}, {"concat", 2}, {"split", 1}]},
@@ -1040,7 +1042,9 @@ stmts_to_fcode(Env, [Expr | Stmts]) ->
 
 op_builtins() ->
     [map_from_list, map_to_list, map_delete, map_member, map_size,
-     string_length, string_concat, string_sha3, string_sha256, string_blake2b,
+     stringinternal_length, stringinternal_concat, stringinternal_to_list, stringinternal_from_list,
+     stringinternal_sha3, stringinternal_sha256, stringinternal_blake2b,
+     char_to_int, char_from_int, char_to_lower, char_to_upper,
      bits_set, bits_clear, bits_test, bits_sum, bits_intersection, bits_union,
      bits_difference, int_to_str, address_to_str, crypto_verify_sig,
      address_to_contract,
