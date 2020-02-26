@@ -591,17 +591,18 @@ global_env() ->
                       {"concat",    Fun([String, String], String)},
                       {"to_list",   Fun1(String, List(Char))},
                       {"from_list", Fun1(List(Char), String)},
+                      {"to_upper",  Fun1(String, String)},
+                      {"to_lower",  Fun1(String, String)},
                       {"sha3",      Fun1(String, Hash)},
                       {"sha256",    Fun1(String, Hash)},
-                      {"blake2b",   Fun1(String, Hash)}]) },
+                      {"blake2b",   Fun1(String, Hash)}
+                     ]) },
 
     %% Chars
     CharScope = #scope
         { funs = MkDefs(
                      [{"to_int",   Fun1(Char, Int)},
-                      {"from_int", Fun1(Int, Option(Char))},
-                      {"to_upper", Fun1(Char, Char)},
-                      {"to_lower", Fun1(Char, Char)}]) },
+                      {"from_int", Fun1(Int, Option(Char))}]) },
 
     %% Bits
     BitsScope = #scope

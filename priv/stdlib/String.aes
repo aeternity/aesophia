@@ -10,6 +10,9 @@ namespace String =
   function from_list(cs : list(char)) : string = StringInternal.from_list(cs)
   function to_list(s : string) : list(char) = StringInternal.to_list(s)
 
+  function to_upper(s : string) = StringInternal.to_upper(s)
+  function to_lower(s : string) = StringInternal.to_lower(s)
+
   function split(i : int, s : string) : string * string =
     let cs = StringInternal.to_list(s)
     (StringInternal.from_list(List.take(i, cs)), StringInternal.from_list(List.drop(i, cs)))
@@ -18,12 +21,6 @@ namespace String =
     switch(List.drop(ix, StringInternal.to_list(s)))
       []     => None
       x :: _ => Some(x)
-
-  function to_upper(s : string) =
-    StringInternal.from_list(List.map(Char.to_upper, StringInternal.to_list(s)))
-
-  function to_lower(s : string) =
-    StringInternal.from_list(List.map(Char.to_lower, StringInternal.to_list(s)))
 
   function contains(str : string, substr : string) : option(int) =
     if(substr == "") Some(0)
