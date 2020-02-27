@@ -198,6 +198,7 @@ dependent on the specific state and event types of the contract.
 
 ### Splitting code over multiple files
 
+
 Code from another file can be included in a contract using an `include`
 statement. These must appear at the top-level (outside the main contract). The
 included file can contain one or more namespaces and abstract contracts. For
@@ -220,6 +221,24 @@ This behaves as if the contents of `library.aes` was textually inserted into
 the file, except that error messages will refer to the original source
 locations. The language will try to include each file at most one time automatically,
 so even cyclic includes should be working without any special tinkering.
+
+### Standard library
+
+Sophia offers [standard library](sophia_stdlib.md) which exposes some 
+primitive operations and some higher level utilities. The builtin
+namespaces like `Chain`, `Contract`, `Map`
+are included by default and are supported internally by the compiler.
+Others like `List`, `Frac`, `Option` need to be manually included using the
+`include` directive. For example
+```
+include "List.aes"
+include "Pair.aes"
+-- Map is already there!
+
+namespace C =
+  entrypoint keys(m : map('a, 'b)) : list('a) =
+    List.map(Pair.fst, (Map.to_list(m)))
+```
 
 ### Types
 Sophia has the following types:
