@@ -1629,13 +1629,13 @@ The datatype consists of three constructors `Neg/2`, `Zero/0` and `Pos/2` which 
 sign of the number. Both values stored in `Neg` and `Pos` need to be strictly positive 
 integers. However, when creating a `frac` you should never use the constructors explicitly.
 Instead of that, always use provided functions like `make_frac` or `from_int`. This helps
-keeping the internal representation in a good form.
+keeping the internal representation well defined.
 
-The described below functions take care of normalization of the fractions –
+The described below functions take care of the normalization of the fractions –
 they won't grow if it is unnecessary. Please note that the size of `frac` can be still
 very big while the value is actually very close to a natural number – the division of
 two extremely big prime numbers *will* be as big as both of them. To face this issue
-the [optimize](#optimize** function is provided. It will approximate the value of the
+the [optimize](#optimize) function is provided. It will approximate the value of the
 fraction to fit in the given error margin and to shrink its size as much as possible.
 
 **Important note:** `frac` must *not* be compared using standard `<`-like operators.
