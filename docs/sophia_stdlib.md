@@ -646,6 +646,13 @@ Chain.gas_limit : int
 The gas limit of the current block.
 
 
+### event
+```
+Chain.event(e : event) : unit
+```
+Emits the event. To use this function one needs to define the `event` type as a `datatype` in the contract.
+
+
 # Includable namespaces
 
 These need to be explicitly included (with `.aes` suffix)

@@ -462,7 +462,7 @@ Please refer to the `Map` [library documentation](sophia_stdlib.md#String).
 ### Byte arrays
 
 Byte arrays are fixed size arrays of 8-bit integers. They are described in hexadecimal system,
-for example the literal `#cafe` means a two-element array of bytes `ca` (202) and `fe` (254)
+for example the literal `#cafe` creates a two-element array of bytes `ca` (202) and `fe` (254)
 and thus is a value of type `bytes(2)`.
 
 Please refer to the `Bytes` [library documentation](sophia_stdlib.md#Bytes).
@@ -490,7 +490,7 @@ wrapping a transaction.) The transaction hash is available in the primitive
 normal contract call it returns `None`.
 
 
-#### Oracle interface
+### Oracle interface
 You can attach an oracle to the current contract and you can interact with oracles
 through the Oracle interface.
 
@@ -499,7 +499,7 @@ For a full description of how Oracle works see
 For a functionality documentation refer to the [standard library](sophia_stdlib.md#Oracle).
 
 
-##### Example
+#### Example
 
 Example for an oracle answering questions of type `string` with answers of type `int`:
 ```
@@ -552,7 +552,7 @@ contract Oracles =
     Oracle.get_answer(o, q)
 ```
 
-##### Sanity checks
+#### Sanity checks
 
 When an Oracle literal is passed to a contract, no deep checks are performed. 
 For extra safety [Oracle.check](sophia_stdlib.md#check) and [Oracle.check_query](sophia_stdlib.md#check_query)
@@ -565,17 +565,20 @@ Contracts can interact with the
 For this purpose the [AENS](sophia_stdlib.md#AENS) library was exposed.
 
 
-#### Events
+### Events
 
 Sophia contracts log structured messages to an event log in the resulting
 blockchain transaction. The event log is quite similar to [Events in
-Solidity](https://solidity.readthedocs.io/en/v0.4.24/contracts.html#events). To
-use events a contract must declare a datatype `event`, and events are then
+Solidity](https://solidity.readthedocs.io/en/v0.4.24/contracts.html#events).
+Events are further discussed in the [protocol](https://github.com/aeternity/protocol/blob/master/contracts/events.md).
+
+
+To use events a contract must declare a datatype `event`, and events are then
 logged using the `Chain.event` function:
 
 ```
-  datatype event =
-      Event1(int, int, string)
+  datatype event 
+    = Event1(int, int, string)
     | Event2(string, address)
 
   Chain.event(e : event) : unit
@@ -597,9 +600,6 @@ The fields can appear in any order.
 
 *NOTE:* Indexing is not part of the core aeternity node.
 
-Events are further discussed in [Sophia explained -
-Events](./sophia_explained.md#events).
-
 Events are emitted by using the `Chain.event` function. The following function
 will emit one Event of each kind in the example.
 
@@ -608,6 +608,19 @@ will emit one Event of each kind in the example.
     Chain.event(TheFirstEvent(42))
     Chain.event(AnotherEvent(Contract.address, "This is not indexed"))
 ```
+
+#### Argument order
+
+It is only possible to have one (1) `string` parameter in the event, but it can
+be placed in any position (and its value will end up in the `data` field), i.e.
+```
+AnotherEvent(string, indexed address)
+
+...
+
+Chain.event(AnotherEvent("This is not indexed", Contract.address))
+```
+would yield exactly the same result in the example above!
 
 ### Compiler pragmas
 
