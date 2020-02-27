@@ -32,6 +32,7 @@ Sophia language offers standard library that consists of following namespaces:
 - [Pair](#Pair)
 - [Triple](#Triple)
 - [BLS12_381](#BLS12_381)
+- [Frac](#Frac)
 
 # Builtin namespaces
 
@@ -1618,3 +1619,216 @@ BLS12_381.final_exp(p : gt) : gt
 ```
 
 Perform the final exponentiation step of pairing for a `gt` value.
+
+## Frac
+
+This namespace provides operations on rational numbers. A rational number is represented
+as a fraction of two integers which are stored internally in the `frac` datatype.
+
+The datatype consists of three constructors `Neg/2`, `Zero/0` and `Pos/2` which determine the
+sign of the number. Both values stored in `Neg` and `Pos` need to be strictly positive 
+integers. However, when creating a `frac` you should never use the constructors explicitly.
+Instead of that, always use provided functions like `make_frac` or `from_int`. This helps
+keeping the internal representation in a good form.
+
+The described below functions take care of normalization of the fractions –
+they won't grow if it is unnecessary. Please note that the size of `frac` can be still
+very big while the value is actually very close to a natural number – the division of
+two extremely big prime numbers *will* be as big as both of them. To face this issue
+the [optimize](#optimize) function is provided. It will approximate the value of the
+fraction to fit in the given error margin and to shrink its size as much as possible.
+
+### make_frac
+`Frac.make_frac(n : int, d : int) : frac`
+
+Creates a fraction out of numerator and denominator. Automatically normalizes, so
+`make_frac(2, 4)` and `make_frac(1, 2)` will yield same results.
+
+
+### num
+`Frac.num(f : frac) : int`
+
+Returns the numerator of a fraction.
+
+
+### den
+`Frac.den(f : frac) : int`
+
+Returns the denominator of a fraction.
+
+
+### to_pair
+`Frac.to_pair(f : frac) : int * int`
+
+Turns a fraction into a pair of numerator and denominator.
+
+
+### sign
+`Frac.sign(f : frac) : int`
+
+Returns the signum of a fraction, -1, 0, 1 if negative, zero, positive respectively.
+
+
+### to_str
+`Frac.to_str(f : frac) : string`
+
+Conversion to string. Does not display division by 1 or denominator if equals zero.
+
+
+### simplify
+`Frac.simplify(f : frac) : frac`
+
+Reduces fraction to normal form if for some reason it is not in it.
+
+
+### eq
+`Frac.eq(a : frac, b : frac) : bool`
+
+Checks if `a` is equal to `b`.
+
+
+### neq
+`Frac.neq(a : frac, b : frac) : bool`
+
+Checks if `a` is not equal to `b`.
+
+
+### geq
+`Frac.geq(a : frac, b : frac) : bool`
+
+Checks if `a` is greater or equal to `b`.
+
+
+### leq
+`Frac.leq(a : frac, b : frac) : bool`
+
+Checks if `a` is lesser or equal to `b`.
+
+
+### gt
+`Frac.gt(a : frac, b : frac) : bool`
+
+Checks if `a` is greater than `b`.
+
+
+### lt
+`Frac.lt(a : frac, b : frac) : bool`
+
+Checks if `a` is lesser than `b`.
+
+
+### min
+`Frac.min(a : frac, b : frac) : frac`
+
+Chooses lesser of the two fractions.
+
+
+### max
+`Frac.max(a : frac, b : frac) : frac`
+
+Chooses greater of the two fractions.
+
+
+### abs
+`Frac.abs(f : frac) : frac`
+
+Absolute value.
+
+
+### from_int
+`Frac.from_int(n : int) : frac`
+
+From integer conversion. Effectively `make_frac(n, 1)`.
+
+
+### floor
+`Frac.floor(f : frac) : int`
+
+Rounds a fraction to the nearest lesser or equal integer.
+
+
+### ceil
+`Frac.ceil(f : frac) : int`
+
+Rounds a fraction to the nearest greater or equal integer.
+
+
+### round_to_zero
+`Frac.round_to_zero(f : frac) : int`
+
+Rounds a fraction towards zero. 
+Effectively `ceil` if lesser than zero and `floor` if greater.
+
+
+### round_from_zero
+`Frac.round_from_zero(f : frac) : int`
+
+Rounds a fraction from zero. 
+Effectively `ceil` if greater than zero and `floor` if lesser.
+
+
+### round
+`Frac.round(f : frac) : int`
+
+Rounds a fraction to a nearest integer. If two integers are in the same distance it
+will choose the even one.
+
+
+### add
+`Frac.add(a : frac, b : frac) : frac`
+
+Sum of the fractions.
+
+
+### neg
+`Frac.neg(a : frac) : frac`
+
+Negation of the fraction.
+
+
+### sub
+`Frac.sub(a : frac, b : frac) : frac`
+
+Subtraction of two fractions.
+
+
+### inv
+`Frac.inv(a : frac) : frac`
+
+Inverts a fraction. Throws error if `a` is zero. 
+
+
+### mul
+`Frac.mul(a : frac, b : frac) : frac`
+
+Multiplication of two fractions.
+
+
+### div
+`Frac.div(a : frac, b : frac) : frac`
+
+Division of two fractions.
+
+
+### int_exp
+`Frac.int_exp(b : frac, e : int) : frac`
+
+Takes `b` to the power of `e`. The exponent can be a negative value.
+
+
+### optimize
+`Frac.optimize(f : frac, loss : frac) : frac`
+
+Shrink the internal size of a fraction as much as possible by approximating it to the
+point where the error would exceed the `loss` value.
+
+
+### is_sane
+`Frac.is_sane(f : frac) : bool`
+
+For debugging. If it ever returns false in a code that doesn't call `frac` constructors or
+accept arbitrary `frac`s from the surface you should report it as a
+[bug](https://github.com/aeternity/aesophia/issues/new)
+
+If you expect getting calls with malformed `frac`s in your contract, you should use
+this function to verify the input.
