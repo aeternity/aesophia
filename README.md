@@ -11,8 +11,8 @@ can then be loaded into the æternity system.
 ## Documentation
 
 * [Smart Contracts on aeternity Blockchain](https://github.com/aeternity/protocol/blob/master/contracts/contracts.md).
-* [Sophia Documentation](https://github.com/aeternity/aesophia/blob/master/docs/sophia.md).
-* [Sophia Standard Library](https://github.com/aeternity/aesophia/blob/master/docs/sophia_stdlib.md).
+* [Sophia Documentation](docs/sophia.md).
+* [Sophia Standard Library](docs/sophia_stdlib.md).
 
 
 ## Versioning
