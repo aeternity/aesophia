@@ -1,36 +1,58 @@
 include "List.aes"
 namespace String =
-  function sha3(s : string) : hash = StringInternal.sha3(s)
-  function sha256(s : string) : hash = StringInternal.sha256(s)
+  // Computes the SHA3/Keccak hash of the string
+  function sha3(s : string) : hash    = StringInternal.sha3(s)
+  // Computes the SHA256 hash of the string.
+  function sha256(s : string) : hash  = StringInternal.sha256(s)
+  // Computes the Blake2B hash of the string.
   function blake2b(s : string) : hash = StringInternal.blake2b(s)
 
+  // The length of a string - equivalent to List.lenght(to_list(s))
   function length(s : string) : int = StringInternal.length(s)
+  // Concatenates `s1` and `s2`.
   function concat(s1 : string, s2 : string) : string = StringInternal.concat(s1, s2)
+  // Concatenates a list of strings.
+  function
+    concats : (list(string)) => string
+    concats([])      = ""
+    concats(s :: ss) = List.foldl(StringInternal.concat, s, ss)
 
+  // Converts a `string` to a list of `char` - the code points are normalized, but
+  // composite characters are possibly converted to multiple `char`s.
   function from_list(cs : list(char)) : string = StringInternal.from_list(cs)
+  // Converts a list of characters into a normalized UTF-8 string.
   function to_list(s : string) : list(char) = StringInternal.to_list(s)
 
-  function to_upper(s : string) = StringInternal.to_upper(s)
+  // Converts a string to lowercase.
   function to_lower(s : string) = StringInternal.to_lower(s)
+  // Converts a string to uppercase.
+  function to_upper(s : string) = StringInternal.to_upper(s)
 
+  // Splits a string at (zero-based) index `ix`.
   function split(i : int, s : string) : string * string =
     let cs = StringInternal.to_list(s)
     (StringInternal.from_list(List.take(i, cs)), StringInternal.from_list(List.drop(i, cs)))
 
+  // Returns the character/codepoint at (zero-based) index `ix`.
   function at(ix : int, s : string) =
     switch(List.drop(ix, StringInternal.to_list(s)))
       []     => None
       x :: _ => Some(x)
 
+  // Searches for `pat` in `str`, returning `Some(ix)` if `pat` is a substring
+  // of `str` starting at position `ix`, otherwise returns `None`.
   function contains(str : string, substr : string) : option(int) =
     if(substr == "") Some(0)
     else
       contains_(0, StringInternal.to_list(str), StringInternal.to_list(substr))
 
+  // Splits `s` into tokens, `pat` is the divider of tokens.
   function tokens(s : string, pat : string) =
     require(pat != "", "String.tokens: empty pattern")
     tokens_(StringInternal.to_list(pat), StringInternal.to_list(s), [])
 
+  // Converts a decimal ("123", "-253") or a hexadecimal ("0xa2f", "-0xBBB") string
+  // into an integer. If the string doesn't contain a valid number `None` is returned.
   function to_int(s : string) : option(int) =
     let s = StringInternal.to_list(s)
     switch(is_prefix(['-'], s))
@@ -39,6 +61,7 @@ namespace String =
                    None => None
                    Some(x) => Some(-x)
 
+  // Private helper functions below
   private function to_int_pos(s : list(char)) =
     switch(is_prefix(['0', 'x'], s))
       None =>
