@@ -781,7 +781,7 @@ Valid string escape codes are
 | `\xHexDigits` | *HexDigits* |   |
 
 
-See the [identifier encoding scheme](https://github.com/aeternity/protocol/bloc/master/node/api/api_encoding.md) for the
+See the [identifier encoding scheme](https://github.com/aeternity/protocol/blob/master/node/api/api_encoding.md) for the
 details on the base58 literals.
 
 ### Layout blocks
