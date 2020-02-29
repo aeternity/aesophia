@@ -1,4 +1,61 @@
-[back](./contracts.md)
+<!-- IMPORTANT: REMEMBER TO UPDATE THE TABLE OF CONTENTS AFTER YOUR EDIT -->
+
+**Table of Contents**
+
+- [-](#-)
+- [Language Features](#language-features)
+    - [Contracts](#contracts)
+        - [Calling other contracts](#calling-other-contracts)
+        - [Mutable state](#mutable-state)
+            - [Stateful functions](#stateful-functions)
+        - [Payable](#payable)
+            - [Payable contracts](#payable-contracts)
+            - [Payable entrypoints](#payable-entrypoints)
+        - [Namespaces](#namespaces)
+        - [Splitting code over multiple files](#splitting-code-over-multiple-files)
+        - [Standard library](#standard-library)
+        - [Types](#types)
+        - [Literals](#literals)
+        - [Arithmetic](#arithmetic)
+        - [Bit fields](#bit-fields)
+        - [Type aliases](#type-aliases)
+        - [Algebraic data types](#algebraic-data-types)
+        - [Lists](#lists)
+        - [Maps and records](#maps-and-records)
+            - [Constructing maps and records](#constructing-maps-and-records)
+            - [Accessing values](#accessing-values)
+            - [Updating a value](#updating-a-value)
+            - [Map implementation](#map-implementation)
+        - [Strings](#strings)
+        - [Byte arrays](#byte-arrays)
+        - [Cryptographic builins](#cryptographic-builins)
+            - [AEVM note](#aevm-note)
+        - [Authorization interface](#authorization-interface)
+        - [Oracle interface](#oracle-interface)
+            - [Example](#example)
+            - [Sanity checks](#sanity-checks)
+        - [AENS interface](#aens-interface)
+        - [Events](#events)
+            - [Argument order](#argument-order)
+        - [Compiler pragmas](#compiler-pragmas)
+        - [Exceptions](#exceptions)
+    - [Syntax](#syntax)
+        - [Lexical syntax](#lexical-syntax)
+            - [Comments](#comments)
+            - [Keywords](#keywords)
+            - [Tokens](#tokens)
+        - [Layout blocks](#layout-blocks)
+        - [Notation](#notation)
+        - [Declarations](#declarations)
+        - [Types](#types-1)
+        - [Statements](#statements)
+        - [Expressions](#expressions)
+        - [Operators types](#operators-types)
+        - [Operator precendences](#operator-precendences)
+    - [Examples](#examples)
+    - [The lifetime of a contract](#the-lifetime-of-a-contract)
+        - [Killing a contract](#killing-a-contract)
+
 ## The Sophia Language
 An Æternity BlockChain Language
 
@@ -722,10 +779,9 @@ Valid string escape codes are
 | `\r`          |          13 |   |
 | `\e`          |          27 |   |
 | `\xHexDigits` | *HexDigits* |   |
-|               |             |   |
--------------------
 
-See the [identifier encoding scheme](/node/api/api_encoding.md) for the
+
+See the [identifier encoding scheme](https://github.com/aeternity/protocol/bloc/master/node/api/api_encoding.md) for the
 details on the base58 literals.
 
 ### Layout blocks

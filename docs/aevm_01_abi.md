@@ -46,10 +46,11 @@ More precisely
 - Boxed types are represented as a 256-bit pointer to a contiguous sequence of
   words, called a *heap object*, on the heap.
 
-  | Value/Type | Heap object
-  | --- | ---
-  | Tuple | The value of each component in left-to-right order.
-  | String | The length (number of bytes), followed by as many words as required to store the character data, padded on the right with 0.
+  | Value/Type | Heap object                                                                                                                  |
+  | ---        | ---                                                                                                                          |
+  | Tuple      | The value of each component in left-to-right order.                                                                          |
+  | String     | The length (number of bytes), followed by as many words as required to store the character data, padded on the right with 0. |
+  |            |                                                                                                                              |
 
   The following types are represented in terms of other types:
 
