@@ -7,8 +7,9 @@ in the priv/stdlib directory. Thanks!
 
 # Standard library
 
-Sophia language offers standard library that consists of following namespaces:
-
+Sophia language offers standard library that consists of several namespaces. Some of them are already
+in the scope and do not need any actions to be used, while some others are hidden under includable
+files. The autoincluded namespaces are:
 
 - [Bits](#Bits)
 - [String](#String)
@@ -23,6 +24,12 @@ Sophia language offers standard library that consists of following namespaces:
 - [Contract](#Contract)
 - [Call](#Call)
 - [Chain](#Chain)
+
+The following ones need to be included as regular files with `.aes` suffix, for example
+```
+include "List.aes"
+```
+
 - [List](#List)
 - [Option](#Option)
 - [Func](#Func)
