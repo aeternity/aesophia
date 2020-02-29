@@ -2,10 +2,7 @@
 Oh Hi! I see you are editing the stdlib documentation, that's really cool.
 I have a request for you – if you are going to update some stuff here please
 check if the comments in the sources are up to date as well. You may find them
-in the aeternity/aesophia repo in priv/stdlib directory. Also, if the
-changes are about the builtin functions (ie. these written in FATE VM,
-not in Sophia) please remember to update their entries in
-aeternity/protocol repo in contracts/sophia.md file. Thanks!
+in the priv/stdlib directory. Thanks!
 -->
 
 # Standard library
