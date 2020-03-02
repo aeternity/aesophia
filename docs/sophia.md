@@ -1062,33 +1062,3 @@ contract FundMe =
            amount    = state.contributions[to]})
     put(state{ contributions @ c = Map.delete(to, c) })
 ```
-
-## The lifetime of a contract
-
-### Killing a contract
-
-There is no selfdestruct instruction in the aevm as in the Ethereum
-Virtual Machine instead there is a disable transaction which the
-creator of a contract can issue. When a contract is disabled no new
-contract can call the old contract.
-
-When a contract is posted to the chain all references to other
-contracts are checked and a reference counter in each contract is
-increased. You can only post a contract to the chain if all the
-contracts referred to are enabled.
-
-When a contract is disabled all other contracts it refer to get their
-reference count decreased.
-
-If a contract is disabled and its reference count is zero a miner can
-choose to garbage collect the contract.
-
-The reference count of a contract is handled as the account balance
-and kept in the state tree of the miner and the merkle hash is
-included in the state hash in each block just as with balances.
-
-The transaction for creating a contract has an extra fee called
-deposit which has to be an even number. The disable transaction is
-free but the miner and the creator get half of the deposit fee each at
-contract disable thus encouraging creators to disable their contracts
-and miners to pick disable transactions.
