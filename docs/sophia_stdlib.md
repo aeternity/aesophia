@@ -462,7 +462,7 @@ It returns `true` iff the oracle query exist and has the expected type.
 
 ## AENS
 
-The following functionalities are available for interacting with the Aeternity
+The following functionality is available for interacting with the Aeternity
 Naming System (AENS).
 If `owner` is equal to `Contract.address` the signature `signature` is
 ignored, and can be left out since it is a named argument. Otherwise we need
