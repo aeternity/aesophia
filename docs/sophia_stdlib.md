@@ -8,8 +8,9 @@ in the priv/stdlib directory. Thanks!
 # Standard library
 
 Sophia language offers standard library that consists of several namespaces. Some of them are already
-in the scope and do not need any actions to be used, while some others are hidden under includable
-files. The autoincluded namespaces are:
+in the scope and do not need any actions to be used, while the others require some files to be included.
+
+The out-of-the-box namespaces are:
 
 - [Bits](#Bits)
 - [String](#String)
