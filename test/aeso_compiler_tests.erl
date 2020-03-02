@@ -169,12 +169,13 @@ compilable_contracts() ->
      "qualified_constructor",
      "let_patterns",
      "lhs_matching",
-     "more_strings"
+     "more_strings",
+     "protected_call"
     ].
 
 not_yet_compilable(fate) -> [];
 not_yet_compilable(aevm) -> ["pairing_crypto", "aens_update", "basic_auth_tx", "more_strings",
-                             "unapplied_builtins", "bytes_to_x", "state_handling"].
+                             "unapplied_builtins", "bytes_to_x", "state_handling", "protected_call"].
 
 %% Contracts that should produce type errors
 
@@ -631,6 +632,12 @@ failing_contracts() ->
          <<?Pos(5, 6)
            "Empty record/map update\n"
            "  r {}">>
+        ])
+    , ?TYPE_ERROR(bad_protected_call,
+        [<<?Pos(6, 22)
+           "Invalid 'protected' argument\n"
+           "  (0 : int) == (1 : int) : bool\n"
+           "It must be either 'true' or 'false'.">>
         ])
     ].
 

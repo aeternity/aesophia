@@ -1,0 +1,6 @@
+contract Remote =
+  entrypoint id : int => int
+
+contract ProtectedCall =
+  entrypoint bad(r : Remote) =
+    r.id(protected = 0 == 1, 18)
