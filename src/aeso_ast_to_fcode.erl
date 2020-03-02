@@ -468,6 +468,8 @@ type_to_fcode(Env, Sub, {fun_t, _, Named, Args, Res}) ->
     FNamed = [type_to_fcode(Env, Sub, Arg) || {named_arg_t, _, _, Arg, _} <- Named],
     FArgs  = [type_to_fcode(Env, Sub, Arg) || Arg <- Args],
     {function, FNamed ++ FArgs, type_to_fcode(Env, Sub, Res)};
+type_to_fcode(Env, Sub, {if_t, _, _, _, Else}) ->
+    type_to_fcode(Env, Sub, Else);  %% Hacky: this is only for remote calls, in which case we want the unprotected type
 type_to_fcode(_Env, _Sub, Type) ->
     error({todo, Type}).
 
@@ -1217,8 +1219,8 @@ lambda_lift_expr(Layout, UExpr) when element(1, UExpr) == def_u; element(1, UExp
 lambda_lift_expr(Layout, {remote_u, ArgsT, RetT, Ct, F}) ->
     FVs  = free_vars(Ct),
     Ct1  = lambda_lift_expr(Layout, Ct),
-    GasAndValueArgs = 2,
-    Xs   = [ lists:concat(["arg", I]) || I <- lists:seq(1, length(ArgsT) + GasAndValueArgs) ],
+    NamedArgCount = 3,
+    Xs   = [ lists:concat(["arg", I]) || I <- lists:seq(1, length(ArgsT) + NamedArgCount) ],
     Args = [{var, X} || X <- Xs],
     make_closure(FVs, Xs, {remote, ArgsT, RetT, Ct1, F, Args});
 lambda_lift_expr(Layout, Expr) ->

@@ -169,12 +169,13 @@ compilable_contracts() ->
      "qualified_constructor",
      "let_patterns",
      "lhs_matching",
-     "more_strings"
+     "more_strings",
+     "protected_call"
     ].
 
 not_yet_compilable(fate) -> [];
 not_yet_compilable(aevm) -> ["pairing_crypto", "aens_update", "basic_auth_tx", "more_strings",
-                             "unapplied_builtins", "bytes_to_x", "state_handling"].
+                             "unapplied_builtins", "bytes_to_x", "state_handling", "protected_call"].
 
 %% Contracts that should produce type errors
 
@@ -376,10 +377,10 @@ failing_contracts() ->
         [<<?Pos(12, 42)
            "Cannot unify int\n"
            "         and string\n"
-           "when checking the record projection at line 12, column 42\n"
-           "  r.foo : (gas : int, value : int) => Remote.themap\n"
+           "when checking the type of the expression at line 12, column 42\n"
+           "  r.foo() : map(int, string)\n"
            "against the expected type\n"
-           "  (gas : int, value : int) => map(string, int)">>])
+           "  map(string, int)">>])
     , ?TYPE_ERROR(bad_include_and_ns,
         [<<?Pos(2, 11)
            "Include of 'included.aes' at line 2, column 11\nnot allowed, include only allowed at top level.">>,
@@ -540,11 +541,15 @@ failing_contracts() ->
          "Cannot unify int\n         and string\nwhen checking the type of the pattern at line 2, column 53\n  x : int\nagainst the expected type\n  string">>
       ])
     , ?TYPE_ERROR(map_as_map_key,
-       [<<?Pos(5, 25)
+       [<<?Pos(5, 47)
          "Invalid key type\n"
          "  map(int, int)\n"
          "Map keys cannot contain other maps.">>,
-        <<?Pos(6, 25)
+        <<?Pos(6, 31)
+         "Invalid key type\n"
+         "  list(map(int, int))\n"
+         "Map keys cannot contain other maps.">>,
+        <<?Pos(6, 31)
          "Invalid key type\n"
          "  lm\n"
          "Map keys cannot contain other maps.">>])
@@ -627,6 +632,12 @@ failing_contracts() ->
          <<?Pos(5, 6)
            "Empty record/map update\n"
            "  r {}">>
+        ])
+    , ?TYPE_ERROR(bad_protected_call,
+        [<<?Pos(6, 22)
+           "Invalid 'protected' argument\n"
+           "  (0 : int) == (1 : int) : bool\n"
+           "It must be either 'true' or 'false'.">>
         ])
     ].
 

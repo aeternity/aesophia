@@ -20,6 +20,7 @@
                | aeso_syntax:id()  | aeso_syntax:qid()
                | aeso_syntax:con() | aeso_syntax:qcon()  %% contracts
                | aeso_syntax:tvar()
+               | {if_t, aeso_syntax:ann(), aeso_syntax:id(), utype(), utype()}  %% Can branch on named argument (protected)
                | uvar().
 
 -type uvar() :: {uvar, aeso_syntax:ann(), reference()}.
@@ -43,7 +44,14 @@
      name :: aeso_syntax:id(),
      type :: utype()}).
 
--type named_argument_constraint() :: #named_argument_constraint{}.
+-record(dependent_type_constraint,
+    { named_args_t     :: named_args_t()
+    , named_args       :: [aeso_syntax:arg_expr()]
+    , general_type     :: utype()
+    , specialized_type :: utype()
+    , context          :: term() }).
+
+-type named_argument_constraint() :: #named_argument_constraint{} | #dependent_type_constraint{}.
 
 -record(field_constraint,
     { record_t :: utype()
@@ -232,16 +240,21 @@ bind_fields([], Env) -> Env;
 bind_fields([{Id, Info} | Rest], Env) ->
     bind_fields(Rest, bind_field(Id, Info, Env)).
 
-%% Contract entrypoints take two named arguments (gas : int = Call.gas_left(), value : int = 0).
+%% Contract entrypoints take three named arguments
+%%  gas       : int  = Call.gas_left()
+%%  value     : int  = 0
+%%  protected : bool = false
 contract_call_type({fun_t, Ann, [], Args, Ret}) ->
     Id    = fun(X) -> {id, Ann, X} end,
     Int   = Id("int"),
     Typed = fun(E, T) -> {typed, Ann, E, T} end,
-    Named = fun(Name, Default) -> {named_arg_t, Ann, Id(Name), Int, Default} end,
+    Named = fun(Name, Default = {typed, _, _, T}) -> {named_arg_t, Ann, Id(Name), T, Default} end,
     {fun_t, Ann, [Named("gas",   Typed({app, Ann, Typed({qid, Ann, ["Call", "gas_left"]},
                                                         {fun_t, Ann, [], [], Int}),
                                         []}, Int)),
-                  Named("value", Typed({int, Ann, 0}, Int))], Args, Ret}.
+                  Named("value", Typed({int, Ann, 0}, Int)),
+                  Named("protected", Typed({bool, Ann, false}, Id("bool")))],
+     Args, {if_t, Ann, Id("protected"), {app_t, Ann, {id, Ann, "option"}, [Ret]}, Ret}}.
 
 -spec bind_contract(aeso_syntax:decl(), env()) -> env().
 bind_contract({contract, Ann, Id, Contents}, Env) ->
@@ -1359,7 +1372,7 @@ infer_expr(Env, {typed, As, Body, Type}) ->
     Type1 = check_type(Env, Type),
     {typed, _, NewBody, NewType} = check_expr(Env, Body, Type1),
     {typed, As, NewBody, NewType};
-infer_expr(Env, {app, Ann, Fun, Args0}) ->
+infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
     NamedArgs  = [ Arg || Arg = {named_arg, _, _, _} <- Args0 ],
     Args       = Args0 -- NamedArgs,
     case aeso_syntax:get_ann(format, Ann) of
@@ -1374,8 +1387,16 @@ infer_expr(Env, {app, Ann, Fun, Args0}) ->
             NewFun={typed, _, _, FunType} = infer_expr(Env, Fun),
             NewArgs = [infer_expr(Env, A) || A <- Args],
             ArgTypes = [T || {typed, _, _, T} <- NewArgs],
+            GeneralResultType = fresh_uvar(Ann),
             ResultType = fresh_uvar(Ann),
-            unify(Env, FunType, {fun_t, [], NamedArgsVar, ArgTypes, ResultType}, {infer_app, Fun, Args, FunType, ArgTypes}),
+            When = {infer_app, Fun, NamedArgs1, Args, FunType, ArgTypes},
+            unify(Env, FunType, {fun_t, [], NamedArgsVar, ArgTypes, GeneralResultType}, When),
+            add_named_argument_constraint(
+              #dependent_type_constraint{ named_args_t = NamedArgsVar,
+                                          named_args   = NamedArgs1,
+                                          general_type = GeneralResultType,
+                                          specialized_type = ResultType,
+                                          context = {check_return, App} }),
             {typed, Ann, {app, Ann, NewFun, NamedArgs1 ++ NewArgs}, dereference(ResultType)}
     end;
 infer_expr(Env, {'if', Attrs, Cond, Then, Else}) ->
@@ -1534,7 +1555,7 @@ infer_op(Env, As, Op, Args, InferOp) ->
     TypedArgs = [infer_expr(Env, A) || A <- Args],
     ArgTypes = [T || {typed, _, _, T} <- TypedArgs],
     Inferred = {fun_t, _, _, OperandTypes, ResultType} = InferOp(Op),
-    unify(Env, ArgTypes, OperandTypes, {infer_app, Op, Args, Inferred, ArgTypes}),
+    unify(Env, ArgTypes, OperandTypes, {infer_app, Op, [], Args, Inferred, ArgTypes}),
     {typed, As, {app, As, Op, TypedArgs}, ResultType}.
 
 infer_pattern(Env, Pattern) ->
@@ -1705,12 +1726,12 @@ create_constraints() ->
     create_field_constraints().
 
 destroy_and_report_unsolved_constraints(Env) ->
+    solve_field_constraints(Env),
     solve_named_argument_constraints(Env),
     solve_bytes_constraints(Env),
-    solve_field_constraints(Env),
-    destroy_and_report_unsolved_field_constraints(Env),
     destroy_and_report_unsolved_bytes_constraints(Env),
-    destroy_and_report_unsolved_named_argument_constraints(Env).
+    destroy_and_report_unsolved_named_argument_constraints(Env),
+    destroy_and_report_unsolved_field_constraints(Env).
 
 %% -- Named argument constraints --
 
@@ -1750,7 +1771,42 @@ check_named_argument_constraint(Env,
             type_error({bad_named_argument, Args, Id}),
             false;
         [T] -> unify(Env, T, Type, {check_named_arg_constraint, C}), true
+    end;
+check_named_argument_constraint(Env,
+        #dependent_type_constraint{ named_args_t = NamedArgsT0,
+                                    named_args = NamedArgs,
+                                    general_type = GenType,
+                                    specialized_type = SpecType,
+                                    context = {check_return, App} }) ->
+    NamedArgsT = dereference(NamedArgsT0),
+    case dereference(NamedArgsT0) of
+        [_ | _] = NamedArgsT ->
+            GetVal = fun(Name, Default) ->
+                        hd([ Val || {named_arg, _, {id, _, N}, Val} <- NamedArgs, N == Name] ++
+                           [ Default ])
+                     end,
+            ArgEnv = maps:from_list([ {Name, GetVal(Name, Default)}
+                                      || {named_arg_t, _, {id, _, Name}, _, Default} <- NamedArgsT ]),
+            GenType1 = specialize_dependent_type(ArgEnv, GenType),
+            unify(Env, GenType1, SpecType, {check_expr, App, GenType1, SpecType}),
+            true;
+        _ -> unify(Env, GenType, SpecType, {check_expr, App, GenType, SpecType}), true
     end.
+
+specialize_dependent_type(Env, Type) ->
+    case dereference(Type) of
+        {if_t, _, {id, _, Arg}, Then, Else} ->
+            Val = maps:get(Arg, Env),
+            case Val of
+                {typed, _, {bool, _, true}, _}  -> Then;
+                {typed, _, {bool, _, false}, _} -> Else;
+                _ ->
+                    type_error({named_argument_must_be_literal_bool, Arg, Val}),
+                    fresh_uvar(aeso_syntax:get_ann(Val))
+            end;
+        _ -> Type   %% Currently no deep dependent types
+    end.
+
 
 destroy_and_report_unsolved_named_argument_constraints(Env) ->
     Unsolved = solve_named_argument_constraints(Env, get_named_argument_constraints()),
@@ -1977,9 +2033,11 @@ destroy_and_report_unsolved_field_constraints(Env) ->
     {FieldCs, OtherCs} =
         lists:partition(fun(#field_constraint{}) -> true; (_) -> false end,
                         get_field_constraints()),
-    {CreateCs, ContractCs} =
+    {CreateCs, OtherCs1} =
         lists:partition(fun(#record_create_constraint{}) -> true; (_) -> false end,
                         OtherCs),
+    {ContractCs, []} =
+        lists:partition(fun(#is_contract_constraint{}) -> true; (_) -> false end, OtherCs1),
     Unknown  = solve_known_record_types(Env, FieldCs),
     if Unknown == [] -> ok;
        true ->
@@ -2053,7 +2111,8 @@ unfold_record_types(Env, T) ->
     unfold_types(Env, T, [unfold_record_types]).
 
 unfold_types(Env, {typed, Attr, E, Type}, Options) ->
-    {typed, Attr, unfold_types(Env, E, Options), unfold_types_in_type(Env, Type, Options)};
+    Options1 = [{ann, Attr} | lists:keydelete(ann, 1, Options)],
+    {typed, Attr, unfold_types(Env, E, Options), unfold_types_in_type(Env, Type, Options1)};
 unfold_types(Env, {arg, Attr, Id, Type}, Options) ->
     {arg, Attr, Id, unfold_types_in_type(Env, Type, Options)};
 unfold_types(Env, {type_sig, Ann, Constr, NamedArgs, Args, Ret}, Options) ->
@@ -2079,7 +2138,8 @@ unfold_types_in_type(Env, T) ->
 
 unfold_types_in_type(Env, {app_t, Ann, Id = {id, _, "map"}, Args = [KeyType0, _]}, Options) ->
     Args1 = [KeyType, _] = unfold_types_in_type(Env, Args, Options),
-    [ type_error({map_in_map_key, KeyType0}) || has_maps(KeyType) ],
+    Ann1 = proplists:get_value(ann, Options, aeso_syntax:get_ann(KeyType0)),
+    [ type_error({map_in_map_key, Ann1, KeyType0}) || has_maps(KeyType) ],
     {app_t, Ann, Id, Args1};
 unfold_types_in_type(Env, {app_t, Ann, Id, Args}, Options) when ?is_type_id(Id) ->
     UnfoldRecords  = proplists:get_value(unfold_record_types, Options, false),
@@ -2153,8 +2213,13 @@ subst_tvars1(_Env, X) ->
 unify(_, {id, _, "_"}, _, _When) -> true;
 unify(_, _, {id, _, "_"}, _When) -> true;
 unify(Env, A, B, When) ->
-    A1 = dereference(unfold_types_in_type(Env, A)),
-    B1 = dereference(unfold_types_in_type(Env, B)),
+    Options =
+        case When of    %% Improve source location for map_in_map_key errors
+            {check_expr, E, _, _} -> [{ann, aeso_syntax:get_ann(E)}];
+            _                     -> []
+        end,
+    A1 = dereference(unfold_types_in_type(Env, A, Options)),
+    B1 = dereference(unfold_types_in_type(Env, B, Options)),
     unify1(Env, A1, B1, When).
 
 unify1(_Env, {uvar, _, R}, {uvar, _, R}, _When) ->
@@ -2185,6 +2250,9 @@ unify1(_Env, {qcon, _, Name}, {qcon, _, Name}, _When) ->
     true;
 unify1(_Env, {bytes_t, _, Len}, {bytes_t, _, Len}, _When) ->
     true;
+unify1(Env, {if_t, _, {id, _, Id}, Then1, Else1}, {if_t, _, {id, _, Id}, Then2, Else2}, When) ->
+    unify(Env, Then1, Then2, When) andalso
+    unify(Env, Else1, Else2, When);
 unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, When) ->
     unify(Env, Named1, Named2, When) andalso
     unify(Env, Args1, Args2, When) andalso unify(Env, Result1, Result2, When);
@@ -2245,6 +2313,8 @@ occurs_check1(R, {record_t, Fields}) ->
     occurs_check(R, Fields);
 occurs_check1(R, {field_t, _, _, T}) ->
     occurs_check(R, T);
+occurs_check1(R, {if_t, _, _, Then, Else}) ->
+    occurs_check(R, [Then, Else]);
 occurs_check1(R, [H | T]) ->
     occurs_check(R, H) orelse occurs_check(R, T);
 occurs_check1(_, []) -> false.
@@ -2588,10 +2658,10 @@ mk_error({new_tuple_syntax, Ann, Ts}) ->
     Msg = io_lib:format("Invalid type\n~s  (at ~s)\nThe syntax of tuple types changed in Sophia version 4.0. Did you mean\n~s\n",
                         [pp_type("  ", {args_t, Ann, Ts}), pp_loc(Ann), pp_type("  ", {tuple_t, Ann, Ts})]),
     mk_t_err(pos(Ann), Msg);
-mk_error({map_in_map_key, KeyType}) ->
+mk_error({map_in_map_key, Ann, KeyType}) ->
     Msg = io_lib:format("Invalid key type\n~s\n", [pp_type("  ", KeyType)]),
     Cxt = "Map keys cannot contain other maps.\n",
-    mk_t_err(pos(KeyType), Msg, Cxt);
+    mk_t_err(pos(Ann), Msg, Cxt);
 mk_error({cannot_call_init_function, Ann}) ->
     Msg = "The 'init' function is called exclusively by the create contract transaction\n"
           "and cannot be called from the contract code.\n",
@@ -2641,6 +2711,9 @@ mk_error({mixed_record_and_map, Expr}) ->
     Msg = io_lib:format("Mixed record fields and map keys in\n~s",
                         [pp_expr("  ", Expr)]),
     mk_t_err(pos(Expr), Msg);
+mk_error({named_argument_must_be_literal_bool, Name, Arg}) ->
+    Msg = io_lib:format("Invalid '~s' argument\n~s\nIt must be either 'true' or 'false'.", [Name, pp_expr("  ", instantiate(Arg))]),
+    mk_t_err(pos(Arg), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p\n", [Err]),
     mk_t_err(pos(0, 0), Msg).
@@ -2659,7 +2732,7 @@ pp_when({check_typesig, Name, Inferred, Given}) ->
                    "  inferred type: ~s\n"
                    "  given type:    ~s\n",
          [Name, pp_loc(Given), pp(instantiate(Inferred)), pp(instantiate(Given))])};
-pp_when({infer_app, Fun, Args, Inferred0, ArgTypes0}) ->
+pp_when({infer_app, Fun, NamedArgs, Args, Inferred0, ArgTypes0}) ->
     Inferred = instantiate(Inferred0),
     ArgTypes = instantiate(ArgTypes0),
     {pos(Fun),
@@ -2668,6 +2741,7 @@ pp_when({infer_app, Fun, Args, Inferred0, ArgTypes0}) ->
                    "to arguments\n~s",
                    [pp_loc(Fun),
                     pp_typed("  ", Fun, Inferred),
+                    [ [pp_expr("  ", NamedArg), "\n"] || NamedArg <- NamedArgs ] ++
                     [ [pp_typed("  ", Arg, ArgT), "\n"]
                        || {Arg, ArgT} <- lists:zip(Args, ArgTypes) ] ])};
 pp_when({field_constraint, FieldType0, InferredType0, Fld}) ->
@@ -2744,6 +2818,12 @@ pp_when({list_comp, BindExpr, Inferred0, Expected0}) ->
      io_lib:format("when checking rvalue of list comprehension binding at ~s\n~s\n"
                    "against type \n~s\n",
                    [pp_loc(BindExpr), pp_typed("  ", BindExpr, Inferred), pp_type("  ", Expected)])};
+pp_when({check_named_arg_constraint, C}) ->
+    {id, _, Name} = Arg = C#named_argument_constraint.name,
+    [Type | _] = [ Type || {named_arg_t, _, {id, _, Name1}, Type, _} <- C#named_argument_constraint.args, Name1 == Name ],
+    Err = io_lib:format("when checking named argument\n~s\nagainst inferred type\n~s",
+                        [pp_typed("  ", Arg, Type), pp_type("  ", C#named_argument_constraint.type)]),
+    {pos(Arg), Err};
 pp_when(unknown) -> {pos(0,0), ""}.
 
 -spec pp_why_record(why_record()) -> {pos(), iolist()}.
@@ -2821,6 +2901,8 @@ pp({uvar, _, Ref}) ->
     ["?u" | integer_to_list(erlang:phash2(Ref, 16384)) ];
 pp({tvar, _, Name}) ->
     Name;
+pp({if_t, _, Id, Then, Else}) ->
+    ["if(", pp([Id, Then, Else]), ")"];
 pp({tuple_t, _, []}) ->
     "unit";
 pp({tuple_t, _, Cpts}) ->
@@ -2832,8 +2914,8 @@ pp({app_t, _, T, []}) ->
     pp(T);
 pp({app_t, _, Type, Args}) ->
     [pp(Type), "(", pp(Args), ")"];
-pp({named_arg_t, _, Name, Type, Default}) ->
-    [pp(Name), " : ", pp(Type), " = ", pp(Default)];
+pp({named_arg_t, _, Name, Type, _Default}) ->
+    [pp(Name), " : ", pp(Type)];
 pp({fun_t, _, Named = {uvar, _, _}, As, B}) ->
     ["(", pp(Named), " | ", pp(As), ") => ", pp(B)];
 pp({fun_t, _, Named, As, B}) when is_list(Named) ->

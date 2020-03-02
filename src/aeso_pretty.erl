@@ -257,6 +257,8 @@ type({args_t, _, Args}) ->
 type({bytes_t, _, any}) -> text("bytes(_)");
 type({bytes_t, _, Len}) ->
     text(lists:concat(["bytes(", Len, ")"]));
+type({if_t, _, Id, Then, Else}) ->
+    beside(text("if"), args_type([Id, Then, Else]));
 type({named_arg_t, _, Name, Type, _Default}) ->
     %% Drop the default value
     %% follow(hsep(typed(name(Name), Type), text("=")), expr(Default));
@@ -283,12 +285,9 @@ tuple_type(Factors) ->
       , text(")")
       ]).
 
--spec arg_expr(aeso_syntax:arg_expr()) -> doc().
-arg_expr({named_arg, _, Name, E}) ->
-    follow(hsep(expr(Name), text("=")), expr(E));
-arg_expr(E) -> expr(E).
-
--spec expr_p(integer(), aeso_syntax:expr()) -> doc().
+-spec expr_p(integer(), aeso_syntax:arg_expr()) -> doc().
+expr_p(P, {named_arg, _, Name, E}) ->
+    paren(P > 100, follow(hsep(expr(Name), text("=")), expr(E)));
 expr_p(P, {lam, _, Args, E}) ->
     paren(P > 100, follow(hsep(args(Args), text("=>")), expr_p(100, E)));
 expr_p(P, If = {'if', Ann, Cond, Then, Else}) ->
@@ -447,7 +446,7 @@ prefix(P, Op, A) ->
 app(P, F, Args) ->
     paren(P > 900,
     beside(expr_p(900, F),
-           tuple(lists:map(fun arg_expr/1, Args)))).
+           tuple(lists:map(fun expr/1, Args)))).
 
 field({field, _, LV, E}) ->
     follow(hsep(lvalue(LV), text("=")), expr(E));
