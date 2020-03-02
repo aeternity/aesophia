@@ -45,7 +45,7 @@
      type :: utype()}).
 
 -record(dependent_type_constraint,
-    { named_args_t     :: utype()
+    { named_args_t     :: named_args_t()
     , named_args       :: [aeso_syntax:arg_expr()]
     , general_type     :: utype()
     , specialized_type :: utype()
@@ -1392,11 +1392,11 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
             When = {infer_app, Fun, NamedArgs1, Args, FunType, ArgTypes},
             unify(Env, FunType, {fun_t, [], NamedArgsVar, ArgTypes, GeneralResultType}, When),
             add_named_argument_constraint(
-              [#dependent_type_constraint{ named_args_t = NamedArgsVar,
-                                           named_args   = NamedArgs1,
-                                           general_type = GeneralResultType,
-                                           specialized_type = ResultType,
-                                           context = {check_return, App} }]),
+              #dependent_type_constraint{ named_args_t = NamedArgsVar,
+                                          named_args   = NamedArgs1,
+                                          general_type = GeneralResultType,
+                                          specialized_type = ResultType,
+                                          context = {check_return, App} }),
             {typed, Ann, {app, Ann, NewFun, NamedArgs1 ++ NewArgs}, dereference(ResultType)}
     end;
 infer_expr(Env, {'if', Attrs, Cond, Then, Else}) ->
