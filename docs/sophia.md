@@ -77,7 +77,7 @@ The main unit of code in Sophia is the *contract*.
 - A contract instance is an entity living on the block chain (or in a state
   channel). Each instance has an address that can be used to call its
   entrypoints, either from another contract or in a call transaction.
-- A contract may define a type state encapsulating its local
+- A contract may define a type `state` encapsulating its local
   state. When creating a new contract the `init` entrypoint is executed and the
   state is initialized to its return value.
   
