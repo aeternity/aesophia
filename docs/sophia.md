@@ -81,7 +81,7 @@ The main unit of code in Sophia is the *contract*.
   state. When creating a new contract the `init` entrypoint is executed and the
   state is initialized to its return value.
   
-The language offers some primive functions to interact with the blockchain and contracts.
+The language offers some primitive functions to interact with the blockchain and contracts.
 Please refer to the [Chain](sophia_stdlib.md#Chain), [Contract](sophia_stdlib.md#Contract)
 and the [Call](sophia_stdlib.md#Call) namespaces in the documentation.
 
