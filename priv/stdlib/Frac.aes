@@ -62,17 +62,13 @@ namespace Frac =
     else simplify(Neg(abs_int(n), abs_int(d)))
 
   function eq(a : frac, b : frac) : bool =
-    let na = num(a)
-    let nb = num(b)
-    let da = den(a)
-    let db = den(b)
+    let (na, da) = to_pair(a)
+    let (nb, db) = to_pair(b)
     (na == nb && da == db) || na * db == nb * da // they are more likely to be normalized
 
   function neq(a : frac, b : frac) : bool =
-    let na = num(a)
-    let nb = num(b)
-    let da = den(a)
-    let db = den(b)
+    let (na, da) = to_pair(a)
+    let (nb, db) = to_pair(b)
     (na != nb || da != db) && na * db != nb * da
 
   function geq(a : frac, b : frac) : bool = num(a) * den(b) >= num(b) * den(a)
@@ -131,10 +127,8 @@ namespace Frac =
     else cl
 
   function add(a : frac, b : frac) : frac =
-    let na = num(a)
-    let nb = num(b)
-    let da = den(a)
-    let db = den(b)
+    let (na, da) = to_pair(a)
+    let (nb, db) = to_pair(b)
     if   (da == db) make_frac(na + nb, da)
     else make_frac(na * db + nb * da, da * db)
 
