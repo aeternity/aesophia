@@ -194,6 +194,8 @@ encode_expr({bytes, _, B})  ->
 encode_expr({Lit, _, L}) when Lit == oracle_pubkey; Lit == oracle_query_id;
                               Lit == contract_pubkey; Lit == account_pubkey ->
     aeser_api_encoder:encode(Lit, L);
+encode_expr({app, _, {'-', _}, [{int, _, N}]}) ->
+  encode_expr({int, [], -N});
 encode_expr({app, _, F, As}) ->
     Ef = encode_expr(F),
     Eas = encode_exprs(As),
