@@ -2403,7 +2403,11 @@ mk_error({include, _, {string, Pos, Name}}) ->
                         [binary_to_list(Name), pp_loc(Pos)]),
     mk_t_err(pos(Pos), Msg);
 mk_error({namespace, _Pos, {con, Pos, Name}, _Def}) ->
-    Msg = io_lib:format("Nested namespace not allowed\nNamespace '~s' at ~s not defined at top level.\n",
+    Msg = io_lib:format("Nested namespaces are not allowed\nNamespace '~s' at ~s not defined at top level.\n",
+                        [Name, pp_loc(Pos)]),
+    mk_t_err(pos(Pos), Msg);
+mk_error({contract, _Pos, {con, Pos, Name}, _Def}) ->
+    Msg = io_lib:format("Nested contracts are not allowed\nContract '~s' at ~s not defined at top level.\n",
                         [Name, pp_loc(Pos)]),
     mk_t_err(pos(Pos), Msg);
 mk_error({type_decl, _, {id, Pos, Name}, _}) ->
