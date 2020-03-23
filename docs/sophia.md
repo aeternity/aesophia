@@ -1012,8 +1012,8 @@ contract FundMe =
                    deadline      : int,
                    goal          : int }
 
-  function spend(args : spend_args) =
-    raw_spend(args.recipient, args.amount)
+  stateful function spend(args : spend_args) =
+    Chain.spend(args.recipient, args.amount)
 
   entrypoint init(beneficiary, deadline, goal) : state =
     { contributions = {},
@@ -1052,7 +1052,6 @@ contract FundMe =
     require(state.total >= state.goal, "Project was not funded")
     spend({recipient = state.beneficiary,
            amount    = Contract.balance })
-    put(state{ beneficiary = #0 })
 
   stateful function withdraw_contributor() =
     if(state.total >= state.goal)
