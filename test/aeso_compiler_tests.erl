@@ -379,7 +379,7 @@ failing_contracts() ->
         [<<?Pos(2, 11)
            "Include of 'included.aes' at line 2, column 11\nnot allowed, include only allowed at top level.">>,
          <<?Pos(3, 13)
-           "Nested namespace not allowed\nNamespace 'Foo' at line 3, column 13 not defined at top level.">>])
+           "Nested namespaces are not allowed\nNamespace 'Foo' at line 3, column 13 not defined at top level.">>])
     , ?TYPE_ERROR(bad_address_literals,
         [<<?Pos(11, 5)
            "Cannot unify address\n"
