@@ -2,23 +2,22 @@
 @compiler > 0
 @compiler =< 10.1.1.1.1.1.2.3.4
 
-contract AllSyntaxType =
+
+namespace Ns =
+  datatype d('a) = D | S(int) | M('a, list('a), int)
+  private function fff() = 123
+
+  stateful entrypoint
+    f (1, x) = (_) => x
+
+payable contract AllSyntaxType =
   /** Multi-
     * line
     * comment
     */
-  function foo : _
+  stateful function foo : _
   entrypoint bar : int => (int * 'a)
-/*
-namespace Ns =
-  datatype d('a) = D | S(int) | M('a, list('a), int)
-  private function f() = 123
-  entrypoint
-    f : (int, 'a) => ('a * 'b) => 'a
-    f (1, x) = (_) => x
-    f (_, _) = (t : 'a * 'b) => switch(t)
-      (l, r) => l
-      _ => abort("tuple exploit")
+
 
 contract AllSyntax =
 
@@ -47,6 +46,7 @@ contract AllSyntax =
     goethe = () }
 
   function f() =
+     let kp = "nietzsche"
      let p = "Пушкин"
      let k(x : bytes(8)) : bytes(8) = Bytes.to_int(#fedcba9876543210)
 
@@ -68,6 +68,7 @@ contract AllSyntax =
        _ => 13
        1::[2] => 2138
      put(state{johann = 1})
+     
      let m = {["foo"] = 19, /*hey wanna talk about inlined comments?*/ ["bar"] = 42}
      let n = {}
      m{ ["x" = 0] @ z = z + state.johann }
@@ -75,4 +76,3 @@ contract AllSyntax =
      let sh : shakespeare(shakespeare(int)) =
        {wolfgang = state}
      sh{wolfgang.wolfgang = sh.wolfgang} // comment
-/*

@@ -2275,8 +2275,10 @@ mk_error({wrong_type_arguments, X, ArityGiven, ArityReal}) ->
 mk_error({unnamed_map_update_with_default, Upd}) ->
     Msg = "Invalid map update with default\n",
     mk_t_err(pos(Upd), Msg);
-mk_error({fundecl_must_have_funtype, _Ann, Id, _Type}) ->
-    Msg = io_lib:format("Function/entrypoint declaration must have a function type\n"),
+mk_error({fundecl_must_have_funtype, _Ann, Id, Type}) ->
+    Msg = io_lib:format("~s at ~s was declared with an invalid type ~s.\n"
+                       "Entrypoints and functions must have functional types"
+                       , [pp(Id), pp_loc(Id), pp(instantiate(Type))]),
     mk_t_err(pos(Id), Msg);
 mk_error({cannot_unify, A, B, When}) ->
     Msg = io_lib:format("Cannot unify ~s\n         and ~s\n",
