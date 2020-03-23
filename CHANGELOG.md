@@ -6,7 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Added documentation (actually, moved from `protocol`)
+- Added standard library docs. Moved builtin docs from `sophia.md` to
+  `sophia_stdlib.md`
+- Added library for rational numbers
 ### Changed
+- Optimized `List.aes` library
 ### Removed
 
 ## [4.2.0] - 2020-01-15
