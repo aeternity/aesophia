@@ -1,44 +1,78 @@
 // Try to cover all syntactic constructs.
+@compiler > 0
+@compiler =< 10.1.1.1.1.1.2.3.4
 
 contract AllSyntaxType =
-  type typeDecl /* bla */
-  type paramTypeDecl('a, 'b)
-
   /** Multi-
     * line
     * comment
     */
   function foo : _
+  entrypoint bar : int => (int * 'a)
+/*
+namespace Ns =
+  datatype d('a) = D | S(int) | M('a, list('a), int)
+  private function f() = 123
+  entrypoint
+    f : (int, 'a) => ('a * 'b) => 'a
+    f (1, x) = (_) => x
+    f (_, _) = (t : 'a * 'b) => switch(t)
+      (l, r) => l
+      _ => abort("tuple exploit")
 
 contract AllSyntax =
 
-  type typeDecl = int
-  type paramTypeDecl('a, 'b) = (('a, 'b) => 'b) => list('a) => 'b => 'b
+  datatype mickiewicz = Adam | Mickiewicz
+  record goethe('a, 'b) = {
+    johann : int,
+    wolfgang : 'a,
+    von : 'a * 'b * int,
+    goethe : unit
+    }
+  type dante = Ns.d(int)
+  type shakespeare('a) = goethe('a, 'a)
 
-  record nestedRecord = { x : int }
-  record recordType = { z : nestedRecord, y : int }
-  datatype variantType('a) = None | Some('a)
+  type state = shakespeare(int)
 
-  let valWithType : map(int, int) => option(int) = (m) => Map.get(m, 42)
-  let valNoType =
-        if(valWithType(Map.empty) == None)
-          print(42 mod 10 * 5 / 3)
+  entrypoint init() = {
+    johann = 1000,
+    wolfgang = -10,
+    von = (2 + 2, 0, List.sum([x | k <- [1,2,3]
+                                 , let l = k + 1
+                                 , if(l < 10)
+                                 , let f(x) = x + 100
+                                 , Adam <- [Adam, Mickiewicz]
+                                 , let x = f(l)
+                                 ])),
+    goethe = () }
 
-  function funWithType(x : int, y) : int * list(int) = (x, 0 :: [y] ++ [])
-  function funNoType() =
-    let foo = (x, y : bool) =>
-                if (! (y && x =< 0x0b || true)) [x]
-                else [11..20]
-    let setY(r : recordType) : unit = r{ y = 5 }
-    let setX(r : recordType, x : int) : recordType = r { z.x = x }  // nested record update
-    let getY(r) = switch(r) {y = y} => y
-    switch (funWithType(1, -2))
-      (x, [y, z]) => bar({x = z, y = -y + - -z * (-1)})
-      (x, y :: _) => ()
+  function f() =
+     let p = "Пушкин"
+     let k(x : bytes(8)) : bytes(8) = Bytes.to_int(#fedcba9876543210)
 
-  let hash : address = #01ab0fff11
-  let b = false
-  let qcon = Mod.Con
-  let str = "blabla\nfoo"
-  let chr = '"'
+     let f : () => address = () => ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt
+     if(Bits.test(Bits.all, 10))
+       abort("ohno")
+     if(true && false)
+       require(true, "ohyes")
+     elif(false || 2 == 2)
+       ()
+     else
+       ()
+     if(true) f(1,2)((1,2))
+     else switch(1::[1,2,3])
+       [] => 1
+       a::b => 123
+       1::2::3 => 123123
+       [2,3,4] => 1
+       _ => 13
+       1::[2] => 2138
+     put(state{johann = 1})
+     let m = {["foo"] = 19, /*hey wanna talk about inlined comments?*/ ["bar"] = 42}
+     let n = {}
+     m{ ["x" = 0] @ z = z + state.johann }
 
+     let sh : shakespeare(shakespeare(int)) =
+       {wolfgang = state}
+     sh{wolfgang.wolfgang = sh.wolfgang} // comment
+/*

@@ -15,7 +15,7 @@ contract MultiSig =
       | OwnerRemoved (address)          // of { .removedOwner : Address }
       | ReqChanged   (int)             // of { .newReq : int }
 
-    let maxOwners : int = 250
+    function maxOwners() : int = 250
 
     record state = { nRequired    : int
                  , nOwners      : int
@@ -68,7 +68,7 @@ contract MultiSig =
       switch(check_pending(callhash()))
         CheckFail(state') => { state = state' }
         CheckOk(state') =>
-            if(state.nOwners >= maxOwners) () /* TODO */
+            if(state.nOwners >= maxOwners()) () /* TODO */
             else
               let nOwners' = state'.nOwners + 1
               { state = state' { owners    = Map.insert(nOwners', newOwner, state'.owners)

@@ -58,8 +58,7 @@ contract Greeter =
 
     let state = { greeting = "Hello" }
 
-    let setGreeting =
-        (greeting: string) =>
+    function setGreeting(greeting: string) =
             state{ greeting = greeting }
 
 

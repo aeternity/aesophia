@@ -37,20 +37,24 @@
 -type decl() :: {contract, ann(), con(), [decl()]}
               | {namespace, ann(), con(), [decl()]}
               | {pragma, ann(), pragma()}
-              | {type_decl, ann(), id(), [tvar()]}
+              | {type_decl, ann(), id(), [tvar()]} % Only for error msgs
               | {type_def, ann(), id(), [tvar()], typedef()}
               | {fun_decl, ann(), id(), type()}
               | {fun_clauses, ann(), id(), type(), [letbind()]}
               | {block, ann(), [decl()]}
-              | letbind().
+              | letfun()
+              | letval(). % Only for error msgs
 
 -type compiler_version() :: [non_neg_integer()].
 
 -type pragma() :: {compiler, '==' | '<' | '>' | '=<' | '>=', compiler_version()}.
 
+
+-type letval() :: {letval, ann(), pat(), expr()}.
+-type letfun() :: {letfun, ann(), id(), [pat()], type(), expr()}.
 -type letbind()
-    :: {letval, ann(), pat(), expr()}
-     | {letfun, ann(), id(), [pat()], type(), expr()}.
+    :: letfun()
+     | letval().
 
 -type arg() :: {arg, ann(), id(), type()}.
 
