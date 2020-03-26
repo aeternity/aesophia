@@ -1,0 +1,3 @@
+contract C =
+  type t
+  entrypoint f() = 123

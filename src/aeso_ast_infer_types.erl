@@ -2263,8 +2263,8 @@ mk_t_err(Pos, Msg, Ctxt) ->
     aeso_errors:new(type_error, Pos, lists:flatten(Msg), lists:flatten(Ctxt)).
 
 mk_error({higher_kinded_typevar, T}) ->
-    Msg = io_lib:format("Type ~s is higher kinded (takes a type argument that takes\n"
-                        "a type argument)\n", [pp(instantiate(T))]
+    Msg = io_lib:format("Type ~s is a higher kinded type variable\n"
+                        "(takes another type as an argument)\n", [pp(instantiate(T))]
                        ),
     mk_t_err(pos(T), Msg);
 mk_error({wrong_type_arguments, X, ArityGiven, ArityReal}) ->
