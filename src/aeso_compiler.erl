@@ -336,12 +336,12 @@ to_sophia_value(ContractString, FunName, ok, Data, Options0) ->
                 try
                     {ok, aeso_vm_decode:from_fate(Type, aeb_fate_encoding:deserialize(Data))}
                 catch throw:cannot_translate_to_sophia ->
-                        Type1 = prettypr:format(aeso_pretty:type(Type)),
+                        Type1 = prettypr:format(aeso_pretty:type(Type0)),
                         Msg = io_lib:format("Cannot translate FATE value ~p\n  of Sophia type ~s\n",
                                             [aeb_fate_encoding:deserialize(Data), Type1]),
                         {error, [aeso_errors:new(data_error, Msg)]};
                       _:_ ->
-                        Type1 = prettypr:format(aeso_pretty:type(Type)),
+                        Type1 = prettypr:format(aeso_pretty:type(Type0)),
                         Msg = io_lib:format("Failed to decode binary as type ~s\n", [Type1]),
                         {error, [aeso_errors:new(data_error, Msg)]}
                end
