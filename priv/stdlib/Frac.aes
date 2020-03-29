@@ -56,10 +56,13 @@ namespace Frac =
 /** Integer to rational division
  */
   function make_frac(n : int, d : int) : frac =
-    if (d == 0) abort("Division by zero")
+    if (d == 0) abort("Zero denominator")
     elif (n == 0) Zero
     elif ((n < 0) == (d < 0)) simplify(Pos(abs_int(n), abs_int(d)))
     else simplify(Neg(abs_int(n), abs_int(d)))
+
+  function one() : frac = Pos(1, 1)
+  function zero() : frac = Zero
 
   function eq(a : frac, b : frac) : bool =
     let (na, da) = to_pair(a)
@@ -146,7 +149,10 @@ namespace Frac =
 
   function mul(a : frac, b : frac) : frac = make_frac(num(a) * num(b), den(a) * den(b))
 
-  function div(a : frac, b : frac) : frac = mul(a, inv(b))
+  function div(a : frac, b : frac) : frac = switch(b)
+    Neg(n, d) => mul(a, Neg(d, n))
+    Zero      => abort("Division by zero")
+    Pos(n, d) => mul(a, Pos(d, n))
 
 /** `b` to the power of `e`
  */
@@ -168,9 +174,10 @@ namespace Frac =
   function optimize(f : frac, loss : frac) : frac =
     require(geq(loss, Zero), "negative loss optimize")
     let s = sign(f)
-    mul(from_int(s), run_optimize(abs(f), loss))
-  private function run_optimize(f : frac, loss : frac) : frac =
-    let t = make_frac((num(f) + 1) / 2, (den(f) + 1)/2)
-    if(gt(abs(sub(t, f)), loss)) f
+    mul(from_int(s), run_optimize(abs(f), abs(f), loss))
+  private function run_optimize(orig : frac, f : frac, loss : frac) : frac =
+    let (n, d) = to_pair(f)
+    let t = make_frac((n+1)/2, (d+1)/2)
+    if(gt(abs(sub(t, orig)), loss)) f
     elif (eq(t, f)) f
-    else run_optimize(t, loss)
+    else run_optimize(orig, t, loss)
