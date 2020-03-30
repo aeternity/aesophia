@@ -1,0 +1,3 @@
+contract C =
+  let this_is_illegal = 2/0
+  entrypoint this_is_legal() = 2/0

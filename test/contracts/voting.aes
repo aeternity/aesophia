@@ -1,16 +1,3 @@
-
-/* Contract type */
-contract VotingType =
-  type state
-  function init            : list(string) => state
-
-  function giveRightToVote : address => unit
-  function delegate        : address => unit
-  function vote            : int => unit
-  function winnerName      : unit => string
-  function currentTally    : unit => list(string * int)
-
-/* Contract implementation */
 contract Voting =
 
   // Types

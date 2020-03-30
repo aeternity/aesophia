@@ -1,0 +1,5 @@
+namespace BadNs =
+  include "included.aes"
+
+contract Con =
+  entrypoint foo() = 43

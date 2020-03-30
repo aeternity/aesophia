@@ -446,6 +446,13 @@ Example syntax:
 // yields [12,13,14,20,21,22,30,31,32]
 ```
 
+Lists can be constructed using the range syntax using special `..` operator:
+```
+[1..4] == [1,2,3,4] 
+```
+The ranges are always ascending and have step equal to 1.
+
+
 Please refer to the [standard library](sophia_stdlib.md#List) for the predefined functionalities.
 
 ### Maps and records
@@ -825,15 +832,17 @@ In describing the syntax below, we use the following conventions:
 A Sophia file consists of a sequence of *declarations* in a layout block.
 
 ```c
-File ::= Block(Decl)
-Decl ::= ['payable'] 'contract' Con '=' Block(Decl)
+File ::= Block(TopDecl)
+
+TopDecl ::= ['payable'] 'contract' Con '=' Block(Decl)
        | 'namespace' Con '=' Block(Decl)
        | '@compiler' PragmaOp Version
        | 'include' String
-       | 'type'     Id ['(' TVar* ')'] ['=' TypeAlias]
+
+Decl ::= 'type'     Id ['(' TVar* ')'] '=' TypeAlias
        | 'record'   Id ['(' TVar* ')'] '=' RecordType
        | 'datatype' Id ['(' TVar* ')'] '=' DataType
-       | EModifier* ('entrypoint' | 'function') Block(FunDecl)
+       | (EModifier* 'entrypoint' | FModifier* 'function') Block(FunDecl)
 
 FunDecl ::= Id ':' Type                             // Type signature
           | Id Args [':' Type] '=' Block(Stmt)      // Definition
@@ -945,6 +954,7 @@ Expr ::= '(' LamArgs ')' '=>' Block(Stmt)   // Anonymous function    (x) => x + 
        | '[' Sep(Expr, ',') ']'             // List                  [1, 2, 3]
        | '[' Expr '|' Sep(Generator, ',') ']'
                                             // List comprehension    [k | x <- [1], if (f(x)), let k = x+1]
+       | '[' Expr '..' Expr ']'             // List range            [1..n]
        | '{' Sep(FieldUpdate, ',') '}'      // Record or map value   {x = 0, y = 1}, {[key] = val}
        | '(' Expr ')'                       // Parens                (1 + 2) * 3
        | Id | Con | QId | QCon              // Identifiers           x, None, Map.member, AELib.Token

@@ -656,8 +656,14 @@ stdlib_options() ->
 
 get_include_code(File, Ann, Opts) ->
     case {read_file(File, Opts), read_file(File, stdlib_options())} of
-        {{ok, _}, {ok,_ }} ->
-            fail(ann_pos(Ann), "Illegal redefinition of standard library " ++ File);
+        {{ok, Bin}, {ok, _}} ->
+            case filename:basename(File) == File of
+                true -> { error
+                        , fail( ann_pos(Ann)
+                              , "Illegal redefinition of standard library " ++ binary_to_list(File))};
+                %% If a path is provided then the stdlib takes lower priority
+                false -> {ok, binary_to_list(Bin)}
+            end;
         {_, {ok, Bin}} ->
             {ok, binary_to_list(Bin)};
         {{ok, Bin}, _} ->

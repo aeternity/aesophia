@@ -1,5 +1,4 @@
-contract Bad =
-  include "included.aes"
+contract BadCon =
   namespace Foo =
     function foo() = 42
 

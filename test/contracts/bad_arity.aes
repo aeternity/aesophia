@@ -1,0 +1,4 @@
+contract C =
+  type id('a) = 'a
+  entrypoint f() : id = 123
+  entrypoint g() : id(int, int) = 123

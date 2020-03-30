@@ -45,7 +45,6 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
             %% decl()
             {contract, _, _, Ds}     -> Decl(Ds);
             {namespace, _, _, Ds}    -> Decl(Ds);
-            {type_decl, _, I, _}     -> BindType(I);
             {type_def, _, I, _, D}   -> Plus(BindType(I), Decl(D));
             {fun_decl, _, _, T}      -> Type(T);
             {letval, _, P, E}        -> Scoped(BindExpr(P), Expr(E));

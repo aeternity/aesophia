@@ -2262,6 +2262,24 @@ mk_t_err(Pos, Msg) ->
 mk_t_err(Pos, Msg, Ctxt) ->
     aeso_errors:new(type_error, Pos, lists:flatten(Msg), lists:flatten(Ctxt)).
 
+mk_error({higher_kinded_typevar, T}) ->
+    Msg = io_lib:format("Type ~s is a higher kinded type variable\n"
+                        "(takes another type as an argument)\n", [pp(instantiate(T))]
+                       ),
+    mk_t_err(pos(T), Msg);
+mk_error({wrong_type_arguments, X, ArityGiven, ArityReal}) ->
+    Msg = io_lib:format("Arity for ~s doesn't match. Expected ~p, got ~p\n"
+                       , [pp(instantiate(X)), ArityReal, ArityGiven]
+                       ),
+    mk_t_err(pos(X), Msg);
+mk_error({unnamed_map_update_with_default, Upd}) ->
+    Msg = "Invalid map update with default\n",
+    mk_t_err(pos(Upd), Msg);
+mk_error({fundecl_must_have_funtype, _Ann, Id, Type}) ->
+    Msg = io_lib:format("~s at ~s was declared with an invalid type ~s.\n"
+                       "Entrypoints and functions must have functional types"
+                       , [pp(Id), pp_loc(Id), pp(instantiate(Type))]),
+    mk_t_err(pos(Id), Msg);
 mk_error({cannot_unify, A, B, When}) ->
     Msg = io_lib:format("Cannot unify ~s\n         and ~s\n",
                         [pp(instantiate(A)), pp(instantiate(B))]),
@@ -2344,14 +2362,6 @@ mk_error({indexed_type_must_be_word, Type, Type1}) ->
     Msg = io_lib:format("The indexed type ~s (at ~s) equals ~s which is not a word type\n",
                         [pp_type("", Type), pp_loc(Type), pp_type("", Type1)]),
     mk_t_err(pos(Type), Msg);
-mk_error({payload_type_must_be_string, Type, Type}) ->
-    Msg = io_lib:format("The payload type ~s (at ~s) should be string\n",
-                        [pp_type("", Type), pp_loc(Type)]),
-    mk_t_err(pos(Type), Msg);
-mk_error({payload_type_must_be_string, Type, Type1}) ->
-    Msg = io_lib:format("The payload type ~s (at ~s) equals ~s but it should be string\n",
-                        [pp_type("", Type), pp_loc(Type), pp_type("", Type1)]),
-    mk_t_err(pos(Type), Msg);
 mk_error({event_0_to_3_indexed_values, Constr}) ->
     Msg = io_lib:format("The event constructor ~s (at ~s) has too many indexed values (max 3)\n",
                         [name(Constr), pp_loc(Constr)]),
@@ -2395,13 +2405,21 @@ mk_error({include, _, {string, Pos, Name}}) ->
                         [binary_to_list(Name), pp_loc(Pos)]),
     mk_t_err(pos(Pos), Msg);
 mk_error({namespace, _Pos, {con, Pos, Name}, _Def}) ->
-    Msg = io_lib:format("Nested namespace not allowed\nNamespace '~s' at ~s not defined at top level.\n",
+    Msg = io_lib:format("Nested namespaces are not allowed\nNamespace '~s' at ~s not defined at top level.\n",
                         [Name, pp_loc(Pos)]),
     mk_t_err(pos(Pos), Msg);
-mk_error({repeated_arg, Fun, Arg}) ->
-    Msg = io_lib:format("Repeated argument ~s to function ~s (at ~s).\n",
-                        [Arg, pp(Fun), pp_loc(Fun)]),
-    mk_t_err(pos(Fun), Msg);
+mk_error({contract, _Pos, {con, Pos, Name}, _Def}) ->
+    Msg = io_lib:format("Nested contracts are not allowed\nContract '~s' at ~s not defined at top level.\n",
+                        [Name, pp_loc(Pos)]),
+    mk_t_err(pos(Pos), Msg);
+mk_error({type_decl, _, {id, Pos, Name}, _}) ->
+    Msg = io_lib:format("Empty type declarations are not supported\nType ~s at ~s lacks a definition\n",
+                        [Name, pp_loc(Pos)]),
+    mk_t_err(pos(Pos), Msg);
+mk_error({letval, _Pos, {id, Pos, Name}, _Def}) ->
+    Msg = io_lib:format("Toplevel \"let\" definitions are not supported\nValue ~s at ~s could be replaced by 0-argument function\n",
+                        [Name, pp_loc(Pos)]),
+    mk_t_err(pos(Pos), Msg);
 mk_error({stateful_not_allowed, Id, Fun}) ->
     Msg = io_lib:format("Cannot reference stateful function ~s (at ~s)\nin the definition of non-stateful function ~s.\n",
                         [pp(Id), pp_loc(Id), pp(Fun)]),
