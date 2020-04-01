@@ -2,7 +2,6 @@
 
 **Table of Contents**
 
-- [-](#-)
 - [Language Features](#language-features)
     - [Contracts](#contracts)
         - [Calling other contracts](#calling-other-contracts)
@@ -53,8 +52,7 @@
         - [Operators types](#operators-types)
         - [Operator precendences](#operator-precendences)
     - [Examples](#examples)
-    - [The lifetime of a contract](#the-lifetime-of-a-contract)
-        - [Killing a contract](#killing-a-contract)
+
 
 ## The Sophia Language
 An Æternity BlockChain Language
