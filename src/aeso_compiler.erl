@@ -38,6 +38,7 @@
                 | pp_assembler
                 | pp_bytecode
                 | no_code
+		  | keep_included
                 | {backend, aevm | fate}
                 | {include, {file_system, [string()]} |
                             {explicit_files, #{string() => binary()}}}
@@ -336,12 +337,12 @@ to_sophia_value(ContractString, FunName, ok, Data, Options0) ->
                 try
                     {ok, aeso_vm_decode:from_fate(Type, aeb_fate_encoding:deserialize(Data))}
                 catch throw:cannot_translate_to_sophia ->
-                        Type1 = prettypr:format(aeso_pretty:type(Type)),
+                        Type1 = prettypr:format(aeso_pretty:type(Type0)),
                         Msg = io_lib:format("Cannot translate FATE value ~p\n  of Sophia type ~s\n",
                                             [aeb_fate_encoding:deserialize(Data), Type1]),
                         {error, [aeso_errors:new(data_error, Msg)]};
                       _:_ ->
-                        Type1 = prettypr:format(aeso_pretty:type(Type)),
+                        Type1 = prettypr:format(aeso_pretty:type(Type0)),
                         Msg = io_lib:format("Failed to decode binary as type ~s\n", [Type1]),
                         {error, [aeso_errors:new(data_error, Msg)]}
                end
@@ -650,8 +651,9 @@ pp_fate_type(T) -> io_lib:format("~w", [T]).
 
 %% -------------------------------------------------------------------
 
+-spec sophia_type_to_typerep(string()) -> {error, bad_type} | {ok, aeb_aevm_data:type()}.
 sophia_type_to_typerep(String) ->
-    {ok, Ast} = aeso_parser:type(String),
+    Ast = aeso_parser:run_parser(aeso_parser:type(), String),
     try aeso_ast_to_icode:ast_typerep(Ast) of
         Type -> {ok, Type}
     catch _:_ -> {error, bad_type}

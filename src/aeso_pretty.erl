@@ -145,8 +145,12 @@ decl(D, Options) ->
     with_options(Options, fun() -> decl(D) end).
 
 -spec decl(aeso_syntax:decl()) -> doc().
-decl({contract, _, C, Ds}) ->
-    block(follow(text("contract"), hsep(name(C), text("="))), decls(Ds));
+decl({contract, Attrs, C, Ds}) ->
+    Mod = fun({Mod, true}) when Mod == payable ->
+                  text(atom_to_list(Mod));
+             (_) -> empty() end,
+    block(follow( hsep(lists:map(Mod, Attrs) ++ [text("contract")])
+                , hsep(name(C), text("="))), decls(Ds));
 decl({namespace, _, C, Ds}) ->
     block(follow(text("namespace"), hsep(name(C), text("="))), decls(Ds));
 decl({pragma, _, Pragma}) -> pragma(Pragma);
@@ -155,13 +159,16 @@ decl({type_def, _, T, Vars, Def}) ->
     Kind = element(1, Def),
     equals(typedecl(Kind, T, Vars), typedef(Def));
 decl({fun_decl, Ann, F, T}) ->
+    Mod = fun({Mod, true}) when Mod == private; Mod == stateful; Mod == payable ->
+                  text(atom_to_list(Mod));
+             (_) -> empty() end,
     Fun = case aeso_syntax:get_ann(entrypoint, Ann, false) of
             true  -> text("entrypoint");
             false -> text("function")
           end,
-    hsep(Fun, typed(name(F), T));
+    hsep(lists:map(Mod, Ann) ++ [Fun, typed(name(F), T)]);
 decl(D = {letfun, Attrs, _, _, _, _}) ->
-    Mod = fun({Mod, true}) when Mod == private; Mod == stateful ->
+    Mod = fun({Mod, true}) when Mod == private; Mod == stateful; Mod == payable ->
                             text(atom_to_list(Mod));
              (_) -> empty() end,
     Fun = case aeso_syntax:get_ann(entrypoint, Attrs, false) of
@@ -363,7 +370,8 @@ expr_p(_, {Type, _, Bin})
          Type == oracle_query_id ->
     text(binary_to_list(aeser_api_encoder:encode(Type, Bin)));
 expr_p(_, {string, _, <<>>}) -> text("\"\"");
-expr_p(_, {string, _, S}) -> term(binary_to_list(S));
+expr_p(_, {string, _, S}) ->
+    text(io_lib:format("\"~s\"", [binary_to_list(S)]));
 expr_p(_, {char, _, C}) ->
     case C of
         $' -> text("'\\''");
@@ -489,7 +497,4 @@ get_elifs(If = {'if', Ann, Cond, Then, Else}, Elifs) ->
         _    -> {lists:reverse(Elifs), If}
     end;
 get_elifs(Else, Elifs) -> {lists:reverse(Elifs), {else, Else}}.
-
-fmt(Fmt, Args) -> text(lists:flatten(io_lib:format(Fmt, Args))).
-term(X) -> fmt("~p", [X]).
 

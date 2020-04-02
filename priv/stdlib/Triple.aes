@@ -10,15 +10,23 @@ namespace Triple =
     (_, _, z) => z
 
 
+/** Map over first
+ */
   function map1(f : 'a => 'm, t : ('a * 'b * 'c)) : ('m * 'b * 'c) = switch(t)
     (x, y, z) => (f(x), y, z)
 
+/** Map over second
+ */
   function map2(f : 'b => 'm, t : ('a * 'b * 'c)) : ('a * 'm * 'c) = switch(t)
     (x, y, z) => (x, f(y), z)
 
+/** Map over third
+ */
   function map3(f : 'c => 'm, t : ('a * 'b * 'c)) : ('a * 'b * 'm) = switch(t)
     (x, y, z) => (x, y, f(z))
 
+/** Map over all elements
+ */
   function trimap( f : 'a => 'x
                  , g : 'b => 'y
                  , h : 'c => 'z
@@ -29,9 +37,13 @@ namespace Triple =
   function swap(t : ('a * 'b * 'c)) : ('c * 'b * 'a) = switch(t)
     (x, y, z) => (z, y, x)
 
+/** Right rotation
+ */
   function rotr(t : ('a * 'b * 'c)) : ('c * 'a * 'b) = switch(t)
     (x, y, z) => (z, x, y)
 
+/** Left rotation
+ */
   function rotl(t : ('a * 'b * 'c)) : ('b * 'c * 'a) = switch(t)
     (x, y, z) => (y, z, x)
 

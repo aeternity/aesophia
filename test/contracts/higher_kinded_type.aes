@@ -1,0 +1,3 @@
+contract IWantToBelieve =
+  type stateT('s, 'm, 'a) = 's => 'm('a * 's)
+  entrypoint s() = 123

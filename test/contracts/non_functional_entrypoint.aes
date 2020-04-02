@@ -1,0 +1,5 @@
+contract C1 =
+  entrypoint f : int
+
+contract C =
+  entrypoint f() = 123
