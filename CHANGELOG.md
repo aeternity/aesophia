@@ -7,8 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
-- Bug fix: Fixed ACI encoder to handle `-` unary operator
 ### Removed
+
+## [4.3.0]
+### Added
+- Added documentation (moved from `protocol`)
+- `Frac.aes` – library for rational numbers
+- Added some more meaningful error messages
+- Exported several parsing functionalities
+ - With option `keep_included` it is possible to see which files were included during the parse
+ - There is a function `run_parser` that be used to evaluate any parsing rule
+ - Exported parsers: `body`, `type` and `decl`
+### Changed
+- Performance improvements in the standard library
+- Fixed ACI encoder to handle `-` unary operator
+- Fixed including by absolute path
+- Fixed variant type printing in the ACI error messages
+- Fixed pretty printing of combined function clauses
+### Removed
+- `let` definitions are no longer supported in the toplevel of the contract
+- type declarations are no longer supported
 
 ## [4.2.0] - 2020-01-15
 ### Added
