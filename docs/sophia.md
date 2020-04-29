@@ -37,6 +37,7 @@
             - [Example](#example)
             - [Sanity checks](#sanity-checks)
         - [AENS interface](#aens-interface)
+            - [Example](#example-1)
         - [Events](#events)
             - [Argument order](#argument-order)
         - [Compiler pragmas](#compiler-pragmas)
@@ -55,6 +56,7 @@
         - [Operators types](#operators-types)
         - [Operator precendences](#operator-precendences)
     - [Examples](#examples)
+        - [Delegation signature](#delegation-signature)
 
 
 ## The Sophia Language
@@ -686,6 +688,43 @@ Contracts can interact with the
 [Aeternity Naming System](https://github.com/aeternity/protocol/blob/master/AENS.md).
 For this purpose the [AENS](sophia_stdlib.md#AENS) library was exposed.
 
+#### Example
+
+In this example we assume that the name `name` already exists, and is owned by
+an account with address `addr`. In order to allow a contract `ct` to handle
+`name` the account holder needs to create a
+[signature](#delegation-signature) `sig` of `addr | name.hash | ct.address`.
+
+Armed with this information we can for example write a function that extends
+the name if it expires within 1000 blocks:
+```
+  stateful entrypoint extend_if_necessary(addr : address, name : string, sig : signature) =
+    switch(AENS.lookup(name))
+      None => ()
+      Some(AENS.Name(_, FixedTTL(expiry), _)) =>
+        if(Chain.block_height + 1000 > expiry)
+          AENS.update(addr, name, Some(RelativeTTL(50000)), None, None, signature = sig)
+```
+
+And we can write functions that adds and removes keys from the pointers of the
+name:
+```
+  stateful entrypoint add_key(addr : address, name : string, key : string,
+                              pt : AENS.pointee, sig : signature) =
+    switch(AENS.lookup(name))
+      None => ()
+      Some(AENS.Name(_, _, ptrs)) =>
+        AENS.update(addr, name, None, None, Some(ptrs{[key] = pt}), signature = sig)
+
+  stateful entrypoint delete_key(addr : address, name : string,
+                                 key : string, sig : signature) =
+    switch(AENS.lookup(name))
+      None => ()
+      Some(AENS.Name(_, _, ptrs)) =>
+        let ptrs = Map.delete(key, ptrs)
+        AENS.update(addr, name, None, None, Some(ptrs), signature = sig)
+```
+
 
 ### Events
 
@@ -1110,3 +1149,11 @@ contract FundMe =
            amount    = state.contributions[to]})
     put(state{ contributions @ c = Map.delete(to, c) })
 ```
+
+### Delegation signature
+
+Some chain operations (`Oracle.<operation>` and `AENS.<operation>`) have an
+optional delegation signature. This is typically used when a user/accounts
+would like to allow a contract to act on it's behalf. The exact data to be
+signed varies for the different operations, but in all cases you should prepend
+the signature data with the `network_id` (`ae_mainnet` for the Aeternity mainnet, etc.).
