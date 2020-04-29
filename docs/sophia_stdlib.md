@@ -13,8 +13,8 @@ in the scope and do not need any actions to be used, while the others require so
 The out-of-the-box namespaces are:
 
 - [Bits](#Bits)
-- [String](#String)
 - [Bytes](#Bytes)
+- [Char](#Char)
 - [Int](#Int)
 - [Map](#Map)
 - [Address](#Address)
@@ -33,6 +33,7 @@ include "List.aes"
 
 - [List](#List)
 - [Option](#Option)
+- [String](#String)
 - [Func](#Func)
 - [Pair](#Pair)
 - [Triple](#Triple)
@@ -45,7 +46,7 @@ They are available without any explicit includes.
 
 ## Bits
 
-### none
+#### none
 ```
 Bits.none : bits
 ```
@@ -53,7 +54,7 @@ Bits.none : bits
 A bit field with all bits cleared
 
 
-### all
+#### all
 ```
 Bits.all : bits
 ```
@@ -61,7 +62,7 @@ Bits.all : bits
 A bit field with all bits set
 
 
-### set
+#### set
 ```
 Bits.set(b : bits, i : int) : bits
 ```
@@ -69,7 +70,7 @@ Bits.set(b : bits, i : int) : bits
 Set bit i
 
 
-### clear
+#### clear
 ```
 Bits.clear(b : bits, i : int) : bits
 ```
@@ -77,7 +78,7 @@ Bits.clear(b : bits, i : int) : bits
 Clear bit i
 
 
-### test
+#### test
 ```
 Bits.test(b : bits, i : int) : bool
 ```
@@ -85,7 +86,7 @@ Bits.test(b : bits, i : int) : bool
 Check if bit i is set
 
 
-### sum
+#### sum
 ```
 Bits.sum(b : bits) : int
 ```
@@ -93,7 +94,7 @@ Bits.sum(b : bits) : int
 Count the number of set bits
 
 
-### union
+#### union
 ```
 Bits.union(a : bits, b : bits) : bits
 ```
@@ -101,7 +102,7 @@ Bits.union(a : bits, b : bits) : bits
 Bitwise disjunction
 
 
-### intersection
+#### intersection
 ```
 Bits.intersection(a : bits, b : bits) : bits
 ```
@@ -109,7 +110,7 @@ Bits.intersection(a : bits, b : bits) : bits
 Bitwise conjunction
 
 
-### difference
+#### difference
 ```
 Bits.difference(a : bits, b : bits) : bits
 ```
@@ -117,51 +118,9 @@ Bits.difference(a : bits, b : bits) : bits
 Each bit is true if and only if it was 1 in `a` and 0 in `b`
 
 
-## String
-
-### length
-```
-String.length(s : string) : int
-```
-
-Returns the length of a string
-
-
-### concat
-```
-String.concat(s1 : string, s2 : string) : string
-```
-
-Concatenates two strings
-
-
-### sha3
-```
-String.sha3(s : string) : hash
-```
-
-Calculates SHA3 sum of a string.
-
-
-### sha256
-```
-String.sha256(s : string) : hash
-```
-
-Calculates SHA256 sum of a string
-
-
-### blake2b
-```
-String.blake2b(s : string) : hash
-```
-
-Calculates blake2b of a string
-
-
 ## Bytes
 
-### to_int
+#### to_int
 ```
 Bytes.to_int(b : bytes(n)) : int
 ```
@@ -169,7 +128,7 @@ Bytes.to_int(b : bytes(n)) : int
 Interprets the byte array as a big endian integer
 
 
-### to_str
+#### to_str
 ```
 Bytes.to_str(b : bytes(n)) : string
 ```
@@ -177,7 +136,7 @@ Bytes.to_str(b : bytes(n)) : string
 Returns the hexadecimal representation of the byte array
 
 
-### concat
+#### concat
 ```
 Bytes.concat : (a : bytes(m), b : bytes(n)) => bytes(m + n)
 ```
@@ -185,7 +144,7 @@ Bytes.concat : (a : bytes(m), b : bytes(n)) => bytes(m + n)
 Concatenates two byte arrays
 
 
-### split
+#### split
 ```
 Bytes.split(a : bytes(m + n)) : bytes(m) * bytes(n)
 ```
@@ -193,9 +152,28 @@ Bytes.split(a : bytes(m + n)) : bytes(m) * bytes(n)
 Splits a byte array at given index
 
 
+## Char
+
+#### to_int
+ ```
+Char.to_int(c : char) : int
+```
+
+Returns the UTF-8 codepoint of a character
+
+
+#### from_int
+
+```
+Char.from_int(i : int) : option(char)
+ ```
+
+Opposite of [to_int](#to_int). Returns `None` if the integer doesn't correspond to a single (normalized) codepoint.
+
+
 ## Int
 
-### to_str
+#### to_str
 ```
 Int.to_str : int => string
 ```
@@ -205,45 +183,45 @@ Casts integer to string using decimal representation
 
 ## Map
 
-### lookup
+#### lookup
 `Map.lookup(k : 'k, m : map('k, 'v)) : option('v)`
 
 Returns the value under a key in given map as `Some` or `None`
 if the key is not present
 
 
-### lookup_default
+#### lookup_default
 `Map.lookup_default(k : 'k, m : map('k, 'v), v : 'v) : 'v`
 
 Returns the value under a key in given map or the
 default value `v` if the key is not present
 
 
-### member
+#### member
 `Map.member(k : 'k, m : map('k, 'v)) : bool`
 
 Checks if the key is present in the map
 
 
-### delete
+#### delete
 `Map.delete(k : 'k, m : map('k, 'v)) : map('k, 'v)`
 
 Removes the key from the map
 
 
-### size
+#### size
 `Map.size(m : map('k, 'v)) : int`
 
 Returns the number of elements in the map
 
 
-### to_list
+#### to_list
 `Map.to_list(m : map('k, 'v)) : list('k * 'v)`
 
 Returns a list containing pairs of keys and their respective elements.
 
 
-### from_list
+#### from_list
 `Map.from_list(m : list('k * 'v)) : map('k, 'v)`
 
 Turns a list of pairs of form `(key, value)` into a map
@@ -252,7 +230,7 @@ Turns a list of pairs of form `(key, value)` into a map
 
 ## Address
 
-### to_str
+#### to_str
 ```
 Address.to_str(a : address) : string
 ```
@@ -260,7 +238,7 @@ Address.to_str(a : address) : string
 Base58 encoded string
 
 
-### is_contract
+#### is_contract
 ```
 Address.is_contract(a : address) : bool
 ```
@@ -268,7 +246,7 @@ Address.is_contract(a : address) : bool
 Is the address a contract
 
 
-### is_oracle
+#### is_oracle
 ```
 Address.is_oracle(a : address) : bool
 ```
@@ -276,7 +254,7 @@ Address.is_oracle(a : address) : bool
 Is the address a registered oracle
 
 
-### is_payable
+#### is_payable
 ```
 Address.is_payable(a : address) : bool
 ```
@@ -284,7 +262,7 @@ Address.is_payable(a : address) : bool
 Can the address be spent to
 
 
-### to_contract
+#### to_contract
 ```
 Address.to_contract(a : address) : C
 ```
@@ -294,7 +272,7 @@ Cast address to contract type C (where `C` is a contract)
 
 ## Crypto
 
-### sha3
+#### sha3
 ```
 Crypto.sha3(x : 'a) : hash
 ```
@@ -302,7 +280,7 @@ Crypto.sha3(x : 'a) : hash
 Hash any object to SHA3
 
 
-### sha256
+#### sha256
 ```
 Crypto.sha256(x : 'a) : hash
 ```
@@ -310,7 +288,7 @@ Crypto.sha256(x : 'a) : hash
 Hash any object to SHA256
 
 
-### blake2b
+#### blake2b
 ```
 Crypto.blake2b(x : 'a) : hash
 ```
@@ -318,7 +296,7 @@ Crypto.blake2b(x : 'a) : hash
 Hash any object to blake2b
 
 
-### verify_sig
+#### verify_sig
 ```
 Crypto.verify_sig(msg : hash, pubkey : address, sig : signature) : bool
 ```
@@ -326,7 +304,7 @@ Crypto.verify_sig(msg : hash, pubkey : address, sig : signature) : bool
 Checks if the signature of `msg` was made using private key corresponding to
 the `pubkey`
 
-### ecverify_secp256k1
+#### ecverify_secp256k1
 ```
 Crypto.ecverify_secp256k1(msg : hash, addr : bytes(20), sig : bytes(65)) : bool
 ```
@@ -334,7 +312,7 @@ Crypto.ecverify_secp256k1(msg : hash, addr : bytes(20), sig : bytes(65)) : bool
 Verifies a signature for a msg against an Ethereum style address
 
 
-### ecrecover_secp256k1
+#### ecrecover_secp256k1
 ```
 Crypto.ecrecover_secp256k1(msg : hash, sig : bytes(65)) : option(bytes(20))
 ```
@@ -342,7 +320,7 @@ Crypto.ecrecover_secp256k1(msg : hash, sig : bytes(65)) : option(bytes(20))
 Recovers the Ethereum style address from a msg hash and respective signature
 
 
-### verify_sig_secp256k1
+#### verify_sig_secp256k1
 ```
 Crypto.verify_sig_secp256k1(msg : hash, pubkey : bytes(64), sig : bytes(64)) : bool
 ```
@@ -351,16 +329,16 @@ Crypto.verify_sig_secp256k1(msg : hash, pubkey : bytes(64), sig : bytes(64)) : b
 
 ## Auth
 
-### tx_hash
+#### tx_hash
 ```
-Auth.tx_hash : option(hash)
+Auth.tx_hash : option(Chain.tx)
 ```
 
 Gets the transaction hash during authentication.
 
 ## Oracle
 
-### register
+#### register
 ```
 Oracle.register(<signature : bytes(64)>, acct : address, qfee : int, ttl : Chain.ttl) : oracle('a, 'b)
 ```
@@ -386,7 +364,7 @@ Examples:
 ```
 
 
-### get_question
+#### get_question
 ```
 Oracle.get_question(o : oracle('a, 'b), q : oracle_query('a, 'b)) : 'a
 ```
@@ -394,7 +372,7 @@ Oracle.get_question(o : oracle('a, 'b), q : oracle_query('a, 'b)) : 'a
 Checks what was the question of query `q` on oracle `o`
 
 
-### respond
+#### respond
 ```
 Oracle.respond(<signature : bytes(64)>, o : oracle('a, 'b), q : oracle_query('a, 'b), 'b) : unit
 ```
@@ -406,7 +384,7 @@ needs to be provided. Proving that we have the private key of the oracle by
 signing the oracle query id + contract address
 
 
-### extend
+#### extend
 ```
 Oracle.extend(<signature : bytes(64)>, o : oracle('a, 'b), ttl : Chain.ttl) : unit
 ```
@@ -416,7 +394,7 @@ Extends TTL of an oracle.
 * `o` is the oracle being extended
 * `ttl` must be `RelativeTTL`. The time to live of `o` will be extended by this value.
 
-### query_fee
+#### query_fee
 ```
 Oracle.query_fee(o : oracle('a, 'b)) : int
 ```
@@ -424,7 +402,7 @@ Oracle.query_fee(o : oracle('a, 'b)) : int
 Returns the query fee of the oracle
 
 
-### query
+#### query
 ```
 Oracle.query(o : oracle('a, 'b), q : 'a, qfee : int, qttl : Chain.ttl, rttl : Chain.ttl) : oracle_query('a, 'b)
 ```
@@ -437,7 +415,7 @@ Asks the oracle a question.
 The call fails if the oracle could expire before an answer.
 
 
-### get_answer
+#### get_answer
 ```
 Oracle.get_answer(o : oracle('a, 'b), q : oracle_query('a, 'b)) : option('b)
 ```
@@ -445,7 +423,16 @@ Oracle.get_answer(o : oracle('a, 'b), q : oracle_query('a, 'b)) : option('b)
 Checks what is the optional query answer
 
 
-### check
+#### expire
+
+```
+Oracle.expire(o : oracle('a, 'b)) : int
+```
+
+Ask the oracle when it expires. The result is the block height at which it will happen.
+
+
+#### check
 ```
 Oracle.check(o : oracle('a, 'b)) : bool
 ```
@@ -453,7 +440,7 @@ Oracle.check(o : oracle('a, 'b)) : bool
 Returns `true` iff the oracle `o` exists and has correct type
 
 
-### check_query
+#### check_query
 ```
 Oracle.check_query(o : oracle('a, 'b), q : oracle_query('a, 'b)) : bool
 ```
@@ -470,7 +457,25 @@ ignored, and can be left out since it is a named argument. Otherwise we need
 a signature to prove that we are allowed to do AENS operations on behalf of
 `owner`
 
-### resolve
+### Types
+
+#### name
+```
+datatype name = Name(address, Chain.ttl, map(string, AENS.pointee))
+```
+
+
+#### pointee
+
+```
+datatype pointee = AccountPt(address) | OraclePt(address)
+                 | ContractPt(address) | ChannelPt(address)
+```
+
+
+### Functions
+
+#### resolve
 ```
 AENS.resolve(name : string, key : string) : option('a)
 ```
@@ -481,7 +486,21 @@ associated with this name (for instance `"account_pubkey"`). The return type
 type checked against this type at run time.
 
 
-### preclaim
+#### lookup
+```
+AENS.lookup(name : string) : option(AENS.name)
+```
+
+If `name` is an active name `AENS.lookup` returns a name object.
+The three arguments to `Name` are `owner`, `expiry` and a map of the
+`pointees` for the name. Note: the expiry of the name is always a fixed TTL.
+For example:
+```
+let Some(Name(owner, FixedTTL(expiry), ptrs)) = AENS.lookup("example.chain")
+```
+
+
+#### preclaim
 ```
 AENS.preclaim(owner : address, commitment_hash : hash, <signature : signature>) : unit
 ```
@@ -490,7 +509,7 @@ The signature should be over `owner address` + `Contract.address`
 (concatenated as byte arrays).
 
 
-### claim
+#### claim
 ```
 AENS.claim(owner : address, name : string, salt : int, name_fee : int, <signature : signature>) : unit
 ```
@@ -499,7 +518,7 @@ The signature should be over `owner address` + `name_hash` + `Contract.address`
 using the private key of the `owner` account for signing.
 
 
-### transfer
+#### transfer
 ```
 AENS.transfer(owner : address, new_owner : address, name_hash : hash, <signature : signature>) : unit
 ```
@@ -510,7 +529,7 @@ The signature should be over `owner address` + `name_hash` + `Contract.address`
 using the private key of the `owner` account for signing.
 
 
-### revoke
+#### revoke
 ```
 AENS.revoke(owner : address, name_hash : hash, <signature : signature>) : unit
 ```
@@ -521,11 +540,22 @@ The signature should be over `owner address` + `name_hash` + `Contract.address`
 using the private key of the `owner` account for signing.
 
 
+#### update
+```
+AENS.update(owner : address, name : string, expiry : option(Chain.ttl), client_ttl : option(int),
+            new_ptrs : map(string, AENS.pointee), <signature : signature>) : unit
+```
+
+Updates the name. If the optional parameters are set to `None` that parameter
+will not be updated, for example if `None` is passed as `expiry` the expiry
+block of the name is not changed.
+
+
 ## Contract
 
 Values related to the current contract
 
-### creator
+#### creator
 ```
 Contract.creator : address
 ```
@@ -533,7 +563,7 @@ Contract.creator : address
 Address of the entity that signed the contract creation transaction
 
 
-### address
+#### address
 ```
 Contract.address : address
 ```
@@ -541,7 +571,7 @@ Contract.address : address
 Address of the contract account
 
 
-### balance
+#### balance
 ```
 Contract.balance : int
 ```
@@ -553,7 +583,7 @@ Amount of coins in the contract account
 
 Values related to the call to the current contract
 
-### origin
+#### origin
 ```
 Call.origin : address
 ```
@@ -561,14 +591,14 @@ Call.origin : address
 The address of the account that signed the call transaction that led to this call.
 
 
-### caller
+#### caller
 ```
 Call.caller : address
 ```
 
 The address of the entity (possibly another contract) calling the contract.
 
-### value
+#### value
 ```
 Call.value : int
 ```
@@ -576,7 +606,7 @@ Call.value : int
 The amount of coins transferred to the contract in the call.
 
 
-### gas
+#### gas
 ```
 Call.gas_price : int
 ```
@@ -584,7 +614,7 @@ Call.gas_price : int
 The gas price of the current call.
 
 
-### gas
+#### gas
 ```
 Call.gas_left() : int
 ```
@@ -596,7 +626,46 @@ The amount of gas left for the current call.
 
 Values and functions related to the chain itself and other entities that live on it.
 
-### balance
+### Types
+
+#### tx
+```
+record tx = { paying_for : option(Chain.paying_for_tx)
+            , ga_metas : list(Chain.ga_meta_tx)
+            , actor : address
+            , fee   : int
+            , ttl   : int
+            , tx    : Chain.base_tx }
+```
+
+#### ga_meta_tx
+```
+datatype ga_meta_tx    = GAMetaTx(address, int)
+```
+
+#### paying_for_tx
+```
+datatype paying_for_tx = PayingForTx(address, int)
+```
+
+
+#### base_tx
+```
+datatype base_tx = SpendTx(address, int, string)
+                 | OracleRegisterTx | OracleQueryTx | OracleResponseTx | OracleExtendTx
+                 | NamePreclaimTx | NameClaimTx(hash) | NameUpdateTx(string)
+                 | NameRevokeTx(hash) | NameTransferTx(address, string)
+                 | ChannelCreateTx(address) | ChannelDepositTx(address, int) | ChannelWithdrawTx(address, int) |
+                 | ChannelForceProgressTx(address) | ChannelCloseMutualTx(address) | ChannelCloseSoloTx(address)
+                 | ChannelSlashTx(address) | ChannelSettleTx(address) | ChannelSnapshotSoloTx(address)
+                 | ContractCreateTx(int) | ContractCallTx(address, int)
+                 | GAAttachTx
+```
+
+
+### Functions
+
+#### balance
 ```
 Chain.balance(a : address) : int
 ```
@@ -604,7 +673,7 @@ Chain.balance(a : address) : int
 The balance of account `a`.
 
 
-### block_hash
+#### block_hash
 ```
 Chain.block_hash(h : int) : option(bytes(32))
 ```
@@ -612,7 +681,7 @@ Chain.block_hash(h : int) : option(bytes(32))
 The hash of the block at height `h`.
 
 
-### block_height
+#### block_height
 ```
 Chain.block_height : int"
 ```
@@ -620,7 +689,7 @@ Chain.block_height : int"
 The height of the current block (i.e. the block in which the current call will be included).
 
 
-### coinbase
+#### coinbase
 ```
 Chain.coinbase : address
 ```
@@ -628,7 +697,7 @@ Chain.coinbase : address
 The address of the account that mined the current block.
 
 
-### timestamp
+#### timestamp
 ```
 Chain.timestamp : int
 ```
@@ -636,7 +705,7 @@ Chain.timestamp : int
 The timestamp of the current block.
 
 
-### difficulty
+#### difficulty
 ```
 Chain.difficulty : int
 ```
@@ -644,7 +713,7 @@ Chain.difficulty : int
 The difficulty of the current block.
 
 
-### gas
+#### gas
 ```
 Chain.gas_limit : int
 ```
@@ -652,7 +721,7 @@ Chain.gas_limit : int
 The gas limit of the current block.
 
 
-### event
+#### event
 ```
 Chain.event(e : event) : unit
 ```
@@ -667,7 +736,7 @@ These need to be explicitly included (with `.aes` suffix)
 
 This module contains common operations on lists like constructing, querying, traversing etc.
 
-### is_empty
+#### is_empty
 ```
 List.is_empty(l : list('a)) : bool
 ```
@@ -675,7 +744,7 @@ List.is_empty(l : list('a)) : bool
 Returns `true` iff the list is equal to `[]`.
 
 
-### first
+#### first
 ```
 List.first(l : list('a)) : option('a)
 ```
@@ -683,7 +752,7 @@ List.first(l : list('a)) : option('a)
 Returns `Some` of the first element of a list or `None` if the list is empty.
 
 
-### tail
+#### tail
 ```
 List.tail(l : list('a)) : option(list('a))
 ```
@@ -691,7 +760,7 @@ List.tail(l : list('a)) : option(list('a))
 Returns `Some` of a list without its first element or `None` if the list is empty.
 
 
-### last
+#### last
 ```
 List.last(l : list('a)) : option('a)
 ```
@@ -699,7 +768,7 @@ List.last(l : list('a)) : option('a)
 Returns `Some` of the last element of a list or `None` if the list is empty.
 
 
-### find
+#### find
 ```
 List.find(p : 'a => bool, l : list('a)) : option('a)
 ```
@@ -707,7 +776,7 @@ List.find(p : 'a => bool, l : list('a)) : option('a)
 Finds first element of `l` fulfilling predicate `p` as `Some` or `None` if no such element exists.
 
 
-### find_indices
+#### find_indices
 ```
 List.find_indices(p : 'a => bool, l : list('a)) : list(int)
 ```
@@ -715,7 +784,7 @@ List.find_indices(p : 'a => bool, l : list('a)) : list(int)
 Returns list of all indices of elements from `l` that fulfill the predicate `p`.
 
 
-### nth
+#### nth
 ```
 List.nth(n : int, l : list('a)) : option('a)
 ```
@@ -723,7 +792,7 @@ List.nth(n : int, l : list('a)) : option('a)
 Gets `n`th element of `l` as `Some` or `None` if `l` is shorter than `n + 1` or `n` is negative.
 
 
-### get
+#### get
 ```
 List.get(n : int, l : list('a)) : 'a
 ```
@@ -731,7 +800,7 @@ List.get(n : int, l : list('a)) : 'a
 Gets `n`th element of `l` forcefully, throwing and error if `l` is shorter than `n + 1` or `n` is negative.
 
 
-### length
+#### length
 ```
 List.length(l : list('a)) : int
 ```
@@ -739,7 +808,7 @@ List.length(l : list('a)) : int
 Returns length of a list.
 
 
-### from_to
+#### from_to
 ```
 List.from_to(a : int, b : int) : list(int)
 ```
@@ -747,7 +816,7 @@ List.from_to(a : int, b : int) : list(int)
 Creates an ascending sequence of all integer numbers between `a` and `b` (including `a` and `b`).
 
 
-### from_to_step
+#### from_to_step
 ```
 List.from_to_step(a : int, b : int, step : int) : list(int)
 ```
@@ -755,7 +824,7 @@ List.from_to_step(a : int, b : int, step : int) : list(int)
 Creates an ascending sequence of integer numbers betweeen `a` and `b` jumping by given `step`. Includes `a` and takes `b` only if `(b - a) mod step == 0`. `step` should be bigger than 0.
 
 
-### replace_at
+#### replace_at
 ```
 List.replace_at(n : int, e : 'a, l : list('a)) : list('a)
 ```
@@ -763,7 +832,7 @@ List.replace_at(n : int, e : 'a, l : list('a)) : list('a)
 Replaces `n`th element of `l` with `e`. Throws an error if `n` is negative or would cause an overflow.
 
 
-### insert_at
+#### insert_at
 ```
 List.insert_at(n : int, e : 'a, l : list('a)) : list('a)
 ```
@@ -775,7 +844,7 @@ insert_at(2, 9, [1,2,3,4])
 will yield `[1,2,9,3,4]`.
 
 
-### insert_by
+#### insert_by
 ```
 List.insert_by(cmp : (('a, 'a) => bool), x : 'a, l : list('a)) : list('a)
 ```
@@ -787,7 +856,7 @@ insert_by((a, b) => a < b, 4, [1,2,3,5,6,7])
 will yield `[1,2,3,4,5,6,7]`
 
 
-### foldr
+#### foldr
 ```
 List.foldr(cons : ('a, 'b) => 'b, nil : 'b, l : list('a)) : 'b
 ```
@@ -796,7 +865,7 @@ Right fold of a list. Assuming `l = [x, y, z]` will return `f(x, f(y, f(z, nil))
 Not tail recursive.
 
 
-### foldl
+#### foldl
 ```
 List.foldl(rcons : ('b, 'a) => 'b, acc : 'b, l : list('a)) : 'b
 ```
@@ -804,7 +873,7 @@ List.foldl(rcons : ('b, 'a) => 'b, acc : 'b, l : list('a)) : 'b
 Left fold of a list. Assuming `l = [x, y, z]` will return `f(f(f(acc, x), y), z)`.
 Tail recursive.
 
-### foreach
+#### foreach
 ```
 List.foreach(l : list('a), f : 'a => unit) : unit
 ```
@@ -812,7 +881,7 @@ List.foreach(l : list('a), f : 'a => unit) : unit
 Evaluates `f` on each element of a list.
 
 
-### reverse
+#### reverse
 ```
 List.reverse(l : list('a)) : list('a)
 ```
@@ -820,7 +889,7 @@ List.reverse(l : list('a)) : list('a)
 Returns a copy of `l` with reversed order of elements.
 
 
-### map
+#### map
 ```
 List.map(f : 'a => 'b, l : list('a)) : list('b)
 ```
@@ -832,7 +901,7 @@ map((x) => x == 0, [1, 2, 0, 3, 0])
 will yield `[false, false, true, false, true]`
 
 
-### flat_map
+#### flat_map
 ```
 List.flat_map(f : 'a => list('b), l : list('a)) : list('b)
 ```
@@ -844,7 +913,7 @@ flat_map((x) => [x, x * 10], [1, 2, 3])
 will yield `[1, 10, 2, 20, 3, 30]`
 
 
-### filter
+#### filter
 ```
 List.filter(p : 'a => bool, l : list('a)) : list('a)
 ```
@@ -856,7 +925,7 @@ filter((x) => x > 0, [-1, 1, -2, 0, 1, 2, -3])
 will yield `[1, 1, 2]`
 
 
-### take
+#### take
 ```
 List.take(n : int, l : list('a)) : list('a)
 ```
@@ -864,7 +933,7 @@ List.take(n : int, l : list('a)) : list('a)
 Takes `n` first elements of `l`. Fails if `n` is negative. If `n` is greater than length of a list it will return whole list.
 
 
-### drop
+#### drop
 ```
 List.drop(n : int, l : list('a)) : list('a)
 ```
@@ -872,7 +941,7 @@ List.drop(n : int, l : list('a)) : list('a)
 Removes `n` first elements of `l`. Fails if `n` is negative. If `n` is greater than length of a list it will return `[]`.
 
 
-### take_while
+#### take_while
 ```
 List.take_while(p : 'a => bool, l : list('a)) : list('a)
 ```
@@ -880,7 +949,7 @@ List.take_while(p : 'a => bool, l : list('a)) : list('a)
 Returns longest prefix of `l` in which all elements fulfill `p`.
 
 
-### drop_while
+#### drop_while
 ```
 List.drop_while(p : 'a => bool, l : list('a)) : list('a)
 ```
@@ -888,7 +957,7 @@ List.drop_while(p : 'a => bool, l : list('a)) : list('a)
 Removes longest prefix from `l` in which all elements fulfill `p`.
 
 
-### partition
+#### partition
 ```
 List.partition(p : 'a => bool, l : list('a)) : (list('a) * list('a))
 ```
@@ -900,7 +969,7 @@ partition((x) => x > 0, [-1, 1, -2, 0, 1, 2, -3])
 will yield `([1, 1, 2], [-1, -2, 0, -3])`
 
 
-### flatten
+#### flatten
 ```
 List.flatten(ll : list(list('a))) : list('a)
 ```
@@ -908,7 +977,7 @@ List.flatten(ll : list(list('a))) : list('a)
 Flattens a list of lists into a one list.
 
 
-### all
+#### all
 ```
 List.all(p : 'a => bool, l : list('a)) : bool
 ```
@@ -916,7 +985,7 @@ List.all(p : 'a => bool, l : list('a)) : bool
 Checks if all elements of a list fulfill predicate `p`.
 
 
-### any
+#### any
 ```
 List.any(p : 'a => bool, l : list('a)) : bool
 ```
@@ -924,7 +993,7 @@ List.any(p : 'a => bool, l : list('a)) : bool
 Checks if any element of a list fulfills predicate `p`.
 
 
-### sum
+#### sum
 ```
 List.sum(l : list(int)) : int
 ```
@@ -932,7 +1001,7 @@ List.sum(l : list(int)) : int
 Sums elements of a list. Returns 0 if the list is empty.
 
 
-### product
+#### product
 ```
 List.product(l : list(int)) : int
 ```
@@ -940,7 +1009,7 @@ List.product(l : list(int)) : int
 Multiplies elements of a list. Returns 1 if the list is empty.
 
 
-### zip_with
+#### zip_with
 ```
 List.zip_with(f : ('a, 'b) => 'c, l1 : list('a), l2 : list('b)) : list('c)
 ```
@@ -952,14 +1021,14 @@ zip_with((a, b) => a + b, [1,2], [1,2,3])
 will yield `[2,4]`
 
 
-### zip
+#### zip
 ```
 List.zip(l1 : list('a), l2 : list('b)) : list('a * 'b)
 ```
 
 Special case of [zip_with](#zip_with) where the zipping function is `(a, b) => (a, b)`.
 
-### unzip
+#### unzip
 ```
 List.unzip(l : list('a * 'b)) : list('a) * list('b)
 ```
@@ -967,7 +1036,7 @@ List.unzip(l : list('a * 'b)) : list('a) * list('b)
 Opposite to the `zip` operation. Takes a list of pairs and returns pair of lists with respective elements on same indices.
 
 
-### sort
+#### sort
 ```
 List.sort(lesser_cmp : ('a, 'a) => bool, l : list('a)) : list('a)
 ```
@@ -975,7 +1044,7 @@ List.sort(lesser_cmp : ('a, 'a) => bool, l : list('a)) : list('a)
 Sorts a list using given comparator. `lesser_cmp(x, y)` should return `true` iff `x < y`. If `lesser_cmp` is not transitive or there exists an element `x` such that `lesser_cmp(x, x)` or there exists a pair of elements `x` and `y` such that `lesser_cmp(x, y) && lesser_cmp(y, x)` then the result is undefined. Currently O(n^2).
 
 
-### intersperse
+#### intersperse
 ```
 List.intersperse(delim : 'a, l : list('a)) : list('a)
 ```
@@ -987,7 +1056,7 @@ intersperse(0, [1, 2, 3, 4])
 will yield `[1, 0, 2, 0, 3, 0, 4]`
 
 
-### enumerate
+#### enumerate
 ```
 List.enumerate(l : list('a)) : list(int * 'a)
 ```
@@ -999,7 +1068,7 @@ Equivalent to [zip](#zip) with `[0..length(l)]`, but slightly faster.
 
 Common operations on `option` types and lists of `option`s.
 
-### is_none
+#### is_none
 ```
 Option.is_none(o : option('a)) : bool
 ```
@@ -1007,7 +1076,7 @@ Option.is_none(o : option('a)) : bool
 Returns true iff `o == None`
 
 
-### is_some
+#### is_some
 ```
 Option.is_some(o : option('a)) : bool
 ```
@@ -1015,7 +1084,7 @@ Option.is_some(o : option('a)) : bool
 Returns true iff `o` is not `None`.
 
 
-### match
+#### match
 ```
 Option.match(n : 'b, s : 'a => 'b, o : option('a)) : 'b
 ```
@@ -1023,7 +1092,7 @@ Option.match(n : 'b, s : 'a => 'b, o : option('a)) : 'b
 Behaves like pattern matching on `option` using two case functions.
 
 
-### default
+#### default
 ```
 Option.default(def : 'a, o : option('a)) : 'a
 ```
@@ -1031,7 +1100,7 @@ Option.default(def : 'a, o : option('a)) : 'a
 Escapes `option` wrapping by providing default value for `None`.
 
 
-### force
+#### force
 ```
 Option.force(o : option('a)) : 'a
 ```
@@ -1039,7 +1108,7 @@ Option.force(o : option('a)) : 'a
 Forcefully escapes `option` wrapping assuming it is `Some`. Throws error on `None`.
 
 
-### on_elem
+#### on_elem
 ```
 Option.on_elem(o : option('a), f : 'a => unit) : unit
 ```
@@ -1047,7 +1116,7 @@ Option.on_elem(o : option('a), f : 'a => unit) : unit
 Evaluates `f` on element under `Some`. Does nothing on `None`.
 
 
-### map
+#### map
 ```
 Option.map(f : 'a => 'b, o : option('a)) : option('b)
 ```
@@ -1055,7 +1124,7 @@ Option.map(f : 'a => 'b, o : option('a)) : option('b)
 Maps element under `Some`. Leaves `None` unchanged.
 
 
-### map2
+#### map2
 ```
 Option.map2(f : ('a, 'b) => 'c, o1 : option('a), o2 : option('b)) : option('c)
 ```
@@ -1071,7 +1140,7 @@ map2((a, b) => a + b, Some(1), None)
 will yield `None`.
 
 
-### map3
+#### map3
 ```
 Option.map3(f : ('a, 'b, 'c) => 'd, o1 : option('a), o2 : option('b), o3 : option('c)) : option('d)
 ```
@@ -1079,7 +1148,7 @@ Option.map3(f : ('a, 'b, 'c) => 'd, o1 : option('a), o2 : option('b), o3 : optio
 Same as [map2](#map2) but with arity 3 function.
 
 
-### app_over
+#### app_over
 ```
 Option.app_over(f : option ('a => 'b), o : option('a)) : option('b)
 ```
@@ -1095,7 +1164,7 @@ app_over(Some((x) => x + 1), None)
 will yield `None`.
 
 
-### flat_map
+#### flat_map
 ```
 Option.flat_map(f : 'a => option('b), o : option('a)) : option('b)
 ```
@@ -1111,7 +1180,7 @@ flat_map((x) => Some(x + 1), None)
 will yield `None`.
 
 
-### to_list
+#### to_list
 ```
 Option.to_list(o : option('a)) : list('a)
 ```
@@ -1119,7 +1188,7 @@ Option.to_list(o : option('a)) : list('a)
 Turns `o` into an empty (if `None`) or singleton (if `Some`) list.
 
 
-### filter_options
+#### filter_options
 ```
 Option.filter_options(l : list(option('a))) : list('a)
 ```
@@ -1131,7 +1200,7 @@ filter_options([Some(1), None, Some(2)])
 will yield `[1, 2]`.
 
 
-### seq_options
+#### seq_options
 ```
 Option.seq_options(l : list (option('a))) : option (list('a))
 ```
@@ -1147,7 +1216,7 @@ seq_options([Some(1), Some(2), None])
 will yield `None`.
 
 
-### choose
+#### choose
 ```
 Option.choose(o1 : option('a), o2 : option('a)) : option('a) 
 ```
@@ -1155,7 +1224,7 @@ Option.choose(o1 : option('a), o2 : option('a)) : option('a)
 Out of two `option`s choose the one that is `Some`, or `None` if both are `None`s.
 
 
-### choose_first
+#### choose_first
 ```
 Option.choose_first(l : list(option('a))) : option('a)
 ```
@@ -1163,11 +1232,127 @@ Option.choose_first(l : list(option('a))) : option('a)
 Same as [choose](#choose), but chooses from a list insted of two arguments.
 
 
+## String
+
+Operations on the `string` type. A `string` is a UTF-8 encoded byte array.
+
+#### length
+`length(s : string) : int`
+
+The length of a string.
+
+Note: not equivalent to byte size of the string, rather `List.length(String.to_list(s))`
+
+#### concat
+```
+concat(s1 : string, s2 : string) : string
+```
+
+Concatenates `s1` and `s2`.
+
+#### concats
+```
+concats(ss : list(string)) : string
+```
+
+Concatenates a list of strings.
+
+#### to\_list
+```
+to_list(s : string) : list(char)
+```
+
+Converts a `string` to a list of `char` - the code points are normalized, but
+composite characters are possibly converted to multiple `char`s. For example the
+string "😜i̇" is converted to `[128540,105,775]` - where the smiley is the first
+code point and the strangely dotted `i` becomes `[105, 775]`.
+
+#### from\_list
+```
+from_list(cs : list(char)) : string
+```
+
+Converts a list of characters into a normalized UTF-8 string.
+
+#### to\_lower
+```
+to_lower(s : string) : string
+```
+
+Converts a string to lowercase.
+
+#### to\_upper
+```
+to_upper(s : string) : string
+```
+
+Converts a string to uppercase.
+
+#### at
+```
+at(ix : int, s : string) : option(char)
+```
+
+Returns the character/codepoint at (zero-based) index `ix`. Basically the equivalent to
+`List.nth(ix, String.to_list(s))`.
+
+#### split
+```
+split(ix : int, s:string) : string * string
+```
+
+Splits a string at (zero-based) index `ix`.
+
+#### contains
+```
+contains(str : string, pat : string) : option(int)
+```
+
+Searches for `pat` in `str`, returning `Some(ix)` if `pat` is a substring of
+`str` starting at position `ix`, otherwise returns `None`.
+
+#### tokens
+```
+tokens(str : string, pat : string) : list(string)
+```
+
+Splits `str` into tokens, `pat` is the divider of tokens.
+
+#### to\_int
+```
+to_int(s : string) : option(int)
+```
+
+Converts a decimal ("123", "-253") or a hexadecimal ("0xa2f", "-0xBBB") string into
+an integer. If the string doesn't contain a valid number `None` is returned.
+
+#### sha3
+```
+sha3(s : string) : hash
+```
+
+Computes the SHA3/Keccak hash of the string.
+
+#### sha256
+```
+sha256(s : string) : hash
+```
+
+Computes the SHA256 hash of the string.
+
+#### blake2b
+```
+blake2b(s : string) : hash
+```
+
+Computes the Blake2B hash of the string.
+
+
 ## Func
 
 Functional combinators.
 
-### id
+#### id
 ```
 Func.id(x : 'a) : 'a
 ```
@@ -1175,7 +1360,7 @@ Func.id(x : 'a) : 'a
 Identity function. Returns its argument.
 
 
-### const
+#### const
 ```
 Func.const(x : 'a) : 'b => 'a = (y) => x
 ```
@@ -1183,7 +1368,7 @@ Func.const(x : 'a) : 'b => 'a = (y) => x
 Constant function constructor. Given `x` returns a function that returns `x` regardless of its argument.
 
 
-### flip
+#### flip
 ```
 Func.flip(f : ('a, 'b) => 'c) : ('b, 'a) => 'c
 ```
@@ -1191,7 +1376,7 @@ Func.flip(f : ('a, 'b) => 'c) : ('b, 'a) => 'c
 Switches order of arguments of arity 2 function.
 
 
-### comp
+#### comp
 ```
 Func.comp(f : 'b => 'c, g : 'a => 'b) : 'a => 'c
 ```
@@ -1199,7 +1384,7 @@ Func.comp(f : 'b => 'c, g : 'a => 'b) : 'a => 'c
 Function composition. `comp(f, g)(x) == f(g(x))`.
 
 
-### pipe
+#### pipe
 ```
 Func.pipe(f : 'a => 'b, g : 'b => 'c) : 'a => 'c
 ```
@@ -1207,7 +1392,7 @@ Func.pipe(f : 'a => 'b, g : 'b => 'c) : 'a => 'c
 Flipped function composition. `pipe(f, g)(x) == g(f(x))`.
 
 
-### rapply
+#### rapply
 ```
 Func.rapply(x : 'a, f : 'a => 'b) : 'b
 ```
@@ -1215,7 +1400,7 @@ Func.rapply(x : 'a, f : 'a => 'b) : 'b
 Reverse application. `rapply(x, f) == f(x)`.
 
 
-### recur
+#### recur
 ```
 Func.recur(f : ('arg => 'res, 'arg) => 'res) : 'arg => 'res
 ```
@@ -1247,7 +1432,7 @@ let factorial_c(n, step) =
 ```
 
 
-### iter
+#### iter
 ```
 Func.iter(n : int, f : 'a => 'a) : 'a => 'a
 ```
@@ -1255,7 +1440,7 @@ Func.iter(n : int, f : 'a => 'a) : 'a => 'a
 `n`th composition of f with itself, for instance `iter(3, f)` is equivalent to `(x) => f(f(f(x)))`.
 
 
-### curry
+#### curry
 ```
 Func.curry2(f : ('a, 'b) => 'c) : 'a => ('b => 'c)
 Func.curry3(f : ('a, 'b, 'c) => 'd) : 'a => ('b => ('c => 'd))
@@ -1266,7 +1451,7 @@ one argument and returns a function that waits for the rest in the same
 manner. For instance `curry2((a, b) => a + b)(1)(2) == 3`.
 
 
-### uncurry
+#### uncurry
 ```
 Func.uncurry2(f : 'a => ('b => 'c)) : ('a, 'b) => 'c
 Func.uncurry3(f : 'a => ('b => ('c => 'd))) : ('a, 'b, 'c) => 'd
@@ -1275,7 +1460,7 @@ Func.uncurry3(f : 'a => ('b => ('c => 'd))) : ('a, 'b, 'c) => 'd
 Opposite to [curry](#curry).
 
 
-### tuplify
+#### tuplify
 ```
 Func.tuplify2(f : ('a, 'b) => 'c) : (('a * 'b)) => 'c
 Func.tuplify3(f : ('a, 'b, 'c) => 'd) : 'a * 'b * 'c => 'd
@@ -1284,7 +1469,7 @@ Func.tuplify3(f : ('a, 'b, 'c) => 'd) : 'a * 'b * 'c => 'd
 Turns a function that takes n arguments into a function that takes an n-tuple.
 
 
-### untuplify
+#### untuplify
 ```
 Func.untuplify2(f : 'a * 'b => 'c) : ('a, 'b) => 'c
 Func.untuplify3(f : 'a * 'b * 'c => 'd) : ('a, 'b, 'c) => 'd
@@ -1297,7 +1482,7 @@ Opposite to [tuplify](#tuplify).
 
 Common operations on 2-tuples.
 
-### fst
+#### fst
 ```
 Pair.fst(t : ('a * 'b)) : 'a
 ```
@@ -1305,7 +1490,7 @@ Pair.fst(t : ('a * 'b)) : 'a
 First element projection.
 
 
-### snd
+#### snd
 ```
 Pair.snd(t : ('a * 'b)) : 'b
 ```
@@ -1313,7 +1498,7 @@ Pair.snd(t : ('a * 'b)) : 'b
 Second element projection.
 
 
-### map1
+#### map1
 ```
 Pair.map1(f : 'a => 'c, t : ('a * 'b)) : ('c * 'b)
 ```
@@ -1321,7 +1506,7 @@ Pair.map1(f : 'a => 'c, t : ('a * 'b)) : ('c * 'b)
 Applies function over first element.
 
 
-### map2
+#### map2
 ```
 Pair.map2(f : 'b => 'c, t : ('a * 'b)) : ('a * 'c)
 ```
@@ -1329,7 +1514,7 @@ Pair.map2(f : 'b => 'c, t : ('a * 'b)) : ('a * 'c)
 Applies function over second element.
 
 
-### bimap
+#### bimap
 ```
 Pair.bimap(f : 'a => 'c, g : 'b => 'd, t : ('a * 'b)) : ('c * 'd)
 ```
@@ -1337,7 +1522,7 @@ Pair.bimap(f : 'a => 'c, g : 'b => 'd, t : ('a * 'b)) : ('c * 'd)
 Applies functions over respective elements.
 
 
-### swap
+#### swap
 ```
 Pair.swap(t : ('a * 'b)) : ('b * 'a)
 ```
@@ -1347,7 +1532,7 @@ Swaps elements.
 
 ## Triple
 
-### fst
+#### fst
 ```
 Triple.fst(t : ('a * 'b * 'c)) : 'a
 ```
@@ -1355,7 +1540,7 @@ Triple.fst(t : ('a * 'b * 'c)) : 'a
 First element projection.
 
 
-### snd
+#### snd
 ```
 Triple.snd(t : ('a * 'b * 'c)) : 'b
 ```
@@ -1363,7 +1548,7 @@ Triple.snd(t : ('a * 'b * 'c)) : 'b
 Second element projection.
 
 
-### thd
+#### thd
 ```
 Triple.thd(t : ('a * 'b * 'c)) : 'c
 ```
@@ -1371,7 +1556,7 @@ Triple.thd(t : ('a * 'b * 'c)) : 'c
 Third element projection.
 
 
-### map1
+#### map1
 ```
 Triple.map1(f : 'a => 'm, t : ('a * 'b * 'c)) : ('m * 'b * 'c)
 ```
@@ -1379,7 +1564,7 @@ Triple.map1(f : 'a => 'm, t : ('a * 'b * 'c)) : ('m * 'b * 'c)
 Applies function over first element.
 
 
-### map2
+#### map2
 ```
 Triple.map2(f : 'b => 'm, t : ('a * 'b * 'c)) : ('a * 'm * 'c)
 ```
@@ -1387,7 +1572,7 @@ Triple.map2(f : 'b => 'm, t : ('a * 'b * 'c)) : ('a * 'm * 'c)
 Applies function over second element.
 
 
-### map3
+#### map3
 ```
 Triple.map3(f : 'c => 'm, t : ('a * 'b * 'c)) : ('a * 'b * 'm)
 ```
@@ -1395,7 +1580,7 @@ Triple.map3(f : 'c => 'm, t : ('a * 'b * 'c)) : ('a * 'b * 'm)
 Applies function over third element.
 
 
-### trimap
+#### trimap
 ```
 Triple.trimap(f : 'a => 'x, g : 'b => 'y, h : 'c => 'z, t : ('a * 'b * 'c)) : ('x * 'y * 'z)
 ```
@@ -1403,7 +1588,7 @@ Triple.trimap(f : 'a => 'x, g : 'b => 'y, h : 'c => 'z, t : ('a * 'b * 'c)) : ('
 Applies functions over respective elements.
 
 
-### swap
+#### swap
 ```
 Triple.swap(t : ('a * 'b * 'c)) : ('c * 'b * 'a)
 ```
@@ -1411,7 +1596,7 @@ Triple.swap(t : ('a * 'b * 'c)) : ('c * 'b * 'a)
 Swaps first and third element.
 
 
-### rotr
+#### rotr
 ```
 Triple.rotr(t : ('a * 'b * 'c)) : ('c * 'a * 'b)
 ```
@@ -1419,7 +1604,7 @@ Triple.rotr(t : ('a * 'b * 'c)) : ('c * 'a * 'b)
 Cyclic rotation of the elements to the right.
 
 
-### rotl
+#### rotl
 ```
 Triple.rotl(t : ('a * 'b * 'c)) : ('b * 'c * 'a)
 ```
@@ -1429,196 +1614,224 @@ Cyclic rotation of the elements to the left.
 ## BLS12\_381
 
 ### Types
-- `fp // Built-in (Montgomery) integer representation 32 bytes`
-- `fr // Built-in (Montgomery) integer representation 48 bytes`
-- `record fp2 = { x1 : fp, x2 : fp }`
-- `record g1  = { x : fp, y : fp, z : fp }`
-- `record g2  = { x : fp2, y : fp2, z : fp2 }`
-- `record gt  = { x1 : fp, x2 : fp, x3 : fp, x4 : fp, x5 : fp, x6 : fp, x7 : fp, x8 : fp, x9 : fp, x10 : fp, x11 : fp, x12 : fp }`
 
-### pairing\_check
+#### fp
+
+Built-in (Montgomery) integer representation 32 bytes
+
+
+#### fr
+
+Built-in (Montgomery) integer representation 48 bytes
+
+
+#### fp2
+```
+record fp2 = { x1 : fp, x2 : fp }`
+```
+
+#### g1
+```
+record g1  = { x : fp, y : fp, z : fp }
+```
+
+
+#### g2
+```
+record g2  = { x : fp2, y : fp2, z : fp2 }
+```
+
+
+#### gt
+```
+record gt  = { x1 : fp, x2 : fp, x3 : fp, x4 : fp, x5 : fp, x6 : fp, x7 : fp, x8 : fp, x9 : fp, x10 : fp, x11 : fp, x12 : fp }
+```
+
+### Functions
+
+#### pairing\_check
 ```
 BLS12_381.pairing_check(xs : list(g1), ys : list(g2)) : bool
 ```
 
 Pairing check of a list of points, `xs` and `ys` should be of equal length.
 
-### int_to_fr
+#### int_to_fr
 ```
 BLS12_381.int_to_fr(x : int) : fr
 ```
 
 Convert an integer to an `fr` - a 32 bytes internal (Montgomery) integer representation.
 
-### int_to_fp
+#### int_to_fp
 ```
 BLS12_381.int_to_fp(x : int) : fp
 ```
 
 Convert an integer to an `fp` - a 48 bytes internal (Montgomery) integer representation.
 
-### fr_to_int
+#### fr_to_int
 ```
 BLS12_381.fr_to_int(x : fr)  : int
 ```
 
 Convert a `fr` value into an integer.
 
-### fp_to_int
+#### fp_to_int
 ```
 BLS12_381.fp_to_int(x : fp)  : int
 ```
 
 Convert a `fp` value into an integer.
 
-### mk_g1
+#### mk_g1
 ```
 BLS12_381.mk_g1(x : int, y : int, z : int) : g1
 ```
 
 Construct a `g1` point from three integers.
 
-### mk_g2
+#### mk_g2
 ```
 BLS12_381.mk_g2(x1 : int, x2 : int, y1 : int, y2 : int, z1 : int, z2 : int) : g2
 ```
 
 Construct a `g2` point from six integers.
 
-### g1_neg
+#### g1_neg
 ```
 BLS12_381.g1_neg(p : g1) : g1
 ```
 
 Negate a `g1` value.
 
-### g1_norm
+#### g1_norm
 ```
 BLS12_381.g1_norm(p : g1) : g1
 ```
 
 Normalize a `g1` value.
 
-### g1_valid
+#### g1_valid
 ```
 BLS12_381.g1_valid(p : g1) : bool
 ```
 
 Check that a `g1` value is a group member.
 
-### g1_is_zero
+#### g1_is_zero
 ```
 BLS12_381.g1_is_zero(p : g1) : bool
 ```
 
 Check if a `g1` value corresponds to the zero value of the group.
 
-### g1_add
+#### g1_add
 ```
 BLS12_381.g1_add(p : g1, q : g1) : g1
 ```
 
 Add two `g1` values.
 
-### g1_mul
+#### g1_mul
 ```
 BLS12_381.g1_mul(k : fr, p : g1) : g1
 ```
 
 Scalar multiplication for `g1`.
 
-### g2_neg
+#### g2_neg
 ```
 BLS12_381.g2_neg(p : g2) : g2
 ```
 
 Negate a `g2` value.
 
-### g2_norm
+#### g2_norm
 ```
 BLS12_381.g2_norm(p : g2) : g2
 ```
 
 Normalize a `g2` value.
 
-### g2_valid
+#### g2_valid
 ```
 BLS12_381.g2_valid(p : g2) : bool
 ```
 
 Check that a `g2` value is a group member.
 
-### g2_is_zero
+#### g2_is_zero
 ```
 BLS12_381.g2_is_zero(p : g2) : bool
 ```
 
 Check if a `g2` value corresponds to the zero value of the group.
 
-### g2_add
+#### g2_add
 ```
 BLS12_381.g2_add(p : g2, q : g2) : g2
 ```
 
 Add two `g2` values.
 
-### g2_mul
+#### g2_mul
 ```
 BLS12_381.g2_mul(k : fr, p : g2) : g2
 ```
 
 Scalar multiplication for `g2`.
 
-### gt_inv
+#### gt_inv
 ```
 BLS12_381.gt_inv(p : gt) : gt
 ```
 
 Invert a `gt` value.
 
-### gt_add
+#### gt_add
 ```
 BLS12_381.gt_add(p : gt, q : gt) : gt
 ```
 
 Add two `gt` values.
 
-### gt_mul
+#### gt_mul
 ```
 BLS12_381.gt_mul(p : gt, q : gt) : gt
 ```
 
 Multiply two `gt` values.
 
-### gt_pow
+#### gt_pow
 ```
 BLS12_381.gt_pow(p : gt, k : fr) : gt
 ```
 
 Calculate exponentiation `p ^ k`.
 
-### gt_is_one
+#### gt_is_one
 ```
 BLS12_381.gt_is_one(p : gt) : bool
 ```
 
 Compare a `gt` value to the unit value of the Gt group.
 
-### pairing
+#### pairing
 ```
 BLS12_381.pairing(p : g1, q : g2) : gt
 ```
 
 Compute the pairing of a `g1` value and a `g2` value.
 
-### miller_loop
+#### miller_loop
 ```
 BLS12_381.miller_loop(p : g1, q : g2) : gt
 ```
 
 Do the Miller loop stage of pairing for `g1` and `g2`.
 
-### final_exp
+#### final_exp
 ```
 BLS12_381.final_exp(p : gt) : gt
 ```
@@ -1649,192 +1862,205 @@ language provides checkers to prevent unintended usage of them. Therefore the ty
 **will** allow that and the results of such comparison will be unspecified.
 You should use [lt](#lt), [geq](#geq), [eq](#eq) etc instead.
 
-### make_frac
+### Types
+
+#### frac
+```
+datatype frac = Pos(int, int) | Zero | Neg(int, int)
+```
+
+Internal representation of fractional numbers. First integer encodes the numerator and the second the denominator – 
+both must be always positive, as the sign is being handled by the choice of the constructor.
+
+
+### Functions
+
+#### make_frac
 `Frac.make_frac(n : int, d : int) : frac`
 
 Creates a fraction out of numerator and denominator. Automatically normalizes, so
 `make_frac(2, 4)` and `make_frac(1, 2)` will yield same results.
 
 
-### num
+#### num
 `Frac.num(f : frac) : int`
 
 Returns the numerator of a fraction.
 
 
-### den
+#### den
 `Frac.den(f : frac) : int`
 
 Returns the denominator of a fraction.
 
 
-### to_pair
+#### to_pair
 `Frac.to_pair(f : frac) : int * int`
 
 Turns a fraction into a pair of numerator and denominator.
 
 
-### sign
+#### sign
 `Frac.sign(f : frac) : int`
 
 Returns the signum of a fraction, -1, 0, 1 if negative, zero, positive respectively.
 
 
-### to_str
+#### to_str
 `Frac.to_str(f : frac) : string`
 
 Conversion to string. Does not display division by 1 or denominator if equals zero.
 
 
-### simplify
+#### simplify
 `Frac.simplify(f : frac) : frac`
 
 Reduces fraction to normal form if for some reason it is not in it.
 
 
-### eq
+#### eq
 `Frac.eq(a : frac, b : frac) : bool`
 
 Checks if `a` is equal to `b`.
 
 
-### neq
+#### neq
 `Frac.neq(a : frac, b : frac) : bool`
 
 Checks if `a` is not equal to `b`.
 
 
-### geq
+#### geq
 `Frac.geq(a : frac, b : frac) : bool`
 
 Checks if `a` is greater or equal to `b`.
 
 
-### leq
+#### leq
 `Frac.leq(a : frac, b : frac) : bool`
 
 Checks if `a` is lesser or equal to `b`.
 
 
-### gt
+#### gt
 `Frac.gt(a : frac, b : frac) : bool`
 
 Checks if `a` is greater than `b`.
 
 
-### lt
+#### lt
 `Frac.lt(a : frac, b : frac) : bool`
 
 Checks if `a` is lesser than `b`.
 
 
-### min
+#### min
 `Frac.min(a : frac, b : frac) : frac`
 
 Chooses lesser of the two fractions.
 
 
-### max
+#### max
 `Frac.max(a : frac, b : frac) : frac`
 
 Chooses greater of the two fractions.
 
 
-### abs
+#### abs
 `Frac.abs(f : frac) : frac`
 
 Absolute value.
 
 
-### from_int
+#### from_int
 `Frac.from_int(n : int) : frac`
 
 From integer conversion. Effectively `make_frac(n, 1)`.
 
 
-### floor
+#### floor
 `Frac.floor(f : frac) : int`
 
 Rounds a fraction to the nearest lesser or equal integer.
 
 
-### ceil
+#### ceil
 `Frac.ceil(f : frac) : int`
 
 Rounds a fraction to the nearest greater or equal integer.
 
 
-### round_to_zero
+#### round_to_zero
 `Frac.round_to_zero(f : frac) : int`
 
 Rounds a fraction towards zero. 
 Effectively `ceil` if lesser than zero and `floor` if greater.
 
 
-### round_from_zero
+#### round_from_zero
 `Frac.round_from_zero(f : frac) : int`
 
 Rounds a fraction from zero. 
 Effectively `ceil` if greater than zero and `floor` if lesser.
 
 
-### round
+#### round
 `Frac.round(f : frac) : int`
 
 Rounds a fraction to a nearest integer. If two integers are in the same distance it
 will choose the even one.
 
 
-### add
+#### add
 `Frac.add(a : frac, b : frac) : frac`
 
 Sum of the fractions.
 
 
-### neg
+#### neg
 `Frac.neg(a : frac) : frac`
 
 Negation of the fraction.
 
 
-### sub
+#### sub
 `Frac.sub(a : frac, b : frac) : frac`
 
 Subtraction of two fractions.
 
 
-### inv
+#### inv
 `Frac.inv(a : frac) : frac`
 
 Inverts a fraction. Throws error if `a` is zero. 
 
 
-### mul
+#### mul
 `Frac.mul(a : frac, b : frac) : frac`
 
 Multiplication of two fractions.
 
 
-### div
+#### div
 `Frac.div(a : frac, b : frac) : frac`
 
 Division of two fractions.
 
 
-### int_exp
+#### int_exp
 `Frac.int_exp(b : frac, e : int) : frac`
 
 Takes `b` to the power of `e`. The exponent can be a negative value.
 
 
-### optimize
+#### optimize
 `Frac.optimize(f : frac, loss : frac) : frac`
 
 Shrink the internal size of a fraction as much as possible by approximating it to the
 point where the error would exceed the `loss` value.
 
 
-### is_sane
+#### is_sane
 `Frac.is_sane(f : frac) : bool`
 
 For debugging. If it ever returns false in a code that doesn't call `frac` constructors or

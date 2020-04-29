@@ -2,9 +2,11 @@
 
 **Table of Contents**
 
+- [-](#-)
 - [Language Features](#language-features)
     - [Contracts](#contracts)
         - [Calling other contracts](#calling-other-contracts)
+        - [Protected contract calls](#protected-contract-calls)
         - [Mutable state](#mutable-state)
             - [Stateful functions](#stateful-functions)
         - [Payable](#payable)
@@ -26,6 +28,7 @@
             - [Updating a value](#updating-a-value)
             - [Map implementation](#map-implementation)
         - [Strings](#strings)
+        - [Chars](#chars)
         - [Byte arrays](#byte-arrays)
         - [Cryptographic builins](#cryptographic-builins)
             - [AEVM note](#aevm-note)
@@ -135,6 +138,36 @@ without calling it you can write
   entrypoint pay(v : VotingType, amount : int) =
     Chain.spend(v.address, amount)
 ```
+
+#### Protected contract calls
+
+If a contract call fails for any reason (for instance, the remote contract
+crashes or runs out of gas, or the entrypoint doesn't exist or has the wrong
+type) the parent call also fails. To make it possible to recover from failures,
+contract calls takes a named argument `protected : bool` (default `false`).
+
+The protected argument must be a literal boolean, and when set to `true`
+changes the type of the contract call, wrapping the result in an `option` type.
+If the call fails the result is `None`, otherwise it's `Some(r)` where `r` is
+the return value of the call.
+
+```sophia
+contract VotingType =
+  entrypoint : vote : string => unit
+
+contract Voter =
+  entrypoint tryVote(v : VotingType, alt : string) =
+    switch(v.vote(alt, protected = true) : option(unit))
+      None    => "Voting failed"
+      Some(_) => "Voting successful"
+```
+
+Any gas that was consumed by the contract call before the failure stays
+consumed, which means that in order to protect against the remote contract
+running out of gas it is necessary to set a gas limit using the `gas` argument.
+However, note that errors that would normally consume all the gas in the
+transaction still only uses up the gas spent running the contract.
+
 
 ### Mutable state
 
@@ -538,7 +571,16 @@ Strings can be compared for equality (`==`, `!=`), used as keys in maps and
 records, and used in builtin functions `String.length`, `String.concat` and
 the hash functions described below.
 
-Please refer to the `Map` [library documentation](sophia_stdlib.md#String).
+Please refer to the `String` [library documentation](sophia_stdlib.md#String).
+
+### Chars
+
+There is a builtin type `char` (the underlying representation being an integer),
+mainly used to manipulate strings via `String.to_list`/`String.from_list`.
+
+Characters can also be introduced as character literals (`'x', '+', ...).
+
+Please refer to the `Char` [library documentation](sophia_stdlib.md#Char).
 
 ### Byte arrays
 
@@ -565,11 +607,10 @@ string`, `String.sha3(s)` and `Crypto.sha3(s)` will give different results on AE
 ### Authorization interface
 
 When a Generalized account is authorized, the authorization function needs
-access to the transaction hash for the wrapped transaction. (A `GAMetaTx`
-wrapping a transaction.) The transaction hash is available in the primitive
-`Auth.tx_hash`, it is *only* available during authentication if invoked by a
-normal contract call it returns `None`.
-
+access to the transaction and the transaction hash for the wrapped transaction. (A `GAMetaTx`
+wrapping a transaction.) The transaction and the transaction hash is available in the primitive
+`Auth.tx` and `Auth.tx_hash` respectively, they are *only* available during authentication if invoked by a
+normal contract call they return `None`.
 
 ### Oracle interface
 You can attach an oracle to the current contract and you can interact with oracles
