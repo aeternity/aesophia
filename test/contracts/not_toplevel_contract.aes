@@ -1,0 +1,6 @@
+namespace BadNs =
+  contract Con =
+    entrypoint e : () => int
+
+contract Con =
+  entrypoint foo() = 43

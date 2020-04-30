@@ -1,0 +1,183 @@
+namespace Frac =
+
+  private function gcd(a : int, b : int) =
+    if (b == 0) a else gcd(b, a mod b)
+
+  private function abs_int(a : int) = if (a < 0) -a else a
+
+  datatype frac = Pos(int, int) | Zero | Neg(int, int)
+
+/** Checks if the internal representation is correct.
+  * Numerator and denominator must be positive.
+  * Exposed for debug purposes
+  */
+  function is_sane(f : frac) : bool = switch(f)
+    Pos(n, d) => n > 0 && d > 0
+    Zero => true
+    Neg(n, d) => n > 0 && d > 0
+
+  function num(f : frac) : int = switch(f)
+    Pos(n, _) => n
+    Neg(n, _) => -n
+    Zero      => 0
+
+  function den(f : frac) : int = switch(f)
+    Pos(_, d) => d
+    Neg(_, d) => d
+    Zero      => 1
+
+  function to_pair(f : frac) : int * int = switch(f)
+    Pos(n, d) => (n, d)
+    Neg(n, d) => (-n, d)
+    Zero      => (0, 1)
+
+  function sign(f : frac) : int = switch(f)
+    Pos(_, _) => 1
+    Neg(_, _) => -1
+    Zero      => 0
+
+  function to_str(f : frac) : string = switch(f)
+    Pos(n, d) => String.concat(Int.to_str(n), if (d == 1) "" else String.concat("/", Int.to_str(d)))
+    Neg(n, d) => String.concat("-", to_str(Pos(n, d)))
+    Zero      => "0"
+
+/** Reduce fraction to normal form
+ */
+  function simplify(f : frac) : frac =
+    switch(f)
+      Neg(n, d) =>
+        let cd = gcd(n, d)
+        Neg(n / cd, d / cd)
+      Zero  => Zero
+      Pos(n, d)  =>
+        let cd = gcd(n, d)
+        Pos(n / cd, d / cd)
+
+/** Integer to rational division
+ */
+  function make_frac(n : int, d : int) : frac =
+    if (d == 0) abort("Zero denominator")
+    elif (n == 0) Zero
+    elif ((n < 0) == (d < 0)) simplify(Pos(abs_int(n), abs_int(d)))
+    else simplify(Neg(abs_int(n), abs_int(d)))
+
+  function one() : frac = Pos(1, 1)
+  function zero() : frac = Zero
+
+  function eq(a : frac, b : frac) : bool =
+    let (na, da) = to_pair(a)
+    let (nb, db) = to_pair(b)
+    (na == nb && da == db) || na * db == nb * da // they are more likely to be normalized
+
+  function neq(a : frac, b : frac) : bool =
+    let (na, da) = to_pair(a)
+    let (nb, db) = to_pair(b)
+    (na != nb || da != db) && na * db != nb * da
+
+  function geq(a : frac, b : frac) : bool = num(a) * den(b) >= num(b) * den(a)
+
+  function leq(a : frac, b : frac) : bool = num(a) * den(b) =< num(b) * den(a)
+
+  function gt(a : frac, b : frac) : bool = num(a) * den(b) > num(b) * den(a)
+
+  function lt(a : frac, b : frac) : bool = num(a) * den(b) < num(b) * den(a)
+
+  function min(a : frac, b : frac) : frac = if (leq(a, b)) a else b 
+
+  function max(a : frac, b : frac) : frac = if (geq(a, b)) a else b 
+
+  function abs(f : frac) : frac = switch(f)
+    Pos(n, d) => Pos(n, d)
+    Zero      => Zero
+    Neg(n, d) => Pos(n, d)
+
+  function from_int(n : int) : frac =
+    if   (n > 0) Pos(n, 1)
+    elif (n < 0) Neg(-n, 1)
+    else Zero
+
+  function floor(f : frac) : int = switch(f)
+    Pos(n, d) => n / d
+    Zero      => 0
+    Neg(n, d) => -(n + d - 1) / d
+
+  function ceil(f : frac) : int = switch(f)
+    Pos(n, d) => (n + d - 1) / d
+    Zero      => 0
+    Neg(n, d) => -n / d
+  
+  function round_to_zero(f : frac) : int = switch(f)
+    Pos(n, d) => n / d
+    Zero      => 0
+    Neg(n, d) => -n / d
+
+  function round_from_zero(f : frac) : int = switch(f)
+    Pos(n, d) => (n + d - 1) / d
+    Zero      => 0
+    Neg(n, d) => -(n + d - 1) / d
+
+/** Round towards nearest integer. If two integers are in the same
+ * distance, choose the even one.
+ */
+  function round(f : frac) : int =
+    let fl = floor(f)
+    let cl = ceil(f)
+    let dif_fl = abs(sub(f, from_int(fl)))
+    let dif_cl = abs(sub(f, from_int(cl)))
+    if   (gt(dif_fl, dif_cl)) cl
+    elif (gt(dif_cl, dif_fl)) fl
+    elif (fl mod 2 == 0) fl
+    else cl
+
+  function add(a : frac, b : frac) : frac =
+    let (na, da) = to_pair(a)
+    let (nb, db) = to_pair(b)
+    if   (da == db) make_frac(na + nb, da)
+    else make_frac(na * db + nb * da, da * db)
+
+  function neg(a : frac) : frac = switch(a)
+    Neg(n, d) => Pos(n, d)
+    Zero      => Zero
+    Pos(n, d) => Neg(n, d)
+
+  function sub(a : frac, b : frac) : frac = add(a, neg(b))
+
+  function inv(a : frac) : frac = switch(a)
+    Neg(n, d) => Neg(d, n)
+    Zero      => abort("Inversion of zero")
+    Pos(n, d) => Pos(d, n)
+
+  function mul(a : frac, b : frac) : frac = make_frac(num(a) * num(b), den(a) * den(b))
+
+  function div(a : frac, b : frac) : frac = switch(b)
+    Neg(n, d) => mul(a, Neg(d, n))
+    Zero      => abort("Division by zero")
+    Pos(n, d) => mul(a, Pos(d, n))
+
+/** `b` to the power of `e`
+ */
+  function int_exp(b : frac, e : int) : frac =
+    if (sign(b) == 0 && e == 0) abort("Zero to the zero exponentation")
+    elif (e < 0) inv(int_exp_(b, -e))
+    else int_exp_(b, e)
+  private function int_exp_(b : frac, e : int) =
+      if (e == 0) from_int(1)
+      elif (e == 1) b
+      else
+        let half = int_exp_(b, e / 2)
+        if (e mod 2 == 1) mul(mul(half, half), b)
+        else mul(half, half)
+
+/** Reduces the fraction's in-memory size by dividing its components by two until the
+ * the error is bigger than `loss` value
+ */
+  function optimize(f : frac, loss : frac) : frac =
+    require(geq(loss, Zero), "negative loss optimize")
+    let s = sign(f)
+    mul(from_int(s), run_optimize(abs(f), abs(f), loss))
+  private function run_optimize(orig : frac, f : frac, loss : frac) : frac =
+    let (n, d) = to_pair(f)
+    let t = make_frac((n+1)/2, (d+1)/2)
+    if(gt(abs(sub(t, orig)), loss)) f
+    elif (eq(t, f)) f
+    else run_optimize(orig, t, loss)

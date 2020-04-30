@@ -3,19 +3,32 @@
 %%% Description :
 %%% Created     : 1 Mar 2018 by Ulf Norell
 -module(aeso_parser).
+-compile({no_auto_import,[map_get/2]}).
 
 -export([string/1,
          string/2,
          string/3,
+         auto_imports/1,
          hash_include/2,
-         type/1]).
+         decl/0,
+         type/0,
+         body/0,
+         maybe_block/1,
+         run_parser/2,
+         run_parser/3]).
 
 -include("aeso_parse_lib.hrl").
 -import(aeso_parse_lib, [current_file/0, set_current_file/1]).
 
--type parse_result() :: aeso_syntax:ast() | none().
+-type parse_result() :: aeso_syntax:ast() | {aeso_syntax:ast(), sets:set(include_hash())} | none().
 
 -type include_hash() :: {string(), binary()}.
+
+
+escape_errors({ok, Ok}) ->
+    Ok;
+escape_errors({error, Err}) ->
+    parse_error(Err).
 
 -spec string(string()) -> parse_result().
 string(String) ->
@@ -30,21 +43,17 @@ string(String, Opts) ->
 
 -spec string(string(), sets:set(include_hash()), aeso_compiler:options()) -> parse_result().
 string(String, Included, Opts) ->
-    case parse_and_scan(file(), String, Opts) of
-        {ok, AST} ->
-            case expand_includes(AST, Included, Opts) of
-                {ok, AST1}   -> AST1;
-                {error, Err} -> parse_error(Err)
-            end;
-        {error, Err} ->
-            parse_error(Err)
+    AST = run_parser(file(), String, Opts),
+    case expand_includes(AST, Included, Opts) of
+        {ok, AST1}   -> AST1;
+        {error, Err} -> parse_error(Err)
     end.
 
-type(String) ->
-    case parse_and_scan(type(), String, []) of
-        {ok, AST}    -> {ok, AST};
-        {error, Err} -> {error, [mk_error(Err)]}
-    end.
+
+run_parser(P, Inp) ->
+    escape_errors(parse_and_scan(P, Inp, [])).
+run_parser(P, Inp, Opts) ->
+    escape_errors(parse_and_scan(P, Inp, Opts)).
 
 parse_and_scan(P, S, Opts) ->
     set_current_file(proplists:get_value(src_file, Opts, no_file)),
@@ -102,7 +111,7 @@ decl() ->
 
       %% Function declarations
     , ?RULE(modifiers(), fun_or_entry(), maybe_block(fundef_or_decl()), fun_block(_1, _2, _3))
-    , ?RULE(keyword('let'), valdef(),set_pos(get_pos(_1), _2))
+    , ?RULE(keyword('let'), valdef(), set_pos(get_pos(_1), _2))
     ])).
 
 fun_block(Mods, Kind, [Decl]) ->
@@ -596,8 +605,13 @@ expand_includes(AST, Included, Opts) ->
              || File <- lists:usort(auto_imports(AST)) ] ++ AST,
     expand_includes(AST1, Included, [], Opts).
 
-expand_includes([], _Included, Acc, _Opts) ->
-    {ok, lists:reverse(Acc)};
+expand_includes([], Included, Acc, Opts) ->
+    case lists:member(keep_included, Opts) of
+        false ->
+            {ok, lists:reverse(Acc)};
+        true ->
+            {ok, {lists:reverse(Acc), Included}}
+    end;
 expand_includes([{include, Ann, {string, _SAnn, File}} | AST], Included, Acc, Opts) ->
     case get_include_code(File, Ann, Opts) of
         {ok, Code} ->
@@ -656,8 +670,14 @@ stdlib_options() ->
 
 get_include_code(File, Ann, Opts) ->
     case {read_file(File, Opts), read_file(File, stdlib_options())} of
-        {{ok, _}, {ok,_ }} ->
-            fail(ann_pos(Ann), "Illegal redefinition of standard library " ++ File);
+        {{ok, Bin}, {ok, _}} ->
+            case filename:basename(File) == File of
+                true -> { error
+                        , fail( ann_pos(Ann)
+                              , "Illegal redefinition of standard library " ++ binary_to_list(File))};
+                %% If a path is provided then the stdlib takes lower priority
+                false -> {ok, binary_to_list(Bin)}
+            end;
         {_, {ok, Bin}} ->
             {ok, binary_to_list(Bin)};
         {{ok, Bin}, _} ->

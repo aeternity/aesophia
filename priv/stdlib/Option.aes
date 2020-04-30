@@ -10,13 +10,18 @@ namespace Option =
     None => false
     Some(_) => true
 
-
+/** Catamorphism on `option`. Also known as inlined pattern matching.
+ */
   function match(n : 'b, s : 'a => 'b, o : option('a)) : 'b = switch(o)
     None => n
     Some(x) => s(x)
 
+/** Escape option providing default if `None`
+ */
   function default(def : 'a, o : option('a)) : 'a = match(def, (x) => x, o)
 
+/** Assume it is `Some`
+ */
   function force(o : option('a)) : 'a = default(abort("Forced None value"), o)
 
   function on_elem(o : option('a), f : 'a => unit) : unit = match((), f, o)
@@ -40,10 +45,14 @@ namespace Option =
     (Some(x1), Some(x2), Some(x3)) => Some(f(x1, x2, x3))
     _ => None
 
+/** Like `map`, but the function is in `option`
+ */
   function app_over(f : option ('a => 'b), o : option('a)) : option('b) = switch((f, o))
     (Some(ff), Some(xx)) => Some(ff(xx))
     _ => None
 
+/** Monadic bind
+ */
   function flat_map(f : 'a => option('b), o : option('a)) : option('b) = switch(o)
     None => None
     Some(x) => f(x)
@@ -53,11 +62,17 @@ namespace Option =
     None => []
     Some(x) => [x]
 
+/** Turns list of options into a list of elements that are under `Some`s.
+ * Safe.
+ */
   function filter_options(l : list(option('a))) : list('a) = switch(l)
     []         => []
     None::t    => filter_options(t)
     Some(x)::t => x::filter_options(t)
 
+/** Just like `filter_options` but requires all elements to be `Some` and returns
+ * None if any of them is not
+ */
   function seq_options(l : list (option('a))) : option (list('a)) = switch(l)
     []         => Some([])
     None::_    => None
@@ -66,11 +81,14 @@ namespace Option =
       Some(st) => Some(x::st)
 
 
+/** Choose `Some` out of two if possible
+ */
   function choose(o1 : option('a), o2 : option('a)) : option('a) =
     if(is_some(o1)) o1 else o2
 
+/** Choose `Some` from list of options if possible
+ */
   function choose_first(l : list(option('a))) : option('a) = switch(l)
     [] => None
     None::t    => choose_first(t)
     Some(x)::_ => Some(x)
-

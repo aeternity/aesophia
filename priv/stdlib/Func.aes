@@ -12,35 +12,66 @@ namespace Func =
 
   function rapply(x : 'a, f : 'a => 'b) : 'b = f(x)
 
-  /* The Z combinator - replacement for local and anonymous recursion.
-   */
+/** The Z combinator - replacement for local and anonymous recursion.
+  */
   function recur(f : ('arg => 'res, 'arg) => 'res) : 'arg => 'res =
     (x) => f(recur(f), x)
 
+/** n-times composition with itself
+ */
   function iter(n : int, f : 'a => 'a) : 'a => 'a = iter_(n, f, (x) => x)
   private function iter_(n : int, f : 'a => 'a, acc : 'a => 'a) : 'a => 'a =
     if(n == 0) acc
     elif(n == 1) comp(f, acc)
     else iter_(n / 2, comp(f, f), if(n mod 2 == 0) acc else comp(f, acc))
 
-  function curry2(f : ('a, 'b) => 'c) : 'a => ('b => 'c) =
+/** Turns an ugly, bad and disgusting arity-n function into
+ * a beautiful and sweet function taking the first argument
+ * and returning a function watiting for the remaining ones
+ * in the same manner
+ */
+  function curry2(f : ('a, 'b) => 'x) : 'a => ('b => 'x) =
     (x) => (y) => f(x, y)
-  function curry3(f : ('a, 'b, 'c) => 'd) : 'a => ('b => ('c => 'd)) =
+  function curry3(f : ('a, 'b, 'c) => 'x) : 'a => ('b => ('c => 'x)) =
     (x) => (y) => (z) => f(x, y, z)
+  function curry4(f : ('a, 'b, 'c, 'd) => 'x) : 'a => ('b => ('c => ('d => 'x))) =
+    (x) => (y) => (z) => (w) => f(x, y, z, w)
+  function curry5(f : ('a, 'b, 'c, 'd, 'e) => 'x) : 'a => ('b => ('c => ('d => ('e => 'x)))) =
+    (x) => (y) => (z) => (w) => (q) => f(x, y, z, w, q)
 
-  function uncurry2(f : 'a => ('b => 'c)) : ('a, 'b) => 'c =
+/** Opposite of curry. Gross
+ */
+  function uncurry2(f : 'a => ('b => 'x)) : ('a, 'b) => 'x =
     (x, y) => f(x)(y)
-  function uncurry3(f : 'a => ('b => ('c => 'd))) : ('a, 'b, 'c) => 'd =
+  function uncurry3(f : 'a => ('b => ('c => 'x))) : ('a, 'b, 'c) => 'x =
     (x, y, z) => f(x)(y)(z)
+  function uncurry4(f : 'a => ('b => ('c => ('d => 'x)))) : ('a, 'b, 'c, 'd) => 'x =
+    (x, y, z, w) => f(x)(y)(z)(w)
+  function uncurry5(f : 'a => ('b => ('c => ('d => ('e => 'x))))) : ('a, 'b, 'c, 'd, 'e) => 'x =
+    (x, y, z, w, q) => f(x)(y)(z)(w)(q)
 
-  function tuplify2(f : ('a, 'b) => 'c) : (('a * 'b)) => 'c =
+/** Turns an arity-n function into a function taking n-tuple
+ */
+  function tuplify2(f : ('a, 'b) => 'x) : (('a * 'b)) => 'x =
     (t) => switch(t)
       (x, y) => f(x, y)
-  function tuplify3(f : ('a, 'b, 'c) => 'd) : 'a * 'b * 'c => 'd =
+  function tuplify3(f : ('a, 'b, 'c) => 'x) : 'a * 'b * 'c => 'x =
     (t) => switch(t)
       (x, y, z) => f(x, y, z)
+  function tuplify4(f : ('a, 'b, 'c, 'd) => 'x) : 'a * 'b * 'c * 'd => 'x =
+    (t) => switch(t)
+      (x, y, z, w) => f(x, y, z, w)
+  function tuplify5(f : ('a, 'b, 'c, 'd, 'e) => 'x) : 'a * 'b * 'c * 'd * 'e => 'x =
+    (t) => switch(t)
+      (x, y, z, w, q) => f(x, y, z, w, q)
 
-  function untuplify2(f : 'a * 'b => 'c) : ('a, 'b) => 'c =
+/** Opposite of tuplify
+ */
+  function untuplify2(f : 'a * 'b => 'x) : ('a, 'b) => 'x =
     (x, y) => f((x, y))
-  function untuplify3(f : 'a * 'b * 'c => 'd) : ('a, 'b, 'c) => 'd =
+  function untuplify3(f : 'a * 'b * 'c => 'x) : ('a, 'b, 'c) => 'x =
     (x, y, z) => f((x, y, z))
+  function untuplify4(f : 'a * 'b * 'c * 'd => 'x) : ('a, 'b, 'c, 'd) => 'x =
+    (x, y, z, w) => f((x, y, z, w))
+  function untuplify5(f : 'a * 'b * 'c * 'd * 'e => 'x) : ('a, 'b, 'c, 'd, 'e) => 'x =
+    (x, y, z, w, q) => f((x, y, z, w, q))

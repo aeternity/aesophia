@@ -381,11 +381,15 @@ failing_contracts() ->
            "  r.foo() : map(int, string)\n"
            "against the expected type\n"
            "  map(string, int)">>])
-    , ?TYPE_ERROR(bad_include_and_ns,
-        [<<?Pos(2, 11)
-           "Include of 'included.aes' at line 2, column 11\nnot allowed, include only allowed at top level.">>,
-         <<?Pos(3, 13)
-           "Nested namespace not allowed\nNamespace 'Foo' at line 3, column 13 not defined at top level.">>])
+    , ?TYPE_ERROR(not_toplevel_include,
+                  [<<?Pos(2, 11)
+                     "Include of 'included.aes' at line 2, column 11\nnot allowed, include only allowed at top level.">>])
+    , ?TYPE_ERROR(not_toplevel_namespace,
+                  [<<?Pos(2, 13)
+                     "Nested namespaces are not allowed\nNamespace 'Foo' at line 2, column 13 not defined at top level.">>])
+    , ?TYPE_ERROR(not_toplevel_contract,
+        [<<?Pos(2, 12)
+           "Nested contracts are not allowed\nContract 'Con' at line 2, column 12 not defined at top level.">>])
     , ?TYPE_ERROR(bad_address_literals,
         [<<?Pos(11, 5)
            "Cannot unify address\n"
@@ -622,6 +626,44 @@ failing_contracts() ->
          [<<?Pos(5, 28)
             "Invalid call to contract entrypoint 'Foo.foo'.\n"
             "It must be called as 'c.foo' for some c : Foo.">>])
+    , ?TYPE_ERROR(toplevel_let,
+                  [<<?Pos(2, 7)
+                     "Toplevel \"let\" definitions are not supported\n"
+                     "Value this_is_illegal at line 2, column 7 could be replaced by 0-argument function">>])
+    , ?TYPE_ERROR(empty_typedecl,
+                  [<<?Pos(2, 8)
+                     "Empty type declarations are not supported\n"
+                     "Type t at line 2, column 8 lacks a definition">>])
+    , ?TYPE_ERROR(higher_kinded_type,
+                  [<<?Pos(2, 35)
+                     "Type 'm is a higher kinded type variable\n"
+                     "(takes another type as an argument)">>])
+    , ?TYPE_ERROR(bad_arity,
+                  [<<?Pos(3, 20)
+                     "Arity for id doesn't match. Expected 1, got 0">>,
+                   <<?Pos(3, 25)
+                     "Cannot unify int\n"
+                     "         and id\n"
+                     "when checking the type of the expression at line 3, column 25\n"
+                     "  123 : int\n"
+                     "against the expected type\n"
+                     "  id">>,
+                   <<?Pos(4, 20)
+                     "Arity for id doesn't match. Expected 1, got 2">>,
+                   <<?Pos(4, 35)
+                     "Cannot unify int\n"
+                     "         and id(int, int)\n"
+                     "when checking the type of the expression at line 4, column 35\n"
+                     "  123 : int\n"
+                     "against the expected type\n"
+                     "  id(int, int)">>])
+    , ?TYPE_ERROR(bad_unnamed_map_update_default,
+                  [<<?Pos(4, 17)
+                     "Invalid map update with default">>])
+    , ?TYPE_ERROR(non_functional_entrypoint,
+                  [<<?Pos(2, 14)
+                     "f at line 2, column 14 was declared with an invalid type int.\n"
+                     "Entrypoints and functions must have functional types">>])
     , ?TYPE_ERROR(bad_records,
         [<<?Pos(3, 16)
            "Mixed record fields and map keys in\n"
@@ -639,6 +681,28 @@ failing_contracts() ->
            "  (0 : int) == (1 : int) : bool\n"
            "It must be either 'true' or 'false'.">>
         ])
+    , ?TYPE_ERROR(bad_number_of_args,
+                  [<<?Pos(3, 39)
+                     "Cannot unify () => unit\n"
+                     "         and (int) => 'a\n",
+                     "when checking the application at line 3, column 39 of\n"
+                     "  f : () => unit\n"
+                     "to arguments\n"
+                     "  1 : int">>,
+                   <<?Pos(4, 20)
+                     "Cannot unify (int, string) => 'e\n"
+                     "         and (int) => 'd\n"
+                     "when checking the application at line 4, column 20 of\n"
+                     "  g : (int, string) => 'e\n"
+                     "to arguments\n"
+                     "  1 : int">>,
+                   <<?Pos(5, 20)
+                     "Cannot unify (int, string) => 'c\n"
+                     "         and (string) => 'b\n"
+                     "when checking the application at line 5, column 20 of\n"
+                     "  g : (int, string) => 'c\nto arguments\n"
+                     "  \"Litwo, ojczyzno moja\" : string">>
+                  ])
     ].
 
 -define(Path(File), "code_errors/" ??File).

@@ -1,0 +1,5 @@
+contract C =
+  entrypoint f() =
+    let z = 123
+    {}{ [1 = 0] = z + 1 }
+    2

@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 ### Removed
 
+## [4.3.0]
+### Added
+- Added documentation (moved from `protocol`)
+- `Frac.aes` – library for rational numbers
+- Added some more meaningful error messages
+- Exported several parsing functionalities
+ - With option `keep_included` it is possible to see which files were included during the parse
+ - There is a function `run_parser` that be used to evaluate any parsing rule
+ - Exported parsers: `body`, `type` and `decl`
+### Changed
+- Performance improvements in the standard library
+- Fixed ACI encoder to handle `-` unary operator
+- Fixed including by absolute path
+- Fixed variant type printing in the ACI error messages
+- Fixed pretty printing of combined function clauses
+### Removed
+- `let` definitions are no longer supported in the toplevel of the contract
+- type declarations are no longer supported
+
 ## [4.2.0] - 2020-01-15
 ### Added
 - Allow separate entrypoint/function type signature and definition, and pattern
@@ -53,7 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (de-)construct byte arrays.
 - `[a..b]` language construct, returning the list of numbers between
   `a` and `b` (inclusive). Returns the empty list if `a` > `b`.
-- [Standard libraries] (https://github.com/aeternity/protocol/blob/master/contracts/sophia_stdlib.md)
+- [Standard libraries](https://github.com/aeternity/aesophia/blob/master/docs/sophia_stdlib.md)
 - Checks that `init` is not called from other functions.
 - FATE backend - the compiler is able to produce VM code for both `AEVM` and `FATE`. Many
   of the APIs now take `{backend, aevm | fate}` to decide wich backend to produce artifacts
@@ -192,10 +211,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v4.2.0...HEAD
-[4.2.0]: https://github.com/aeternity/aesophia/compare/v4.2.0...v4.1.0
-[4.1.0]: https://github.com/aeternity/aesophia/compare/v4.1.0...v4.0.0
-[4.0.0]: https://github.com/aeternity/aesophia/compare/v4.0.0...v3.2.0
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v4.3.0...HEAD
+[4.3.0]: https://github.com/aeternity/aesophia/compare/v4.2.0...v4.3.0
+[4.2.0]: https://github.com/aeternity/aesophia/compare/v4.1.0...v4.2.0
+[4.1.0]: https://github.com/aeternity/aesophia/compare/v4.0.0...v4.1.0
+[4.0.0]: https://github.com/aeternity/aesophia/compare/v3.2.0...v4.0.0
 [3.2.0]: https://github.com/aeternity/aesophia/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/aeternity/aesophia/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/aeternity/aesophia/compare/v2.1.0...v3.0.0
