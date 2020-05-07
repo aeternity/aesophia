@@ -520,7 +520,7 @@ using the private key of the `owner` account for signing.
 
 #### transfer
 ```
-AENS.transfer(owner : address, new_owner : address, name_hash : hash, <signature : signature>) : unit
+AENS.transfer(owner : address, new_owner : address, name : string, <signature : signature>) : unit
 ```
 
 Transfers name to the new owner.
@@ -531,7 +531,7 @@ using the private key of the `owner` account for signing.
 
 #### revoke
 ```
-AENS.revoke(owner : address, name_hash : hash, <signature : signature>) : unit
+AENS.revoke(owner : address, name : string, <signature : signature>) : unit
 ```
 
 Revokes the name to extend the ownership time.
