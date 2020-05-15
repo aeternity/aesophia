@@ -39,9 +39,9 @@
               | {pragma, ann(), pragma()}
               | {type_decl, ann(), id(), [tvar()]} % Only for error msgs
               | {type_def, ann(), id(), [tvar()], typedef()}
-              | {fun_decl, ann(), id(), type()}
-              | {fun_clauses, ann(), id(), type(), [letbind()]}
+              | {fun_clauses, ann(), id(), type(), [letfun() | fundecl()]}
               | {block, ann(), [decl()]}
+              | fundecl()
               | letfun()
               | letval(). % Only for error msgs
 
@@ -50,8 +50,10 @@
 -type pragma() :: {compiler, '==' | '<' | '>' | '=<' | '>=', compiler_version()}.
 
 
--type letval() :: {letval, ann(), pat(), expr()}.
--type letfun() :: {letfun, ann(), id(), [pat()], type(), expr()}.
+-type letval()  :: {letval, ann(), pat(), expr()}.
+-type letfun()  :: {letfun, ann(), id(), [pat()], type(), expr()}.
+-type fundecl() :: {fun_decl, ann(), id(), type()}.
+
 -type letbind()
     :: letfun()
      | letval().

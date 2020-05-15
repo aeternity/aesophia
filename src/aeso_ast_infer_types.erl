@@ -564,6 +564,10 @@ init_env(_Options) -> global_env().
 
 -spec infer(aeso_syntax:ast(), list(option())) ->
     aeso_syntax:ast() | {env(), aeso_syntax:ast()}.
+infer([], Options) ->
+    create_type_errors(),
+    type_error({no_decls, proplists:get_value(src_file, Options, no_file)}),
+    destroy_and_report_type_errors(init_env(Options));
 infer(Contracts, Options) ->
     ets_init(), %% Init the ETS table state
     try
@@ -626,7 +630,9 @@ infer_contract_top(Env, Kind, Defs0, _Options) ->
 %% a list of definitions.
 -spec infer_contract(env(), main_contract | contract | namespace, [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
 infer_contract(Env0, What, Defs0) ->
+    create_type_errors(),
     Defs = process_blocks(Defs0),
+    destroy_and_report_type_errors(Env0),
     Env  = Env0#env{ what = What },
     Kind = fun({type_def, _, _, _, _})    -> type;
               ({letfun, _, _, _, _, _})   -> function;
@@ -679,12 +685,12 @@ process_block(Ann, [Decl | Decls]) ->
     case Decl of
         {fun_decl, Ann1, Id = {id, _, Name}, Type} ->
             {Clauses, Rest} = lists:splitwith(IsThis(Name), Decls),
-            [{fun_clauses, Ann1, Id, Type, Clauses} |
-             process_block(Ann, Rest)];
+            [type_error({mismatched_decl_in_funblock, Name, D1}) || D1 <- Rest],
+            [{fun_clauses, Ann1, Id, Type, Clauses}];
         {letfun, Ann1, Id = {id, _, Name}, _, _, _} ->
             {Clauses, Rest} = lists:splitwith(IsThis(Name), [Decl | Decls]),
-            [{fun_clauses, Ann1, Id, {id, [{origin, system} | Ann1], "_"}, Clauses} |
-             process_block(Ann, Rest)]
+            [type_error({mismatched_decl_in_funblock, Name, D1}) || D1 <- Rest],
+            [{fun_clauses, Ann1, Id, {id, [{origin, system} | Ann1], "_"}, Clauses}]
     end.
 
 -spec check_typedefs(env(), [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
@@ -2266,6 +2272,12 @@ mk_t_err(Pos, Msg) ->
 mk_t_err(Pos, Msg, Ctxt) ->
     aeso_errors:new(type_error, Pos, lists:flatten(Msg), lists:flatten(Ctxt)).
 
+mk_error({no_decls, File}) ->
+    Pos = aeso_errors:pos(File, 0, 0),
+    mk_t_err(Pos, "Empty contract\n");
+mk_error({mismatched_decl_in_funblock, Name, Decl}) ->
+    Msg = io_lib:format("Mismatch in the function block. Expected implementation/type declaration of ~s function\n", [Name]),
+    mk_t_err(pos(Decl), Msg);
 mk_error({higher_kinded_typevar, T}) ->
     Msg = io_lib:format("Type ~s is a higher kinded type variable\n"
                         "(takes another type as an argument)\n", [pp(instantiate(T))]
