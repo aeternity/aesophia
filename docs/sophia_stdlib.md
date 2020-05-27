@@ -501,7 +501,7 @@ using the private key of the `owner` account for signing.
 
 ### transfer
 ```
-AENS.transfer(owner : address, new_owner : address, name_hash : hash, <signature : signature>) : unit
+AENS.transfer(owner : address, new_owner : address, name : string, <signature : signature>) : unit
 ```
 
 Transfers name to the new owner.
@@ -512,7 +512,7 @@ using the private key of the `owner` account for signing.
 
 ### revoke
 ```
-AENS.revoke(owner : address, name_hash : hash, <signature : signature>) : unit
+AENS.revoke(owner : address, name : string, <signature : signature>) : unit
 ```
 
 Revokes the name to extend the ownership time.
@@ -1149,7 +1149,7 @@ will yield `None`.
 
 ### choose
 ```
-Option.choose(o1 : option('a), o2 : option('a)) : option('a) 
+Option.choose(o1 : option('a), o2 : option('a)) : option('a)
 ```
 
 Out of two `option`s choose the one that is `Some`, or `None` if both are `None`s.
@@ -1261,7 +1261,7 @@ Func.curry2(f : ('a, 'b) => 'c) : 'a => ('b => 'c)
 Func.curry3(f : ('a, 'b, 'c) => 'd) : 'a => ('b => ('c => 'd))
 ```
 
-Turns a function that takes n arguments into a curried function that takes 
+Turns a function that takes n arguments into a curried function that takes
 one argument and returns a function that waits for the rest in the same
 manner. For instance `curry2((a, b) => a + b)(1)(2) == 3`.
 
@@ -1631,7 +1631,7 @@ This namespace provides operations on rational numbers. A rational number is rep
 as a fraction of two integers which are stored internally in the `frac` datatype.
 
 The datatype consists of three constructors `Neg/2`, `Zero/0` and `Pos/2` which determine the
-sign of the number. Both values stored in `Neg` and `Pos` need to be strictly positive 
+sign of the number. Both values stored in `Neg` and `Pos` need to be strictly positive
 integers. However, when creating a `frac` you should never use the constructors explicitly.
 Instead of that, always use provided functions like `make_frac` or `from_int`. This helps
 keeping the internal representation well defined.
@@ -1767,14 +1767,14 @@ Rounds a fraction to the nearest greater or equal integer.
 ### round_to_zero
 `Frac.round_to_zero(f : frac) : int`
 
-Rounds a fraction towards zero. 
+Rounds a fraction towards zero.
 Effectively `ceil` if lesser than zero and `floor` if greater.
 
 
 ### round_from_zero
 `Frac.round_from_zero(f : frac) : int`
 
-Rounds a fraction from zero. 
+Rounds a fraction from zero.
 Effectively `ceil` if greater than zero and `floor` if lesser.
 
 
@@ -1806,7 +1806,7 @@ Subtraction of two fractions.
 ### inv
 `Frac.inv(a : frac) : frac`
 
-Inverts a fraction. Throws error if `a` is zero. 
+Inverts a fraction. Throws error if `a` is zero.
 
 
 ### mul
