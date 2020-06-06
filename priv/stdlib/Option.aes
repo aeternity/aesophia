@@ -22,7 +22,9 @@ namespace Option =
 
 /** Assume it is `Some`
  */
-  function force(o : option('a)) : 'a = default(abort("Forced None value"), o)
+  function force(o : option('a)) : 'a = switch(o)
+    None    => abort("Forced None value")
+    Some(x) => x
 
   function on_elem(o : option('a), f : 'a => unit) : unit = match((), f, o)
 
