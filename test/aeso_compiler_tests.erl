@@ -665,6 +665,16 @@ failing_contracts() ->
            "Empty record/map update\n"
            "  r {}">>
         ])
+    , ?TYPE_ERROR(bad_function_block,
+                  [<<?Pos(4, 5)
+                     "Mismatch in the function block. Expected implementation/type declaration of g function">>,
+                   <<?Pos(5, 5)
+                     "Mismatch in the function block. Expected implementation/type declaration of g function">>
+                  ])
+    , ?TYPE_ERROR(just_an_empty_file,
+                  [<<?Pos(0, 0)
+                     "Empty contract">>
+                  ])
     , ?TYPE_ERROR(bad_number_of_args,
                   [<<?Pos(3, 39)
                      "Cannot unify () => unit\n"
