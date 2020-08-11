@@ -95,6 +95,8 @@ from_fate({tuple_t, _, Types}, ?FATE_TUPLE(Val))
         when length(Types) == tuple_size(Val) ->
     {tuple, [], [from_fate(Type, X)
                  || {Type, X} <- lists:zip(Types, tuple_to_list(Val))]};
+from_fate({record_t, [{field_t, _, FName, FType}]}, Val) ->
+    {record, [], [{field, [], [{proj, [], FName}], from_fate(FType, Val)}]};
 from_fate({record_t, Fields}, ?FATE_TUPLE(Val))
         when length(Fields) == tuple_size(Val) ->
     {record, [], [ {field, [], [{proj, [], FName}], from_fate(FType, X)}
