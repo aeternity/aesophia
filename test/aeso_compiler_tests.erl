@@ -39,7 +39,7 @@ simple_compile_test_() ->
                    error(ErrBin)
            end
        end} || ContractName <- compilable_contracts(), Backend <- [aevm, fate],
-               not lists:member(ContractName, not_yet_compilable(Backend))] ++
+               not lists:member(ContractName, not_compilable_on(Backend))] ++
     [ {"Test file not found error",
        fun() ->
            {error, Errors} = aeso_compiler:file("does_not_exist.aes"),
@@ -168,8 +168,11 @@ compilable_contracts() ->
      "lhs_matching"
     ].
 
-not_yet_compilable(fate) -> [];
-not_yet_compilable(aevm) -> [].
+not_compilable_on(fate) -> [];
+not_compilable_on(aevm) ->
+    ["stdlib_include",
+     "manual_stdlib_include"
+    ].
 
 %% Contracts that should produce type errors
 
@@ -316,8 +319,8 @@ failing_contracts() ->
           "  x : int\n"
           "against the expected type\n"
           "  string">>,
-        <<?Pos(14, 24)
-          "No record type with fields y, z (at line 14, column 24)">>,
+        <<?Pos(14, 35)
+          "No record type with fields z, y (at line 14, column 35)">>,
         <<?Pos(15, 26)
           "The field z is missing when constructing an element of type r2 (at line 15, column 26)">>,
         <<?Pos(15, 24)

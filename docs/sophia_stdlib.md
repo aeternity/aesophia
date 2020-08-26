@@ -700,6 +700,13 @@ List.last(l : list('a)) : option('a)
 Returns `Some` of the last element of a list or `None` if the list is empty.
 
 
+### contains
+```
+List.contains(e : 'a, l : list('a)) : bool
+```
+Checks if list `l` contains element `e`. Equivalent to `List.find(x => x == e, l) != None`.
+
+
 ### find
 ```
 List.find(p : 'a => bool, l : list('a)) : option('a)
@@ -1038,6 +1045,13 @@ Option.force(o : option('a)) : 'a
 ```
 
 Forcefully escapes `option` wrapping assuming it is `Some`. Throws error on `None`.
+
+
+### contains
+```
+Option.contains(e : 'a, o : option('a)) : bool
+```
+Returns `true` if and only if `o` contains element equal to `e`. Equivalent to `Option.match(false, x => x == e, o)`.
 
 
 ### on_elem
