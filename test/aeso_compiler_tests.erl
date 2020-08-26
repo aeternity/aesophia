@@ -319,8 +319,8 @@ failing_contracts() ->
           "  x : int\n"
           "against the expected type\n"
           "  string">>,
-        <<?Pos(14, 35)
-          "No record type with fields z, y (at line 14, column 35)">>,
+        <<?Pos(14, 24)
+          "No record type with fields y, z (at line 14, column 24)">>,
         <<?Pos(15, 26)
           "The field z is missing when constructing an element of type r2 (at line 15, column 26)">>,
         <<?Pos(15, 24)
