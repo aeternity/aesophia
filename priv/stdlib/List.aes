@@ -15,9 +15,13 @@ namespace List =
     _::t => Some(t)
 
   function last(l : list('a)) : option('a) = switch(l)
-    []  => None
-    [x] => Some(x)
+    []   => None
+    [x]  => Some(x)
     _::t => last(t)
+
+  function contains(e : 'a, l : list('a)) = switch(l)
+    []   => false
+    h::t => h == e || contains(e, t)
 
 /** Finds first element of `l` fulfilling predicate `p` as `Some` or `None`
  * if no such element exists.

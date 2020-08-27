@@ -39,7 +39,7 @@ simple_compile_test_() ->
                    error(ErrBin)
            end
        end} || ContractName <- compilable_contracts(), Backend <- [aevm, fate],
-               not lists:member(ContractName, not_yet_compilable(Backend))] ++
+               not lists:member(ContractName, not_compilable_on(Backend))] ++
     [ {"Test file not found error",
        fun() ->
            {error, Errors} = aeso_compiler:file("does_not_exist.aes"),
@@ -168,8 +168,11 @@ compilable_contracts() ->
      "lhs_matching"
     ].
 
-not_yet_compilable(fate) -> [];
-not_yet_compilable(aevm) -> [].
+not_compilable_on(fate) -> [];
+not_compilable_on(aevm) ->
+    ["stdlib_include",
+     "manual_stdlib_include"
+    ].
 
 %% Contracts that should produce type errors
 

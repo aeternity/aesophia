@@ -26,6 +26,8 @@ namespace Option =
     None    => abort("Forced None value")
     Some(x) => x
 
+  function contains(e : 'a, o : option('a)) = o == Some(e)
+
   function on_elem(o : option('a), f : 'a => unit) : unit = match((), f, o)
 
   function map(f : 'a => 'b, o : option('a)) : option('b) = switch(o)
