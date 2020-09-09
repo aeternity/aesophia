@@ -157,14 +157,16 @@ string_to_code(ContractString, Options) ->
         aevm ->
             Icode = ast_to_icode(TypedAst, Options),
             pp_icode(Icode, Options),
-            #{ icode => Icode,
-               typed_ast => TypedAst,
-               type_env  => TypeEnv};
+            #{ icode => Icode
+             , typed_ast => TypedAst
+             , type_env  => TypeEnv
+             , ast => Ast };
         fate ->
             Fcode = aeso_ast_to_fcode:ast_to_fcode(TypedAst, Options),
-            #{ fcode => Fcode,
-               typed_ast => TypedAst,
-               type_env  => TypeEnv}
+            #{ fcode => Fcode
+             , typed_ast => TypedAst
+             , type_env  => TypeEnv
+             , ast => Ast }
     end.
 
 -define(CALL_NAME,   "__call").
@@ -199,8 +201,8 @@ check_call1(ContractString0, FunName, Args, Options) ->
         case proplists:get_value(backend, Options, aevm) of
             aevm ->
                 %% First check the contract without the __call function
-                #{} = string_to_code(ContractString0, Options),
-                ContractString = insert_call_function(ContractString0, ?CALL_NAME, FunName, Args, Options),
+                #{ast := Ast} = string_to_code(ContractString0, Options),
+                ContractString = insert_call_function(Ast, ContractString0, ?CALL_NAME, FunName, Args),
                 #{typed_ast := TypedAst,
                   icode     := Icode} = string_to_code(ContractString, Options),
                 {ok, {FunName, {fun_t, _, _, ArgTypes, RetType}}} = get_call_type(TypedAst),
@@ -221,13 +223,14 @@ check_call1(ContractString0, FunName, Args, Options) ->
                 {ok, FunName, {ArgVMTypes, RetVMType1}, ArgTerms};
             fate ->
                 %% First check the contract without the __call function
-                #{fcode := OrgFcode} = string_to_code(ContractString0, Options),
+                #{ fcode := OrgFcode
+                 , ast := Ast } = string_to_code(ContractString0, Options),
                 FateCode = aeso_fcode_to_fate:compile(OrgFcode, []),
                 %% collect all hashes and compute the first name without hash collision to
                 SymbolHashes = maps:keys(aeb_fate_code:symbols(FateCode)),
                 CallName = first_none_match(?CALL_NAME, SymbolHashes,
                                             lists:seq($1, $9) ++ lists:seq($A, $Z) ++ lists:seq($a, $z)),
-                ContractString = insert_call_function(ContractString0, CallName, FunName, Args, Options),
+                ContractString = insert_call_function(Ast, ContractString0, CallName, FunName, Args),
                 #{fcode := Fcode} = string_to_code(ContractString, Options),
                 CallArgs = arguments_of_body(CallName, FunName, Fcode),
                 {ok, FunName, CallArgs}
@@ -253,9 +256,8 @@ first_none_match(CallName, Hashes, [Char|Chars]) ->
     end.
 
 %% Add the __call function to a contract.
--spec insert_call_function(string(), string(), string(), [string()], options()) -> string().
-insert_call_function(Code, Call, FunName, Args, Options) ->
-    Ast = parse(Code, Options),
+-spec insert_call_function(aeso_syntax:ast(), string(), string(), string(), [string()]) -> string().
+insert_call_function(Ast, Code, Call, FunName, Args) ->
     Ind = last_contract_indent(Ast),
     lists:flatten(
         [ Code,
