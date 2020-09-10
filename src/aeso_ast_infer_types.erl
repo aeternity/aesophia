@@ -553,7 +553,7 @@ global_env() ->
 option_t(As, T) -> {app_t, As, {id, As, "option"}, [T]}.
 map_t(As, K, V) -> {app_t, As, {id, As, "map"}, [K, V]}.
 
--spec infer(aeso_syntax:ast()) -> aeso_syntax:ast() | {env(), aeso_syntax:ast()}.
+-spec infer(aeso_syntax:ast()) -> {aeso_syntax:ast(), aeso_syntax:ast()} | {env(), aeso_syntax:ast(), aeso_syntax:ast()}.
 infer(Contracts) ->
     infer(Contracts, []).
 
@@ -563,7 +563,7 @@ infer(Contracts) ->
 init_env(_Options) -> global_env().
 
 -spec infer(aeso_syntax:ast(), list(option())) ->
-    aeso_syntax:ast() | {env(), aeso_syntax:ast()}.
+  {aeso_syntax:ast(), aeso_syntax:ast()} | {env(), aeso_syntax:ast(), aeso_syntax:ast()}.
 infer([], Options) ->
     create_type_errors(),
     type_error({no_decls, proplists:get_value(src_file, Options, no_file)}),
@@ -576,15 +576,15 @@ infer(Contracts, Options) ->
         ets_new(type_vars, [set]),
         check_modifiers(Env, Contracts),
         {Env1, Decls} = infer1(Env, Contracts, [], Options),
-        {Env2, Decls2} =
+        {Env2, DeclsFolded, DeclsUnfolded} =
             case proplists:get_value(dont_unfold, Options, false) of
-                true  -> {Env1, Decls};
+                true  -> {Env1, Decls, Decls};
                 false -> E = on_scopes(Env1, fun(Scope) -> unfold_record_types(Env1, Scope) end),
-                         {E, unfold_record_types(E, Decls)}
+                         {E, Decls, unfold_record_types(E, Decls)}
             end,
         case proplists:get_value(return_env, Options, false) of
-            false -> Decls2;
-            true  -> {Env2, Decls2}
+            false -> {DeclsFolded, DeclsUnfolded};
+            true  -> {Env2, DeclsFolded, DeclsUnfolded}
         end
     after
         clean_up_ets()
