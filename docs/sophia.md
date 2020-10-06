@@ -1,3 +1,5 @@
+<!--  IMPORTANT: This file shall temporarily remain as an internal reference for the transformation of the doc into the format favored by readthedocs and will be removed soon. For the actual documentation, see https://aeternity-sophia.readthedocs.io/-->
+
 <!-- IMPORTANT: REMEMBER TO UPDATE THE TABLE OF CONTENTS AFTER YOUR EDIT -->
 
 **Table of Contents**
