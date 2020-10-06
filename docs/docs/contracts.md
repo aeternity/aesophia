@@ -1,76 +1,4 @@
-<!-- IMPORTANT: REMEMBER TO UPDATE THE TABLE OF CONTENTS AFTER YOUR EDIT -->
-
-**Table of Contents**
-
-- [-](#-)
-- [Language Features](#language-features)
-    - [Contracts](#contracts)
-        - [Calling other contracts](#calling-other-contracts)
-        - [Protected contract calls](#protected-contract-calls)
-        - [Mutable state](#mutable-state)
-            - [Stateful functions](#stateful-functions)
-        - [Payable](#payable)
-            - [Payable contracts](#payable-contracts)
-            - [Payable entrypoints](#payable-entrypoints)
-        - [Namespaces](#namespaces)
-        - [Splitting code over multiple files](#splitting-code-over-multiple-files)
-        - [Standard library](#standard-library)
-        - [Types](#types)
-        - [Literals](#literals)
-        - [Arithmetic](#arithmetic)
-        - [Bit fields](#bit-fields)
-        - [Type aliases](#type-aliases)
-        - [Algebraic data types](#algebraic-data-types)
-        - [Lists](#lists)
-        - [Maps and records](#maps-and-records)
-            - [Constructing maps and records](#constructing-maps-and-records)
-            - [Accessing values](#accessing-values)
-            - [Updating a value](#updating-a-value)
-            - [Map implementation](#map-implementation)
-        - [Strings](#strings)
-        - [Chars](#chars)
-        - [Byte arrays](#byte-arrays)
-        - [Cryptographic builtins](#cryptographic-builtins)
-            - [AEVM note](#aevm-note)
-        - [Authorization interface](#authorization-interface)
-        - [Oracle interface](#oracle-interface)
-            - [Example](#example)
-            - [Sanity checks](#sanity-checks)
-        - [AENS interface](#aens-interface)
-            - [Example](#example-1)
-        - [Events](#events)
-            - [Argument order](#argument-order)
-        - [Compiler pragmas](#compiler-pragmas)
-        - [Exceptions](#exceptions)
-    - [Syntax](#syntax)
-        - [Lexical syntax](#lexical-syntax)
-            - [Comments](#comments)
-            - [Keywords](#keywords)
-            - [Tokens](#tokens)
-        - [Layout blocks](#layout-blocks)
-        - [Notation](#notation)
-        - [Declarations](#declarations)
-        - [Types](#types-1)
-        - [Statements](#statements)
-        - [Expressions](#expressions)
-        - [Operators types](#operators-types)
-        - [Operator precendences](#operator-precendences)
-    - [Examples](#examples)
-        - [Delegation signature](#delegation-signature)
-
-
-## The Sophia Language
-An Æternity BlockChain Language
-
-The Sophia is a language in the ML family. It is strongly typed and has
-restricted mutable state.
-
-Sophia is customized for smart contracts, which can be published
-to a blockchain (the Æternity BlockChain). Thus some features of conventional
-languages, such as floating point arithmetic, are not present in Sophia, and
-some blockchain specific primitives, constructions and types have been added.
-## Language Features
-### Contracts
+## Contracts
 
 The main unit of code in Sophia is the *contract*.
 
@@ -143,33 +71,31 @@ without calling it you can write
 
 #### Protected contract calls
 
+!!! attention
+    This feature is not part of the current protocol version and could be implemented in a future protocol upgrade. 
+
 If a contract call fails for any reason (for instance, the remote contract
 crashes or runs out of gas, or the entrypoint doesn't exist or has the wrong
 type) the parent call also fails. To make it possible to recover from failures,
 contract calls takes a named argument `protected : bool` (default `false`).
-
 The protected argument must be a literal boolean, and when set to `true`
 changes the type of the contract call, wrapping the result in an `option` type.
 If the call fails the result is `None`, otherwise it's `Some(r)` where `r` is
 the return value of the call.
-
 ```sophia
 contract VotingType =
   entrypoint : vote : string => unit
-
 contract Voter =
   entrypoint tryVote(v : VotingType, alt : string) =
     switch(v.vote(alt, protected = true) : option(unit))
       None    => "Voting failed"
       Some(_) => "Voting successful"
 ```
-
 Any gas that was consumed by the contract call before the failure stays
 consumed, which means that in order to protect against the remote contract
 running out of gas it is necessary to set a gas limit using the `gas` argument.
 However, note that errors that would normally consume all the gas in the
 transaction still only uses up the gas spent running the contract.
-
 
 ### Mutable state
 
@@ -288,6 +214,9 @@ dependent on the specific state and event types of the contract.
 
 ### Splitting code over multiple files
 
+!!! info
+    This feature is currently not supported by the [AEstudio IDE](https://studio.aepps.com/)
+    and shall only be used with the standalone compiler.
 
 Code from another file can be included in a contract using an `include`
 statement. These must appear at the top-level (outside the main contract). The
@@ -314,7 +243,7 @@ so even cyclic includes should be working without any special tinkering.
 
 ### Standard library
 
-Sophia offers [standard library](sophia_stdlib.md) which exposes some
+Sophia offers [standard library](sophia_stdlib.md) which exposes some 
 primitive operations and some higher level utilities. The builtin
 namespaces like `Chain`, `Contract`, `Map`
 are included by default and are supported internally by the compiler.
@@ -481,7 +410,7 @@ Example syntax:
 
 Lists can be constructed using the range syntax using special `..` operator:
 ```
-[1..4] == [1,2,3,4]
+[1..4] == [1,2,3,4] 
 ```
 The ranges are always ascending and have step equal to 1.
 
@@ -595,7 +524,7 @@ Please refer to the `Bytes` [library documentation](sophia_stdlib.md#Bytes).
 
 ### Cryptographic builtins
 
-Libraries [Crypto](sophia_stdlib.md#Crypto) and [String](sophia_stdlib.md#String) provide functions to
+Libraries [Crypto](sophia_stdlib.md#Crypto) and [String](sophia_stdlib.md#String) provide functions to 
 hash objects, verify signatures etc. The `hash` is a type alias for `bytes(32)`.
 
 #### AEVM note
@@ -630,7 +559,7 @@ Example for an oracle answering questions of type `string` with answers of type 
 contract Oracles =
 
   stateful entrypoint registerOracle(acct : address,
-                                     sign : signature,   // Signed network id + oracle address + contract address
+                                     sign : signature,   // Signed oracle address + contract address
                                      qfee : int,
                                      ttl  : Chain.ttl) : oracle(string, int) =
      Oracle.register(acct, signature = sign, qfee, ttl)
@@ -651,13 +580,13 @@ contract Oracles =
     Oracle.extend(o, ttl)
 
   stateful entrypoint signExtendOracle(o    : oracle(string, int),
-                                       sign : signature,   // Signed network id + oracle address + contract address
-                                       ttl  : Chain.ttl) : unit =
+                                     sign : signature,   // Signed oracle address + contract address
+                                     ttl  : Chain.ttl) : unit =
     Oracle.extend(o, signature = sign, ttl)
 
   stateful entrypoint respond(o    : oracle(string, int),
                               q    : oracle_query(string, int),
-                              sign : signature,        // Signed network id + oracle query id + contract address
+                              sign : signature,        // Signed oracle query id + contract address
                               r    : int) =
     Oracle.respond(o, q, signature = sign, r)
 
@@ -678,7 +607,7 @@ contract Oracles =
 
 #### Sanity checks
 
-When an Oracle literal is passed to a contract, no deep checks are performed.
+When an Oracle literal is passed to a contract, no deep checks are performed. 
 For extra safety [Oracle.check](sophia_stdlib.md#check) and [Oracle.check_query](sophia_stdlib.md#check_query)
 functions are provided.
 
@@ -693,7 +622,7 @@ For this purpose the [AENS](sophia_stdlib.md#AENS) library was exposed.
 In this example we assume that the name `name` already exists, and is owned by
 an account with address `addr`. In order to allow a contract `ct` to handle
 `name` the account holder needs to create a
-[signature](#delegation-signature) `sig` of `addr | name.hash | ct.address`.
+[signature](examples.md#delegation-signature) `sig` of `addr | name.hash | ct.address`.
 
 Armed with this information we can for example write a function that extends
 the name if it expires within 1000 blocks:
@@ -738,7 +667,7 @@ To use events a contract must declare a datatype `event`, and events are then
 logged using the `Chain.event` function:
 
 ```
-  datatype event
+  datatype event 
     = Event1(int, int, string)
     | Event2(string, address)
 
@@ -819,341 +748,3 @@ For convenience the following function is also built-in:
 function require(b : bool, err : string) =
     if(!b) abort(err)
 ```
-
-## Syntax
-
-### Lexical syntax
-
-#### Comments
-
-Single line comments start with `//` and block comments are enclosed in `/*`
-and `*/` and can be nested.
-
-#### Keywords
-
-```
-contract elif else entrypoint false function if import include let mod namespace
-private payable stateful switch true type record datatype
-```
-
-#### Tokens
-
-- `Id = [a-z_][A-Za-z0-9_']*` identifiers start with a lower case letter.
-- `Con = [A-Z][A-Za-z0-9_']*` constructors start with an upper case letter.
-- `QId = (Con\.)+Id` qualified identifiers (e.g. `Map.member`)
-- `QCon = (Con\.)+Con` qualified constructor
-- `TVar = 'Id` type variable (e.g `'a`, `'b`)
-- `Int = [0-9]+(_[0-9]+)*|0x[0-9A-Fa-f]+(_[0-9A-Fa-f]+)*` integer literal with optional `_` separators
-- `Bytes = #[0-9A-Fa-f]+(_[0-9A-Fa-f]+)*` byte array literal with optional `_` separators
-- `String` string literal enclosed in `"` with escape character `\`
-- `Char` character literal enclosed in `'` with escape character `\`
-- `AccountAddress` base58-encoded 32 byte account pubkey with `ak_` prefix
-- `ContractAddress` base58-encoded 32 byte contract address with `ct_` prefix
-- `OracleAddress` base58-encoded 32 byte oracle address with `ok_` prefix
-- `OracleQueryId` base58-encoded 32 byte oracle query id with `oq_` prefix
-
-Valid string escape codes are
-
-| Escape        |       ASCII |   |
-|---------------|-------------|---|
-| `\b`          |           8 |   |
-| `\t`          |           9 |   |
-| `\n`          |          10 |   |
-| `\v`          |          11 |   |
-| `\f`          |          12 |   |
-| `\r`          |          13 |   |
-| `\e`          |          27 |   |
-| `\xHexDigits` | *HexDigits* |   |
-
-
-See the [identifier encoding scheme](https://github.com/aeternity/protocol/blob/master/node/api/api_encoding.md) for the
-details on the base58 literals.
-
-### Layout blocks
-
-Sophia uses Python-style layout rules to group declarations and statements. A
-layout block with more than one element must start on a separate line and be
-indented more than the currently enclosing layout block. Blocks with a single
-element can be written on the same line as the previous token.
-
-Each element of the block must share the same indentation and no part of an
-element may be indented less than the indentation of the block. For instance
-
-```
-contract Layout =
-  function foo() = 0  // no layout
-  function bar() =    // layout block starts on next line
-    let x = foo()     // indented more than 2 spaces
-    x
-     + 1              // the '+' is indented more than the 'x'
-```
-
-### Notation
-
-In describing the syntax below, we use the following conventions:
-- Upper-case identifiers denote non-terminals (like `Expr`) or terminals with
-  some associated value (like `Id`).
-- Keywords and symbols are enclosed in single quotes: `'let'` or `'='`.
-- Choices are separated by vertical bars: `|`.
-- Optional elements are enclosed in `[` square brackets `]`.
-- `(` Parentheses `)` are used for grouping.
-- Zero or more repetitions are denoted by a postfix `*`, and one or more
-  repetitions by a `+`.
-- `Block(X)` denotes a layout block of `X`s.
-- `Sep(X, S)` is short for `[X (S X)*]`, i.e. a possibly empty sequence of `X`s
-  separated by `S`s.
-- `Sep1(X, S)` is short for `X (S X)*`, i.e. same as `Sep`, but must not be empty.
-
-
-### Declarations
-
-A Sophia file consists of a sequence of *declarations* in a layout block.
-
-```c
-File ::= Block(TopDecl)
-
-TopDecl ::= ['payable'] 'contract' Con '=' Block(Decl)
-       | 'namespace' Con '=' Block(Decl)
-       | '@compiler' PragmaOp Version
-       | 'include' String
-
-Decl ::= 'type'     Id ['(' TVar* ')'] '=' TypeAlias
-       | 'record'   Id ['(' TVar* ')'] '=' RecordType
-       | 'datatype' Id ['(' TVar* ')'] '=' DataType
-       | (EModifier* 'entrypoint' | FModifier* 'function') Block(FunDecl)
-
-FunDecl ::= Id ':' Type                             // Type signature
-          | Id Args [':' Type] '=' Block(Stmt)      // Definition
-
-PragmaOp ::= '<' | '=<' | '==' | '>=' | '>'
-Version  ::= Sep1(Int, '.')
-
-EModifier ::= 'payable' | 'stateful'
-FModifier ::= 'stateful' | 'private'
-
-Args ::= '(' Sep(Pattern, ',') ')'
-```
-
-Contract declarations must appear at the top-level.
-
-For example,
-```
-contract Test =
-  type t = int
-  entrypoint add (x : t, y : t) = x + y
-```
-
-There are three forms of type declarations: type aliases (declared with the
-`type` keyword), record type definitions (`record`) and data type definitions
-(`datatype`):
-
-```c
-TypeAlias  ::= Type
-RecordType ::= '{' Sep(FieldType, ',') '}'
-DataType   ::= Sep1(ConDecl, '|')
-
-FieldType  ::= Id ':' Type
-ConDecl    ::= Con ['(' Sep1(Type, ',') ')']
-```
-
-For example,
-```
-record   point('a) = {x : 'a, y : 'a}
-datatype shape('a) = Circle(point('a), 'a) | Rect(point('a), point('a))
-type     int_shape = shape(int)
-```
-
-### Types
-
-```c
-Type ::= Domain '=>' Type             // Function type
-       | Type '(' Sep(Type, ',') ')'  // Type application
-       | '(' Type ')'                 // Parens
-       | 'unit' | Sep(Type, '*')      // Tuples
-       | Id | QId | TVar
-
-Domain ::= Type                       // Single argument
-         | '(' Sep(Type, ',') ')'     // Multiple arguments
-```
-
-The function type arrow associates to the right.
-
-Example,
-```
-'a => list('a) => (int * list('a))
-```
-
-### Statements
-
-Function bodies are blocks of *statements*, where a statement is one of the following
-
-```c
-Stmt ::= 'switch' '(' Expr ')' Block(Case)
-       | 'if' '(' Expr ')' Block(Stmt)
-       | 'elif' '(' Expr ')' Block(Stmt)
-       | 'else' Block(Stmt)
-       | 'let' LetDef
-       | Expr
-
-LetDef ::= Id Args [':' Type] '=' Block(Stmt)   // Function definition
-         | Pattern '=' Block(Stmt)              // Value definition
-
-Case    ::= Pattern '=>' Block(Stmt)
-Pattern ::= Expr
-```
-
-`if` statements can be followed by zero or more `elif` statements and an optional final `else` statement. For example,
-
-```
-let x : int = 4
-switch(f(x))
-  None => 0
-  Some(y) =>
-    if(y > 10)
-      "too big"
-    elif(y < 3)
-      "too small"
-    else
-      "just right"
-```
-
-### Expressions
-
-```c
-Expr ::= '(' LamArgs ')' '=>' Block(Stmt)   // Anonymous function    (x) => x + 1
-       | 'if' '(' Expr ')' Expr 'else' Expr // If expression         if(x < y) y else x
-       | Expr ':' Type                      // Type annotation       5 : int
-       | Expr BinOp Expr                    // Binary operator       x + y
-       | UnOp Expr                          // Unary operator        ! b
-       | Expr '(' Sep(Expr, ',') ')'        // Application           f(x, y)
-       | Expr '.' Id                        // Projection            state.x
-       | Expr '[' Expr ']'                  // Map lookup            map[key]
-       | Expr '{' Sep(FieldUpdate, ',') '}' // Record or map update  r{ fld[key].x = y }
-       | '[' Sep(Expr, ',') ']'             // List                  [1, 2, 3]
-       | '[' Expr '|' Sep(Generator, ',') ']'
-                                            // List comprehension    [k | x <- [1], if (f(x)), let k = x+1]
-       | '[' Expr '..' Expr ']'             // List range            [1..n]
-       | '{' Sep(FieldUpdate, ',') '}'      // Record or map value   {x = 0, y = 1}, {[key] = val}
-       | '(' Expr ')'                       // Parens                (1 + 2) * 3
-       | Id | Con | QId | QCon              // Identifiers           x, None, Map.member, AELib.Token
-       | Int | Bytes | String | Char        // Literals              123, 0xff, #00abc123, "foo", '%'
-       | AccountAddress | ContractAddress   // Chain identifiers
-       | OracleAddress | OracleQueryId      // Chain identifiers
-
-Generator ::= Pattern '<-' Expr   // Generator
-            | 'if' '(' Expr ')'   // Guard
-            | LetDef              // Definition
-
-LamArgs ::= '(' Sep(LamArg, ',') ')'
-LamArg  ::= Id [':' Type]
-
-FieldUpdate ::= Path '=' Expr
-Path ::= Id                 // Record field
-       | '[' Expr ']'       // Map key
-       | Path '.' Id        // Nested record field
-       | Path '[' Expr ']'  // Nested map key
-
-BinOp ::= '||' | '&&' | '<' | '>' | '=<' | '>=' | '==' | '!='
-        | '::' | '++' | '+' | '-' | '*' | '/' | 'mod' | '^'
-UnOp  ::= '-' | '!'
-```
-
-### Operators types
-
-| Operators | Type
-| --- | ---
-| `-` `+` `*` `/` `mod` `^` | arithmetic operators
-| `!` `&&` `\|\|` | logical operators
-| `==` `!=` `<` `>` `=<` `>=` | comparison operators
-| `::` `++` | list operators
-
-### Operator precendences
-
-In order of highest to lowest precedence.
-
-| Operators | Associativity
-| --- | ---
-| `!` | right
-| `^` | left
-| `*` `/` `mod` | left
-| `-` (unary) | right
-| `+` `-` | left
-| `::` `++` | right
-| `<` `>` `=<` `>=` `==` `!=` | none
-| `&&` | right
-| `\|\|` | right
-
-## Examples
-
-```
-/*
- * A simple crowd-funding example
- */
-contract FundMe =
-
-  record spend_args = { recipient : address,
-                        amount    : int }
-
-  record state = { contributions : map(address, int),
-                   total         : int,
-                   beneficiary   : address,
-                   deadline      : int,
-                   goal          : int }
-
-  stateful function spend(args : spend_args) =
-    Chain.spend(args.recipient, args.amount)
-
-  entrypoint init(beneficiary, deadline, goal) : state =
-    { contributions = {},
-      beneficiary   = beneficiary,
-      deadline      = deadline,
-      total         = 0,
-      goal          = goal }
-
-  function is_contributor(addr) =
-    Map.member(addr, state.contributions)
-
-  stateful entrypoint contribute() =
-    if(Chain.block_height >= state.deadline)
-      spend({ recipient = Call.caller, amount = Call.value }) // Refund money
-      false
-    else
-      let amount =
-        switch(Map.lookup(Call.caller, state.contributions))
-          None    => Call.value
-          Some(n) => n + Call.value
-      put(state{ contributions[Call.caller] = amount,
-                 total @ tot = tot + Call.value })
-      true
-
-  stateful entrypoint withdraw() =
-    if(Chain.block_height < state.deadline)
-      abort("Cannot withdraw before deadline")
-    if(Call.caller == state.beneficiary)
-      withdraw_beneficiary()
-    elif(is_contributor(Call.caller))
-      withdraw_contributor()
-    else
-      abort("Not a contributor or beneficiary")
-
-  stateful function withdraw_beneficiary() =
-    require(state.total >= state.goal, "Project was not funded")
-    spend({recipient = state.beneficiary,
-           amount    = Contract.balance })
-
-  stateful function withdraw_contributor() =
-    if(state.total >= state.goal)
-      abort("Project was funded")
-    let to = Call.caller
-    spend({recipient = to,
-           amount    = state.contributions[to]})
-    put(state{ contributions @ c = Map.delete(to, c) })
-```
-
-### Delegation signature
-
-Some chain operations (`Oracle.<operation>` and `AENS.<operation>`) have an
-optional delegation signature. This is typically used when a user/accounts
-would like to allow a contract to act on it's behalf. The exact data to be
-signed varies for the different operations, but in all cases you should prepend
-the signature data with the `network_id` (`ae_mainnet` for the Aeternity mainnet, etc.).
