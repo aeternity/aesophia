@@ -678,7 +678,12 @@ The balance of account `a`.
 Chain.block_hash(h : int) : option(bytes(32))
 ```
 
-The hash of the block at height `h`.
+The hash of the block at height `h`. `h` has to be within 256 blocks from the
+current height of the chain or else the function will return `None`.
+
+NOTE: In AEVM and FATE VM version 1 `Chain.block_height` was not considered an
+allowed height. From FATE VM version 2 (IRIS) it will return the block hash of
+the current generation.
 
 
 #### block_height
