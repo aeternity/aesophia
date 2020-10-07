@@ -504,15 +504,6 @@ the hash functions described below.
 
 Please refer to the `String` [library documentation](sophia_stdlib.md#String).
 
-### Chars
-
-There is a builtin type `char` (the underlying representation being an integer),
-mainly used to manipulate strings via `String.to_list`/`String.from_list`.
-
-Characters can also be introduced as character literals (`'x', '+', ...).
-
-Please refer to the `Char` [library documentation](sophia_stdlib.md#Char).
-
 ### Byte arrays
 
 Byte arrays are fixed size arrays of 8-bit integers. They are described in hexadecimal system,
