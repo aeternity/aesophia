@@ -69,7 +69,7 @@ do_contract_interface(Type, ContractString, Options) ->
     try
         Ast = aeso_compiler:parse(ContractString, Options),
         %% io:format("~p\n", [Ast]),
-        {TypedAst, _} = aeso_ast_infer_types:infer(Ast, [dont_unfold]),
+        {TypedAst, _} = aeso_ast_infer_types:infer(Ast, [dont_unfold | Options]),
         %% io:format("~p\n", [TypedAst]),
         from_typed_ast(Type, TypedAst)
     catch
