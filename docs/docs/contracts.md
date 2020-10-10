@@ -550,7 +550,7 @@ Example for an oracle answering questions of type `string` with answers of type 
 contract Oracles =
 
   stateful entrypoint registerOracle(acct : address,
-                                     sign : signature,   // Signed oracle address + contract address
+                                     sign : signature,   // Signed network id + oracle address + contract address
                                      qfee : int,
                                      ttl  : Chain.ttl) : oracle(string, int) =
      Oracle.register(acct, signature = sign, qfee, ttl)
@@ -571,13 +571,13 @@ contract Oracles =
     Oracle.extend(o, ttl)
 
   stateful entrypoint signExtendOracle(o    : oracle(string, int),
-                                     sign : signature,   // Signed oracle address + contract address
+                                     sign : signature,   // Signed network id + oracle address + contract address
                                      ttl  : Chain.ttl) : unit =
     Oracle.extend(o, signature = sign, ttl)
 
   stateful entrypoint respond(o    : oracle(string, int),
                               q    : oracle_query(string, int),
-                              sign : signature,        // Signed oracle query id + contract address
+                              sign : signature,   // Signed network id + oracle address + contract address
                               r    : int) =
     Oracle.respond(o, q, signature = sign, r)
 
