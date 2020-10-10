@@ -14,7 +14,6 @@ The out-of-the-box namespaces are:
 
 - [Bits](#Bits)
 - [Bytes](#Bytes)
-- [Char](#Char)
 - [Int](#Int)
 - [Map](#Map)
 - [Address](#Address)
@@ -152,7 +151,6 @@ Bytes.split(a : bytes(m + n)) : bytes(m) * bytes(n)
 Splits a byte array at given index
 
 
-## Char
 
 #### to_int
  ```
@@ -348,7 +346,7 @@ Registers new oracle answering questions of type `'a` with answers of type `'b`.
 * The `acct` is the address of the oracle to register (can be the same as the contract).
 * `signature` is a signature proving that the contract is allowed to register the account -
   the account address + the contract address (concatenated as byte arrays) is
-  [signed](./sophia.md#delegation-signature) with the
+  [signed](./examples.md#delegation-signature) with the
   private key of the account, proving you have the private key of the oracle to be. If the
   address is the same as the contract `sign` is ignored and can be left out entirely.
 * The `qfee` is the minimum query fee to be paid by a user when asking a question of the oracle.
@@ -381,7 +379,7 @@ Responds to the question `q` on `o`.
 Unless the contract address is the same as the oracle address the `signature`
 (which is an optional, named argument)
 needs to be provided. Proving that we have the private key of the oracle by
-[signing](./sophia.md#delegation-signature) the oracle query id + contract address
+[signing](./examples.md#delegation-signature) the oracle query id + contract address
 
 
 #### extend
@@ -505,7 +503,7 @@ let Some(Name(owner, FixedTTL(expiry), ptrs)) = AENS.lookup("example.chain")
 AENS.preclaim(owner : address, commitment_hash : hash, <signature : signature>) : unit
 ```
 
-The [signature](./sophia.md#delegation-signature) should be over `owner address` + `Contract.address`
+The [signature](./examples.md#delegation-signature) should be over `owner address` + `Contract.address`
 (concatenated as byte arrays).
 
 
@@ -514,7 +512,7 @@ The [signature](./sophia.md#delegation-signature) should be over `owner address`
 AENS.claim(owner : address, name : string, salt : int, name_fee : int, <signature : signature>) : unit
 ```
 
-The [signature](./sophia.md#delegation-signature) should be over `owner address` + `name_hash` + `Contract.address`
+The [signature](./examples.md#delegation-signature) should be over `owner address` + `name_hash` + `Contract.address`
 using the private key of the `owner` account for signing.
 
 
@@ -525,7 +523,7 @@ AENS.transfer(owner : address, new_owner : address, name : string, <signature : 
 
 Transfers name to the new owner.
 
-The [signature](./sophia.md#delegation-signature) should be over `owner address` + `name_hash` + `Contract.address`
+The [signature](./examples.md#delegation-signature) should be over `owner address` + `name_hash` + `Contract.address`
 using the private key of the `owner` account for signing.
 
 
@@ -536,7 +534,7 @@ AENS.revoke(owner : address, name : string, <signature : signature>) : unit
 
 Revokes the name to extend the ownership time.
 
-The [signature](./sophia.md#delegation-signature) should be over `owner address` + `name_hash` + `Contract.address`
+The [signature](./examples.md#delegation-signature) should be over `owner address` + `name_hash` + `Contract.address`
 using the private key of the `owner` account for signing.
 
 

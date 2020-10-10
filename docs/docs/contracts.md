@@ -174,7 +174,7 @@ If in doubt, it is possible to check if an address is payable using
 #### Payable entrypoints
 
 A contract entrypoint is by default *not* payable. Any call to such a function
-(either a [Remote call](contracts.md#calling-other-contracts) or a contract call transaction)
+(either a [Remote call](#calling-other-contracts) or a contract call transaction)
 that has a non-zero `value` will fail. Contract entrypoints that should be called
 with a non-zero value should be declared `payable`.
 
@@ -504,15 +504,6 @@ the hash functions described below.
 
 Please refer to the `String` [library documentation](sophia_stdlib.md#String).
 
-### Chars
-
-There is a builtin type `char` (the underlying representation being an integer),
-mainly used to manipulate strings via `String.to_list`/`String.from_list`.
-
-Characters can also be introduced as character literals (`'x', '+', ...).
-
-Please refer to the `Char` [library documentation](sophia_stdlib.md#Char).
-
 ### Byte arrays
 
 Byte arrays are fixed size arrays of 8-bit integers. They are described in hexadecimal system,
@@ -616,44 +607,6 @@ functions are provided.
 Contracts can interact with the
 [Aeternity Naming System](https://github.com/aeternity/protocol/blob/master/AENS.md).
 For this purpose the [AENS](sophia_stdlib.md#AENS) library was exposed.
-
-#### Example
-
-In this example we assume that the name `name` already exists, and is owned by
-an account with address `addr`. In order to allow a contract `ct` to handle
-`name` the account holder needs to create a
-[signature](examples.md#delegation-signature) `sig` of `addr | name.hash | ct.address`.
-
-Armed with this information we can for example write a function that extends
-the name if it expires within 1000 blocks:
-```
-  stateful entrypoint extend_if_necessary(addr : address, name : string, sig : signature) =
-    switch(AENS.lookup(name))
-      None => ()
-      Some(AENS.Name(_, FixedTTL(expiry), _)) =>
-        if(Chain.block_height + 1000 > expiry)
-          AENS.update(addr, name, Some(RelativeTTL(50000)), None, None, signature = sig)
-```
-
-And we can write functions that adds and removes keys from the pointers of the
-name:
-```
-  stateful entrypoint add_key(addr : address, name : string, key : string,
-                              pt : AENS.pointee, sig : signature) =
-    switch(AENS.lookup(name))
-      None => ()
-      Some(AENS.Name(_, _, ptrs)) =>
-        AENS.update(addr, name, None, None, Some(ptrs{[key] = pt}), signature = sig)
-
-  stateful entrypoint delete_key(addr : address, name : string,
-                                 key : string, sig : signature) =
-    switch(AENS.lookup(name))
-      None => ()
-      Some(AENS.Name(_, _, ptrs)) =>
-        let ptrs = Map.delete(key, ptrs)
-        AENS.update(addr, name, None, None, Some(ptrs), signature = sig)
-```
-
 
 ### Events
 
