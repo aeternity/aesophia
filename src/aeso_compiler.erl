@@ -42,7 +42,8 @@
                 | {backend, aevm | fate}
                 | {include, {file_system, [string()]} |
                             {explicit_files, #{string() => binary()}}}
-                | {src_file, string()}.
+                | {src_file, string()}
+                | {aci, aeso_aci:aci_type()}.
 -type options() :: [option()].
 
 -export_type([ option/0
@@ -116,7 +117,8 @@ from_string(Backend, ContractString, Options) ->
     end.
 
 from_string1(aevm, ContractString, Options) ->
-    #{icode := Icode} = string_to_code(ContractString, Options),
+    #{ icode := Icode
+     , folded_typed_ast := FoldedTypedAst } = string_to_code(ContractString, Options),
     TypeInfo  = extract_type_info(Icode),
     Assembler = assemble(Icode, Options),
     pp_assembler(aevm, Assembler, Options),
@@ -124,47 +126,63 @@ from_string1(aevm, ContractString, Options) ->
     ByteCode = << << B:8 >> || B <- ByteCodeList >>,
     pp_bytecode(ByteCode, Options),
     {ok, Version} = version(),
-    {ok, #{byte_code => ByteCode,
-           compiler_version => Version,
-           contract_source => ContractString,
-           type_info => TypeInfo,
-           abi_version => aeb_aevm_abi:abi_version(),
-           payable => maps:get(payable, Icode)
-          }};
+    Res = #{byte_code => ByteCode,
+            compiler_version => Version,
+            contract_source => ContractString,
+            type_info => TypeInfo,
+            abi_version => aeb_aevm_abi:abi_version(),
+            payable => maps:get(payable, Icode)
+           },
+    {ok, maybe_generate_aci(Res, FoldedTypedAst, Options)};
 from_string1(fate, ContractString, Options) ->
-    #{fcode := FCode} = string_to_code(ContractString, Options),
+    #{ fcode := FCode
+     , folded_typed_ast := FoldedTypedAst } = string_to_code(ContractString, Options),
     FateCode = aeso_fcode_to_fate:compile(FCode, Options),
     pp_assembler(fate, FateCode, Options),
     ByteCode = aeb_fate_code:serialize(FateCode, []),
     {ok, Version} = version(),
-    {ok, #{byte_code => ByteCode,
-           compiler_version => Version,
-           contract_source => ContractString,
-           type_info => [],
-           fate_code => FateCode,
-           abi_version => aeb_fate_abi:abi_version(),
-           payable => maps:get(payable, FCode)
-          }}.
+    Res = #{byte_code => ByteCode,
+            compiler_version => Version,
+            contract_source => ContractString,
+            type_info => [],
+            fate_code => FateCode,
+            abi_version => aeb_fate_abi:abi_version(),
+            payable => maps:get(payable, FCode)
+           },
+    {ok, maybe_generate_aci(Res, FoldedTypedAst, Options)}.
+
+maybe_generate_aci(Result, FoldedTypedAst, Options) ->
+    case proplists:get_value(aci, Options) of
+        undefined ->
+            Result;
+        Type ->
+            {ok, Aci} = aeso_aci:from_typed_ast(Type, FoldedTypedAst),
+            maps:put(aci, Aci, Result)
+    end.
 
 -spec string_to_code(string(), options()) -> map().
 string_to_code(ContractString, Options) ->
     Ast = parse(ContractString, Options),
     pp_sophia_code(Ast, Options),
     pp_ast(Ast, Options),
-    {TypeEnv, TypedAst} = aeso_ast_infer_types:infer(Ast, [return_env | Options]),
-    pp_typed_ast(TypedAst, Options),
+    {TypeEnv, FoldedTypedAst, UnfoldedTypedAst} = aeso_ast_infer_types:infer(Ast, [return_env | Options]),
+    pp_typed_ast(UnfoldedTypedAst, Options),
     case proplists:get_value(backend, Options, aevm) of
         aevm ->
-            Icode = ast_to_icode(TypedAst, Options),
+            Icode = ast_to_icode(UnfoldedTypedAst, Options),
             pp_icode(Icode, Options),
-            #{ icode => Icode,
-               typed_ast => TypedAst,
-               type_env  => TypeEnv};
+            #{ icode => Icode
+             , unfolded_typed_ast => UnfoldedTypedAst
+             , folded_typed_ast => FoldedTypedAst
+             , type_env  => TypeEnv
+             , ast => Ast };
         fate ->
-            Fcode = aeso_ast_to_fcode:ast_to_fcode(TypedAst, Options),
-            #{ fcode => Fcode,
-               typed_ast => TypedAst,
-               type_env  => TypeEnv}
+            Fcode = aeso_ast_to_fcode:ast_to_fcode(UnfoldedTypedAst, Options),
+            #{ fcode => Fcode
+             , unfolded_typed_ast => UnfoldedTypedAst
+             , folded_typed_ast => FoldedTypedAst
+             , type_env  => TypeEnv
+             , ast => Ast }
     end.
 
 -define(CALL_NAME,   "__call").
@@ -199,9 +217,9 @@ check_call1(ContractString0, FunName, Args, Options) ->
         case proplists:get_value(backend, Options, aevm) of
             aevm ->
                 %% First check the contract without the __call function
-                #{} = string_to_code(ContractString0, Options),
-                ContractString = insert_call_function(ContractString0, ?CALL_NAME, FunName, Args, Options),
-                #{typed_ast := TypedAst,
+                #{ast := Ast} = string_to_code(ContractString0, Options),
+                ContractString = insert_call_function(Ast, ContractString0, ?CALL_NAME, FunName, Args),
+                #{unfolded_typed_ast := TypedAst,
                   icode     := Icode} = string_to_code(ContractString, Options),
                 {ok, {FunName, {fun_t, _, _, ArgTypes, RetType}}} = get_call_type(TypedAst),
                 ArgVMTypes = [ aeso_ast_to_icode:ast_typerep(T, Icode) || T <- ArgTypes ],
@@ -221,13 +239,14 @@ check_call1(ContractString0, FunName, Args, Options) ->
                 {ok, FunName, {ArgVMTypes, RetVMType1}, ArgTerms};
             fate ->
                 %% First check the contract without the __call function
-                #{fcode := OrgFcode} = string_to_code(ContractString0, Options),
+                #{ fcode := OrgFcode
+                 , ast := Ast } = string_to_code(ContractString0, Options),
                 FateCode = aeso_fcode_to_fate:compile(OrgFcode, []),
                 %% collect all hashes and compute the first name without hash collision to
                 SymbolHashes = maps:keys(aeb_fate_code:symbols(FateCode)),
                 CallName = first_none_match(?CALL_NAME, SymbolHashes,
                                             lists:seq($1, $9) ++ lists:seq($A, $Z) ++ lists:seq($a, $z)),
-                ContractString = insert_call_function(ContractString0, CallName, FunName, Args, Options),
+                ContractString = insert_call_function(Ast, ContractString0, CallName, FunName, Args),
                 #{fcode := Fcode} = string_to_code(ContractString, Options),
                 CallArgs = arguments_of_body(CallName, FunName, Fcode),
                 {ok, FunName, CallArgs}
@@ -253,9 +272,8 @@ first_none_match(CallName, Hashes, [Char|Chars]) ->
     end.
 
 %% Add the __call function to a contract.
--spec insert_call_function(string(), string(), string(), [string()], options()) -> string().
-insert_call_function(Code, Call, FunName, Args, Options) ->
-    Ast = parse(Code, Options),
+-spec insert_call_function(aeso_syntax:ast(), string(), string(), string(), [string()]) -> string().
+insert_call_function(Ast, Code, Call, FunName, Args) ->
     Ind = last_contract_indent(Ast),
     lists:flatten(
         [ Code,
@@ -311,7 +329,7 @@ to_sophia_value(ContractString, FunName, ok, Data, Options0) ->
     Options = [no_code | Options0],
     try
         Code = string_to_code(ContractString, Options),
-        #{ typed_ast := TypedAst, type_env  := TypeEnv} = Code,
+        #{ unfolded_typed_ast := TypedAst, type_env  := TypeEnv} = Code,
         {ok, _, Type0} = get_decode_type(FunName, TypedAst),
         Type   = aeso_ast_infer_types:unfold_types_in_type(TypeEnv, Type0, [unfold_record_types, unfold_variant_types]),
 
@@ -387,7 +405,7 @@ decode_calldata(ContractString, FunName, Calldata, Options0) ->
     Options = [no_code | Options0],
     try
         Code = string_to_code(ContractString, Options),
-        #{ typed_ast := TypedAst, type_env  := TypeEnv} = Code,
+        #{ unfolded_typed_ast := TypedAst, type_env  := TypeEnv} = Code,
 
         {ok, Args, _} = get_decode_type(FunName, TypedAst),
         GetType       = fun({typed, _, _, T}) -> T; (T) -> T end,

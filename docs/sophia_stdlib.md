@@ -347,7 +347,7 @@ Registers new oracle answering questions of type `'a` with answers of type `'b`.
 
 * The `acct` is the address of the oracle to register (can be the same as the contract).
 * `signature` is a signature proving that the contract is allowed to register the account -
-  the account address + the contract address (concatenated as byte arrays) is
+  the `network id` + `account address` + `contract address` (concatenated as byte arrays) is
   [signed](./sophia.md#delegation-signature) with the
   private key of the account, proving you have the private key of the oracle to be. If the
   address is the same as the contract `sign` is ignored and can be left out entirely.
@@ -381,7 +381,8 @@ Responds to the question `q` on `o`.
 Unless the contract address is the same as the oracle address the `signature`
 (which is an optional, named argument)
 needs to be provided. Proving that we have the private key of the oracle by
-[signing](./sophia.md#delegation-signature) the oracle query id + contract address
+[signing](./sophia.md#delegation-signature)
+the `network id` + `oracle query id` + `contract address`
 
 
 #### extend
@@ -455,7 +456,8 @@ Naming System (AENS).
 If `owner` is equal to `Contract.address` the signature `signature` is
 ignored, and can be left out since it is a named argument. Otherwise we need
 a signature to prove that we are allowed to do AENS operations on behalf of
-`owner`
+`owner`. The [signature is tied to a network id](https://github.com/aeternity/protocol/blob/iris/consensus/consensus.md#transaction-signature),
+i.e. the signature material should be prefixed by the network id.
 
 ### Types
 
@@ -505,8 +507,8 @@ let Some(Name(owner, FixedTTL(expiry), ptrs)) = AENS.lookup("example.chain")
 AENS.preclaim(owner : address, commitment_hash : hash, <signature : signature>) : unit
 ```
 
-The [signature](./sophia.md#delegation-signature) should be over `owner address` + `Contract.address`
-(concatenated as byte arrays).
+The [signature](./sophia.md#delegation-signature) should be over
+`network id` + `owner address` + `Contract.address` (concatenated as byte arrays).
 
 
 #### claim
@@ -514,7 +516,9 @@ The [signature](./sophia.md#delegation-signature) should be over `owner address`
 AENS.claim(owner : address, name : string, salt : int, name_fee : int, <signature : signature>) : unit
 ```
 
-The [signature](./sophia.md#delegation-signature) should be over `owner address` + `name_hash` + `Contract.address`
+The [signature](./sophia.md#delegation-signature) should be over
+`network id` + `owner address` + `name_hash` + `Contract.address`
+(concatenated as byte arrays)
 using the private key of the `owner` account for signing.
 
 
@@ -525,7 +529,9 @@ AENS.transfer(owner : address, new_owner : address, name : string, <signature : 
 
 Transfers name to the new owner.
 
-The [signature](./sophia.md#delegation-signature) should be over `owner address` + `name_hash` + `Contract.address`
+The [signature](./sophia.md#delegation-signature) should be over
+`network id` + `owner address` + `name_hash` + `Contract.address`
+(concatenated as byte arrays)
 using the private key of the `owner` account for signing.
 
 
@@ -536,7 +542,9 @@ AENS.revoke(owner : address, name : string, <signature : signature>) : unit
 
 Revokes the name to extend the ownership time.
 
-The [signature](./sophia.md#delegation-signature) should be over `owner address` + `name_hash` + `Contract.address`
+The [signature](./sophia.md#delegation-signature) should be over
+`network id` + `owner address` + `name_hash` + `Contract.address`
+(concatenated as byte arrays)
 using the private key of the `owner` account for signing.
 
 
@@ -771,6 +779,13 @@ List.last(l : list('a)) : option('a)
 ```
 
 Returns `Some` of the last element of a list or `None` if the list is empty.
+
+
+#### contains
+```
+List.contains(e : 'a, l : list('a)) : bool
+```
+Checks if list `l` contains element `e`. Equivalent to `List.find(x => x == e, l) != None`.
 
 
 #### find
@@ -1111,6 +1126,13 @@ Option.force(o : option('a)) : 'a
 ```
 
 Forcefully escapes `option` wrapping assuming it is `Some`. Throws error on `None`.
+
+
+#### contains
+```
+Option.contains(e : 'a, o : option('a)) : bool
+```
+Returns `true` if and only if `o` contains element equal to `e`. Equivalent to `Option.match(false, x => x == e, o)`.
 
 
 #### on_elem

@@ -39,7 +39,7 @@ simple_compile_test_() ->
                    error(ErrBin)
            end
        end} || ContractName <- compilable_contracts(), Backend <- [aevm, fate],
-               not lists:member(ContractName, not_yet_compilable(Backend))] ++
+               not lists:member(ContractName, not_compilable_on(Backend))] ++
     [ {"Test file not found error",
        fun() ->
            {error, Errors} = aeso_compiler:file("does_not_exist.aes"),
@@ -173,9 +173,13 @@ compilable_contracts() ->
      "protected_call"
     ].
 
-not_yet_compilable(fate) -> [];
-not_yet_compilable(aevm) -> ["pairing_crypto", "aens_update", "basic_auth_tx", "more_strings",
-                             "unapplied_builtins", "bytes_to_x", "state_handling", "protected_call"].
+not_compilable_on(fate) -> [];
+not_compilable_on(aevm) ->
+    [ "stdlib_include", "manual_stdlib_include", "pairing_crypto"
+    , "aens_update", "basic_auth_tx", "more_strings"
+    , "unapplied_builtins", "bytes_to_x", "state_handling", "protected_call"
+    ].
+
 
 %% Contracts that should produce type errors
 
@@ -681,6 +685,16 @@ failing_contracts() ->
            "  (0 : int) == (1 : int) : bool\n"
            "It must be either 'true' or 'false'.">>
         ])
+    , ?TYPE_ERROR(bad_function_block,
+                  [<<?Pos(4, 5)
+                     "Mismatch in the function block. Expected implementation/type declaration of g function">>,
+                   <<?Pos(5, 5)
+                     "Mismatch in the function block. Expected implementation/type declaration of g function">>
+                  ])
+    , ?TYPE_ERROR(just_an_empty_file,
+                  [<<?Pos(0, 0)
+                     "Empty contract">>
+                  ])
     , ?TYPE_ERROR(bad_number_of_args,
                   [<<?Pos(3, 39)
                      "Cannot unify () => unit\n"

@@ -14,6 +14,8 @@
         , contract_interface/2
         , contract_interface/3
 
+        , from_typed_ast/2
+
         , render_aci_json/1
 
         , json_encode_expr/1
@@ -22,6 +24,8 @@
 -type aci_type()  :: json | string.
 -type json()      :: jsx:json_term().
 -type json_text() :: binary().
+
+-export_type([aci_type/0]).
 
 %% External API
 -spec file(aci_type(), string()) -> {ok, json() | string()} | {error, term()}.
@@ -65,16 +69,18 @@ do_contract_interface(Type, ContractString, Options) ->
     try
         Ast = aeso_compiler:parse(ContractString, Options),
         %% io:format("~p\n", [Ast]),
-        TypedAst = aeso_ast_infer_types:infer(Ast, [dont_unfold]),
+        {TypedAst, _} = aeso_ast_infer_types:infer(Ast, [dont_unfold]),
         %% io:format("~p\n", [TypedAst]),
-        JArray = [ encode_contract(C) || C <- TypedAst ],
-
-        case Type of
-            json   -> {ok, JArray};
-            string -> do_render_aci_json(JArray)
-        end
+        from_typed_ast(Type, TypedAst)
     catch
         throw:{error, Errors} -> {error, Errors}
+    end.
+
+from_typed_ast(Type, TypedAst) ->
+    JArray = [ encode_contract(C) || C <- TypedAst ],
+    case Type of
+        json   -> {ok, JArray};
+        string -> do_render_aci_json(JArray)
     end.
 
 encode_contract(Contract = {contract, _, {con, _, Name}, _}) ->
