@@ -110,7 +110,15 @@ compile(Backend, Name) ->
 
 compile(Backend, Name, Options) ->
     String = aeso_test_utils:read_contract(Name),
-    case aeso_compiler:from_string(String, [{src_file, Name ++ ".aes"}, {backend, Backend} | Options]) of
+    Options1 =
+        case lists:member(Name, debug_mode_contracts()) of
+            true  -> [debug_mode];
+            false -> []
+        end ++
+        [ {src_file, Name ++ ".aes"}, {backend, Backend}
+        , {include, {file_system, [aeso_test_utils:contract_path()]}}
+        ] ++ Options,
+    case aeso_compiler:from_string(String, Options1) of
         {ok, Map}                                        -> Map;
         {error, ErrorString} when is_binary(ErrorString) -> ErrorString;
         {error, Errors}                                  -> Errors
@@ -170,7 +178,8 @@ compilable_contracts() ->
      "let_patterns",
      "lhs_matching",
      "more_strings",
-     "protected_call"
+     "protected_call",
+     "hermetization_turnoff"
     ].
 
 not_compilable_on(fate) -> [];
@@ -178,8 +187,12 @@ not_compilable_on(aevm) ->
     [ "stdlib_include", "manual_stdlib_include", "pairing_crypto"
     , "aens_update", "basic_auth_tx", "more_strings"
     , "unapplied_builtins", "bytes_to_x", "state_handling", "protected_call"
+    , "hermetization_turnoff"
+
     ].
 
+debug_mode_contracts() ->
+    ["hermetization_turnoff"].
 
 %% Contracts that should produce type errors
 
@@ -870,6 +883,11 @@ validate(Contract1, Contract2) ->
     ByteCode = #{ fate_code := FCode } = compile(fate, Contract1),
     FCode1   = aeb_fate_code:serialize(aeb_fate_code:strip_init_function(FCode)),
     Source   = aeso_test_utils:read_contract(Contract2),
-    aeso_compiler:validate_byte_code(ByteCode#{ byte_code := FCode1 }, Source,
-                                     [{backend, fate}, {include, {file_system, [aeso_test_utils:contract_path()]}}]).
+    aeso_compiler:validate_byte_code(
+      ByteCode#{ byte_code := FCode1 }, Source,
+      case lists:member(Contract2, debug_mode_contracts()) of
+          true  -> [debug_mode];
+          false -> []
+      end ++
+      [{backend, fate}, {include, {file_system, [aeso_test_utils:contract_path()]}}]).
 

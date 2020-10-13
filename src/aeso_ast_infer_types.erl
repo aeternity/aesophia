@@ -683,7 +683,7 @@ map_t(As, K, V) -> {app_t, As, {id, As, "map"}, [K, V]}.
 infer(Contracts) ->
     infer(Contracts, []).
 
--type option() :: return_env | dont_unfold | no_code | term().
+-type option() :: return_env | dont_unfold | no_code | debug_mode | term().
 
 -spec init_env(list(option())) -> env().
 init_env(_Options) -> global_env().
@@ -748,16 +748,20 @@ check_scope_name_clash(Env, Kind, Name) ->
 
 -spec infer_contract_top(env(), main_contract | contract | namespace, [aeso_syntax:decl()], list(option())) ->
     {env(), [aeso_syntax:decl()]}.
-infer_contract_top(Env, Kind, Defs0, _Options) ->
+infer_contract_top(Env, Kind, Defs0, Options) ->
     Defs = desugar(Defs0),
-    infer_contract(Env, Kind, Defs).
+    infer_contract(Env, Kind, Defs, Options).
 
 %% infer_contract takes a proplist mapping global names to types, and
 %% a list of definitions.
--spec infer_contract(env(), main_contract | contract | namespace, [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
-infer_contract(Env0, What, Defs0) ->
+-spec infer_contract(env(), main_contract | contract | namespace, [aeso_syntax:decl()], list(option())) -> {env(), [aeso_syntax:decl()]}.
+infer_contract(Env0, What, Defs0, Options) ->
     create_type_errors(),
-    Defs = process_blocks(Defs0),
+    Defs01 = process_blocks(Defs0),
+    Defs = case lists:member(debug_mode, Options) of
+               true  -> expose_internals(Defs01, What);
+               false -> Defs01
+           end,
     destroy_and_report_type_errors(Env0),
     Env  = Env0#env{ what = What },
     Kind = fun({type_def, _, _, _, _})    -> type;
@@ -805,7 +809,7 @@ process_blocks(Decls) ->
 -spec process_block(aeso_syntax:ann(), [aeso_syntax:decl()]) -> [aeso_syntax:decl()].
 process_block(_, []) -> [];
 process_block(_, [Decl]) -> [Decl];
-process_block(Ann, [Decl | Decls]) ->
+process_block(_Ann, [Decl | Decls]) ->
     IsThis = fun(Name) -> fun({letfun, _, {id, _, Name1}, _, _, _}) -> Name == Name1;
                              (_) -> false end end,
     case Decl of
@@ -818,6 +822,20 @@ process_block(Ann, [Decl | Decls]) ->
             [type_error({mismatched_decl_in_funblock, Name, D1}) || D1 <- Rest],
             [{fun_clauses, Ann1, Id, {id, [{origin, system} | Ann1], "_"}, Clauses}]
     end.
+
+%% Turns private stuff into public stuff
+expose_internals(Defs, What) ->
+    [ begin
+          Ann = element(2, Def),
+          NewAnn = case What of
+                       namespace -> [A ||A <- Ann, A /= {private, true}, A /= private];
+                       main_contract -> [{entrypoint, true}|Ann];  % minor duplication
+                       contract -> Ann
+                   end,
+          setelement(2, Def, NewAnn)
+      end
+     || Def <- Defs
+    ].
 
 -spec check_typedefs(env(), [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
 check_typedefs(Env = #env{ namespace = Ns }, Defs) ->
