@@ -11,7 +11,10 @@ test_contract(N) ->
     {Contract,MapACI,DecACI} = test_cases(N),
     {ok,JSON} = aeso_aci:contract_interface(json, Contract),
     ?assertEqual([MapACI], JSON),
-    ?assertEqual({ok, DecACI}, aeso_aci:render_aci_json(JSON)).
+    ?assertEqual({ok, DecACI}, aeso_aci:render_aci_json(JSON)),
+    %% Check if the compiler provides correct aci
+    {ok,#{aci := JSON2}} = aeso_compiler:from_string(Contract, [{aci, json}]),
+    ?assertEqual(JSON, JSON2).
 
 test_cases(1) ->
     Contract = <<"payable contract C =\n"
@@ -80,11 +83,11 @@ test_cases(3) ->
     DecACI = <<"contract C =\n"
                "  type state = unit\n"
                "  datatype event = SingleEventDefined\n"
-	       "  datatype bert('a) = Bin('a)\n"
-	       "  entrypoint a : (C.bert(string)) => int\n">>,
+               "  datatype bert('a) = Bin('a)\n"
+               "  entrypoint a : (C.bert(string)) => int\n">>,
     {Contract,MapACI,DecACI}.
 
-%% Rounttrip
+%% Roundtrip
 aci_test_() ->
     [{"Testing ACI generation for " ++ ContractName,
       fun() -> aci_test_contract(ContractName) end}
@@ -94,8 +97,13 @@ all_contracts() -> aeso_compiler_tests:compilable_contracts().
 
 aci_test_contract(Name) ->
     String = aeso_test_utils:read_contract(Name),
-    Opts   = [{include, {file_system, [aeso_test_utils:contract_path()]}}],
+    Opts   = case lists:member(Name, aeso_compiler_tests:debug_mode_contracts()) of
+                 true  -> [debug_mode];
+                 false -> []
+             end ++ [{include, {file_system, [aeso_test_utils:contract_path()]}}],
     {ok, JSON} = aeso_aci:contract_interface(json, String, Opts),
+    {ok, #{aci := JSON1}} = aeso_compiler:from_string(String, [{aci, json}, {backend, fate} | Opts]),
+    ?assertEqual(JSON, JSON1),
 
     io:format("JSON:\n~p\n", [JSON]),
     {ok, ContractStub} = aeso_aci:render_aci_json(JSON),
@@ -122,4 +130,3 @@ check_stub(Stub, Options) ->
         _ = [ io:format("~s\n", [aeso_errors:pp(E)]) || E <- Errs ],
         error({parse_errors, Errs})
     end.
-

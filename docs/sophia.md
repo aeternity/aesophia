@@ -83,7 +83,7 @@ The main unit of code in Sophia is the *contract*.
 - A contract may define a type `state` encapsulating its local
   state. When creating a new contract the `init` entrypoint is executed and the
   state is initialized to its return value.
-  
+
 The language offers some primitive functions to interact with the blockchain and contracts.
 Please refer to the [Chain](sophia_stdlib.md#Chain), [Contract](sophia_stdlib.md#Contract)
 and the [Call](sophia_stdlib.md#Call) namespaces in the documentation.
@@ -314,7 +314,7 @@ so even cyclic includes should be working without any special tinkering.
 
 ### Standard library
 
-Sophia offers [standard library](sophia_stdlib.md) which exposes some 
+Sophia offers [standard library](sophia_stdlib.md) which exposes some
 primitive operations and some higher level utilities. The builtin
 namespaces like `Chain`, `Contract`, `Map`
 are included by default and are supported internally by the compiler.
@@ -481,7 +481,7 @@ Example syntax:
 
 Lists can be constructed using the range syntax using special `..` operator:
 ```
-[1..4] == [1,2,3,4] 
+[1..4] == [1,2,3,4]
 ```
 The ranges are always ascending and have step equal to 1.
 
@@ -595,7 +595,7 @@ Please refer to the `Bytes` [library documentation](sophia_stdlib.md#Bytes).
 
 ### Cryptographic builins
 
-Libraries [Crypto](sophia_stdlib.md#Crypto) and [String](sophia_stdlib.md#String) provide functions to 
+Libraries [Crypto](sophia_stdlib.md#Crypto) and [String](sophia_stdlib.md#String) provide functions to
 hash objects, verify signatures etc. The `hash` is a type alias for `bytes(32)`.
 
 #### AEVM note
@@ -630,7 +630,7 @@ Example for an oracle answering questions of type `string` with answers of type 
 contract Oracles =
 
   stateful entrypoint registerOracle(acct : address,
-                                     sign : signature,   // Signed oracle address + contract address
+                                     sign : signature,   // Signed network id + oracle address + contract address
                                      qfee : int,
                                      ttl  : Chain.ttl) : oracle(string, int) =
      Oracle.register(acct, signature = sign, qfee, ttl)
@@ -651,13 +651,13 @@ contract Oracles =
     Oracle.extend(o, ttl)
 
   stateful entrypoint signExtendOracle(o    : oracle(string, int),
-                                     sign : signature,   // Signed oracle address + contract address
-                                     ttl  : Chain.ttl) : unit =
+                                       sign : signature,   // Signed network id + oracle address + contract address
+                                       ttl  : Chain.ttl) : unit =
     Oracle.extend(o, signature = sign, ttl)
 
   stateful entrypoint respond(o    : oracle(string, int),
                               q    : oracle_query(string, int),
-                              sign : signature,        // Signed oracle query id + contract address
+                              sign : signature,        // Signed network id + oracle query id + contract address
                               r    : int) =
     Oracle.respond(o, q, signature = sign, r)
 
@@ -678,7 +678,7 @@ contract Oracles =
 
 #### Sanity checks
 
-When an Oracle literal is passed to a contract, no deep checks are performed. 
+When an Oracle literal is passed to a contract, no deep checks are performed.
 For extra safety [Oracle.check](sophia_stdlib.md#check) and [Oracle.check_query](sophia_stdlib.md#check_query)
 functions are provided.
 
@@ -738,7 +738,7 @@ To use events a contract must declare a datatype `event`, and events are then
 logged using the `Chain.event` function:
 
 ```
-  datatype event 
+  datatype event
     = Event1(int, int, string)
     | Event2(string, address)
 

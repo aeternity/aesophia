@@ -39,7 +39,7 @@ simple_compile_test_() ->
                    error(ErrBin)
            end
        end} || ContractName <- compilable_contracts(), Backend <- [aevm, fate],
-               not lists:member(ContractName, not_yet_compilable(Backend))] ++
+               not lists:member(ContractName, not_compilable_on(Backend))] ++
     [ {"Test file not found error",
        fun() ->
            {error, Errors} = aeso_compiler:file("does_not_exist.aes"),
@@ -110,7 +110,15 @@ compile(Backend, Name) ->
 
 compile(Backend, Name, Options) ->
     String = aeso_test_utils:read_contract(Name),
-    case aeso_compiler:from_string(String, [{src_file, Name ++ ".aes"}, {backend, Backend} | Options]) of
+    Options1 =
+        case lists:member(Name, debug_mode_contracts()) of
+            true  -> [debug_mode];
+            false -> []
+        end ++
+        [ {src_file, Name ++ ".aes"}, {backend, Backend}
+        , {include, {file_system, [aeso_test_utils:contract_path()]}}
+        ] ++ Options,
+    case aeso_compiler:from_string(String, Options1) of
         {ok, Map}                                        -> Map;
         {error, ErrorString} when is_binary(ErrorString) -> ErrorString;
         {error, Errors}                                  -> Errors
@@ -170,12 +178,21 @@ compilable_contracts() ->
      "let_patterns",
      "lhs_matching",
      "more_strings",
-     "protected_call"
+     "protected_call",
+     "hermetization_turnoff"
     ].
 
-not_yet_compilable(fate) -> [];
-not_yet_compilable(aevm) -> ["pairing_crypto", "aens_update", "basic_auth_tx", "more_strings",
-                             "unapplied_builtins", "bytes_to_x", "state_handling", "protected_call"].
+not_compilable_on(fate) -> [];
+not_compilable_on(aevm) ->
+    [ "stdlib_include", "manual_stdlib_include", "pairing_crypto"
+    , "aens_update", "basic_auth_tx", "more_strings"
+    , "unapplied_builtins", "bytes_to_x", "state_handling", "protected_call"
+    , "hermetization_turnoff"
+
+    ].
+
+debug_mode_contracts() ->
+    ["hermetization_turnoff"].
 
 %% Contracts that should produce type errors
 
@@ -681,6 +698,16 @@ failing_contracts() ->
            "  (0 : int) == (1 : int) : bool\n"
            "It must be either 'true' or 'false'.">>
         ])
+    , ?TYPE_ERROR(bad_function_block,
+                  [<<?Pos(4, 5)
+                     "Mismatch in the function block. Expected implementation/type declaration of g function">>,
+                   <<?Pos(5, 5)
+                     "Mismatch in the function block. Expected implementation/type declaration of g function">>
+                  ])
+    , ?TYPE_ERROR(just_an_empty_file,
+                  [<<?Pos(0, 0)
+                     "Empty contract">>
+                  ])
     , ?TYPE_ERROR(bad_number_of_args,
                   [<<?Pos(3, 39)
                      "Cannot unify () => unit\n"
@@ -856,6 +883,11 @@ validate(Contract1, Contract2) ->
     ByteCode = #{ fate_code := FCode } = compile(fate, Contract1),
     FCode1   = aeb_fate_code:serialize(aeb_fate_code:strip_init_function(FCode)),
     Source   = aeso_test_utils:read_contract(Contract2),
-    aeso_compiler:validate_byte_code(ByteCode#{ byte_code := FCode1 }, Source,
-                                     [{backend, fate}, {include, {file_system, [aeso_test_utils:contract_path()]}}]).
+    aeso_compiler:validate_byte_code(
+      ByteCode#{ byte_code := FCode1 }, Source,
+      case lists:member(Contract2, debug_mode_contracts()) of
+          true  -> [debug_mode];
+          false -> []
+      end ++
+      [{backend, fate}, {include, {file_system, [aeso_test_utils:contract_path()]}}]).
 

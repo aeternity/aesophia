@@ -679,17 +679,21 @@ global_env() ->
 option_t(As, T) -> {app_t, As, {id, As, "option"}, [T]}.
 map_t(As, K, V) -> {app_t, As, {id, As, "map"}, [K, V]}.
 
--spec infer(aeso_syntax:ast()) -> aeso_syntax:ast() | {env(), aeso_syntax:ast()}.
+-spec infer(aeso_syntax:ast()) -> {aeso_syntax:ast(), aeso_syntax:ast()} | {env(), aeso_syntax:ast(), aeso_syntax:ast()}.
 infer(Contracts) ->
     infer(Contracts, []).
 
--type option() :: return_env | dont_unfold | no_code | term().
+-type option() :: return_env | dont_unfold | no_code | debug_mode | term().
 
 -spec init_env(list(option())) -> env().
 init_env(_Options) -> global_env().
 
 -spec infer(aeso_syntax:ast(), list(option())) ->
-    aeso_syntax:ast() | {env(), aeso_syntax:ast()}.
+  {aeso_syntax:ast(), aeso_syntax:ast()} | {env(), aeso_syntax:ast(), aeso_syntax:ast()}.
+infer([], Options) ->
+    create_type_errors(),
+    type_error({no_decls, proplists:get_value(src_file, Options, no_file)}),
+    destroy_and_report_type_errors(init_env(Options));
 infer(Contracts, Options) ->
     ets_init(), %% Init the ETS table state
     try
@@ -698,15 +702,15 @@ infer(Contracts, Options) ->
         ets_new(type_vars, [set]),
         check_modifiers(Env, Contracts),
         {Env1, Decls} = infer1(Env, Contracts, [], Options),
-        {Env2, Decls2} =
+        {Env2, DeclsFolded, DeclsUnfolded} =
             case proplists:get_value(dont_unfold, Options, false) of
-                true  -> {Env1, Decls};
+                true  -> {Env1, Decls, Decls};
                 false -> E = on_scopes(Env1, fun(Scope) -> unfold_record_types(Env1, Scope) end),
-                         {E, unfold_record_types(E, Decls)}
+                         {E, Decls, unfold_record_types(E, Decls)}
             end,
         case proplists:get_value(return_env, Options, false) of
-            false -> Decls2;
-            true  -> {Env2, Decls2}
+            false -> {DeclsFolded, DeclsUnfolded};
+            true  -> {Env2, DeclsFolded, DeclsUnfolded}
         end
     after
         clean_up_ets()
@@ -744,15 +748,21 @@ check_scope_name_clash(Env, Kind, Name) ->
 
 -spec infer_contract_top(env(), main_contract | contract | namespace, [aeso_syntax:decl()], list(option())) ->
     {env(), [aeso_syntax:decl()]}.
-infer_contract_top(Env, Kind, Defs0, _Options) ->
+infer_contract_top(Env, Kind, Defs0, Options) ->
     Defs = desugar(Defs0),
-    infer_contract(Env, Kind, Defs).
+    infer_contract(Env, Kind, Defs, Options).
 
 %% infer_contract takes a proplist mapping global names to types, and
 %% a list of definitions.
--spec infer_contract(env(), main_contract | contract | namespace, [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
-infer_contract(Env0, What, Defs0) ->
-    Defs = process_blocks(Defs0),
+-spec infer_contract(env(), main_contract | contract | namespace, [aeso_syntax:decl()], list(option())) -> {env(), [aeso_syntax:decl()]}.
+infer_contract(Env0, What, Defs0, Options) ->
+    create_type_errors(),
+    Defs01 = process_blocks(Defs0),
+    Defs = case lists:member(debug_mode, Options) of
+               true  -> expose_internals(Defs01, What);
+               false -> Defs01
+           end,
+    destroy_and_report_type_errors(Env0),
     Env  = Env0#env{ what = What },
     Kind = fun({type_def, _, _, _, _})    -> type;
               ({letfun, _, _, _, _, _})   -> function;
@@ -799,19 +809,33 @@ process_blocks(Decls) ->
 -spec process_block(aeso_syntax:ann(), [aeso_syntax:decl()]) -> [aeso_syntax:decl()].
 process_block(_, []) -> [];
 process_block(_, [Decl]) -> [Decl];
-process_block(Ann, [Decl | Decls]) ->
+process_block(_Ann, [Decl | Decls]) ->
     IsThis = fun(Name) -> fun({letfun, _, {id, _, Name1}, _, _, _}) -> Name == Name1;
                              (_) -> false end end,
     case Decl of
         {fun_decl, Ann1, Id = {id, _, Name}, Type} ->
             {Clauses, Rest} = lists:splitwith(IsThis(Name), Decls),
-            [{fun_clauses, Ann1, Id, Type, Clauses} |
-             process_block(Ann, Rest)];
+            [type_error({mismatched_decl_in_funblock, Name, D1}) || D1 <- Rest],
+            [{fun_clauses, Ann1, Id, Type, Clauses}];
         {letfun, Ann1, Id = {id, _, Name}, _, _, _} ->
             {Clauses, Rest} = lists:splitwith(IsThis(Name), [Decl | Decls]),
-            [{fun_clauses, Ann1, Id, {id, [{origin, system} | Ann1], "_"}, Clauses} |
-             process_block(Ann, Rest)]
+            [type_error({mismatched_decl_in_funblock, Name, D1}) || D1 <- Rest],
+            [{fun_clauses, Ann1, Id, {id, [{origin, system} | Ann1], "_"}, Clauses}]
     end.
+
+%% Turns private stuff into public stuff
+expose_internals(Defs, What) ->
+    [ begin
+          Ann = element(2, Def),
+          NewAnn = case What of
+                       namespace -> [A ||A <- Ann, A /= {private, true}, A /= private];
+                       main_contract -> [{entrypoint, true}|Ann];  % minor duplication
+                       contract -> Ann
+                   end,
+          setelement(2, Def, NewAnn)
+      end
+     || Def <- Defs
+    ].
 
 -spec check_typedefs(env(), [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
 check_typedefs(Env = #env{ namespace = Ns }, Defs) ->
@@ -2449,6 +2473,12 @@ mk_t_err(Pos, Msg) ->
 mk_t_err(Pos, Msg, Ctxt) ->
     aeso_errors:new(type_error, Pos, lists:flatten(Msg), lists:flatten(Ctxt)).
 
+mk_error({no_decls, File}) ->
+    Pos = aeso_errors:pos(File, 0, 0),
+    mk_t_err(Pos, "Empty contract\n");
+mk_error({mismatched_decl_in_funblock, Name, Decl}) ->
+    Msg = io_lib:format("Mismatch in the function block. Expected implementation/type declaration of ~s function\n", [Name]),
+    mk_t_err(pos(Decl), Msg);
 mk_error({higher_kinded_typevar, T}) ->
     Msg = io_lib:format("Type ~s is a higher kinded type variable\n"
                         "(takes another type as an argument)\n", [pp(instantiate(T))]

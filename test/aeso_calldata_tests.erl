@@ -113,6 +113,7 @@ compilable_contracts() ->
      {"funargs", "traffic_light", ["Pantone(12)"]},
      {"funargs", "tuples", ["()"]},
      %% TODO {"funargs", "due", ["FixedTTL(1020)"]},
+     {"funargs", "singleton_rec", ["{x = 1000}"]},
      {"variant_types", "init", []},
      {"basic_auth", "init", []},
      {"address_literals", "init", []},

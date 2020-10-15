@@ -1,0 +1,11 @@
+namespace M =
+  function mf() = mg()
+  function mg() = mf()
+
+namespace N =
+  function nf() = ng() + M.mf() + M.mg()
+  private function ng() = nf() + M.mf() + M.mg()
+
+contract C =
+  entrypoint f() = N.ng() + N.nf() + g()
+  function g() = N.ng() + N.nf() + f()

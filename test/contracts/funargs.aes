@@ -45,3 +45,8 @@ contract FunctionArguments =
 
   entrypoint due(t : Chain.ttl) =
      true
+
+  record singleton_r = { x : int }
+
+  entrypoint singleton_rec(r : singleton_r) =
+    r.x
