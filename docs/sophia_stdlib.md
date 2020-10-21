@@ -14,7 +14,6 @@ The out-of-the-box namespaces are:
 
 - [Bits](#Bits)
 - [Bytes](#Bytes)
-- [Char](#Char)
 - [Int](#Int)
 - [Map](#Map)
 - [Address](#Address)
@@ -150,26 +149,6 @@ Bytes.split(a : bytes(m + n)) : bytes(m) * bytes(n)
 ```
 
 Splits a byte array at given index
-
-
-## Char
-
-#### to_int
- ```
-Char.to_int(c : char) : int
-```
-
-Returns the UTF-8 codepoint of a character
-
-
-#### from_int
-
-```
-Char.from_int(i : int) : option(char)
- ```
-
-Opposite of [to_int](#to_int). Returns `None` if the integer doesn't correspond to a single (normalized) codepoint.
-
 
 ## Int
 

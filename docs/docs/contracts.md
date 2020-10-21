@@ -528,6 +528,9 @@ string`, `String.sha3(s)` and `Crypto.sha3(s)` will give different results on AE
 
 ### Authorization interface
 
+!!! attention
+    This feature is not part of the current protocol version and could be implemented in a future protocol upgrade. 
+
 When a Generalized account is authorized, the authorization function needs
 access to the transaction and the transaction hash for the wrapped transaction. (A `GAMetaTx`
 wrapping a transaction.) The transaction and the transaction hash is available in the primitive
