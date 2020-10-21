@@ -832,7 +832,12 @@ expose_internals(Defs, What) ->
                        main_contract -> [{entrypoint, true}|Ann];  % minor duplication
                        contract -> Ann
                    end,
-          setelement(2, Def, NewAnn)
+          Def1 = setelement(2, Def, NewAnn),
+          case Def1 of  % fix inner clauses
+              {fun_clauses, Ans, Id, T, Clauses} ->
+                  {fun_clauses, Ans, Id, T, expose_internals(Clauses, What)};
+              _ -> Def1
+          end
       end
      || Def <- Defs
     ].
