@@ -219,6 +219,7 @@ Without the `stateful` annotation the compiler does not allow the call to
   - `AENS.claim`
   - `AENS.transfer`
   - `AENS.revoke`
+  - `AENS.update`
 * Call a `stateful` function in the current contract
 * Call another contract with a non-zero `value` argument.
 
@@ -725,6 +726,9 @@ name:
         AENS.update(addr, name, None, None, Some(ptrs), signature = sig)
 ```
 
+*Note:* From the Iris hardfork more strict rules apply for AENS pointers, when
+a Sophia contract lookup or update (bad) legacy pointers, the bad keys are
+automatically removed so they will not appear in the pointers map.
 
 ### Events
 
