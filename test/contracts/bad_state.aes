@@ -1,0 +1,5 @@
+contract C =
+  record state = { foo : int }
+  entrypoint init(i : int) =
+    state{ foo = i,
+           foo = 42 }
