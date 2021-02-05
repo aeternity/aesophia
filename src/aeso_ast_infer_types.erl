@@ -623,7 +623,9 @@ check_scope_name_clash(Env, Kind, Name) ->
 -spec infer_contract_top(env(), main_contract | contract | namespace, [aeso_syntax:decl()], list(option())) ->
     {env(), [aeso_syntax:decl()]}.
 infer_contract_top(Env, Kind, Defs0, Options) ->
+    create_type_errors(),
     Defs = desugar(Defs0),
+    destroy_and_report_type_errors(Env),
     infer_contract(Env, Kind, Defs, Options).
 
 %% infer_contract takes a proplist mapping global names to types, and
@@ -2586,6 +2588,9 @@ mk_error({mixed_record_and_map, Expr}) ->
     Msg = io_lib:format("Mixed record fields and map keys in\n~s",
                         [pp_expr("  ", Expr)]),
     mk_t_err(pos(Expr), Msg);
+mk_error({conflicting_updates_for_field, Upd, Key}) ->
+    Msg = io_lib:format("Conflicting updates for field '~s'\n", [Key]),
+    mk_t_err(pos(Upd), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p\n", [Err]),
     mk_t_err(pos(0, 0), Msg).
@@ -2808,7 +2813,7 @@ desugar_updates([Upd | Updates]) ->
     {More, Updates1}       = updates_key(Key, Updates),
     %% Check conflicts
     case length([ [] || [] <- [Rest | More] ]) of
-        N when N > 1 -> error({conflicting_updates_for_field, Upd, Key});
+        N when N > 1 -> type_error({conflicting_updates_for_field, Upd, Key});
         _ -> ok
     end,
     [MakeField(lists:append([Rest | More])) | desugar_updates(Updates1)].

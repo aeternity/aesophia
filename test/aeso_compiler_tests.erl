@@ -713,6 +713,9 @@ failing_contracts() ->
                      "  g : (int, string) => 'c\nto arguments\n"
                      "  \"Litwo, ojczyzno moja\" : string">>
                   ])
+    , ?TYPE_ERROR(bad_state,
+                  [<<?Pos(4, 16)
+                     "Conflicting updates for field 'foo'">>])
     ].
 
 -define(Path(File), "code_errors/" ??File).
