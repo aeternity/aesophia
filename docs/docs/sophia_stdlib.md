@@ -150,6 +150,25 @@ Bytes.split(a : bytes(m + n)) : bytes(m) * bytes(n)
 
 Splits a byte array at given index
 
+
+
+#### to_int
+ ```
+Char.to_int(c : char) : int
+```
+
+Returns the UTF-8 codepoint of a character
+
+
+#### from_int
+
+```
+Char.from_int(i : int) : option(char)
+ ```
+
+Opposite of [to_int](#to_int). Returns `None` if the integer doesn't correspond to a single (normalized) codepoint.
+
+
 ## Int
 
 #### to_str
@@ -326,8 +345,8 @@ Registers new oracle answering questions of type `'a` with answers of type `'b`.
 
 * The `acct` is the address of the oracle to register (can be the same as the contract).
 * `signature` is a signature proving that the contract is allowed to register the account -
-  the `network id` + `account address` + `contract address` (concatenated as byte arrays) is
-  [signed](./sophia.md#delegation-signature) with the
+  the account address + the contract address (concatenated as byte arrays) is
+  [signed](./examples.md#delegation-signature) with the
   private key of the account, proving you have the private key of the oracle to be. If the
   address is the same as the contract `sign` is ignored and can be left out entirely.
 * The `qfee` is the minimum query fee to be paid by a user when asking a question of the oracle.
@@ -360,7 +379,7 @@ Responds to the question `q` on `o`.
 Unless the contract address is the same as the oracle address the `signature`
 (which is an optional, named argument)
 needs to be provided. Proving that we have the private key of the oracle by
-[signing](./sophia.md#delegation-signature) the `network id` + `oracle query id` + `contract address`
+[signing](./examples.md#delegation-signature) the oracle query id + contract address
 
 
 #### extend
@@ -434,8 +453,7 @@ Naming System (AENS).
 If `owner` is equal to `Contract.address` the signature `signature` is
 ignored, and can be left out since it is a named argument. Otherwise we need
 a signature to prove that we are allowed to do AENS operations on behalf of
-`owner`. The [signature is tied to a network id](https://github.com/aeternity/protocol/blob/iris/consensus/consensus.md#transaction-signature),
-i.e. the signature material should be prefixed by the network id.
+`owner`
 
 ### Types
 
@@ -485,7 +503,7 @@ let Some(Name(owner, FixedTTL(expiry), ptrs)) = AENS.lookup("example.chain")
 AENS.preclaim(owner : address, commitment_hash : hash, <signature : signature>) : unit
 ```
 
-The [signature](./sophia.md#delegation-signature) should be over `network id` + `owner address` + `Contract.address`
+The [signature](./examples.md#delegation-signature) should be over `owner address` + `Contract.address`
 (concatenated as byte arrays).
 
 
@@ -494,7 +512,7 @@ The [signature](./sophia.md#delegation-signature) should be over `network id` + 
 AENS.claim(owner : address, name : string, salt : int, name_fee : int, <signature : signature>) : unit
 ```
 
-The [signature](./sophia.md#delegation-signature) should be over `network id` + `owner address` + `name_hash` + `Contract.address`
+The [signature](./examples.md#delegation-signature) should be over `owner address` + `name_hash` + `Contract.address`
 using the private key of the `owner` account for signing.
 
 
@@ -505,7 +523,7 @@ AENS.transfer(owner : address, new_owner : address, name : string, <signature : 
 
 Transfers name to the new owner.
 
-The [signature](./sophia.md#delegation-signature) should be over `network id` + `owner address` + `name_hash` + `Contract.address`
+The [signature](./examples.md#delegation-signature) should be over `owner address` + `name_hash` + `Contract.address`
 using the private key of the `owner` account for signing.
 
 
@@ -516,7 +534,7 @@ AENS.revoke(owner : address, name : string, <signature : signature>) : unit
 
 Revokes the name to extend the ownership time.
 
-The [signature](./sophia.md#delegation-signature)  should be over `network id` + `owner address` + `name_hash` + `Contract.address`
+The [signature](./examples.md#delegation-signature) should be over `owner address` + `name_hash` + `Contract.address`
 using the private key of the `owner` account for signing.
 
 
@@ -748,14 +766,7 @@ List.last(l : list('a)) : option('a)
 Returns `Some` of the last element of a list or `None` if the list is empty.
 
 
-### contains
-```
-List.contains(e : 'a, l : list('a)) : bool
-```
-Checks if list `l` contains element `e`. Equivalent to `List.find(x => x == e, l) != None`.
-
-
-### find
+#### find
 ```
 List.find(p : 'a => bool, l : list('a)) : option('a)
 ```
@@ -1095,14 +1106,7 @@ Option.force(o : option('a)) : 'a
 Forcefully escapes `option` wrapping assuming it is `Some`. Throws error on `None`.
 
 
-### contains
-```
-Option.contains(e : 'a, o : option('a)) : bool
-```
-Returns `true` if and only if `o` contains element equal to `e`. Equivalent to `Option.match(false, x => x == e, o)`.
-
-
-### on_elem
+#### on_elem
 ```
 Option.on_elem(o : option('a), f : 'a => unit) : unit
 ```
@@ -1212,7 +1216,7 @@ will yield `None`.
 
 #### choose
 ```
-Option.choose(o1 : option('a), o2 : option('a)) : option('a)
+Option.choose(o1 : option('a), o2 : option('a)) : option('a) 
 ```
 
 Out of two `option`s choose the one that is `Some`, or `None` if both are `None`s.
@@ -1440,7 +1444,7 @@ Func.curry2(f : ('a, 'b) => 'c) : 'a => ('b => 'c)
 Func.curry3(f : ('a, 'b, 'c) => 'd) : 'a => ('b => ('c => 'd))
 ```
 
-Turns a function that takes n arguments into a curried function that takes
+Turns a function that takes n arguments into a curried function that takes 
 one argument and returns a function that waits for the rest in the same
 manner. For instance `curry2((a, b) => a + b)(1)(2) == 3`.
 
@@ -1838,7 +1842,7 @@ This namespace provides operations on rational numbers. A rational number is rep
 as a fraction of two integers which are stored internally in the `frac` datatype.
 
 The datatype consists of three constructors `Neg/2`, `Zero/0` and `Pos/2` which determine the
-sign of the number. Both values stored in `Neg` and `Pos` need to be strictly positive
+sign of the number. Both values stored in `Neg` and `Pos` need to be strictly positive 
 integers. However, when creating a `frac` you should never use the constructors explicitly.
 Instead of that, always use provided functions like `make_frac` or `from_int`. This helps
 keeping the internal representation well defined.
@@ -1987,14 +1991,14 @@ Rounds a fraction to the nearest greater or equal integer.
 #### round_to_zero
 `Frac.round_to_zero(f : frac) : int`
 
-Rounds a fraction towards zero.
+Rounds a fraction towards zero. 
 Effectively `ceil` if lesser than zero and `floor` if greater.
 
 
 #### round_from_zero
 `Frac.round_from_zero(f : frac) : int`
 
-Rounds a fraction from zero.
+Rounds a fraction from zero. 
 Effectively `ceil` if greater than zero and `floor` if lesser.
 
 
@@ -2026,7 +2030,7 @@ Subtraction of two fractions.
 #### inv
 `Frac.inv(a : frac) : frac`
 
-Inverts a fraction. Throws error if `a` is zero.
+Inverts a fraction. Throws error if `a` is zero. 
 
 
 #### mul
