@@ -686,8 +686,8 @@ will emit one Event of each kind in the example.
 
 ```
   entrypoint emit_events() : () =
-    Chain.event(TheFirstEvent(42))
-    Chain.event(AnotherEvent(Contract.address, "This is not indexed"))
+    Chain.event(Event1(42, 34, "foo"))
+    Chain.event(Event2("This is not indexed", Contract.address))
 ```
 
 #### Argument order
