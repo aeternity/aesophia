@@ -975,12 +975,20 @@ List.unzip(l : list('a * 'b)) : list('a) * list('b)
 Opposite to the `zip` operation. Takes a list of pairs and returns pair of lists with respective elements on same indices.
 
 
+### merge
+```
+List.merge(lesser_cmp : ('a, 'a) => bool, l1 : list('a), l2 : list('a)) : list('a)
+```
+
+Merges two sorted lists into a single sorted list. O(length(l1) + length(l2))
+
+
 ### sort
 ```
 List.sort(lesser_cmp : ('a, 'a) => bool, l : list('a)) : list('a)
 ```
 
-Sorts a list using given comparator. `lesser_cmp(x, y)` should return `true` iff `x < y`. If `lesser_cmp` is not transitive or there exists an element `x` such that `lesser_cmp(x, x)` or there exists a pair of elements `x` and `y` such that `lesser_cmp(x, y) && lesser_cmp(y, x)` then the result is undefined. Currently O(n^2).
+Sorts a list using given comparator. `lesser_cmp(x, y)` should return `true` iff `x < y`. If `lesser_cmp` is not transitive or there exists an element `x` such that `lesser_cmp(x, x)` or there exists a pair of elements `x` and `y` such that `lesser_cmp(x, y) && lesser_cmp(y, x)` then the result is undefined. O(length(l) * log_2(length(l))).
 
 
 ### intersperse
