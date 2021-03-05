@@ -1557,6 +1557,15 @@ free_vars(L) when is_list(L) ->
     [V || Elem <- L,
           V <- free_vars(Elem)].
 
+next_count() ->
+    V = case get(counter) of
+            undefined ->
+                0;
+            X -> X
+        end,
+    put(counter, V + 1),
+    V.
+
 %% Clean up all the ets tables (in case of an exception)
 
 ets_tables() ->
@@ -1602,6 +1611,18 @@ ets_tab2list(Name) ->
     TabId = ets_tabid(Name),
     ets:tab2list(TabId).
 
+ets_insert_ordered(_, []) -> true;
+ets_insert_ordered(Name, [H|T]) ->
+    ets_insert_ordered(Name, H),
+    ets_insert_ordered(Name, T);
+ets_insert_ordered(Name, Object) ->
+    Count = next_count(),
+    TabId = ets_tabid(Name),
+    ets:insert(TabId, {Count, Object}).
+
+ets_tab2list_ordered(Name) ->
+    [E || {_, E} <- ets_tab2list(Name)].
+
 %% Options
 
 create_options(Options) ->
@@ -1637,17 +1658,17 @@ destroy_and_report_unsolved_constraints(Env) ->
 %% -- Named argument constraints --
 
 create_named_argument_constraints() ->
-    ets_new(named_argument_constraints, [bag]).
+    ets_new(named_argument_constraints, [ordered_set]).
 
 destroy_named_argument_constraints() ->
     ets_delete(named_argument_constraints).
 
 get_named_argument_constraints() ->
-    ets_tab2list(named_argument_constraints).
+    ets_tab2list_ordered(named_argument_constraints).
 
 -spec add_named_argument_constraint(named_argument_constraint()) -> ok.
 add_named_argument_constraint(Constraint) ->
-    ets_insert(named_argument_constraints, Constraint),
+    ets_insert_ordered(named_argument_constraints, Constraint),
     ok.
 
 solve_named_argument_constraints(Env) ->
@@ -1686,14 +1707,14 @@ destroy_and_report_unsolved_named_argument_constraints(Env) ->
                          | {add_bytes, aeso_syntax:ann(), concat | split, utype(), utype(), utype()}.
 
 create_bytes_constraints() ->
-    ets_new(bytes_constraints, [bag]).
+    ets_new(bytes_constraints, [ordered_set]).
 
 get_bytes_constraints() ->
-    ets_tab2list(bytes_constraints).
+    ets_tab2list_ordered(bytes_constraints).
 
 -spec add_bytes_constraint(byte_constraint()) -> true.
 add_bytes_constraint(Constraint) ->
-    ets_insert(bytes_constraints, Constraint).
+    ets_insert_ordered(bytes_constraints, Constraint).
 
 solve_bytes_constraints(Env) ->
     [ solve_bytes_constraint(Env, C) || C <- get_bytes_constraints() ],
@@ -1747,18 +1768,18 @@ check_bytes_constraint(Env, {add_bytes, Ann, Fun, A0, B0, C0}) ->
 
 create_field_constraints() ->
     %% A relation from uvars to constraints
-    ets_new(field_constraints, [bag]).
+    ets_new(field_constraints, [ordered_set]).
 
 destroy_field_constraints() ->
     ets_delete(field_constraints).
 
 -spec constrain([field_constraint()]) -> true.
 constrain(FieldConstraints) ->
-    ets_insert(field_constraints, FieldConstraints).
+    ets_insert_ordered(field_constraints, FieldConstraints).
 
 -spec get_field_constraints() -> [field_constraint()].
 get_field_constraints() ->
-    ets_tab2list(field_constraints).
+    ets_tab2list_ordered(field_constraints).
 
 solve_field_constraints(Env) ->
     FieldCs =
