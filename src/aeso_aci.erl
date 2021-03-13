@@ -165,7 +165,9 @@ encode_type({constr_t, _, C, As}) -> #{encode_type(C) => encode_types(As)};
 encode_type({alias_t, Type})      -> encode_type(Type);
 encode_type({fun_t, _, _, As, T}) -> #{function =>
                                          #{arguments => encode_types(As),
-                                           returns => encode_type(T)}}.
+                                           returns => encode_type(T)}};
+encode_type({named_t, _, _, T}) -> encode_type(T);
+encode_type({liquid, _, T, _}) -> encode_type(T).
 
 encode_types(Ts) -> [ encode_type(T) || T <- Ts ].
 

@@ -1,0 +1,12 @@
+contract C =
+  entrypoint f(x) =
+    switch(x)
+      1 => x
+      2 => 2
+      y => (x + y) / 2
+
+  function
+    g : {n : int | n > 0 && n < 4} => {r : int | r == 2}
+    g(1) = 2
+    g(2) = 2
+    g(3) = g(1) + 0

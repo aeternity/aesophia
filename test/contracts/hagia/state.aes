@@ -1,0 +1,7 @@
+contract C =
+  record state = {x : int}
+
+  function inc(x) = x + 1
+  stateful entrypoint f() =
+    let s = state
+    state.x

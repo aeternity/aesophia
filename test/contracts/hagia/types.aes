@@ -1,0 +1,50 @@
+contract C =
+  type i('a) = 'a
+  type ii = i(int)
+  datatype iii = III(ii)
+  datatype ib = I(i(int)) | B(bool) | IB(int, bool)
+  datatype d_nest = DNest(ib)
+
+  datatype maybe('a) = Nothing | Just('a)
+
+  type maybemaybe('a) = maybe(maybe('a))
+  type maybe_int = maybe(int)
+
+  record r = {i : int, b : bool}
+  record rr = {r : r}
+
+  entrypoint
+    test_i : () => {res : int | res == 123}
+    test_i() = 123
+    
+  entrypoint
+    test_ii : (ii) => {res : int | res == 123}
+    test_ii(x) = x - x + 123
+
+  entrypoint
+    test_iii1() = III(123)
+  entrypoint
+    test_iii2 : () => {iii <: III({res : int | res > 0})}
+    test_iii2() = III(123)
+/*
+  entrypoint
+    test_ib1() = I(1)
+  entrypoint
+    test_ib2() = B(true)
+  entrypoint
+    test_ib3() = IB(123, true)
+  function
+    test_ib4 : {ib <: I({n : int | n == 0})} => {res : int | res == 1}
+    test_ib4(I(0)) = 1
+  function
+    test_ib5 : {ib <: I({n : int | n == 0})} => {res : int | res == 1}
+    test_ib5(q) = switch(q)
+     _ => 1
+  function
+    test_ib6 : bool => {ib <: IB({n : int | n == 0}, bool)}
+    test_ib6(b) = IB(0, b)
+
+  entrypoint test_maybemaybe() = Just(Nothing)
+
+  entrypoint test_maybe_int() = Nothing
+*/

@@ -1,0 +1,23 @@
+contract C =
+  entrypoint f() = 1 / 0
+
+  entrypoint g(x) = 1 / x
+
+  stateful entrypoint h(a, x) = Chain.spend(a, x)
+
+  entrypoint i(x) =
+    switch(x)
+      0 => 1
+
+  entrypoint j(x) =
+    switch(x)
+      _ => 1
+      _ => 2
+
+  entrypoint k(x) =
+    let 0 = x
+    x
+
+  entrypoint
+    l : () => {n : int | n > 0}
+    l() = 0

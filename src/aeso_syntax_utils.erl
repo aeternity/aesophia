@@ -153,4 +153,3 @@ used(D) ->
                (_, _)             -> #{}
             end, decl, D)),
     lists:filter(NotBound, Xs).
-

@@ -11,6 +11,8 @@
 
 -export([decls/1, decls/2, decl/1, decl/2, expr/1, expr/2, type/1, type/2]).
 
+-export([constr/1, dep_type/1, predicate/1, pp/2]).
+
 -export_type([options/0]).
 
 -include("aeso_utils.hrl").
@@ -207,7 +209,8 @@ name({con, _,  Name})  -> text(Name);
 name({qid, _,  Names}) -> text(string:join(Names, "."));
 name({qcon, _, Names}) -> text(string:join(Names, "."));
 name({tvar, _, Name})  -> text(Name);
-name({typed, _, Name, _}) -> name(Name).
+name({typed, _, Name, _}) -> name(Name);
+name({ltvar, Name}) -> text(Name).
 
 -spec letdecl(string(), aeso_syntax:letbind()) -> doc().
 letdecl(Let, {letval, _, P, E}) ->
@@ -282,7 +285,198 @@ type(T = {id, _, _})   -> name(T);
 type(T = {qid, _, _})  -> name(T);
 type(T = {con, _, _})  -> name(T);
 type(T = {qcon, _, _}) -> name(T);
-type(T = {tvar, _, _}) -> name(T).
+type(T = {tvar, _, _}) -> name(T);
+
+type(T) -> dep_type(T).
+
+
+dep_type({refined_t, _, Id, BaseType, []}) ->
+    beside(
+      [ text("{")
+      , hsep(
+          [ name(Id)
+          , text(":")
+          , type(BaseType)
+          ])
+      , text("}")
+      ]);
+dep_type({refined_t, _, Id, BaseType, Pred}) ->
+    beside(
+      [ text("{")
+      , hsep(
+          [ name(Id)
+          , text(":")
+          , type(BaseType)
+          , text("|")
+          , predicate(Pred)
+          ])
+      , text("}")
+      ]);
+dep_type({dep_fun_t, _, Args, Ret}) ->
+    follow
+      ( hsep
+          ( tuple([
+                   case DT of
+                       {refined_t, _, Id, _, _} when Id == ArgId ->
+                           dep_type(DT);
+                       {dep_list_t, _, Id, _, _} when Id == ArgId ->
+                           dep_type(DT);
+                       _ ->
+                           beside(
+                             [ text("{")
+                             , hsep(
+                                 [ name(ArgId)
+                                 , text(":")
+                                 , type(DT)
+                                 ])
+                             , text("}")
+                             ]
+                            )
+                   end
+                    || {dep_arg_t, _, ArgId, DT} <- Args])
+          , text("=>")
+          )
+      , type(Ret)
+      );
+dep_type({dep_record_t, _, Type, Fields}) ->
+    beside(
+      [ text("{")
+      , hsep(
+          [ type(Type)
+          , text("<:")
+          , par(punctuate(
+                  text(","),
+                  [ case FType of
+                        {refined_t, _, Id, _, _} when Id == FName ->
+                            dep_type(FType);
+                        _ -> hsep([name(FName), text(":"), type(FType)])
+                    end
+                    || {dep_field_t, _, FName, FType} <- Fields]
+                 ))
+          ])
+      , text("}")
+      ]);
+dep_type({dep_variant_t, _, _, Type, Pred, Constrs}) ->
+    PredList = if is_list(Pred) -> Pred;
+                  true -> []
+               end,
+    IsTags =
+        [ case HEAD of
+              con -> Tag;
+              qcon -> lists:last(Tag)
+          end
+         || {is_tag, _, _, {HEAD, _, Tag}, _, _} <- PredList],
+    NotIsTags =
+        [ case HEAD of
+              con -> Tag;
+              qcon -> lists:last(Tag)
+          end
+         || {app, _, {'!', _}, [{is_tag, _, _, {HEAD, _, Tag}, _, _}]} <- PredList],
+    Constrs1 =
+        case IsTags of
+            [] -> [ Con
+                   || Con = {constr_t, _, {con, _, CName}, _} <- Constrs,
+                      not lists:member(CName, NotIsTags)
+                  ];
+            _ ->
+                [ Con
+                  || Con = {constr_t, _, {con, _, CName}, _} <- Constrs,
+                     lists:member(CName, IsTags)
+                ]
+        end,
+    beside(
+      [ text("{")
+      , hsep(
+          [ type(Type)
+          , text("<:")
+          , if is_list(Pred) -> prettypr:empty();
+               true -> predicate(Pred)
+            end
+          , par(punctuate(text(" |"), lists:map(fun constructor_t/1, Constrs1)))
+          ])
+      , text("}")
+      ]);
+dep_type({dep_list_t, _, Id, Elem, []}) ->
+    beside(
+      [ text("{")
+      , hsep(
+          [ name(Id)
+          , text(":")
+          , type({app_t, [], {id, [], "list"}, [Elem]})
+          ])
+      , text("}")
+      ]);
+dep_type({dep_list_t, _, Id, Elem, LenPred}) ->
+    beside(
+      [ text("{")
+      , hsep(
+          [ name(Id)
+          , text(":")
+          , type({app_t, [], {id, [], "list"}, [Elem]})
+          , text("|")
+          , predicate(LenPred)
+          ])
+      , text("}")
+      ]
+     );
+dep_type(T = {tvar, _, _}) ->
+    name(T).
+
+subst(Subst) ->
+    beside(
+      [ text("[")
+      , hsep(
+          [ par(punctuate(
+                  text(";"),
+                  [ beside([expr(V), text("/"), expr(Q)])
+                    || {V, Q} <- Subst
+                  ]))
+          ])
+      , text("]")
+      ]
+     ).
+
+predicate({template, [], {ltvar, Var}}) -> text(Var);
+predicate({template, Subst, {ltvar, Var}}) ->
+    beside(subst(Subst), text(Var));
+predicate([]) -> text("true");
+predicate(L) when is_list(L) ->
+    par(punctuate(text(" &&"), [expr(E) || E <- L]));
+predicate(Constraints) when is_list(Constraints) ->
+    par(punctuate(text(","), [expr(C) || C <- Constraints])).
+
+constr_env(Env) ->
+    above(
+      [ par(punctuate(
+              text(","),
+              [beside([expr(Var), text(" : "), type(T)])
+               || {Var, {_, T}} <- aeso_ast_refine_types:type_binds(Env)])
+           )
+      , predicate(aeso_ast_refine_types:path_pred(Env))
+      ]).
+
+under_constr_env(Env, X) ->
+    above([ constr_env(Env)
+          , text("--------------")
+          , X
+          ]
+     ).
+
+constr({well_formed, _, Env, T}) ->
+    under_constr_env(Env, type(T));
+constr({subtype, Ref, _, Env, T1, T2}) ->
+    under_constr_env(
+      Env,
+      beside([ text(io_lib:format("~p\t", [Ref]))
+             , type(T1)
+             , text(" <: ")
+             , type(T2)
+             ]));
+constr({unreachable, _, _, Env}) ->
+    under_constr_env(Env, text("false"));
+constr({reachable, _, _, Env}) ->
+    above(text("SAT"), constr_env(Env)).
+
 
 -spec args_type([aeso_syntax:type()]) -> doc().
 args_type(Args) ->
@@ -346,6 +540,8 @@ expr_p(P, {assign, _, LV, E}) ->
 %% -- Operators
 expr_p(_, {app, _, {'..', _}, [A, B]}) ->
     list([infix(0, '..', A, B)]);
+expr_p(P, {app, As, {typed, _, {Op, OpAs}, _}, Args}) when is_atom(Op) ->
+    expr_p(P, {app, As, {Op, OpAs}, Args});
 expr_p(P, E = {app, _, F = {Op, _}, Args}) when is_atom(Op) ->
     case {aeso_syntax:get_ann(format, E), Args} of
         {infix, [A, B]} -> infix(P, Op, A, B);
@@ -398,7 +594,13 @@ expr_p(_, E = {qcon, _, _}) -> name(E);
 %% -- For error messages
 expr_p(_, {Op, _}) when is_atom(Op) ->
     paren(text(atom_to_list(Op)));
-expr_p(_, {lvalue, _, LV})  -> lvalue(LV).
+expr_p(_, {lvalue, _, LV})  -> lvalue(LV);
+expr_p(P, {is_tag, _, What, Con, Args, _}) ->
+    beside(
+      [ expr_p(P, What), text("==")
+      , app(P, Con, [{id, [], "_"} || _ <- Args])
+      ]
+     ).
 
 stmt_p({'if', _, Cond, Then}) ->
     block_expr(200, beside(text("if"), paren(expr(Cond))), Then);
@@ -504,3 +706,5 @@ get_elifs(If = {'if', Ann, Cond, Then, Else}, Elifs) ->
     end;
 get_elifs(Else, Elifs) -> {lists:reverse(Elifs), {else, Else}}.
 
+pp(PP, X) ->
+    prettypr:format(apply(aeso_pretty, PP, [X])).

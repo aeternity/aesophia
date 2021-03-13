@@ -699,12 +699,15 @@ expr_to_fcode(Env, _Type, {block, _, Stmts}) ->
     stmts_to_fcode(Env, Stmts);
 
 %% Binary operator
-expr_to_fcode(Env, _Type, Expr = {app, _, {Op, _}, [_, _]}) when Op == '&&'; Op == '||' ->
+expr_to_fcode(Env, _Type, Expr = {app, _, {typed, _, {Op, _}, _}, [_, _]})
+  when Op == '&&'; Op == '||' ->
     Tree = expr_to_decision_tree(Env, Expr),
     decision_tree_to_fcode(Tree);
-expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A, B]}) when is_atom(Op) ->
+expr_to_fcode(Env, _Type, {app, _Ann, {typed, _, {Op, _}, _}, [A, B]})
+  when is_atom(Op) ->
     {op, Op, [expr_to_fcode(Env, A), expr_to_fcode(Env, B)]};
-expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
+expr_to_fcode(Env, _Type, {app, _Ann, {typed, _, {Op, _}, _}, [A]})
+  when is_atom(Op) ->
     case Op of
         '-' -> {op, '-', [{lit, {int, 0}}, expr_to_fcode(Env, A)]};
         '!' -> {op, '!', [expr_to_fcode(Env, A)]}
@@ -2211,6 +2214,8 @@ pp_pat(P = {Tag, _}) when Tag == bool; Tag == int; Tag == string
                          -> pp_fexpr({lit, P});
 pp_pat(Pat)              -> pp_fexpr(Pat).
 
+is_infix({typed, _, Op, _}) ->
+    is_infix(Op);
 is_infix(Op) ->
     C = hd(atom_to_list(Op)),
     C < $a orelse C > $z.

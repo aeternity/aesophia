@@ -1,0 +1,9 @@
+contract C =
+  stateful entrypoint f1(a) =
+    require(Contract.balance == 10, "xd")
+    Chain.spend(a, 10)
+    Contract.balance
+
+  entrypoint f2(x) =
+    require(x > 0, "")
+    1 / x

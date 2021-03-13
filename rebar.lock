@@ -12,17 +12,25 @@
        {ref,"60a335668a60328a29f9731b67c4a0e9e3d50ab6"}},
   2},
  {<<"eblake2">>,{pkg,<<"eblake2">>,<<"1.0.0">>},0},
+ {<<"effi">>,
+  {git,"https://github.com/joergen7/effi",
+       {ref,"aac0d5716c322200dd1145cf6bb651f79834bfd5"}},
+  0},
  {<<"enacl">>,
   {git,"https://github.com/aeternity/enacl.git",
        {ref,"26180f42c0b3a450905d2efd8bc7fd5fd9cece75"}},
   2},
  {<<"getopt">>,{pkg,<<"getopt">>,<<"1.0.1">>},0},
+ {<<"jsone">>,{pkg,<<"jsone">>,<<"1.4.7">>},1},
  {<<"jsx">>,
   {git,"https://github.com/talentdeficit/jsx.git",
        {ref,"3074d4865b3385a050badf7828ad31490d860df5"}},
-  0}]}.
+  0},
+ {<<"meck">>,{pkg,<<"meck">>,<<"0.8.12">>},0}]}.
 [
 {pkg_hash,[
  {<<"eblake2">>, <<"EC8AD20E438AAB3F2E8D5D118C366A0754219195F8A0F536587440F8F9BCF2EF">>},
- {<<"getopt">>, <<"C73A9FA687B217F2FF79F68A3B637711BB1936E712B521D8CE466B29CBF7808A">>}]}
+ {<<"getopt">>, <<"C73A9FA687B217F2FF79F68A3B637711BB1936E712B521D8CE466B29CBF7808A">>},
+ {<<"jsone">>, <<"A970C23D9700AE7842B526C57677E6E3F10894B429524696EAD547E9302391C0">>},
+ {<<"meck">>, <<"1F7B1A9F5D12C511848FEC26BBEFD09A21E1432EADB8982D9A8ACEB9891A3CF2">>}]}
 ].

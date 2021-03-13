@@ -17,6 +17,8 @@
          run_parser/2,
          run_parser/3]).
 
+-include("aeso_ast_refine_types.hrl").
+
 -include("aeso_parse_lib.hrl").
 -import(aeso_parse_lib, [current_file/0, set_current_file/1]).
 
@@ -181,7 +183,14 @@ constructor() ->    %% TODO: format for Con() vs Con
 
 con_args()   -> paren_list(con_arg()).
 type_args()  -> paren_list(type()).
-field_type() -> ?RULE(id(), tok(':'), type(), {field_t, get_ann(_1), _1, _3}).
+field_type() ->
+    ?LAZY_P(choice(
+    [ ?RULE(tok('{'), id(), tok(':'), typeRefinable(), tok('|'), comma_sep1(expr()), tok('}'),
+            {field_t, get_ann(_2), _2, {refined_t, get_ann(_4), _2, _4, _6}})
+    ,  ?RULE(tok('{'), id(), tok(':'), id("list"), parens(type()), tok('|'), comma_sep1(expr()), tok('}'),
+             {field_t, get_ann(_2), _2, {dep_list_t, get_ann(_4), _2, _5, _7}})
+    , ?RULE(id(), tok(':'), type(), {field_t, get_ann(_1), _1, _3})
+    ])).
 
 con_arg()    -> choice(type(), ?RULE(keyword(indexed), type(), set_ann(indexed, true, _2))).
 
@@ -224,14 +233,40 @@ type300() ->
 
 type400() ->
     choice(
-    [?RULE(typeAtom(), optional(type_args()),
-          case _2 of
-            none       -> _1;
-            {ok, Args} -> {app_t, get_ann(_1), _1, Args}
-          end),
-     ?RULE(id("bytes"), parens(token(int)),
-           {bytes_t, get_ann(_1), element(3, _2)})
+    [?RULE(id("bytes"), parens(token(int)),
+           {bytes_t, get_ann(_1), element(3, _2)}),
+     %% Refined
+     ?RULE(tok('{'), id(), tok(':'), typeRefinable(), tok('|'), comma_sep(expr()), tok('}'),
+           refined_t(get_ann(_1), _2, _4, _6)
+          ),
+     %% Refined without pred
+     ?RULE(tok('{'), id(), tok(':'), typeRefinable(), tok('}'),
+           refined_t(get_ann(_1), _2, _4, [])
+          ),
+     %% Dep record
+     ?RULE(tok('{'), type500(), tok('<:'), comma_sep1(field_type()), tok('}'),
+           dep_record_t(get_ann(_1), _2, _4)
+          ),
+     %% Dep variant
+     ?RULE(tok('{'), type500(), tok('<:'), typedef(variant), tok('}'),
+           dep_variant_t(get_ann(_1), _2, _4)
+          ),
+     %% Dep list
+     ?RULE(tok('{'), id(), tok(':'), id("list"), parens(type()), tok('|'), comma_sep(expr()), tok('}'),
+           dep_list_t(get_ann(_1), _2, _5, _7)),
+     %% Dep list without pred
+     ?RULE(tok('{'), id(), tok(':'), id("list"), parens(type()), tok('}'),
+           dep_list_t(get_ann(_1), _2, _5, [])
+          ),
+     ?RULE(type500(), _1)
     ]).
+
+type500() ->
+    ?RULE(typeAtom(), optional(type_args()),
+          case _2 of
+              none       -> _1;
+              {ok, Args} -> {app_t, get_ann(_1), _1, Args}
+          end).
 
 typeAtom() ->
     ?LAZY_P(choice(
@@ -240,12 +275,16 @@ typeAtom() ->
     , id(), token(con), token(qcon), token(qid), tvar()
     ])).
 
+typeRefinable() ->
+    ?LAZY_P(choice([id(), tvar()])).
+
 args_t() ->
     ?LAZY_P(choice(
     [ ?RULE(tok('('), tok(')'), {args_t, get_ann(_1), []})
       %% Singleton case handled separately
     , ?RULE(tok('('), type(), tok(','), sep1(type(), tok(',')), tok(')'), {args_t, get_ann(_1), [_2|_4]})
     ])).
+
 
 %% -- Statements -------------------------------------------------------------
 
@@ -478,6 +517,7 @@ parens(P)   -> between(tok('('), P, tok(')')).
 braces(P)   -> between(tok('{'), P, tok('}')).
 brackets(P) -> between(tok('['), P, tok(']')).
 comma_sep(P) -> sep(P, tok(',')).
+comma_sep1(P) -> sep1(P, tok(',')).
 
 paren_list(P)   -> parens(comma_sep(P)).
 brace_list(P)   -> braces(comma_sep(P)).
@@ -556,6 +596,18 @@ else_branches([Else = {else, _, _} | Stmts], Acc) ->
     {lists:reverse([Else | Acc]), Stmts};
 else_branches(Stmts, Acc) ->
     {lists:reverse(Acc), Stmts}.
+
+refined_t(Ann, Id, Type, Pred) ->
+    {refined_t, Ann, Id, Type, Pred}.
+
+dep_record_t(Ann, Base, Fields) ->
+    {dep_record_t, Ann, Base, Fields}.
+
+dep_variant_t(Ann, Base, {variant_t, Constrs}) ->
+    {dep_variant_t, Ann, ?nu(Ann), Base, undefined, Constrs}.
+
+dep_list_t(Ann, Id, ElemT, LenPred) ->
+    {dep_list_t, Ann, Id, ElemT, LenPred}.
 
 tuple_t(_Ann, [Type]) -> Type;  %% Not a tuple
 tuple_t(Ann, Types)   -> {tuple_t, Ann, Types}.

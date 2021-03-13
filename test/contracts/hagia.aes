@@ -1,0 +1,14 @@
+
+
+contract C =
+  stateful entrypoint f(a, x:int) =
+    if(a < x) a else x
+
+
+
+
+
+
+
+
+

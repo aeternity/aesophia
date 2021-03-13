@@ -93,6 +93,7 @@ check_errors(Expect, ErrorString) ->
 %% compilable_contracts() -> [ContractName].
 %%  The currently compilable contracts.
 
+compilable_contracts() -> [];     
 compilable_contracts() ->
     [
      {"identity", "init", []},

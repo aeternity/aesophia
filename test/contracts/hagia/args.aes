@@ -1,0 +1,8 @@
+contract C =
+  entrypoint fff() = 123
+ 
+  function
+    f : {n : int | n > 0} => {res : int | res =< n}
+    f(x) =
+      switch(x)
+        _ => 1 / x

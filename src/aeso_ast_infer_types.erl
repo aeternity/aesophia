@@ -16,6 +16,8 @@
         , infer/2
         , unfold_types_in_type/3
         , pp_type/2
+        , init_env/1
+        , lookup_env/4
         ]).
 
 -include("aeso_utils.hrl").
@@ -130,9 +132,11 @@
     , stateful   = false              :: boolean()
     , current_function = none         :: none | aeso_syntax:id()
     , what       = top                :: top | namespace | contract | contract_interface
+    , allow_liquid = true             :: boolean()
     }).
 
 -type env() :: #env{}.
+-export_type([env/0]).
 
 -define(PRINT_TYPES(Fmt, Args),
         when_option(pp_types, fun () -> io:format(Fmt, Args) end)).
@@ -1094,11 +1098,126 @@ check_type(Env, Type = {fun_t, Ann, NamedArgs, Args, Ret}, Arity) ->
     ensure_base_type(Type, Arity),
     NamedArgs1 = [ check_named_arg(Env, NamedArg) || NamedArg <- NamedArgs ],
     Args1      = [ check_type(Env, Arg, 0) || Arg <- Args ],
-    Ret1       = check_type(Env, Ret, 0),
+    NamedTArgs = [{Var, T} || {refined_t, _, Var, T, _} <- Args1]
+        ++ [{Var, {id, [], "int"}} || {dep_list_t, _, Var, _, _} <- Args1],
+    Env1       = bind_vars(NamedTArgs, Env),
+    Ret1       = check_type(Env1, Ret, 0),
     {fun_t, Ann, NamedArgs1, Args1, Ret1};
 check_type(_Env, Type = {uvar, _, _}, Arity) ->
     ensure_base_type(Type, Arity),
     Type;
+check_type(Env, T = {refined_t, Ann, Id, Base, Pred}, Arity) ->
+    [type_error({illegal_liquid, T}) || not Env#env.allow_liquid],
+    ensure_base_type(Base, Arity),
+    Env1 = Env#env{allow_liquid = false},
+    Base1 = check_type(Env1, Base, Arity),
+    Env2 = bind_var(Id, Base, Env1),
+    Pred1 = [check_expr(Env2, Q, {id, aeso_syntax:get_ann(Q), "bool"}) || Q <- Pred],
+    {refined_t, Ann, Id, Base1, Pred1};
+check_type(Env, T = {dep_record_t, Ann, Base, Fields}, Arity) ->
+    ensure_base_type(T, Arity),
+    [type_error({illegal_liquid, T}) || not Env#env.allow_liquid],
+    Base1 = check_type(Env, Base, Arity),
+    Id = case Base1 of
+             {app_t, _, I, _} -> I;
+             _ -> Base1
+         end,
+    %% TODO Validate fields in record
+    {QId, TrueFields} =
+        case lookup_type(Env, Id) of
+            {QName, {QAnn, {_, {record_t, F}}}} -> {qid(QAnn, QName), F};
+            _ -> type_error({not_a_record_type, Id, T}),
+                 {Id, []}
+        end,
+    Fields1 =
+        [ case [ FieldNew
+                 || FieldNew = {field_t, _, FNameNew, _} <- Fields,
+                    name(FNameNew) == name(FNameOld)] of
+              [{field_t, FAnn, FName, FType}] ->
+                  {field_t, FAnn, FName, check_type(Env, FType)};
+              _ -> FieldOld
+          end
+         || FieldOld = {field_t, _, FNameOld, _} <- TrueFields
+        ],
+    constrain(
+      [ #field_constraint{
+           record_t = QId,
+           field    = FName,
+           field_t  = FType,
+           kind     = project,
+           context  = {proj, Ann, QId, FName} }
+        || {field_t, _, FName, FType} <- Fields
+      ]),
+    {dep_record_t, Ann, QId, Fields1};
+check_type(Env, T = {dep_variant_t, Ann, TId, Base, undefined, Constrs}, Arity) ->
+    ensure_base_type(T, Arity),
+    [type_error({illegal_liquid, T}) || not Env#env.allow_liquid],
+    Base1 = check_type(Env, Base, Arity),
+    Id = case Base1 of
+             {app_t, _, I, _} -> I;
+             _ -> Base1
+         end,
+    Args = case Base1 of
+             {app_t, _, _, A} -> A;
+             _ -> []
+         end,
+    {QId, TrueConstrs} =
+        case lookup_type(Env, Id) of
+            {Q, {QAnn, {_, {variant_t, Cs}}}} -> {{qid, QAnn, Q}, Cs};
+            {["option"], {QAnn, {builtin, _}}} ->
+                {{qid, QAnn, ["option"]},
+                 [ {constr_t, QAnn, {con, QAnn, "None"}, []}
+                 , {constr_t, QAnn, {con, QAnn, "Some"}, Args}
+                 ]
+                }; %% TODO other types
+            _ -> type_error({not_a_variant_type, Id, T}),
+                 {Id, []}
+        end,
+    [ check_expr(Env, Con,
+            case CArgs of
+                [] -> Base1;
+                _ -> {fun_t, CAnn, [], CArgs, Base1}
+            end)
+      || {constr_t, CAnn, Con, CArgs} <- Constrs
+    ],
+    Constrs1 =
+        [ case [ ConstrNew
+                 || ConstrNew = {constr_t, _, CNameNew, _} <- Constrs,
+                    name(CNameNew) == name(CNameOld)] of
+              [{constr_t, FAnn, CName, CArgs}] ->
+                  {constr_t, FAnn, CName,
+                   [ check_type(Env, CArg) || CArg <- CArgs ]
+                  };
+              _ -> ConstrOld
+          end
+          || ConstrOld = {constr_t, _, CNameOld, _} <- TrueConstrs
+        ],
+    OnQcon = fun(A) -> qcon(aeso_syntax:get_ann(QId), lists:droplast(qname(QId)) ++ qname(A)) end,
+    TagPred =
+        case Constrs of
+            [] -> [{bool, [], false}];
+            [{constr_t, CAnn, Con, Args}] ->
+                [{is_tag, CAnn, TId, OnQcon(Con), Args, Base1}];
+            _ ->
+                [ {app, Ann, {'!', Ann},
+                   [{is_tag, CAnn, TId, OnQcon(TrueCon), Args, Base1}]}
+                 || {constr_t, CAnn, TrueCon, Args} <- TrueConstrs,
+                    lists:all(
+                      fun({constr_t, _, Con, _}) ->
+                              qname(Con) /= qname(TrueCon)
+                      end, Constrs
+                     )
+                ]
+        end,
+    {dep_variant_t, Ann, TId, Base1, TagPred, Constrs1};
+check_type(Env, T = {dep_list_t, Ann, Id, ElemT, LenPred}, Arity) ->
+    ensure_base_type(T, Arity),
+    [type_error({illegal_liquid, T}) || not Env#env.allow_liquid],
+    ElemT1 = check_type(Env, ElemT),
+    Env1 = Env#env{allow_liquid = false},
+    Env2 = bind_var(Id, {id, [], "int"}, Env1),
+    LenPred1 = [check_expr(Env2, Q, {id, [], "bool"}) || Q <- LenPred],
+    {dep_list_t, Ann, Id, ElemT1, LenPred1};
 check_type(_Env, {args_t, Ann, Ts}, _) ->
     type_error({new_tuple_syntax, Ann, Ts}),
     {tuple_t, Ann, Ts}.
@@ -1263,7 +1382,12 @@ infer_letrec(Env, Defs) ->
 infer_letfun(Env, {fun_clauses, Ann, Fun = {id, _, Name}, Type, Clauses}) ->
     Type1 = check_type(Env, Type),
     {NameSigs, Clauses1} = lists:unzip([ infer_letfun1(Env, Clause) || Clause <- Clauses ]),
-    {_, Sigs = [Sig | _]} = lists:unzip(NameSigs),
+    {_, Sigs = [Sig0 | _]} = lists:unzip(NameSigs),
+    Sig = case Type1 of
+              {fun_t, TAnn, Named, ArgsT, RetT} ->
+                  {type_sig, TAnn, none, Named, ArgsT, RetT};
+              _ -> Sig0
+          end,
     _ = [ begin
             ClauseT = typesig_to_fun_t(ClauseSig),
             unify(Env, ClauseT, Type1, {check_typesig, Name, ClauseT, Type1})
@@ -1302,8 +1426,8 @@ desugar_clauses(Ann, Fun, {type_sig, _, _, _, ArgTypes, RetType}, Clauses) ->
             {letfun, Ann, Fun, Args, RetType,
              {typed, NoAnn,
               {switch, NoAnn, Tuple(Args),
-                [ {'case', AnnC, Tuple(ArgsC), Body}
-                || {letfun, AnnC, _, ArgsC, _, Body} <- Clauses ]}, RetType}}
+               [ {'case', AnnC, Tuple(ArgsC), Body}
+                 || {letfun, AnnC, _, ArgsC, _, Body} <- Clauses ]}, RetType}}
     end.
 
 print_typesig({Name, TypeSig}) ->
@@ -1735,8 +1859,8 @@ infer_op(Env, As, Op, Args, InferOp) ->
     TypedArgs = [infer_expr(Env, A) || A <- Args],
     ArgTypes = [T || {typed, _, _, T} <- TypedArgs],
     Inferred = {fun_t, _, _, OperandTypes, ResultType} = InferOp(Op),
-    unify(Env, ArgTypes, OperandTypes, {infer_app, Op, [], Args, Inferred, ArgTypes}),
-    {typed, As, {app, As, Op, TypedArgs}, ResultType}.
+    unify(Env, ArgTypes, OperandTypes, {infer_app, Op, [], Inferred, ArgTypes}),
+    {typed, As, {app, As, {typed, As, Op, Inferred}, TypedArgs}, ResultType}.
 
 infer_pattern(Env, Pattern) ->
     Vars = free_vars(Pattern),
@@ -2226,7 +2350,7 @@ solve_known_record_types(Env, Constraints) ->
                              unify(Env, FreshRecType, RecType, {record_constraint, FreshRecType, RecType, When}),
                              C
                      end;
-                _ ->
+                X ->
                     type_error({not_a_record_type, instantiate(RecType), When}),
                     not_solved
              end
@@ -2263,6 +2387,8 @@ destroy_and_report_unsolved_field_constraints(Env) ->
 record_type_name({app_t, _Attrs, RecId, _Args}) when ?is_type_id(RecId) ->
     RecId;
 record_type_name(RecId) when ?is_type_id(RecId) ->
+    RecId;
+record_type_name({dep_record_t, _, RecId, _}) when ?is_type_id(RecId) ->
     RecId;
 record_type_name(_Other) ->
     %% io:format("~p is not a record type\n", [Other]),
@@ -2390,6 +2516,8 @@ unfold_types_in_type(Env, {constr_t, Ann, Con, Types}, Options) ->
     {constr_t, Ann, Con, unfold_types_in_type(Env, Types, Options)};
 unfold_types_in_type(Env, {named_arg_t, Ann, Con, Types, Default}, Options) ->
     {named_arg_t, Ann, Con, unfold_types_in_type(Env, Types, Options), Default};
+unfold_types_in_type(Env, {dep_arg_t, Ann, Con, Types}, Options) ->
+    {dep_arg_t, Ann, Con, unfold_types_in_type(Env, Types, Options)};
 unfold_types_in_type(Env, T, Options) when is_tuple(T) ->
     list_to_tuple(unfold_types_in_type(Env, tuple_to_list(T), Options));
 unfold_types_in_type(Env, [H|T], Options) ->
@@ -2487,6 +2615,26 @@ unify1(Env, {app_t, _, T, []}, B, When) ->
     unify(Env, T, B, When);
 unify1(Env, A, {app_t, _, T, []}, When) ->
     unify(Env, A, T, When);
+unify1(Env, A, {refined_t, _, _, B, _}, When) ->
+    unify1(Env, A, B, When);
+unify1(Env, {refined_t, _, _, A, _}, B, When) ->
+    unify1(Env, A, B, When);
+unify1(Env, A, {dep_record_t, _, B, _}, When) ->
+    unify1(Env, A, B, When);
+unify1(Env, {dep_record_t, _, A, _}, B, When) ->
+    unify1(Env, A, B, When);
+unify1(Env, A, {dep_variant_t, _, _, B, _, _}, When) ->
+    unify1(Env, A, B, When);
+unify1(Env, {dep_variant_t, _, _, A, _, _}, B, When) ->
+    unify1(Env, A, B, When);
+unify1(Env, A, {dep_list_t, Ann, _, B, _}, When) ->
+    unify1(Env, A, {app_t, Ann, {id, Ann, "list"}, [B]}, When);
+unify1(Env, {dep_list_t, Ann, _, A, _}, B, When) ->
+    unify1(Env, {app_t, Ann, {id, Ann, "list"}, [A]}, B, When);
+unify1(Env, {named_t, _, _, A}, B, When) ->
+    unify1(Env, A, B, When);
+unify1(Env, A, {named_t, _, _, B}, When) ->
+    unify1(Env, A, B, When);
 unify1(_Env, A, B, When) ->
     cannot_unify(A, B, When),
     false.
@@ -2535,6 +2683,18 @@ occurs_check1(R, {if_t, _, _, Then, Else}) ->
     occurs_check(R, [Then, Else]);
 occurs_check1(R, [H | T]) ->
     occurs_check(R, H) orelse occurs_check(R, T);
+occurs_check1(R, {named_t, _, _, T}) ->
+    occurs_check1(R, T);
+occurs_check1(R, {refined_t, _, _, T, _}) ->
+    occurs_check1(R, T);
+occurs_check1(R, {dep_record_t, _, _, T}) ->
+    occurs_check1(R, T);
+occurs_check1(R, {dep_variant_t, _, _, _, _, T}) ->
+    occurs_check1(R, T);
+occurs_check1(R, {constr_t, _, _, T}) ->
+    occurs_check(R, T);
+occurs_check1(R, {dep_list_t, _, _, T, _}) ->
+    occurs_check1(R, T);
 occurs_check1(_, []) -> false.
 
 fresh_uvar(Attrs) ->
@@ -2689,8 +2849,9 @@ mk_error({fundecl_must_have_funtype, _Ann, Id, Type}) ->
                        , [pp(Id), pp_loc(Id), pp(instantiate(Type))]),
     mk_t_err(pos(Id), Msg);
 mk_error({cannot_unify, A, B, When}) ->
-    Msg = io_lib:format("Cannot unify ~s\n         and ~s\n",
-                        [pp(instantiate(A)), pp(instantiate(B))]),
+    AStr = pp(instantiate(A)),
+    BStr = pp(instantiate(B)),
+    Msg = io_lib:format("Cannot unify ~s\n         and ~s\n", [AStr, BStr]),
     {Pos, Ctxt} = pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
 mk_error({unbound_variable, Id}) ->
@@ -2704,6 +2865,9 @@ mk_error({unbound_variable, Id}) ->
 mk_error({undefined_field, Id}) ->
     Msg = io_lib:format("Unbound field ~s at ~s\n", [pp(Id), pp_loc(Id)]),
     mk_t_err(pos(Id), Msg);
+mk_error({not_a_variant_type, Type}) ->
+    Msg = io_lib:format("~s\n", [pp_type("Not a variant type: ", Type)]),
+    mk_t_err(pos(Type), Msg);
 mk_error({not_a_record_type, Type, Why}) ->
     Msg = io_lib:format("~s\n", [pp_type("Not a record type: ", Type)]),
     {Pos, Ctxt} = pp_why_record(Why),
@@ -2987,6 +3151,9 @@ mk_error({contract_lacks_definition, Type, When}) ->
            ),
     {Pos, Ctxt} = pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
+mk_error({illegal_liquid, T}) ->
+    Msg = io_lib:format("Illegal liquid type ~s", [pp_type("", T)]),
+    mk_t_err(pos(T), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p\n", [Err]),
     mk_t_err(pos(0, 0), Msg).
@@ -3149,8 +3316,11 @@ pp_why_record(Fld = {field, _Ann, LV, _Alias, _E}) ->
 pp_why_record({proj, _Ann, Rec, FldName}) ->
     {pos(Rec),
      io_lib:format("arising from the projection of the field ~s (at ~s)",
-         [pp(FldName), pp_loc(Rec)])}.
-
+                   [pp(FldName), pp_loc(Rec)])};
+pp_why_record({dep_record_t, _, Rec, _}) ->
+    {pos(Rec),
+     io_lib:format("arising from the record refinement of the type ~s (at ~s)",
+                   [pp(Rec), pp_loc(Rec)])}.
 
 if_branches(If = {'if', Ann, _, Then, Else}) ->
     case proplists:get_value(format, Ann) of

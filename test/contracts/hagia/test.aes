@@ -1,0 +1,8 @@
+
+include "List.aes"
+
+contract Test =
+  stateful entrypoint f(l, a) =
+    require(Contract.balance > 10, "xd")
+    Chain.spend(l, 10)
+

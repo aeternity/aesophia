@@ -16,7 +16,9 @@
 -export_type([decl/0, letbind/0, typedef/0, pragma/0]).
 -export_type([arg/0, field_t/0, constructor_t/0, named_arg_t/0]).
 -export_type([type/0, constant/0, expr/0, arg_expr/0, field/1, stmt/0, alt/0, lvalue/0, elim/0, pat/0]).
+-export_type([letfun/0, letval/0, fundecl/0]).
 -export_type([ast/0]).
+-export_type([predicate/0, liquid_type/0, dep_type/1, dep_arg_t/1]).
 
 -type ast() :: [decl()].
 
@@ -72,14 +74,36 @@
 
 -type constructor_t() :: {constr_t, ann(), con(), [type()]}.
 
+
 -type type() :: {fun_t, ann(), [named_arg_t()], [type()], type()}
               | {app_t, ann(), type(), [type()]}
               | {tuple_t, ann(), [type()]}
               | {args_t, ann(), [type()]}   %% old tuple syntax, old for error messages
               | {bytes_t, ann(), integer() | any}
+              | {named_t, ann(), id(), type()}
               | id()  | qid()
               | con() | qcon()  %% contracts
               | tvar().
+
+%% Predicate for a liquid type
+-type predicate() :: [expr()].
+
+%% Dependent type
+%% FIXME it is very inconsistent with the reality...
+-type dep_type(Qual)
+    :: {refined_t, ann(), id(), type(), Qual}
+     | {dep_fun_t, ann(), [dep_arg_t(Qual)], dep_type(Qual)}
+     | {dep_record_t, ann(), type(), [dep_field_t(Qual)]}
+     | {dep_variant_t, ann(), id(), type(), Qual | undefined, [dep_constr_t(Qual)]}
+     | {dep_list_t, ann(), id(), dep_type(Qual), Qual}
+     | tvar().
+-type liquid_type() :: dep_type(predicate()).
+
+-type dep_constr_t(Qual) :: {constr_t, ann(), con(), [dep_type(Qual)]}.
+
+-type dep_arg_t(Qual) :: {dep_arg_t, ann(), id(), dep_type(Qual)}.
+
+-type dep_field_t(Qual) :: {field_t, ann(), id(), dep_type(Qual)}.
 
 -type named_arg_t() :: {named_arg_t, ann(), id(), type(), expr()}.
 

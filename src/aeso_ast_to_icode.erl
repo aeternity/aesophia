@@ -302,12 +302,12 @@ ast_body({app, _, {'..', _}, [A, B]}, Icode) ->
 ast_body({app, As, Fun, Args}, Icode) ->
     case aeso_syntax:get_ann(format, As) of
         infix  ->
-            {Op, _} = Fun,
-            [A, B]  = Args,
+            {typed, _, {Op, _}, _} = Fun,
+            [A, B] = Args,
             ast_binop(Op, As, A, B, Icode);
         prefix ->
-            {Op, _} = Fun,
-            [A]     = Args,
+            {typed, _, {Op, _}, _} = Fun,
+            [A] = Args,
             #unop{op = Op, rand = ast_body(A, Icode)};
         _ ->
             {typed, _, Fun1, {fun_t, _, _, ArgsT, RetT}} = Fun,

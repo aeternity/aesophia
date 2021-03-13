@@ -1,0 +1,5 @@
+contract C =
+  entrypoint
+    len : {l : list('a)} => {r : int | r == l}
+    len([]) = 0
+    len(_::t) = len(t)

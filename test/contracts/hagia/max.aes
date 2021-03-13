@@ -1,0 +1,6 @@
+contract C =
+  entrypoint max(a : int, b : int) =
+    if(a >= b) a else b
+
+  entrypoint trim(x) =
+    max(0, x)
