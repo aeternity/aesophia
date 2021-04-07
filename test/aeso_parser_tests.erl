@@ -12,10 +12,10 @@ simple_contracts_test_() ->
      fun(_) -> ok end,
      [{"Parse a contract with an identity function.",
        fun() ->
-            Text = "contract Identity =\n"
+            Text = "main contract Identity =\n"
                    "  function id(x) = x\n",
             ?assertMatch(
-                [{contract, _, {con, _, "Identity"},
+                [{contract_main, _, {con, _, "Identity"},
                     [{letfun, _, {id, _, "id"}, [{id, _, "x"}], {id, _, "_"},
                         {id, _, "x"}}]}], parse_string(Text)),
             ok

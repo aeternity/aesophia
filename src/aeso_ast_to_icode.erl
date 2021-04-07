@@ -14,12 +14,13 @@
 
 -include_lib("aebytecode/include/aeb_opcodes.hrl").
 -include("aeso_icode.hrl").
+-include("aeso_utils.hrl").
 
 -spec convert_typed(aeso_syntax:ast(), list()) -> aeso_icode:icode().
 convert_typed(TypedTree, Options) ->
     {Payable, Name} =
         case lists:last(TypedTree) of
-            {contract, Attrs, {con, _, Con}, _} ->
+            {Contr, Attrs, {con, _, Con}, _} when ?IS_CONTRACT_HEAD(Contr) ->
                 {proplists:get_value(payable, Attrs, false), Con};
             Decl ->
                 gen_error({last_declaration_must_be_contract, Decl})
@@ -29,7 +30,8 @@ convert_typed(TypedTree, Options) ->
     Icode    = code(TypedTree, NewIcode, Options),
     deadcode_elimination(Icode).
 
-code([{contract, _Attribs, Con, Code}|Rest], Icode, Options) ->
+code([{Contract, _Attribs, Con, Code}|Rest], Icode, Options)
+  when ?IS_CONTRACT_HEAD(Contract) ->
     NewIcode = contract_to_icode(Code, aeso_icode:set_namespace(Con, Icode)),
     code(Rest, NewIcode, Options);
 code([{namespace, _Ann, Name, Code}|Rest], Icode, Options) ->

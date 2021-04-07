@@ -21,6 +21,8 @@
         , json_encode_expr/1
         , json_encode_type/1]).
 
+-include("aeso_utils.hrl").
+
 -type aci_type()  :: json | string.
 -type json()      :: jsx:json_term().
 -type json_text() :: binary().
@@ -68,9 +70,7 @@ do_contract_interface(Type, Contract, Options) when is_binary(Contract) ->
 do_contract_interface(Type, ContractString, Options) ->
     try
         Ast = aeso_compiler:parse(ContractString, Options),
-        %% io:format("~p\n", [Ast]),
         {TypedAst, _} = aeso_ast_infer_types:infer(Ast, [dont_unfold | Options]),
-        %% io:format("~p\n", [TypedAst]),
         from_typed_ast(Type, TypedAst)
     catch
         throw:{error, Errors} -> {error, Errors}
@@ -83,7 +83,7 @@ from_typed_ast(Type, TypedAst) ->
         string -> do_render_aci_json(JArray)
     end.
 
-encode_contract(Contract = {contract, _, {con, _, Name}, _}) ->
+encode_contract(Contract = {Head, _, {con, _, Name}, _}) when ?IS_CONTRACT_HEAD(Head) ->
     C0 = #{name => encode_name(Name)},
 
     Tdefs0 = [ encode_typedef(T) || T <- sort_decls(contract_types(Contract)) ],
@@ -107,7 +107,7 @@ encode_contract(Contract = {contract, _, {con, _, Name}, _}) ->
                || F <- sort_decls(contract_funcs(Contract)),
                   is_entrypoint(F) ],
 
-    #{contract => C3#{functions => Fdefs, payable => is_payable(Contract)}};
+    #{contract => C3#{kind => Head, functions => Fdefs, payable => is_payable(Contract)}};
 encode_contract(Namespace = {namespace, _, {con, _, Name}, _}) ->
     Tdefs = [ encode_typedef(T) || T <- sort_decls(contract_types(Namespace)) ],
     #{namespace => #{name => encode_name(Name),
@@ -232,13 +232,19 @@ do_render_aci_json(Json) ->
     {ok, list_to_binary(string:join(DecodedContracts, "\n"))}.
 
 decode_contract(#{contract := #{name := Name,
+                                kind := Kind,
                                 payable := Payable,
                                 type_defs := Ts0,
                                 functions := Fs} = C}) ->
     MkTDef = fun(N, T) -> #{name => N, vars => [], typedef => T} end,
     Ts = [ MkTDef(<<"state">>, maps:get(state, C)) || maps:is_key(state, C) ] ++
          [ MkTDef(<<"event">>, maps:get(event, C)) || maps:is_key(event, C) ] ++ Ts0,
-    [payable(Payable), "contract ", io_lib:format("~s", [Name])," =\n",
+    [payable(Payable), case Kind of
+                           contract_main -> "main contract ";
+                           contract_child -> "contract ";
+                           contract_interface -> "contract interface "
+                       end,
+     io_lib:format("~s", [Name])," =\n",
      decode_tdefs(Ts), decode_funcs(Fs)];
 decode_contract(#{namespace := #{name := Name, type_defs := Ts}}) when Ts /= [] ->
     ["namespace ", io_lib:format("~s", [Name])," =\n",
@@ -332,10 +338,10 @@ payable(false) -> "".
 
 %% #contract{Ann, Con, [Declarations]}.
 
-contract_funcs({C, _, _, Decls}) when C == contract; C == namespace ->
+contract_funcs({C, _, _, Decls}) when ?IS_CONTRACT_HEAD(C); C == namespace ->
     [ D || D <- Decls, is_fun(D)].
 
-contract_types({C, _, _, Decls}) when C == contract; C == namespace ->
+contract_types({C, _, _, Decls}) when ?IS_CONTRACT_HEAD(C); C == namespace ->
     [ D || D <- Decls, is_type(D) ].
 
 is_fun({letfun, _, _, _, _, _}) -> true;

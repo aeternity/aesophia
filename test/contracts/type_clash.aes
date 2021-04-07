@@ -1,5 +1,5 @@
 
-contract Remote =
+contract interface Remote =
 
   type themap = map(int, string)
   entrypoint foo : () => themap

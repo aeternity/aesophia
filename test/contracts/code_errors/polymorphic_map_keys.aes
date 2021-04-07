@@ -3,4 +3,4 @@ contract MapAsMapKey =
 
   function foo(m) : t('a) = {[m] = 0}
 
-  entrypoint main() = ()
+  entrypoint main_fun() = ()

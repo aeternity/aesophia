@@ -10,9 +10,9 @@
 
 -export([format/1, pos/1]).
 
-format({last_declaration_must_be_contract, Decl = {namespace, _, {con, _, C}, _}}) ->
-    Msg = io_lib:format("Expected a contract as the last declaration instead of the namespace '~s'\n",
-                        [C]),
+format({last_declaration_must_be_contract, Decl = {Kind, _, {con, _, C}, _}}) ->
+    Msg = io_lib:format("Expected a contract as the last declaration instead of the ~p '~s'\n",
+                        [Kind, C]),
     mk_err(pos(Decl), Msg);
 format({missing_init_function, Con}) ->
     Msg = io_lib:format("Missing init function for the contract '~s'.\n", [pp_expr(Con)]),

@@ -190,7 +190,7 @@ parameterized_contract(ExtraCode, FunName, Types) ->
     lists:flatten(
         ["contract Remote =\n"
          "  entrypoint bla : () => unit\n\n"
-         "contract Dummy =\n",
+         "main contract Dummy =\n",
          ExtraCode, "\n",
          "  type an_alias('a) = string * 'a\n"
          "  record r = {x : an_alias(int), y : variant}\n"

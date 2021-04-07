@@ -1,5 +1,7 @@
-contract ContractOne =
-  entrypoint foo() = "foo"
+contract Child =
+  entrypoint
+        add2 : int => int
+        add2(x) = x + 2
 
-contract ContractTwo =
-  entrypoint bar() = "bar"
+main contract Main =
+  entrypoint add4(x, c : Child) = c.add2(x) + 2

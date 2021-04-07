@@ -28,6 +28,7 @@
 
 -include_lib("aebytecode/include/aeb_opcodes.hrl").
 -include("aeso_icode.hrl").
+-include("aeso_utils.hrl").
 
 
 -type option() :: pp_sophia_code
@@ -468,7 +469,7 @@ error_missing_call_function() ->
     Msg = "Internal error: missing '__call'-function",
     aeso_errors:throw(aeso_errors:new(internal_error, Msg)).
 
-get_call_type([{contract, _, _, Defs}]) ->
+get_call_type([{Contract, _, _, Defs}]) when ?IS_CONTRACT_HEAD(Contract) ->
     case [ {lists:last(QFunName), FunType}
           || {letfun, _, {id, _, ?CALL_NAME}, [], _Ret,
                 {typed, _,
@@ -482,7 +483,7 @@ get_call_type([_ | Contracts]) ->
     get_call_type(Contracts).
 
 -dialyzer({nowarn_function, get_decode_type/2}).
-get_decode_type(FunName, [{contract, Ann, _, Defs}]) ->
+get_decode_type(FunName, [{Contract, Ann, _, Defs}]) when ?IS_CONTRACT_HEAD(Contract) ->
     GetType = fun({letfun, _, {id, _, Name}, Args, Ret, _})               when Name == FunName -> [{Args, Ret}];
                  ({fun_decl, _, {id, _, Name}, {fun_t, _, _, Args, Ret}}) when Name == FunName -> [{Args, Ret}];
                  (_) -> [] end,

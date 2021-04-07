@@ -1,3 +1,3 @@
 contract MissingDefinition =
   entrypoint foo : int => int
-  entrypoint main() = foo(0)
+  entrypoint main_fun() = foo(0)

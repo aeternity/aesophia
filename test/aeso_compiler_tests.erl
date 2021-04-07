@@ -179,17 +179,12 @@ compilable_contracts() ->
      "lhs_matching",
      "more_strings",
      "protected_call",
-     "hermetization_turnoff"
+     "hermetization_turnoff",
+     "multiple_contracts"
     ].
 
 not_compilable_on(fate) -> [];
-not_compilable_on(aevm) ->
-    [ "stdlib_include", "manual_stdlib_include", "pairing_crypto"
-    , "aens_update", "basic_auth_tx", "more_strings"
-    , "unapplied_builtins", "bytes_to_x", "state_handling", "protected_call"
-    , "hermetization_turnoff"
-
-    ].
+not_compilable_on(aevm) -> compilable_contracts().
 
 debug_mode_contracts() ->
     ["hermetization_turnoff"].
@@ -635,9 +630,9 @@ failing_contracts() ->
          <<?Pos(2, 1)
            "Cannot compile with this version of the compiler,\n"
            "because it does not satisfy the constraint ", Version/binary, " == 9.9.9">>])
-    , ?TYPE_ERROR(multiple_contracts,
+    , ?TYPE_ERROR(interface_with_defs,
          [<<?Pos(2, 3)
-            "Only the main contract can contain defined functions or entrypoints.\n"
+            "Contract interfaces cannot contain defined functions or entrypoints.\n"
             "Fix: replace the definition of 'foo' by a type signature.">>])
     , ?TYPE_ERROR(contract_as_namespace,
          [<<?Pos(5, 28)
@@ -746,9 +741,7 @@ failing_contracts() ->
                        {fate, ?Msg(File, Line, Col, ErrFATE)}]}).
 
 failing_code_gen_contracts() ->
-    [ ?SAME(last_declaration_must_be_contract, 1, 1,
-            "Expected a contract as the last declaration instead of the namespace 'LastDeclarationIsNotAContract'")
-    , ?SAME(missing_definition, 2, 14,
+    [ ?SAME(missing_definition, 2, 14,
             "Missing definition of function 'foo'.")
     , ?AEVM(polymorphic_entrypoint, 2, 17,
             "The argument\n"

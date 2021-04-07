@@ -5,5 +5,5 @@ contract BadAENSresolve =
   function fail() : t(int) =
     AENS.resolve("foo.aet", "whatever")
 
-  entrypoint main() = ()
+  entrypoint main_fun() = ()
 

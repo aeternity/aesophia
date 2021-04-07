@@ -12,6 +12,8 @@
 -export([ast_to_fcode/2, format_fexpr/1]).
 -export_type([fcode/0, fexpr/0, fun_def/0]).
 
+-include("aeso_utils.hrl").
+
 %% -- Type definitions -------------------------------------------------------
 
 -type option() :: term().
@@ -136,6 +138,7 @@
 -type type_env() :: #{ sophia_name() => type_def() }.
 -type fun_env()  :: #{ sophia_name() => {fun_name(), non_neg_integer()} }.
 -type con_env()  :: #{ sophia_name() => con_tag() }.
+-type child_con_env() :: #{sophia_name() => fcode()}.
 -type builtins() :: #{ sophia_name() => {builtin(), non_neg_integer() | none} }.
 
 -type context() :: {main_contract, string()}
@@ -144,16 +147,17 @@
 
 -type state_layout() :: {tuple, [state_layout()]} | {reg, state_reg()}.
 
--type env() :: #{ type_env     := type_env(),
-                  fun_env      := fun_env(),
-                  con_env      := con_env(),
-                  event_type   => aeso_syntax:typedef(),
-                  builtins     := builtins(),
-                  options      := [option()],
-                  state_layout => state_layout(),
-                  context      => context(),
-                  vars         => [var_name()],
-                  functions    := #{ fun_name() => fun_def() } }.
+-type env() :: #{ type_env      := type_env(),
+                  fun_env       := fun_env(),
+                  con_env       := con_env(),
+                  child_con_env := child_con_env(),
+                  event_type    => aeso_syntax:typedef(),
+                  builtins      := builtins(),
+                  options       := [option()],
+                  state_layout  => state_layout(),
+                  context       => context(),
+                  vars          => [var_name()],
+                  functions     := #{ fun_name() => fun_def() } }.
 
 -define(HASH_BYTES, 32).
 
@@ -182,6 +186,7 @@ init_env(Options) ->
     #{ type_env  => init_type_env(),
        fun_env   => #{},
        builtins  => builtins(),
+       child_con_env => #{},
        con_env   => #{["None"]        => #con_tag{ tag = 0, arities = [0, 1] },
                       ["Some"]        => #con_tag{ tag = 1, arities = [0, 1] },
                       ["RelativeTTL"] => #con_tag{ tag = 0, arities = [1, 1] },
@@ -308,30 +313,41 @@ get_option(Opt, Env, Default) ->
 %% -- Compilation ------------------------------------------------------------
 
 -spec to_fcode(env(), aeso_syntax:ast()) -> fcode().
-to_fcode(Env, [{contract, Attrs, MainCon = {con, _, Main}, Decls}]) ->
-    #{ builtins := Builtins } = Env,
-    MainEnv = Env#{ context  => {main_contract, Main},
-                    builtins => Builtins#{[Main, "state"]          => {get_state, none},
-                                          [Main, "put"]            => {set_state, 1},
-                                          [Main, "Chain", "event"] => {chain_event, 1}} },
-    #{ functions := Funs } = Env1 =
-        decls_to_fcode(MainEnv, Decls),
-    StateType   = lookup_type(Env1, [Main, "state"], [], {tuple, []}),
-    EventType   = lookup_type(Env1, [Main, "event"], [], none),
-    StateLayout = state_layout(Env1),
-    Payable     = proplists:get_value(payable, Attrs, false),
-    #{ contract_name => Main,
-       state_type    => StateType,
-       state_layout  => StateLayout,
-       event_type    => EventType,
-       payable       => Payable,
-       functions     => add_init_function(Env1, MainCon, StateType,
-                        add_event_function(Env1, EventType, Funs)) };
-to_fcode(_Env, [NotContract]) ->
-    fcode_error({last_declaration_must_be_contract, NotContract});
-to_fcode(Env, [{contract, _, {con, _, Con}, Decls} | Code]) ->
-    Env1 = decls_to_fcode(Env#{ context => {abstract_contract, Con} }, Decls),
-    to_fcode(Env1, Code);
+to_fcode(Env, [{Contract, Attrs, Con = {con, _, Name}, Decls}|Rest])
+  when ?IS_CONTRACT_HEAD(Contract) ->
+    case Contract =:= contract_interface of
+        false ->
+
+            #{ builtins := Builtins } = Env,
+            ConEnv = Env#{ context  => {main_contract, Name},
+                           builtins => Builtins#{[Name, "state"]          => {get_state, none},
+                                                 [Name, "put"]            => {set_state, 1},
+                                                 [Name, "Chain", "event"] => {chain_event, 1}} },
+            #{ functions := Funs } = Env1 =
+                decls_to_fcode(ConEnv, Decls),
+            StateType   = lookup_type(Env1, [Name, "state"], [], {tuple, []}),
+            EventType   = lookup_type(Env1, [Name, "event"], [], none),
+            StateLayout = state_layout(Env1),
+            Payable     = proplists:get_value(payable, Attrs, false),
+            ConFcode = #{ contract_name => Name,
+                          state_type    => StateType,
+                          state_layout  => StateLayout,
+                          event_type    => EventType,
+                          payable       => Payable,
+                          functions     => add_init_function(Env1, Con, StateType,
+                                                             add_event_function(Env1, EventType, Funs)) },
+            case Contract of
+                contract_main -> Rest = [], ConFcode;
+                contract_child ->
+                    Env2 = add_child_con(Env1, Name, ConFcode),
+                    to_fcode(Env2, Rest)
+            end;
+        true ->
+            Env1 = decls_to_fcode(Env#{ context => {abstract_contract, Con} }, Decls),
+            to_fcode(Env1, Rest)
+    end;
+to_fcode(_Env, [NotMain = {NotMainHead, _ ,_ , _}]) when NotMainHead =/= main_contract ->
+    fcode_error({last_declaration_must_be_main_contract, NotMain});
 to_fcode(Env, [{namespace, _, {con, _, Con}, Decls} | Code]) ->
     Env1 = decls_to_fcode(Env#{ context => {namespace, Con} }, Decls),
     to_fcode(Env1, Code).
@@ -341,9 +357,7 @@ decls_to_fcode(Env, Decls) ->
     %% First compute mapping from Sophia names to fun_names and add it to the
     %% environment.
     Env1 = add_fun_env(Env, Decls),
-    lists:foldl(fun(D, E) ->
-                    R = decl_to_fcode(E, D),
-                    R
+    lists:foldl(fun(D, E) -> decl_to_fcode(E, D)
                 end, Env1, Decls).
 
 -spec decl_to_fcode(env(), aeso_syntax:decl()) -> env().
@@ -1613,6 +1627,10 @@ bind_constructors(Env = #{ con_env := ConEnv }, NewCons) ->
     Env#{ con_env := maps:merge(ConEnv, NewCons) }.
 
 %% -- Names --
+
+-spec add_child_con(env(), sophia_name(), fcode()) -> env().
+add_child_con(Env = #{child_con_env := CEnv}, Name, Fcode) ->
+    Env#{ child_con_env := CEnv#{Name => Fcode} }.
 
 -spec add_fun_env(env(), [aeso_syntax:decl()]) -> env().
 add_fun_env(Env = #{ context := {abstract_contract, _} }, _) -> Env;  %% no functions from abstract contracts

@@ -18,6 +18,8 @@
         , pp_type/2
         ]).
 
+-include("aeso_utils.hrl").
+
 -type utype() :: {fun_t, aeso_syntax:ann(), named_args_t(), [utype()], utype()}
                | {app_t, aeso_syntax:ann(), utype(), [utype()]}
                | {tuple_t, aeso_syntax:ann(), [utype()]}
@@ -123,7 +125,7 @@
     , in_pattern = false              :: boolean()
     , stateful   = false              :: boolean()
     , current_function = none         :: none | aeso_syntax:id()
-    , what       = top                :: top | namespace | contract | main_contract
+    , what       = top                :: top | namespace | contract | contract_interface
     }).
 
 -type env() :: #env{}.
@@ -191,9 +193,9 @@ bind_fun(X, Type, Env) ->
 force_bind_fun(X, Type, Env = #env{ what = What }) ->
     Ann    = aeso_syntax:get_ann(Type),
     NoCode = get_option(no_code, false),
-    Entry = if X == "init", What == main_contract, not NoCode ->
+    Entry = if X == "init", What == contract, not NoCode ->
                     {reserved_init, Ann, Type};
-               What == contract -> {contract_fun, Ann, Type};
+               What == contract_interface -> {contract_fun, Ann, Type};
                true -> {Ann, Type}
             end,
     on_current_scope(Env, fun(Scope = #scope{ funs = Funs }) ->
@@ -261,13 +263,21 @@ contract_call_type({fun_t, Ann, [], Args, Ret}) ->
      Args, {if_t, Ann, Id("protected"), {app_t, Ann, {id, Ann, "option"}, [Ret]}, Ret}}.
 
 -spec bind_contract(aeso_syntax:decl(), env()) -> env().
-bind_contract({contract, Ann, Id, Contents}, Env) ->
+bind_contract({Contract, Ann, Id, Contents}, Env)
+  when ?IS_CONTRACT_HEAD(Contract) ->
     Key    = name(Id),
     Sys    = [{origin, system}],
-    Fields = [ {field_t, AnnF, Entrypoint, contract_call_type(Type)}
-                || {fun_decl, AnnF, Entrypoint, Type} <- Contents ] ++
-              %% Predefined fields
-             [ {field_t, Sys, {id, Sys, "address"}, {id, Sys, "address"}} ],
+    Fields =
+        [ {field_t, AnnF, Entrypoint, contract_call_type(Type)}
+          || {fun_decl, AnnF, Entrypoint, Type} <- Contents ] ++
+        [ {field_t, AnnF, Entrypoint,
+           contract_call_type(
+             {fun_t, AnnF, [], [ArgT || ArgT <- if is_list(Args) -> Args; true -> [Args] end], RetT})
+          }
+          || {letfun, AnnF, Entrypoint, _Named, Args, {typed, _, _, RetT}} <- Contents
+        ] ++
+        %% Predefined fields
+        [ {field_t, Sys, {id, Sys, "address"}, {id, Sys, "address"}} ],
     FieldInfo = [ {Entrypoint, #field_info{ ann      = FieldAnn,
                                             kind     = contract,
                                             field_t  = Type,
@@ -463,6 +473,7 @@ global_env() ->
                      {"block_height", Int},
                      {"difficulty",   Int},
                      {"gas_limit",    Int},
+                     {"bytecode_hash", Fun1(Address, Option(Hash))},
                      %% Tx constructors
                      {"GAMetaTx",     Fun([Address, Int], GAMetaTx)},
                      {"PayingForTx",  Fun([Address, Int], PayForTx)},
@@ -701,7 +712,10 @@ infer(Contracts, Options) ->
         create_options(Options),
         ets_new(type_vars, [set]),
         check_modifiers(Env, Contracts),
-        {Env1, Decls} = infer1(Env, Contracts, [], Options),
+        create_type_errors(),
+        Contracts1 = identify_main_contract(Contracts),
+        destroy_and_report_type_errors(Env),
+        {Env1, Decls} = infer1(Env, Contracts1, [], Options),
         {Env2, DeclsFolded, DeclsUnfolded} =
             case proplists:get_value(dont_unfold, Options, false) of
                 true  -> {Env1, Decls, Decls};
@@ -719,12 +733,16 @@ infer(Contracts, Options) ->
 -spec infer1(env(), [aeso_syntax:decl()], [aeso_syntax:decl()], list(option())) ->
     {env(), [aeso_syntax:decl()]}.
 infer1(Env, [], Acc, _Options) -> {Env, lists:reverse(Acc)};
-infer1(Env, [{contract, Ann, ConName, Code} | Rest], Acc, Options) ->
+infer1(Env, [{Contract, Ann, ConName, Code} | Rest], Acc, Options)
+  when ?IS_CONTRACT_HEAD(Contract) ->
     %% do type inference on each contract independently.
     check_scope_name_clash(Env, contract, ConName),
-    What = if Rest == [] -> main_contract; true -> contract end,
+    What = case aeso_syntax:get_ann(interface, Ann, false) of
+               true -> contract_interface;
+               false -> contract
+           end,
     {Env1, Code1} = infer_contract_top(push_scope(contract, ConName, Env), What, Code, Options),
-    Contract1 = {contract, Ann, ConName, Code1},
+    Contract1 = {Contract, Ann, ConName, Code1},
     Env2 = pop_scope(Env1),
     Env3 = bind_contract(Contract1, Env2),
     infer1(Env3, Rest, [Contract1 | Acc], Options);
@@ -737,6 +755,26 @@ infer1(Env, [{pragma, _, _} | Rest], Acc, Options) ->
     %% Pragmas are checked in check_modifiers
     infer1(Env, Rest, Acc, Options).
 
+%% Checks if the main contract is somehow defined.
+%% Performs some basic sorting to make the dependencies more happy.
+identify_main_contract(Contracts) ->
+    Childs     = [C || C = {contract_child, _, _, _} <- Contracts],
+    Mains      = [C || C = {contract_main, _, _, _} <- Contracts],
+    Interfaces = [C || C = {contract_interface, _, _, _} <- Contracts],
+    Namespaces = [N || N = {namespace, _, _, _} <- Contracts],
+    case Mains of
+        [] -> case Childs of
+                  [] -> type_error({main_contract_undefined});
+                  [{contract_child, Ann, Con, Body}] ->
+                      Interfaces ++ Namespaces ++
+                          [C || C = {_, _, Con1, _} <- Childs, Con1 /= Con] ++
+                          [{contract_main, Ann, Con, Body}];
+                  _ -> type_error({ambiguous_main_contract})
+              end;
+        [_] -> Interfaces ++ Namespaces ++ Childs ++ Mains;
+        _ -> type_error({multiple_main_contracts})
+    end.
+
 check_scope_name_clash(Env, Kind, Name) ->
     case get_scope(Env, qname(Name)) of
         false -> ok;
@@ -746,7 +784,7 @@ check_scope_name_clash(Env, Kind, Name) ->
             destroy_and_report_type_errors(Env)
     end.
 
--spec infer_contract_top(env(), main_contract | contract | namespace, [aeso_syntax:decl()], list(option())) ->
+-spec infer_contract_top(env(), contract_interface | contract | namespace, [aeso_syntax:decl()], list(option())) ->
     {env(), [aeso_syntax:decl()]}.
 infer_contract_top(Env, Kind, Defs0, Options) ->
     create_type_errors(),
@@ -756,7 +794,7 @@ infer_contract_top(Env, Kind, Defs0, Options) ->
 
 %% infer_contract takes a proplist mapping global names to types, and
 %% a list of definitions.
--spec infer_contract(env(), main_contract | contract | namespace, [aeso_syntax:decl()], list(option())) -> {env(), [aeso_syntax:decl()]}.
+-spec infer_contract(env(), contract_interface | contract | namespace, [aeso_syntax:decl()], list(option())) -> {env(), [aeso_syntax:decl()]}.
 infer_contract(Env0, What, Defs0, Options) ->
     create_type_errors(),
     Defs01 = process_blocks(Defs0),
@@ -772,19 +810,19 @@ infer_contract(Env0, What, Defs0, Options) ->
               ({fun_decl, _, _, _})       -> prototype;
               (_)                         -> unexpected
            end,
-    Get = fun(K) -> [ Def || Def <- Defs, Kind(Def) == K ] end,
-    {Env1, TypeDefs} = check_typedefs(Env, Get(type)),
+    Get = fun(K, In) -> [ Def || Def <- In, Kind(Def) == K ] end,
+    {Env1, TypeDefs} = check_typedefs(Env, Get(type, Defs)),
     create_type_errors(),
-    check_unexpected(Get(unexpected)),
+    check_unexpected(Get(unexpected, Defs)),
     Env2 =
         case What of
-            namespace     -> Env1;
-            contract      -> Env1;
-            main_contract -> bind_state(Env1)   %% bind state and put
+            namespace          -> Env1;
+            contract_interface -> Env1;
+            contract           -> bind_state(Env1)   %% bind state and put
         end,
-    {ProtoSigs, Decls} = lists:unzip([ check_fundecl(Env1, Decl) || Decl <- Get(prototype) ]),
+    {ProtoSigs, Decls} = lists:unzip([ check_fundecl(Env1, Decl) || Decl <- Get(prototype, Defs) ]),
     Env3      = bind_funs(ProtoSigs, Env2),
-    Functions = Get(function),
+    Functions = Get(function, Defs),
     %% Check for duplicates in Functions (we turn it into a map below)
     FunBind   = fun({letfun, Ann, {id, _, Fun}, _, _, _})   -> {Fun, {tuple_t, Ann, []}};
                    ({fun_clauses, Ann, {id, _, Fun}, _, _}) -> {Fun, {tuple_t, Ann, []}} end,
@@ -794,11 +832,11 @@ infer_contract(Env0, What, Defs0, Options) ->
     check_reserved_entrypoints(FunMap),
     DepGraph  = maps:map(fun(_, Def) -> aeso_syntax_utils:used_ids(Def) end, FunMap),
     SCCs      = aeso_utils:scc(DepGraph),
-    %% io:format("Dependency sorted functions:\n  ~p\n", [SCCs]),
     {Env4, Defs1} = check_sccs(Env3, FunMap, SCCs, []),
     %% Check that `init` doesn't read or write the state
     check_state_dependencies(Env4, Defs1),
     destroy_and_report_type_errors(Env4),
+    %% Add inferred types of definitions
     {Env4, TypeDefs ++ Decls ++ Defs1}.
 
 %% Restructure blocks into multi-clause fundefs (`fun_clauses`).
@@ -830,9 +868,9 @@ expose_internals(Defs, What) ->
     [ begin
           Ann = element(2, Def),
           NewAnn = case What of
-                       namespace -> [A ||A <- Ann, A /= {private, true}, A /= private];
-                       main_contract -> [{entrypoint, true}|Ann];  % minor duplication
-                       contract -> Ann
+                       namespace          -> [A ||A <- Ann, A /= {private, true}, A /= private];
+                       contract           -> [{entrypoint, true}|Ann];  % minor duplication
+                       contract_interface -> Ann
                    end,
           Def1 = setelement(2, Def, NewAnn),
           case Def1 of  % fix inner clauses
@@ -907,15 +945,16 @@ check_modifiers(Env, Contracts) ->
     check_modifiers_(Env, Contracts),
     destroy_and_report_type_errors(Env).
 
-check_modifiers_(Env, [{contract, _, Con, Decls} | Rest]) ->
-    IsMain = Rest == [],
+check_modifiers_(Env, [{Contract, _, Con, Decls} | Rest])
+  when ?IS_CONTRACT_HEAD(Contract) ->
+    IsInterface = Contract =:= contract_interface,
     check_modifiers1(contract, Decls),
     case {lists:keymember(letfun, 1, Decls),
             [ D || D <- Decls, aeso_syntax:get_ann(entrypoint, D, false) ]} of
         {true, []} -> type_error({contract_has_no_entrypoints, Con});
-        _ when not IsMain ->
-            case [ {Ann, Id} || {letfun, Ann, Id, _, _, _} <- Decls ] of
-                [{Ann, Id} | _] -> type_error({definition_in_non_main_contract, Ann, Id});
+        _ when IsInterface ->
+            case [ {AnnF, Id} || {letfun, AnnF, Id, _, _, _} <- Decls ] of
+                [{AnnF, Id} | _] -> type_error({definition_in_contract_interface, AnnF, Id});
                 [] -> ok
             end;
         _ -> ok
@@ -2653,7 +2692,7 @@ mk_error({namespace, _Pos, {con, Pos, Name}, _Def}) ->
     Msg = io_lib:format("Nested namespaces are not allowed\nNamespace '~s' at ~s not defined at top level.\n",
                         [Name, pp_loc(Pos)]),
     mk_t_err(pos(Pos), Msg);
-mk_error({contract, _Pos, {con, Pos, Name}, _Def}) ->
+mk_error({Contract, _Pos, {con, Pos, Name}, _Def}) when ?IS_CONTRACT_HEAD(Contract) ->
     Msg = io_lib:format("Nested contracts are not allowed\nContract '~s' at ~s not defined at top level.\n",
                         [Name, pp_loc(Pos)]),
     mk_t_err(pos(Pos), Msg);
@@ -2728,8 +2767,8 @@ mk_error({contract_has_no_entrypoints, Con}) ->
                         "contract functions must be declared with the 'entrypoint' keyword instead of\n"
                         "'function'.\n", [pp_expr("", Con), pp_loc(Con)]),
     mk_t_err(pos(Con), Msg);
-mk_error({definition_in_non_main_contract, Ann, {id, _, Id}}) ->
-    Msg = "Only the main contract can contain defined functions or entrypoints.\n",
+mk_error({definition_in_contract_interface, Ann, {id, _, Id}}) ->
+    Msg = "Contract interfaces cannot contain defined functions or entrypoints.\n",
     Cxt = io_lib:format("Fix: replace the definition of '~s' by a type signature.\n", [Id]),
     mk_t_err(pos(Ann), Msg, Cxt);
 mk_error({unbound_type, Type}) ->
@@ -2798,6 +2837,15 @@ mk_error({named_argument_must_be_literal_bool, Name, Arg}) ->
 mk_error({conflicting_updates_for_field, Upd, Key}) ->
     Msg = io_lib:format("Conflicting updates for field '~s'\n", [Key]),
     mk_t_err(pos(Upd), Msg);
+mk_error({ambiguous_main_contract}) ->
+    Msg = "Could not deduce the main contract. You can point it manually with `main` keyword.",
+    mk_t_err(pos(0, 0), Msg);
+mk_error({main_contract_undefined}) ->
+    Msg = "No contract defined.",
+    mk_t_err(pos(0, 0), Msg);
+mk_error({multiple_main_contracts}) ->
+    Msg = "Up to one main contract can be defined.",
+    mk_t_err(pos(0, 0), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p\n", [Err]),
     mk_t_err(pos(0, 0), Msg).

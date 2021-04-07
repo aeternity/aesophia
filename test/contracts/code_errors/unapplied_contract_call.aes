@@ -1,4 +1,4 @@
-contract Remote =
+contract interface Remote =
   entrypoint foo : int => int
 
 contract UnappliedContractCall =

@@ -1,5 +1,5 @@
 
-contract Remote =
+contract interface Remote =
   entrypoint foo : () => unit
 
 contract AddressLiterals =

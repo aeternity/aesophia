@@ -59,8 +59,8 @@ calldata_aci_test_() ->
         end} || {ContractName, Fun, Args} <- compilable_contracts()].
 
 parse_args(Fun, Args) ->
-    [{contract, _, _, [{letfun, _, _, _, _, {app, _, _, AST}}]}] =
-        aeso_parser:string("contract Temp = function foo() = " ++ Fun ++ "(" ++ string:join(Args, ", ") ++ ")"),
+    [{contract_main, _, _, [{letfun, _, _, _, _, {app, _, _, AST}}]}] =
+        aeso_parser:string("main contract Temp = function foo() = " ++ Fun ++ "(" ++ string:join(Args, ", ") ++ ")"),
     strip_ann(AST).
 
 strip_ann(T) when is_tuple(T) ->
