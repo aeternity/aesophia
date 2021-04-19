@@ -139,7 +139,7 @@
 -type fun_env()  :: #{ sophia_name() => {fun_name(), non_neg_integer()} }.
 -type con_env()  :: #{ sophia_name() => con_tag() }.
 -type child_con_env() :: #{sophia_name() => fcode()}.
--type builtins() :: #{ sophia_name() => {builtin(), non_neg_integer() | none} }.
+-type builtins() :: #{ sophia_name() => {builtin(), non_neg_integer() | none | variable} }.
 
 -type context() :: {main_contract, string()}
                  | {namespace, string()}
@@ -232,7 +232,7 @@ builtins() ->
     Scopes = [{[],           [{"abort", 1}, {"require", 2}]},
               {["Chain"],    [{"spend", 2}, {"balance", 1}, {"block_hash", 1}, {"coinbase", none},
                               {"timestamp", none}, {"block_height", none}, {"difficulty", none},
-                              {"gas_limit", none}]},
+                              {"gas_limit", none}, {"bytecode_hash", 1}, {"create", variable}, {"clone", variable}]},
               {["Contract"], [{"address", none}, {"balance", none}, {"creator", none}]},
               {["Call"],     [{"origin", none}, {"caller", none}, {"value", none}, {"gas_price", none},
                               {"gas_left", 0}]},
@@ -692,11 +692,18 @@ expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
     end;
 
 %% Function calls
-expr_to_fcode(Env, _Type, {app, _, Fun = {typed, _, _, {fun_t, _, NamedArgsT, _, _}}, Args}) ->
+expr_to_fcode(Env, _Type, {app, _, Fun = {typed, _, _, {fun_t, _, NamedArgsT, ArgsT, _}}, Args}) ->
     Args1 = get_named_args(NamedArgsT, Args),
     FArgs = [expr_to_fcode(Env, Arg) || Arg <- Args1],
     case expr_to_fcode(Env, Fun) of
         {builtin_u, B, _Ar, TypeArgs}     -> builtin_to_fcode(state_layout(Env), B, FArgs ++ TypeArgs);
+        {builtin_u, chain_clone, _Ar}     ->
+            case ArgsT of
+                [_Con|InitArgs] ->
+                    FInitArgsT = {tuple, [type_to_fcode(Env, T) || T <- InitArgs]},
+                    builtin_to_fcode(state_layout(Env), chain_clone, [FInitArgsT|FArgs]);
+                [] -> error(wtf) %% FIXME
+            end;
         {builtin_u, B, _Ar}               -> builtin_to_fcode(state_layout(Env), B, FArgs);
         {def_u, F, _Ar}                   -> {def, F, FArgs};
         {remote_u, ArgsT, RetT, Ct, RFun} -> {remote, ArgsT, RetT, Ct, RFun, FArgs};

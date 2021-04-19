@@ -20,7 +20,7 @@
 
 -include("aeso_utils.hrl").
 
--type utype() :: {fun_t, aeso_syntax:ann(), named_args_t(), [utype()], utype()}
+-type utype() :: {fun_t, aeso_syntax:ann(), named_args_t(), [utype()] | var_args, utype()}
                | {app_t, aeso_syntax:ann(), utype(), [utype()]}
                | {tuple_t, aeso_syntax:ann(), [utype()]}
                | aeso_syntax:id()  | aeso_syntax:qid()
@@ -408,6 +408,7 @@ global_env() ->
     FunC    = fun(C, Ts, T) -> {type_sig, Ann, C, [], Ts, T} end,
     Fun     = fun(Ts, T) -> FunC(none, Ts, T) end,
     Fun1    = fun(S, T) -> Fun([S], T) end,
+    FunCN   = fun(C, Named, Normal, Ret) -> {type_sig, Ann, C, Named, Normal, Ret} end,
     %% Lambda    = fun(Ts, T) -> {fun_t, Ann, [], Ts, T} end,
     %% Lambda1   = fun(S, T) -> Lambda([S], T) end,
     StateFun  = fun(Ts, T) -> {type_sig, [stateful|Ann], none, [], Ts, T} end,
@@ -473,7 +474,18 @@ global_env() ->
                      {"block_height", Int},
                      {"difficulty",   Int},
                      {"gas_limit",    Int},
-                     {"bytecode_hash", Fun1(Address, Option(Hash))},
+                     {"bytecode_hash",Fun1(Address, Option(Hash))},
+                     {"create",       FunCN(create,
+                                            [ {named_arg_t, Ann, {id, Ann, "value"}, Int, {int, Ann, 0}}
+                                            , {named_arg_t, Ann, {id, Ann, "code"}, A, undefined}
+                                            ], var_args, A)},
+                     {"clone",        FunCN(clone,
+                                            [ {named_arg_t, Ann, {id, Ann, "gas"}, Int,
+                                               {qid, Ann, ["Call","gas_left"]}}
+                                            , {named_arg_t, Ann, {id, Ann, "value"}, Int, {int, Ann, 0}}
+                                            , {named_arg_t, Ann, {id, Ann, "protected"}, Bool, {bool, Ann, false}}
+                                            , {named_arg_t, Ann, {id, Ann, "ref"}, A, undefined}
+                                            ], var_args, A)},
                      %% Tx constructors
                      {"GAMetaTx",     Fun([Address, Int], GAMetaTx)},
                      {"PayingForTx",  Fun([Address, Int], PayForTx)},
@@ -1447,8 +1459,7 @@ infer_expr(Env, {typed, As, Body, Type}) ->
     {typed, _, NewBody, NewType} = check_expr(Env, Body, Type1),
     {typed, As, NewBody, NewType};
 infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
-    NamedArgs  = [ Arg || Arg = {named_arg, _, _, _} <- Args0 ],
-    Args       = Args0 -- NamedArgs,
+    {NamedArgs, Args} = split_args(Args0),
     case aeso_syntax:get_ann(format, Ann) of
         infix ->
             infer_op(Env, Ann, Fun, Args, fun infer_infix/1);
@@ -1457,10 +1468,27 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
         _ ->
             NamedArgsVar = fresh_uvar(Ann),
             NamedArgs1 = [ infer_named_arg(Env, NamedArgsVar, Arg) || Arg <- NamedArgs ],
-            %% TODO: named args constraints
-            NewFun={typed, _, _, FunType} = infer_expr(Env, Fun),
+            NewFun = {typed, _, _, FunType0} = infer_expr(Env, Fun),
             NewArgs = [infer_expr(Env, A) || A <- Args],
             ArgTypes = [T || {typed, _, _, T} <- NewArgs],
+            FunType =
+                case Fun of
+                    {qid, _, ["Chain", "clone"]} ->
+                        {fun_t, FunAnn, NamedArgsT, var_args, RetT} = FunType0,
+                        {typed, CAnn, Contract, ContractT} =
+                            case [Contract || {named_arg, _, {id, _, "ref"}, Contract} <- NamedArgs1] of
+                                [C] -> C;
+                                _ -> type_error({clone_no_contract, Ann})
+                            end,
+                        NamedArgsTNoRef =
+                            lists:filter(fun({named_arg_t, _, {id, _, "ref"}, _, _}) -> false; (_) -> true end, NamedArgsT),
+                        {typed, _, _, InitT} =
+                            infer_expr(Env, {proj, CAnn, Contract, {id, [], "init"}}),
+                        unify(Env, InitT, {fun_t, FunAnn, NamedArgsTNoRef, ArgTypes, fresh_uvar(CAnn)}, checking_init_todo),
+                        unify(Env, RetT, ContractT, dupadupa_todo),
+                        {fun_t, FunAnn, NamedArgsT, ArgTypes, RetT};
+                    _ -> FunType0
+                end,
             GeneralResultType = fresh_uvar(Ann),
             ResultType = fresh_uvar(Ann),
             When = {infer_app, Fun, NamedArgs1, Args, FunType, ArgTypes},
@@ -1575,6 +1603,11 @@ infer_expr(Env, Let = {letval, Attrs, _, _}) ->
 infer_expr(Env, Let = {letfun, Attrs, _, _, _, _}) ->
     type_error({missing_body_for_let, Attrs}),
     infer_expr(Env, {block, Attrs, [Let, abort_expr(Attrs, "missing body")]}).
+
+split_args(Args0) ->
+    NamedArgs = [ Arg || Arg = {named_arg, _, _, _} <- Args0 ],
+    Args      = Args0 -- NamedArgs,
+    {NamedArgs, Args}.
 
 infer_named_arg(Env, NamedArgs, {named_arg, Ann, Id, E}) ->
     CheckedExpr = {typed, _, _, ArgType} = infer_expr(Env, E),
@@ -2348,6 +2381,8 @@ unify1(_Env, {bytes_t, _, Len}, {bytes_t, _, Len}, _When) ->
 unify1(Env, {if_t, _, {id, _, Id}, Then1, Else1}, {if_t, _, {id, _, Id}, Then2, Else2}, When) ->
     unify(Env, Then1, Then2, When) andalso
     unify(Env, Else1, Else2, When);
+unify1(Env, {fun_t, _, Named1, var_args, Result1}, {fun_t, _, Named2, Args2, Result2}, When) ->
+    error(unify_varargs); %% TODO
 unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, When)
     when length(Args1) == length(Args2) ->
     unify(Env, Named1, Named2, When) andalso
@@ -2358,6 +2393,9 @@ unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, When
 unify1(Env, {tuple_t, _, As}, {tuple_t, _, Bs}, When)
   when length(As) == length(Bs) ->
     unify(Env, As, Bs, When);
+unify1(Env, {named_arg_t, _, Id1, Type1, _}, {named_arg_t, _, Id2, Type2, _}, When) ->
+    unify1(Env, Id1, Id2, {arg_name, When}), %% TODO
+    unify1(Env, Type1, Type2, When);
 %% The grammar is a bit inconsistent about whether types without
 %% arguments are represented as applications to an empty list of
 %% parameters or not. We therefore allow them to unify.
@@ -2465,7 +2503,9 @@ apply_typesig_constraint(Ann, address_to_contract, {fun_t, _, [], [_], Type}) ->
 apply_typesig_constraint(Ann, bytes_concat, {fun_t, _, [], [A, B], C}) ->
     add_bytes_constraint({add_bytes, Ann, concat, A, B, C});
 apply_typesig_constraint(Ann, bytes_split, {fun_t, _, [], [C], {tuple_t, _, [A, B]}}) ->
-    add_bytes_constraint({add_bytes, Ann, split, A, B, C}).
+    add_bytes_constraint({add_bytes, Ann, split, A, B, C});
+apply_typesig_constraint(Ann, clone, {fun_t, _, Named, var_args, Ret}) ->
+    ok.
 
 %% Dereferences all uvars and replaces the uninstantiated ones with a
 %% succession of tvars.

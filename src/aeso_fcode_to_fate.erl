@@ -555,7 +555,31 @@ builtin_to_scode(Env, aens_lookup, [_Name] = Args) ->
 builtin_to_scode(_Env, auth_tx_hash, []) ->
     [aeb_fate_ops:auth_tx_hash(?a)];
 builtin_to_scode(_Env, auth_tx, []) ->
-    [aeb_fate_ops:auth_tx(?a)].
+    [aeb_fate_ops:auth_tx(?a)];
+builtin_to_scode(Env, chain_bytecode_hash, [_Addr] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:bytecode_hash(?a), Args);
+builtin_to_scode(Env, chain_clone,
+                 [InitArgs, _GasCap = {con,[0,1],0,[]}, Prot, Value, Contract | InitArgs]) ->
+    error(InitArgs),
+    TypeRep = xd,
+    call_to_scode(Env, aeb_fate_ops:clone(?a, ?a, ?a, ?a),
+                  [Contract, TypeRep, Value, Prot | InitArgs]
+                 );
+builtin_to_scode(Env, chain_clone,
+                 [_GasCap = {con,[0,1],0,[]}, Prot, Value, Contract | InitArgs]) ->
+    TypeRep = xd,
+    call_to_scode(Env, aeb_fate_ops:clone(?a, ?a, ?a, ?a),
+                  [Contract, TypeRep, Value, Prot | InitArgs]
+                 );
+builtin_to_scode(Env, chain_create,
+  [_GasCap = {con,[0,1],0,[]}, Prot, Value, Contract | InitArgs]) ->
+    TypeRep = xd,
+    call_to_scode(Env, aeb_fate_ops:clone(?a, ?a, ?a, ?a),
+                  [Contract, TypeRep, Value, Prot | InitArgs]
+                 ).
+
+
+
 
 %% -- Operators --
 

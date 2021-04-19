@@ -127,6 +127,7 @@ compile(Backend, Name, Options) ->
 %% compilable_contracts() -> [ContractName].
 %%  The currently compilable contracts.
 
+compilable_contracts() -> ["clone"]; % FIXME remove
 compilable_contracts() ->
     ["complex_types",
      "counter",
@@ -180,7 +181,8 @@ compilable_contracts() ->
      "more_strings",
      "protected_call",
      "hermetization_turnoff",
-     "multiple_contracts"
+     "multiple_contracts",
+     "clone"
     ].
 
 not_compilable_on(fate) -> [];
@@ -205,6 +207,7 @@ debug_mode_contracts() ->
 -define(TYPE_ERROR(Name, Errs), ?ERROR("Type", Name, Errs)).
 -define(PARSE_ERROR(Name, Errs), ?ERROR("Parse", Name, Errs)).
 
+failing_contracts() -> []; % FIXME remove
 failing_contracts() ->
     {ok, V} = aeso_compiler:numeric_version(),
     Version = list_to_binary(string:join([integer_to_list(N) || N <- V], ".")),
