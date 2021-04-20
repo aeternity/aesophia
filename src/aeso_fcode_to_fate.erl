@@ -557,7 +557,7 @@ builtin_to_scode(_Env, auth_tx_hash, []) ->
 builtin_to_scode(_Env, auth_tx, []) ->
     [aeb_fate_ops:auth_tx(?a)];
 builtin_to_scode(Env, chain_bytecode_hash, [_Addr] = Args) ->
-    call_to_scode(Env, aeb_fate_ops:bytecode_hash(?a), Args);
+    call_to_scode(Env, aeb_fate_ops:bytecode_hash(?a, ?a), Args);
 builtin_to_scode(Env, chain_clone,
                  [TypeRep, GasCap, Value, Prot, Contract | InitArgs]) ->
     call_to_scode(Env, aeb_fate_ops:clone_g(?a, ?a, ?a, ?a, ?a),

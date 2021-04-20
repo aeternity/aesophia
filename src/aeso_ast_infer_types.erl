@@ -406,6 +406,7 @@ global_env() ->
     Map     = fun(A, B) -> {app_t, Ann, {id, Ann, "map"}, [A, B]} end,
     Pair    = fun(A, B) -> {tuple_t, Ann, [A, B]} end,
     FunC    = fun(C, Ts, T) -> {type_sig, Ann, C, [], Ts, T} end,
+    FunC1   = fun(C, S, T) -> {type_sig, Ann, C, [], [S], T} end,
     Fun     = fun(Ts, T) -> FunC(none, Ts, T) end,
     Fun1    = fun(S, T) -> Fun([S], T) end,
     FunCN   = fun(C, Named, Normal, Ret) -> {type_sig, Ann, C, Named, Normal, Ret} end,
@@ -475,7 +476,7 @@ global_env() ->
                      {"block_height", Int},
                      {"difficulty",   Int},
                      {"gas_limit",    Int},
-                     {"bytecode_hash",Fun1(Address, Option(Hash))},
+                     {"bytecode_hash",FunC1(bytecode_hash, A, Option(Hash))},
                      {"create",       FunCN(create,
                                             [ {named_arg_t, Ann, {id, Ann, "value"}, Int, {typed, Ann, {int, Ann, 0}, Int}}
                                             , {named_arg_t, Ann, {id, Ann, "code"}, A, undefined}
@@ -1909,7 +1910,6 @@ check_named_argument_constraint(Env,
                                     general_type = GenType,
                                     specialized_type = SpecType,
                                     context = {check_return, App} }) ->
-    io:format("CEHCK DEP: GEN ~p, SPEC: ~p\n", [GenType, SpecType]),
     NamedArgsT = dereference(NamedArgsT0),
     case dereference(NamedArgsT0) of
         [_ | _] = NamedArgsT ->
@@ -1934,7 +1934,6 @@ specialize_dependent_type(Env, Type) ->
                 {typed, _, {bool, _, false}, _} -> Else;
                 _ ->
                     type_error({named_argument_must_be_literal_bool, Arg, Val}),
-                    io:format("CHYUJ: ~p\n", [Val]),
                     fresh_uvar(aeso_syntax:get_ann(Val))
             end;
         _ -> Type   %% Currently no deep dependent types
@@ -2510,8 +2509,14 @@ apply_typesig_constraint(Ann, bytes_concat, {fun_t, _, [], [A, B], C}) ->
     add_bytes_constraint({add_bytes, Ann, concat, A, B, C});
 apply_typesig_constraint(Ann, bytes_split, {fun_t, _, [], [C], {tuple_t, _, [A, B]}}) ->
     add_bytes_constraint({add_bytes, Ann, split, A, B, C});
-apply_typesig_constraint(Ann, clone, {fun_t, _, Named, var_args, Ret}) ->
-    ok.
+apply_typesig_constraint(Ann, clone, {fun_t, _, Named, var_args, _}) ->
+    [RefT] = [RefT || {named_arg_t, _, {id, _, "ref"}, RefT, _} <- Named],
+    constrain([#is_contract_constraint{ contract_t = RefT,
+                                        context    = {clone, Ann} }]);
+apply_typesig_constraint(Ann, bytecode_hash, {fun_t, _, _, [Con], _}) ->
+    constrain([#is_contract_constraint{ contract_t = Con,
+                                        context    = {bytecode_hash, Ann} }]).
+
 
 %% Dereferences all uvars and replaces the uninstantiated ones with a
 %% succession of tvars.
@@ -2640,6 +2645,10 @@ mk_error({not_a_contract_type, Type, Cxt}) ->
         end,
     {Pos, Cxt1} =
         case Cxt of
+            {clone, Ann} ->
+                {pos(Ann), "when calling Chain.clone"};
+            {bytecode_hash, Ann} ->
+                {pos(Ann), "when calling Chain.bytecode_hash"};
             {contract_literal, Lit} ->
                 {pos(Lit),
                  io_lib:format("when checking that the contract literal\n~s\n"

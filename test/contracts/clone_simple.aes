@@ -1,0 +1,7 @@
+contract interface I =
+  entrypoint init : () => void
+
+contract C =
+  entrypoint f(i : I) =
+    let Some(c1) = Chain.clone(ref=i, protected = true)
+    2

@@ -127,7 +127,7 @@ compile(Backend, Name, Options) ->
 %% compilable_contracts() -> [ContractName].
 %%  The currently compilable contracts.
 
-compilable_contracts() -> ["clone"]; % FIXME remove
+compilable_contracts() -> ["test"]; % FIXME remove
 compilable_contracts() ->
     ["complex_types",
      "counter",
