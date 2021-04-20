@@ -454,6 +454,7 @@ global_env() ->
                      {"require", Fun([Bool, String], Unit)}])
         , types = MkDefs(
                     [{"int", 0}, {"bool", 0}, {"char", 0}, {"string", 0}, {"address", 0},
+                     {"void", 0},
                      {"unit", {[], {alias_t, Unit}}},
                      {"hash", {[], {alias_t, Bytes(32)}}},
                      {"signature", {[], {alias_t, Bytes(64)}}},
@@ -476,14 +477,14 @@ global_env() ->
                      {"gas_limit",    Int},
                      {"bytecode_hash",Fun1(Address, Option(Hash))},
                      {"create",       FunCN(create,
-                                            [ {named_arg_t, Ann, {id, Ann, "value"}, Int, {int, Ann, 0}}
+                                            [ {named_arg_t, Ann, {id, Ann, "value"}, Int, {typed, Ann, {int, Ann, 0}, Int}}
                                             , {named_arg_t, Ann, {id, Ann, "code"}, A, undefined}
                                             ], var_args, A)},
                      {"clone",        FunCN(clone,
                                             [ {named_arg_t, Ann, {id, Ann, "gas"}, Int,
                                                {qid, Ann, ["Call","gas_left"]}}
-                                            , {named_arg_t, Ann, {id, Ann, "value"}, Int, {int, Ann, 0}}
-                                            , {named_arg_t, Ann, {id, Ann, "protected"}, Bool, {bool, Ann, false}}
+                                            , {named_arg_t, Ann, {id, Ann, "value"}, Int, {typed, Ann, {int, Ann, 0}, Int}}
+                                            , {named_arg_t, Ann, {id, Ann, "protected"}, Bool, {typed, Ann, {bool, Ann, false}, Bool}}
                                             , {named_arg_t, Ann, {id, Ann, "ref"}, A, undefined}
                                             ], var_args, A)},
                      %% Tx constructors
@@ -1484,9 +1485,10 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
                             lists:filter(fun({named_arg_t, _, {id, _, "ref"}, _, _}) -> false; (_) -> true end, NamedArgsT),
                         {typed, _, _, InitT} =
                             infer_expr(Env, {proj, CAnn, Contract, {id, [], "init"}}),
-                        unify(Env, InitT, {fun_t, FunAnn, NamedArgsTNoRef, ArgTypes, fresh_uvar(CAnn)}, checking_init_todo),
+                        unify(Env, InitT, {fun_t, FunAnn, NamedArgsTNoRef, ArgTypes, fresh_uvar(Ann)}, checking_init_todo),
                         unify(Env, RetT, ContractT, dupadupa_todo),
-                        {fun_t, FunAnn, NamedArgsT, ArgTypes, RetT};
+                        {fun_t, Ann, NamedArgsT, ArgTypes,
+                         {if_t, Ann, {id, Ann, "protected"}, {app_t, Ann, {id, Ann, "option"}, [RetT]}, RetT}};
                     _ -> FunType0
                 end,
             GeneralResultType = fresh_uvar(Ann),
@@ -1907,6 +1909,7 @@ check_named_argument_constraint(Env,
                                     general_type = GenType,
                                     specialized_type = SpecType,
                                     context = {check_return, App} }) ->
+    io:format("CEHCK DEP: GEN ~p, SPEC: ~p\n", [GenType, SpecType]),
     NamedArgsT = dereference(NamedArgsT0),
     case dereference(NamedArgsT0) of
         [_ | _] = NamedArgsT ->
@@ -1931,6 +1934,7 @@ specialize_dependent_type(Env, Type) ->
                 {typed, _, {bool, _, false}, _} -> Else;
                 _ ->
                     type_error({named_argument_must_be_literal_bool, Arg, Val}),
+                    io:format("CHYUJ: ~p\n", [Val]),
                     fresh_uvar(aeso_syntax:get_ann(Val))
             end;
         _ -> Type   %% Currently no deep dependent types
@@ -2457,8 +2461,6 @@ occurs_check1(R, [H | T]) ->
     occurs_check(R, H) orelse occurs_check(R, T);
 occurs_check1(_, []) -> false.
 
-fresh_uvar([{origin, system}]) ->
-    error(oh_no_you_dont);
 fresh_uvar(Attrs) ->
     {uvar, Attrs, make_ref()}.
 

@@ -182,7 +182,7 @@ compilable_contracts() ->
      "protected_call",
      "hermetization_turnoff",
      "multiple_contracts",
-     "clone"
+     "clone", "clone_simple"
     ].
 
 not_compilable_on(fate) -> [];
