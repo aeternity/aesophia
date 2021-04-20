@@ -477,6 +477,8 @@ type_to_fcode(_Env, _Sub, {bytes_t, _, N}) ->
     {bytes, N};
 type_to_fcode(_Env, Sub, {tvar, _, X}) ->
     maps:get(X, Sub, {tvar, X});
+type_to_fcode(_Env, _Sub, {fun_t, Ann, _, var_args, _}) ->
+    fcode_error({var_args_not_set, {id, Ann, "a very suspicious function"}});
 type_to_fcode(Env, Sub, {fun_t, _, Named, Args, Res}) ->
     FNamed = [type_to_fcode(Env, Sub, Arg) || {named_arg_t, _, _, Arg, _} <- Named],
     FArgs  = [type_to_fcode(Env, Sub, Arg) || Arg <- Args],
@@ -692,17 +694,17 @@ expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
     end;
 
 %% Function calls
-expr_to_fcode(Env, _Type, {app, _, Fun = {typed, _, _, {fun_t, _, NamedArgsT, ArgsT, _}}, Args}) ->
+expr_to_fcode(Env, _Type, {app, _, Fun = {typed, _, FunE, {fun_t, _, NamedArgsT, ArgsT, _}}, Args}) ->
     Args1 = get_named_args(NamedArgsT, Args),
     FArgs = [expr_to_fcode(Env, Arg) || Arg <- Args1],
     case expr_to_fcode(Env, Fun) of
         {builtin_u, B, _Ar, TypeArgs}     -> builtin_to_fcode(state_layout(Env), B, FArgs ++ TypeArgs);
         {builtin_u, chain_clone, _Ar}     ->
             case ArgsT of
-                [_Con|InitArgs] ->
-                    FInitArgsT = {tuple, [type_to_fcode(Env, T) || T <- InitArgs]},
-                    builtin_to_fcode(state_layout(Env), chain_clone, [FInitArgsT|FArgs]);
-                [] -> error(wtf) %% FIXME
+                var_args -> fcode_error({var_args_not_set, FunE});
+                _ ->
+                    FInitArgsT = {typerep, {tuple, [type_to_fcode(Env, T) || T <- ArgsT]}},
+                    builtin_to_fcode(state_layout(Env), chain_clone, [{lit, FInitArgsT}|FArgs])
             end;
         {builtin_u, B, _Ar}               -> builtin_to_fcode(state_layout(Env), B, FArgs);
         {def_u, F, _Ar}                   -> {def, F, FArgs};

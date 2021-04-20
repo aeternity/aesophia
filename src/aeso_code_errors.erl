@@ -87,6 +87,10 @@ format({higher_order_state, {type_def, Ann, _, _, State}}) ->
     Msg = io_lib:format("Invalid state type\n~s\n", [pp_type(2, State)]),
     Cxt = "The state cannot contain functions in the AEVM. Use FATE if you need this.\n",
     mk_err(pos(Ann), Msg, Cxt);
+format({var_args_not_set, Expr}) ->
+    mk_err( pos(Expr), "Could not deduce type of variadic arguments"
+          , "When compiling " ++ pp_expr(Expr)
+          );
 
 format(Err) ->
     mk_err(aeso_errors:pos(0, 0), io_lib:format("Unknown error: ~p\n", [Err])).

@@ -1468,7 +1468,7 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
         _ ->
             NamedArgsVar = fresh_uvar(Ann),
             NamedArgs1 = [ infer_named_arg(Env, NamedArgsVar, Arg) || Arg <- NamedArgs ],
-            NewFun = {typed, _, _, FunType0} = infer_expr(Env, Fun),
+            NewFun0 = {typed, _, _, FunType0} = infer_expr(Env, Fun),
             NewArgs = [infer_expr(Env, A) || A <- Args],
             ArgTypes = [T || {typed, _, _, T} <- NewArgs],
             FunType =
@@ -1491,6 +1491,7 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
                 end,
             GeneralResultType = fresh_uvar(Ann),
             ResultType = fresh_uvar(Ann),
+            NewFun1 = setelement(4, NewFun0, FunType),
             When = {infer_app, Fun, NamedArgs1, Args, FunType, ArgTypes},
             unify(Env, FunType, {fun_t, [], NamedArgsVar, ArgTypes, GeneralResultType}, When),
             add_named_argument_constraint(
@@ -1499,7 +1500,7 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
                                           general_type = GeneralResultType,
                                           specialized_type = ResultType,
                                           context = {check_return, App} }),
-            {typed, Ann, {app, Ann, NewFun, NamedArgs1 ++ NewArgs}, dereference(ResultType)}
+            {typed, Ann, {app, Ann, NewFun1, NamedArgs1 ++ NewArgs}, dereference(ResultType)}
     end;
 infer_expr(Env, {'if', Attrs, Cond, Then, Else}) ->
     NewCond = check_expr(Env, Cond, {id, Attrs, "bool"}),
@@ -2381,6 +2382,9 @@ unify1(_Env, {bytes_t, _, Len}, {bytes_t, _, Len}, _When) ->
 unify1(Env, {if_t, _, {id, _, Id}, Then1, Else1}, {if_t, _, {id, _, Id}, Then2, Else2}, When) ->
     unify(Env, Then1, Then2, When) andalso
     unify(Env, Else1, Else2, When);
+
+unify1(Env, {fun_t, _, Named1, _, Result1}, {fun_t, _, Named2, var_args, Result2}, When) ->
+    error(unify_varargs); %% TODO
 unify1(Env, {fun_t, _, Named1, var_args, Result1}, {fun_t, _, Named2, Args2, Result2}, When) ->
     error(unify_varargs); %% TODO
 unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, When)

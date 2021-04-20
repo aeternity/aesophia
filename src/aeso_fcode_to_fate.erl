@@ -559,17 +559,9 @@ builtin_to_scode(_Env, auth_tx, []) ->
 builtin_to_scode(Env, chain_bytecode_hash, [_Addr] = Args) ->
     call_to_scode(Env, aeb_fate_ops:bytecode_hash(?a), Args);
 builtin_to_scode(Env, chain_clone,
-                 [InitArgs, _GasCap = {con,[0,1],0,[]}, Prot, Value, Contract | InitArgs]) ->
-    error(InitArgs),
-    TypeRep = xd,
-    call_to_scode(Env, aeb_fate_ops:clone(?a, ?a, ?a, ?a),
-                  [Contract, TypeRep, Value, Prot | InitArgs]
-                 );
-builtin_to_scode(Env, chain_clone,
-                 [_GasCap = {con,[0,1],0,[]}, Prot, Value, Contract | InitArgs]) ->
-    TypeRep = xd,
-    call_to_scode(Env, aeb_fate_ops:clone(?a, ?a, ?a, ?a),
-                  [Contract, TypeRep, Value, Prot | InitArgs]
+                 [TypeRep, GasCap, Value, Prot, Contract | InitArgs]) ->
+    call_to_scode(Env, aeb_fate_ops:clone_g(?a, ?a, ?a, ?a, ?a),
+                  [Contract, TypeRep, Value, GasCap, Prot | InitArgs]
                  );
 builtin_to_scode(Env, chain_create,
   [_GasCap = {con,[0,1],0,[]}, Prot, Value, Contract | InitArgs]) ->
@@ -965,6 +957,10 @@ attributes(I) ->
         {'STR_TO_LOWER', A, B}                -> Pure(A, [B]);
         {'CHAR_TO_INT', A, B}                 -> Pure(A, [B]);
         {'CHAR_FROM_INT', A, B}               -> Pure(A, [B]);
+        {'CREATE', A, B, C}                   -> Impure(?a, [A, B, C]);
+        {'CLONE', A, B, C, D}                 -> Impure(?a, [A, B, C, D]);
+        {'CLONE_G', A, B, C, D, E}            -> Impure(?a, [A, B, C, D, E]);
+        {'BYTECODE_HASH', A, B}               -> Pure(A, [B]);
         {'ABORT', A}                          -> Impure(pc, A);
         {'EXIT', A}                           -> Impure(pc, A);
         'NOP'                                 -> Pure(none, [])
@@ -1718,6 +1714,9 @@ split_calls(Ref, [I | Code], Acc, Blocks) when element(1, I) == 'CALL';
                                                element(1, I) == 'CALL_R';
                                                element(1, I) == 'CALL_GR';
                                                element(1, I) == 'CALL_PGR';
+                                               element(1, I) == 'CREATE';
+                                               element(1, I) == 'CLONE';
+                                               element(1, I) == 'CLONE_G';
                                                element(1, I) == 'jumpif' ->
     split_calls(make_ref(), Code, [], [{Ref, lists:reverse([I | Acc])} | Blocks]);
 split_calls(Ref, [{'ABORT', _} = I | _Code], Acc, Blocks) ->
