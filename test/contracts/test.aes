@@ -1,9 +1,9 @@
 // If you need a quick compiler test — this file is for your playground
-contract interface Remote =
-  entrypoint init : int => void
-  entrypoint f : int => int
+contract Chuj =
+  type state = bool
+//  entrypoint init : (int, bool) => void
+  entrypoint init(x : int, y : bool) = if(x < 0) abort("xD") else true
 
-contract Test =
-  entrypoint kek(r : Remote) =
-    Chain.clone(ref=r, 123)
-    Chain.bytecode_hash(r)
+main contract Test =
+  stateful entrypoint kek() =
+    Chain.create(value=3, 123, 555) : Chuj

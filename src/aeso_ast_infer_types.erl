@@ -41,6 +41,7 @@
                        element(1, T) =:= qcon).
 
 -type why_record() :: aeso_syntax:field(aeso_syntax:expr())
+                    | {var_args, aeso_syntax:ann(), aeso_syntax:expr()}
                     | {proj, aeso_syntax:ann(), aeso_syntax:expr(), aeso_syntax:id()}.
 
 -type pos() :: aeso_errors:pos().
@@ -479,7 +480,6 @@ global_env() ->
                      {"gas_limit",    Int},
                      {"bytecode_hash",FunC1(bytecode_hash, A, Option(Hash))},
                      {"create",       FunN([ {named_arg_t, Ann, {id, Ann, "value"}, Int, {typed, Ann, {int, Ann, 0}, Int}}
-                                           , {named_arg_t, Ann, {id, Ann, "code"}, A, undefined}
                                            ], var_args, A)},
                      {"clone",        FunN([ {named_arg_t, Ann, {id, Ann, "gas"}, Int,
                                               {qid, Ann, ["Call","gas_left"]}}
@@ -1593,9 +1593,10 @@ infer_var_args_fun(Env, {typed, Ann, Fun, FunType0}, NamedArgs, ArgTypes) ->
         case Fun of
             {qid, _, ["Chain", "create"]} ->
                 {fun_t, _, NamedArgsT, var_args, RetT} = FunType0,
-                check_contract_construction(Env, RetT, Fun, NamedArgsT, ArgTypes, RetT),
-                {fun_t, Ann, NamedArgsT, ArgTypes,
-                 {if_t, Ann, {id, Ann, "protected"}, {app_t, Ann, {id, Ann, "option"}, [RetT]}, RetT}};
+                GasCapMock    = {named_arg_t, Ann, {id, Ann, "gas"}, {id, Ann, "int"}, {int, Ann, 0}},
+                ProtectedMock = {named_arg_t, Ann, {id, Ann, "protected"}, {id, Ann, "bool"}, {bool, Ann, false}},
+                check_contract_construction(Env, RetT, Fun, [GasCapMock, ProtectedMock|NamedArgsT], ArgTypes, RetT),
+                {fun_t, Ann, NamedArgsT, ArgTypes, RetT};
             {qid, _, ["Chain", "clone"]} ->
                 {fun_t, _, NamedArgsT, var_args, RetT} = FunType0,
                 ContractT =
@@ -1617,14 +1618,15 @@ check_contract_construction(Env, ContractT, Fun, NamedArgsT, ArgTypes, RetT) ->
     InitT = fresh_uvar(Ann),
     unify(Env, InitT, {fun_t, Ann, NamedArgsT, ArgTypes, fresh_uvar(Ann)}, {checking_init_args, Ann, ContractT, ArgTypes}),
     unify(Env, RetT, ContractT, {return_contract, Fun, ContractT}),
+    io:format("DEREF: ~p\n", [dereference_deep(InitT)]),
     constrain([ #field_constraint{
                    record_t = unfold_types_in_type(Env, ContractT),
                    field    = {id, Ann, "init"},
                    field_t  = InitT,
                    kind     = project,
-                   context  = {var_args, Fun} }
+                   context  = {var_args, Ann, Fun} }
               , #is_contract_constraint{ contract_t = ContractT,
-                                         context    = {var_args, Fun} }
+                                         context    = {var_args, Ann, Fun} }
               ]).
 
 split_args(Args0) ->
@@ -1909,7 +1911,7 @@ solve_named_argument_constraints(Env, Constraints0) ->
     [ C || C <- dereference_deep(Constraints0),
            unsolved == check_named_argument_constraint(Env, C) ].
 
-%% If false, a type error have been emitted, so it's safe to drop the constraint.
+%% If false, a type error has been emitted, so it's safe to drop the constraint.
 -spec check_named_argument_constraint(env(), named_argument_constraint()) -> true | false | unsolved.
 check_named_argument_constraint(_Env, #named_argument_constraint{ args = {uvar, _, _} }) ->
     unsolved;
@@ -2410,8 +2412,14 @@ unify1(_Env, {fun_t, _, _, _, _}, {fun_t, _, _, var_args, _}, When) ->
 unify1(_Env, {fun_t, _, _, var_args, _}, {fun_t, _, _, _, _}, When) ->
     error({unify_varargs, When});
 unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, When)
-    when length(Args1) == length(Args2) ->
-    unify(Env, Named1, Named2, When) andalso
+  when length(Args1) == length(Args2) ->
+    Named1_ = if is_list(Named1) -> lists:keysort(3, Named1);
+                 true -> Named1
+              end,
+    Named2_ = if is_list(Named2) -> lists:keysort(3, Named2);
+                 true -> Named2
+              end,
+    unify(Env, Named1_, Named2_, When) andalso
     unify(Env, Args1, Args2, When) andalso unify(Env, Result1, Result2, When);
 unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, When)
   when length(Args1) == length(Args2), Tag == id orelse Tag == qid ->
@@ -2528,10 +2536,6 @@ apply_typesig_constraint(Ann, bytes_concat, {fun_t, _, [], [A, B], C}) ->
     add_bytes_constraint({add_bytes, Ann, concat, A, B, C});
 apply_typesig_constraint(Ann, bytes_split, {fun_t, _, [], [C], {tuple_t, _, [A, B]}}) ->
     add_bytes_constraint({add_bytes, Ann, split, A, B, C});
-apply_typesig_constraint(Ann, clone, {fun_t, _, Named, var_args, _}) ->
-    [RefT] = [RefT || {named_arg_t, _, {id, _, "ref"}, RefT, _} <- Named],
-    constrain([#is_contract_constraint{ contract_t = RefT,
-                                        context    = {clone, Ann} }]);
 apply_typesig_constraint(Ann, bytecode_hash, {fun_t, _, _, [Con], _}) ->
     constrain([#is_contract_constraint{ contract_t = Con,
                                         context    = {bytecode_hash, Ann} }]).
@@ -2664,10 +2668,9 @@ mk_error({not_a_contract_type, Type, Cxt}) ->
         end,
     {Pos, Cxt1} =
         case Cxt of
-            {clone, Ann} ->
-                {pos(Ann), "when calling Chain.clone"};
-            {bytecode_hash, Ann} ->
-                {pos(Ann), "when calling Chain.bytecode_hash"};
+            {var_args, Ann, Fun} ->
+                {pos(Ann),
+                 io_lib:format("when calling variadic function\n~s\n", [pp_expr("  ", Fun)])};
             {contract_literal, Lit} ->
                 {pos(Lit),
                  io_lib:format("when checking that the contract literal\n~s\n"
@@ -2959,6 +2962,12 @@ pp_when({field_constraint, FieldType0, InferredType0, Fld}) ->
     InferredType = instantiate(InferredType0),
     {pos(Fld),
      case Fld of
+         {var_args, _Ann, _Fun} ->
+             io_lib:format("when checking contract construction of type\n~s (at ~s)\nagainst the expected type\n~s\n",
+                          [pp_type("  ", FieldType),
+                           pp_loc(Fld),
+                           pp_type("  ", InferredType)
+                          ]);
          {field, _Ann, LV, Id, E} ->
              io_lib:format("when checking the assignment of the field\n~s (at ~s)\nto the old value ~s and the new value\n~s\n",
                  [pp_typed("  ", {lvalue, [], LV}, FieldType),
@@ -2981,6 +2990,13 @@ pp_when({record_constraint, RecType0, InferredType0, Fld}) ->
     InferredType = instantiate(InferredType0),
     {Pos, WhyRec} = pp_why_record(Fld),
     case Fld of
+        {var_args, _Ann, _Fun} ->
+            {Pos,
+             io_lib:format("when checking that contract construction of type\n~s\n~s\n"
+                           "matches the expected type\n~s\n",
+                           [pp_type("  ", RecType), WhyRec, pp_type("  ", InferredType)]
+                          )
+            };
         {field, _Ann, _LV, _Id, _E} ->
             {Pos,
              io_lib:format("when checking that the record type\n~s\n~s\n"
@@ -3051,17 +3067,21 @@ pp_when({arg_name, Id1, Id2, When}) ->
     {Pos
     , io_lib:format("when unifying names of named arguments: ~s and ~s\n~s", [pp_expr(Id1), pp_expr(Id2), Ctx])
     };
+pp_when({var_args, Ann, Fun}) ->
+    {pos(Ann)
+    , io_lib:format("when resolving arguments of variadic function\n~s\n", [pp_expr("  ", Fun)])
+    };
 pp_when(unknown) -> {pos(0,0), ""}.
 
 -spec pp_why_record(why_record()) -> {pos(), iolist()}.
-pp_why_record(Fld = {field, _Ann, LV, _Id, _E}) ->
-    {pos(Fld),
-     io_lib:format("arising from an assignment of the field ~s (at ~s)",
-         [pp_expr("", {lvalue, [], LV}), pp_loc(Fld)])};
+pp_why_record({var_args, Ann, Fun}) ->
+    {pos(Ann),
+     io_lib:format("arising from resolution of variadic function ~s (at ~s)",
+                   [pp_expr("", Fun), pp_loc(Fun)])};
 pp_why_record(Fld = {field, _Ann, LV, _E}) ->
     {pos(Fld),
      io_lib:format("arising from an assignment of the field ~s (at ~s)",
-         [pp_expr("", {lvalue, [], LV}), pp_loc(Fld)])};
+                   [pp_expr("", {lvalue, [], LV}), pp_loc(Fld)])};
 pp_why_record({proj, _Ann, Rec, FldName}) ->
     {pos(Rec),
      io_lib:format("arising from the projection of the field ~s (at ~s)",
