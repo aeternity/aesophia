@@ -88,7 +88,7 @@ format({higher_order_state, {type_def, Ann, _, _, State}}) ->
     Cxt = "The state cannot contain functions in the AEVM. Use FATE if you need this.\n",
     mk_err(pos(Ann), Msg, Cxt);
 format({var_args_not_set, Expr}) ->
-    mk_err( pos(Expr), "Could not deduce type of variadic arguments"
+    mk_err( pos(Expr), "Could not deduce type of variable arguments list"
           , "When compiling " ++ pp_expr(Expr)
           );
 format({found_void, Ann}) ->

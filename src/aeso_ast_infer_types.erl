@@ -410,6 +410,7 @@ global_env() ->
     Fun     = fun(Ts, T) -> FunC(none, Ts, T) end,
     Fun1    = fun(S, T) -> Fun([S], T) end,
     FunCN   = fun(C, Named, Normal, Ret) -> {type_sig, Ann, C, Named, Normal, Ret} end,
+    FunN    = fun(Named, Normal, Ret) -> FunCN(none, Named, Normal, Ret) end,
     %% Lambda    = fun(Ts, T) -> {fun_t, Ann, [], Ts, T} end,
     %% Lambda1   = fun(S, T) -> Lambda([S], T) end,
     StateFun  = fun(Ts, T) -> {type_sig, [stateful|Ann], none, [], Ts, T} end,
@@ -477,17 +478,15 @@ global_env() ->
                      {"difficulty",   Int},
                      {"gas_limit",    Int},
                      {"bytecode_hash",FunC1(bytecode_hash, A, Option(Hash))},
-                     {"create",       FunCN(create,
-                                            [ {named_arg_t, Ann, {id, Ann, "value"}, Int, {typed, Ann, {int, Ann, 0}, Int}}
-                                            , {named_arg_t, Ann, {id, Ann, "code"}, A, undefined}
-                                            ], var_args, A)},
-                     {"clone",        FunCN(clone,
-                                            [ {named_arg_t, Ann, {id, Ann, "gas"}, Int,
-                                               {qid, Ann, ["Call","gas_left"]}}
-                                            , {named_arg_t, Ann, {id, Ann, "value"}, Int, {typed, Ann, {int, Ann, 0}, Int}}
-                                            , {named_arg_t, Ann, {id, Ann, "protected"}, Bool, {typed, Ann, {bool, Ann, false}, Bool}}
-                                            , {named_arg_t, Ann, {id, Ann, "ref"}, A, undefined}
-                                            ], var_args, A)},
+                     {"create",       FunN([ {named_arg_t, Ann, {id, Ann, "value"}, Int, {typed, Ann, {int, Ann, 0}, Int}}
+                                           , {named_arg_t, Ann, {id, Ann, "code"}, A, undefined}
+                                           ], var_args, A)},
+                     {"clone",        FunN([ {named_arg_t, Ann, {id, Ann, "gas"}, Int,
+                                              {qid, Ann, ["Call","gas_left"]}}
+                                           , {named_arg_t, Ann, {id, Ann, "value"}, Int, {typed, Ann, {int, Ann, 0}, Int}}
+                                           , {named_arg_t, Ann, {id, Ann, "protected"}, Bool, {typed, Ann, {bool, Ann, false}, Bool}}
+                                           , {named_arg_t, Ann, {id, Ann, "ref"}, A, undefined}
+                                           ], var_args, A)},
                      %% Tx constructors
                      {"GAMetaTx",     Fun([Address, Int], GAMetaTx)},
                      {"PayingForTx",  Fun([Address, Int], PayForTx)},
@@ -1475,19 +1474,21 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
             ArgTypes = [T || {typed, _, _, T} <- NewArgs],
             FunType =
                 case Fun of
+                    {qid, _, ["Chain", "create"]} ->
+                        {fun_t, _, NamedArgsT, var_args, RetT} = FunType0,
+                        check_contract_contstruction(Env, RetT, Fun, NamedArgsT, ArgTypes, RetT),
+                        {fun_t, Ann, NamedArgsT, ArgTypes,
+                         {if_t, Ann, {id, Ann, "protected"}, {app_t, Ann, {id, Ann, "option"}, [RetT]}, RetT}};
                     {qid, _, ["Chain", "clone"]} ->
-                        {fun_t, FunAnn, NamedArgsT, var_args, RetT} = FunType0,
-                        {typed, CAnn, Contract, ContractT} =
-                            case [Contract || {named_arg, _, {id, _, "ref"}, Contract} <- NamedArgs1] of
+                        {fun_t, _, NamedArgsT, var_args, RetT} = FunType0,
+                        ContractT =
+                            case [ContractT || {named_arg, _, {id, _, "ref"}, {typed, _, _, ContractT}} <- NamedArgs1] of
                                 [C] -> C;
                                 _ -> type_error({clone_no_contract, Ann})
                             end,
                         NamedArgsTNoRef =
                             lists:filter(fun({named_arg_t, _, {id, _, "ref"}, _, _}) -> false; (_) -> true end, NamedArgsT),
-                        {typed, _, _, InitT} =
-                            infer_expr(Env, {proj, CAnn, Contract, {id, [], "init"}}),
-                        unify(Env, InitT, {fun_t, FunAnn, NamedArgsTNoRef, ArgTypes, fresh_uvar(Ann)}, checking_init_todo),
-                        unify(Env, RetT, ContractT, dupadupa_todo),
+                        check_contract_contstruction(Env, ContractT, Fun, NamedArgsTNoRef, ArgTypes, RetT),
                         {fun_t, Ann, NamedArgsT, ArgTypes,
                          {if_t, Ann, {id, Ann, "protected"}, {app_t, Ann, {id, Ann, "option"}, [RetT]}, RetT}};
                     _ -> FunType0
@@ -1607,6 +1608,21 @@ infer_expr(Env, Let = {letval, Attrs, _, _}) ->
 infer_expr(Env, Let = {letfun, Attrs, _, _, _, _}) ->
     type_error({missing_body_for_let, Attrs}),
     infer_expr(Env, {block, Attrs, [Let, abort_expr(Attrs, "missing body")]}).
+
+check_contract_contstruction(Env, ContractT, Fun, NamedArgsT, ArgTypes, RetT) ->
+    Ann = aeso_syntax:get_ann(Fun),
+    InitT = fresh_uvar(Ann),
+    unify(Env, InitT, {fun_t, Ann, NamedArgsT, ArgTypes, fresh_uvar(Ann)}, {checking_init_args, Ann, ContractT, ArgTypes}),
+    unify(Env, RetT, ContractT, {return_contract, Fun, ContractT}),
+    constrain([ #field_constraint{
+                   record_t = unfold_types_in_type(Env, ContractT),
+                   field    = {id, Ann, "init"},
+                   field_t  = InitT,
+                   kind     = project,
+                   context  = {var_args, Fun} }
+              , #is_contract_constraint{ contract_t = ContractT,
+                                         context    = {var_args, Fun} }
+              ]).
 
 split_args(Args0) ->
     NamedArgs = [ Arg || Arg = {named_arg, _, _, _} <- Args0 ],
@@ -2386,10 +2402,10 @@ unify1(Env, {if_t, _, {id, _, Id}, Then1, Else1}, {if_t, _, {id, _, Id}, Then2, 
     unify(Env, Then1, Then2, When) andalso
     unify(Env, Else1, Else2, When);
 
-unify1(Env, {fun_t, _, Named1, _, Result1}, {fun_t, _, Named2, var_args, Result2}, When) ->
-    error(unify_varargs); %% TODO
-unify1(Env, {fun_t, _, Named1, var_args, Result1}, {fun_t, _, Named2, Args2, Result2}, When) ->
-    error(unify_varargs); %% TODO
+unify1(_Env, {fun_t, _, _, _, _}, {fun_t, _, _, var_args, _}, When) ->
+    type_error({unify_varargs, When});
+unify1(_Env, {fun_t, _, _, var_args, _}, {fun_t, _, _, _, _}, When) ->
+    error({unify_varargs, When});
 unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, When)
     when length(Args1) == length(Args2) ->
     unify(Env, Named1, Named2, When) andalso
@@ -2401,7 +2417,7 @@ unify1(Env, {tuple_t, _, As}, {tuple_t, _, Bs}, When)
   when length(As) == length(Bs) ->
     unify(Env, As, Bs, When);
 unify1(Env, {named_arg_t, _, Id1, Type1, _}, {named_arg_t, _, Id2, Type2, _}, When) ->
-    unify1(Env, Id1, Id2, {arg_name, When}), %% TODO
+    unify1(Env, Id1, Id2, {arg_name, Id1, Id2, When}),
     unify1(Env, Type1, Type2, When);
 %% The grammar is a bit inconsistent about whether types without
 %% arguments are represented as applications to an empty list of
@@ -2901,6 +2917,10 @@ mk_error({main_contract_undefined}) ->
 mk_error({multiple_main_contracts}) ->
     Msg = "Up to one main contract can be defined.",
     mk_t_err(pos(0, 0), Msg);
+mk_error({unify_varargs, When}) ->
+    Msg = io_lib:format("Cannot unify variable argument list.\n"),
+    {Pos, Ctxt} = pp_when(When),
+    mk_t_err(Pos, Msg, Ctxt);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p\n", [Err]),
     mk_t_err(pos(0, 0), Msg).
@@ -3011,6 +3031,23 @@ pp_when({check_named_arg_constraint, C}) ->
     Err = io_lib:format("when checking named argument\n~s\nagainst inferred type\n~s",
                         [pp_typed("  ", Arg, Type), pp_type("  ", C#named_argument_constraint.type)]),
     {pos(Arg), Err};
+pp_when({checking_init_args, Ann, Con0, ArgTypes0}) ->
+    Con = instantiate(Con0),
+    ArgTypes = instantiate(ArgTypes0),
+    {pos(Ann),
+     io_lib:format("when checking arguments of ~s's init entrypoint to match\n(~s)",
+                   [pp_type(Con), string:join([pp_type(A) || A <- ArgTypes], ", ")])
+    };
+pp_when({return_contract, App, Con0}) ->
+    Con = instantiate(Con0),
+    {pos(App)
+    , io_lib:format("when checking that expression returns contract of type\n~s", [pp_type("  ", Con)])
+    };
+pp_when({arg_name, Id1, Id2, When}) ->
+    {Pos, Ctx} = pp_when(When),
+    {Pos
+    , io_lib:format("when unifying names of named arguments: ~s and ~s\n~s", [pp_expr(Id1), pp_expr(Id2), Ctx])
+    };
 pp_when(unknown) -> {pos(0,0), ""}.
 
 -spec pp_why_record(why_record()) -> {pos(), iolist()}.
@@ -3041,9 +3078,13 @@ pp_typed(Label, {typed, _, Expr, _}, Type) ->
 pp_typed(Label, Expr, Type) ->
     pp_expr(Label, {typed, [], Expr, Type}).
 
+pp_expr(Expr) ->
+    pp_expr("", Expr).
 pp_expr(Label, Expr) ->
     prettypr:format(prettypr:beside(prettypr:text(Label), aeso_pretty:expr(Expr, [show_generated]))).
 
+pp_type(Type) ->
+    pp_type("", Type).
 pp_type(Label, Type) ->
     prettypr:format(prettypr:beside(prettypr:text(Label), aeso_pretty:type(Type, [show_generated]))).
 
