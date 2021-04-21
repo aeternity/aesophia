@@ -1469,31 +1469,10 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
         _ ->
             NamedArgsVar = fresh_uvar(Ann),
             NamedArgs1 = [ infer_named_arg(Env, NamedArgsVar, Arg) || Arg <- NamedArgs ],
-            NewFun0 = {typed, _, _, FunType0} = infer_expr(Env, Fun),
+            NewFun0 = infer_expr(Env, Fun),
             NewArgs = [infer_expr(Env, A) || A <- Args],
             ArgTypes = [T || {typed, _, _, T} <- NewArgs],
-            FunType =
-                case Fun of
-                    {qid, _, ["Chain", "create"]} ->
-                        {fun_t, _, NamedArgsT, var_args, RetT} = FunType0,
-                        check_contract_construction(Env, RetT, Fun, NamedArgsT, ArgTypes, RetT),
-                        {fun_t, Ann, NamedArgsT, ArgTypes,
-                         {if_t, Ann, {id, Ann, "protected"}, {app_t, Ann, {id, Ann, "option"}, [RetT]}, RetT}};
-                    {qid, _, ["Chain", "clone"]} ->
-                        {fun_t, _, NamedArgsT, var_args, RetT} = FunType0,
-                        ContractT =
-                            case [ContractT || {named_arg, _, {id, _, "ref"}, {typed, _, _, ContractT}} <- NamedArgs1] of
-                                [C] -> C;
-                                _ -> type_error({clone_no_contract, Ann})
-                            end,
-                        NamedArgsTNoRef =
-                            lists:filter(fun({named_arg_t, _, {id, _, "ref"}, _, _}) -> false; (_) -> true end, NamedArgsT),
-                        check_contract_construction(Env, ContractT, Fun, NamedArgsTNoRef, ArgTypes, RetT),
-                        {fun_t, Ann, NamedArgsT, ArgTypes,
-                         {if_t, Ann, {id, Ann, "protected"}, {app_t, Ann, {id, Ann, "option"}, [RetT]}, RetT}};
-                    _ -> FunType0
-                end,
-            NewFun1 = setelement(4, NewFun0, FunType),
+            NewFun1 = {typed, _, _, FunType} = infer_var_args_fun(Env, NewFun0, NamedArgs1, ArgTypes),
             When = {infer_app, Fun, NamedArgs1, Args, FunType, ArgTypes},
             GeneralResultType = fresh_uvar(Ann),
             ResultType = fresh_uvar(Ann),
@@ -1608,6 +1587,30 @@ infer_expr(Env, Let = {letval, Attrs, _, _}) ->
 infer_expr(Env, Let = {letfun, Attrs, _, _, _, _}) ->
     type_error({missing_body_for_let, Attrs}),
     infer_expr(Env, {block, Attrs, [Let, abort_expr(Attrs, "missing body")]}).
+
+infer_var_args_fun(Env, {typed, Ann, Fun, FunType0}, NamedArgs, ArgTypes) ->
+    FunType =
+        case Fun of
+            {qid, _, ["Chain", "create"]} ->
+                {fun_t, _, NamedArgsT, var_args, RetT} = FunType0,
+                check_contract_construction(Env, RetT, Fun, NamedArgsT, ArgTypes, RetT),
+                {fun_t, Ann, NamedArgsT, ArgTypes,
+                 {if_t, Ann, {id, Ann, "protected"}, {app_t, Ann, {id, Ann, "option"}, [RetT]}, RetT}};
+            {qid, _, ["Chain", "clone"]} ->
+                {fun_t, _, NamedArgsT, var_args, RetT} = FunType0,
+                ContractT =
+                    case [ContractT || {named_arg, _, {id, _, "ref"}, {typed, _, _, ContractT}} <- NamedArgs] of
+                        [C] -> C;
+                        _ -> type_error({clone_no_contract, Ann})
+                    end,
+                NamedArgsTNoRef =
+                    lists:filter(fun({named_arg_t, _, {id, _, "ref"}, _, _}) -> false; (_) -> true end, NamedArgsT),
+                check_contract_construction(Env, ContractT, Fun, NamedArgsTNoRef, ArgTypes, RetT),
+                {fun_t, Ann, NamedArgsT, ArgTypes,
+                 {if_t, Ann, {id, Ann, "protected"}, {app_t, Ann, {id, Ann, "option"}, [RetT]}, RetT}};
+            _ -> FunType0
+        end,
+    {typed, Ann, Fun, FunType}.
 
 check_contract_construction(Env, ContractT, Fun, NamedArgsT, ArgTypes, RetT) ->
     Ann = aeso_syntax:get_ann(Fun),
