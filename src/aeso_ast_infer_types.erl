@@ -1476,7 +1476,7 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
                 case Fun of
                     {qid, _, ["Chain", "create"]} ->
                         {fun_t, _, NamedArgsT, var_args, RetT} = FunType0,
-                        check_contract_contstruction(Env, RetT, Fun, NamedArgsT, ArgTypes, RetT),
+                        check_contract_construction(Env, RetT, Fun, NamedArgsT, ArgTypes, RetT),
                         {fun_t, Ann, NamedArgsT, ArgTypes,
                          {if_t, Ann, {id, Ann, "protected"}, {app_t, Ann, {id, Ann, "option"}, [RetT]}, RetT}};
                     {qid, _, ["Chain", "clone"]} ->
@@ -1488,15 +1488,15 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
                             end,
                         NamedArgsTNoRef =
                             lists:filter(fun({named_arg_t, _, {id, _, "ref"}, _, _}) -> false; (_) -> true end, NamedArgsT),
-                        check_contract_contstruction(Env, ContractT, Fun, NamedArgsTNoRef, ArgTypes, RetT),
+                        check_contract_construction(Env, ContractT, Fun, NamedArgsTNoRef, ArgTypes, RetT),
                         {fun_t, Ann, NamedArgsT, ArgTypes,
                          {if_t, Ann, {id, Ann, "protected"}, {app_t, Ann, {id, Ann, "option"}, [RetT]}, RetT}};
                     _ -> FunType0
                 end,
-            GeneralResultType = fresh_uvar(Ann),
-            ResultType = fresh_uvar(Ann),
             NewFun1 = setelement(4, NewFun0, FunType),
             When = {infer_app, Fun, NamedArgs1, Args, FunType, ArgTypes},
+            GeneralResultType = fresh_uvar(Ann),
+            ResultType = fresh_uvar(Ann),
             unify(Env, FunType, {fun_t, [], NamedArgsVar, ArgTypes, GeneralResultType}, When),
             add_named_argument_constraint(
               #dependent_type_constraint{ named_args_t = NamedArgsVar,
@@ -1609,7 +1609,7 @@ infer_expr(Env, Let = {letfun, Attrs, _, _, _, _}) ->
     type_error({missing_body_for_let, Attrs}),
     infer_expr(Env, {block, Attrs, [Let, abort_expr(Attrs, "missing body")]}).
 
-check_contract_contstruction(Env, ContractT, Fun, NamedArgsT, ArgTypes, RetT) ->
+check_contract_construction(Env, ContractT, Fun, NamedArgsT, ArgTypes, RetT) ->
     Ann = aeso_syntax:get_ann(Fun),
     InitT = fresh_uvar(Ann),
     unify(Env, InitT, {fun_t, Ann, NamedArgsT, ArgTypes, fresh_uvar(Ann)}, {checking_init_args, Ann, ContractT, ArgTypes}),
