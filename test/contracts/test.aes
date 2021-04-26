@@ -1,9 +1,20 @@
 // If you need a quick compiler test — this file is for your playground
-contract Chuj =
-  type state = bool
-//  entrypoint init : (int, bool) => void
-  entrypoint init(x : int, y : bool) = if(x < 0) abort("xD") else true
+contract IntegerAdder =
+  entrypoint init() = unit           
+  entrypoint addIntegers(x, y) = x + y
 
-main contract Test =
-  stateful entrypoint kek() =
-    Chain.create(value=3, 123, 555) : Chuj
+contract IntegerAdderHolder =
+  type state = IntegerAdder
+  entrypoint init() = Chain.create() : IntegerAdder
+  entrypoint get() = state
+
+namespace IntegerAdderFactory =
+  function new() =
+    let i = Chain.create() : IntegerAdderHolder
+    i.get()
+
+main contract EnterpriseContract =
+  entrypoint calculateSomething(x) =
+    let adder = IntegerAdderFactory.new()
+    adder.addIntegers(x, 2137)
+                              

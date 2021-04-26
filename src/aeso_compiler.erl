@@ -138,8 +138,9 @@ from_string1(aevm, ContractString, Options) ->
     {ok, maybe_generate_aci(Res, FoldedTypedAst, Options)};
 from_string1(fate, ContractString, Options) ->
     #{ fcode := FCode
+     , fcode_env := #{child_con_env := ChildContracts}
      , folded_typed_ast := FoldedTypedAst } = string_to_code(ContractString, Options),
-    FateCode = aeso_fcode_to_fate:compile(FCode, Options),
+    FateCode = aeso_fcode_to_fate:compile(ChildContracts, FCode, Options),
     pp_assembler(fate, FateCode, Options),
     ByteCode = aeb_fate_code:serialize(FateCode, []),
     {ok, Version} = version(),
@@ -179,8 +180,9 @@ string_to_code(ContractString, Options) ->
              , type_env  => TypeEnv
              , ast => Ast };
         fate ->
-            Fcode = aeso_ast_to_fcode:ast_to_fcode(UnfoldedTypedAst, Options),
+            {Env, Fcode} = aeso_ast_to_fcode:ast_to_fcode(UnfoldedTypedAst, Options),
             #{ fcode => Fcode
+             , fcode_env => Env
              , unfolded_typed_ast => UnfoldedTypedAst
              , folded_typed_ast => FoldedTypedAst
              , type_env  => TypeEnv

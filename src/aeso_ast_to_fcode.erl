@@ -55,6 +55,7 @@
               | {oracle_pubkey, binary()}
               | {oracle_query_id, binary()}
               | {bool, false | true}
+              | {contract_code, string()} %% for CREATE, by name
               | {typerep, ftype()}.
 
 -type fexpr() :: {lit, flit()}
@@ -167,15 +168,24 @@
 %% and produces Fate intermediate code.
 -spec ast_to_fcode(aeso_syntax:ast(), [option()]) -> fcode().
 ast_to_fcode(Code, Options) ->
-    Verbose = lists:member(pp_fcode, Options),
     init_fresh_names(),
-    FCode1 = to_fcode(init_env(Options), Code),
+    {Env1, FCode1} = to_fcode(init_env(Options), Code),
+    FCode2 = optimize(FCode1, Options),
+    Env2 = Env1#{ child_con_env :=
+                      maps:map(
+                        fun (_, FC) -> optimize(FC, Options) end,
+                        maps:get(child_con_env, Env1)
+                       )},
+    clear_fresh_names(),
+    {Env2, FCode2}.
+
+optimize(FCode1, Options) ->
+    Verbose = lists:member(pp_fcode, Options),
     [io:format("-- Before lambda lifting --\n~s\n\n", [format_fcode(FCode1)]) || Verbose],
     FCode2 = optimize_fcode(FCode1),
     [ io:format("-- After optimization --\n~s\n\n", [format_fcode(FCode2)]) || Verbose, FCode2 /= FCode1 ],
     FCode3 = lambda_lift(FCode2),
     [ io:format("-- After lambda lifting --\n~s\n\n", [format_fcode(FCode3)]) || Verbose, FCode3 /= FCode2 ],
-    clear_fresh_names(),
     FCode3.
 
 %% -- Environment ------------------------------------------------------------
@@ -337,7 +347,7 @@ to_fcode(Env, [{Contract, Attrs, Con = {con, _, Name}, Decls}|Rest])
                           functions     => add_init_function(Env1, Con, StateType,
                                                              add_event_function(Env1, EventType, Funs)) },
             case Contract of
-                contract_main -> Rest = [], ConFcode;
+                contract_main -> Rest = [], {Env1, ConFcode};
                 contract_child ->
                     Env2 = add_child_con(Env1, Name, ConFcode),
                     to_fcode(Env2, Rest)
@@ -696,7 +706,7 @@ expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
     end;
 
 %% Function calls
-expr_to_fcode(Env, _Type, {app, _, Fun = {typed, _, FunE, {fun_t, _, NamedArgsT, ArgsT, _}}, Args}) ->
+expr_to_fcode(Env, Type, {app, _, Fun = {typed, _, FunE, {fun_t, _, NamedArgsT, ArgsT, _}}, Args}) ->
     Args1 = get_named_args(NamedArgsT, Args),
     FArgs = [expr_to_fcode(Env, Arg) || Arg <- Args1],
     case expr_to_fcode(Env, Fun) of
@@ -707,6 +717,14 @@ expr_to_fcode(Env, _Type, {app, _, Fun = {typed, _, FunE, {fun_t, _, NamedArgsT,
                 _ ->
                     FInitArgsT = {typerep, {tuple, [type_to_fcode(Env, T) || T <- ArgsT]}},
                     builtin_to_fcode(state_layout(Env), chain_clone, [{lit, FInitArgsT}|FArgs])
+            end;
+        {builtin_u, chain_create, _Ar}     ->
+            case {ArgsT, Type} of
+                {var_args, _} -> fcode_error({var_args_not_set, FunE});
+                {_, {con, _, Contract}} ->
+                    FInitArgsT = {typerep, {tuple, [type_to_fcode(Env, T) || T <- ArgsT]}},
+                    builtin_to_fcode(state_layout(Env), chain_clone, [{lit, {contract_code, Contract}}, {lit, FInitArgsT}|FArgs]);
+                {_, _} -> fcode_error({not_a_contract_type, Type})
             end;
         {builtin_u, B, _Ar}               -> builtin_to_fcode(state_layout(Env), B, FArgs);
         {def_u, F, _Ar}                   -> {def, F, FArgs};

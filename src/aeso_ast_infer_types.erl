@@ -267,15 +267,16 @@ contract_call_type({fun_t, Ann, [], Args, Ret}) ->
 bind_contract({Contract, Ann, Id, Contents}, Env)
   when ?IS_CONTRACT_HEAD(Contract) ->
     Key    = name(Id),
+    io:format("BIND CONTRACT ~p\n", [Id]),
     Sys    = [{origin, system}],
     Fields =
         [ {field_t, AnnF, Entrypoint, contract_call_type(Type)}
           || {fun_decl, AnnF, Entrypoint, Type} <- Contents ] ++
         [ {field_t, AnnF, Entrypoint,
            contract_call_type(
-             {fun_t, AnnF, [], [ArgT || ArgT <- if is_list(Args) -> Args; true -> [Args] end], RetT})
+             {fun_t, AnnF, [], [ArgT || {typed, _, _, ArgT} <- if is_list(Args) -> Args; true -> [Args] end], RetT})
           }
-          || {letfun, AnnF, Entrypoint, _Named, Args, {typed, _, _, RetT}} <- Contents
+          || {letfun, AnnF, Entrypoint, Args, _Type, {typed, _, _, RetT}} <- Contents
         ] ++
         %% Predefined fields
         [ {field_t, Sys, {id, Sys, "address"}, {id, Sys, "address"}} ],
@@ -1595,6 +1596,7 @@ infer_var_args_fun(Env, {typed, Ann, Fun, FunType0}, NamedArgs, ArgTypes) ->
                 {fun_t, _, NamedArgsT, var_args, RetT} = FunType0,
                 GasCapMock    = {named_arg_t, Ann, {id, Ann, "gas"}, {id, Ann, "int"}, {int, Ann, 0}},
                 ProtectedMock = {named_arg_t, Ann, {id, Ann, "protected"}, {id, Ann, "bool"}, {bool, Ann, false}},
+
                 check_contract_construction(Env, RetT, Fun, [GasCapMock, ProtectedMock|NamedArgsT], ArgTypes, RetT),
                 {fun_t, Ann, NamedArgsT, ArgTypes, RetT};
             {qid, _, ["Chain", "clone"]} ->
@@ -1618,7 +1620,6 @@ check_contract_construction(Env, ContractT, Fun, NamedArgsT, ArgTypes, RetT) ->
     InitT = fresh_uvar(Ann),
     unify(Env, InitT, {fun_t, Ann, NamedArgsT, ArgTypes, fresh_uvar(Ann)}, {checking_init_args, Ann, ContractT, ArgTypes}),
     unify(Env, RetT, ContractT, {return_contract, Fun, ContractT}),
-    io:format("DEREF: ~p\n", [dereference_deep(InitT)]),
     constrain([ #field_constraint{
                    record_t = unfold_types_in_type(Env, ContractT),
                    field    = {id, Ann, "init"},

@@ -9,7 +9,7 @@
 %%%-------------------------------------------------------------------
 -module(aeso_fcode_to_fate).
 
--export([compile/2, term_to_fate/1]).
+-export([compile/2, compile/3, term_to_fate/1, term_to_fate/2]).
 
 -ifdef(TEST).
 -export([optimize_fun/4, to_basic_blocks/1]).
@@ -45,7 +45,7 @@
 -define(s(N), {store, N}).
 -define(void, {var, 9999}).
 
--record(env, { contract, vars = [], locals = [], current_function, tailpos = true }).
+-record(env, { contract, vars = [], locals = [], current_function, tailpos = true, child_contracts = #{}, options = []}).
 
 %% -- Debugging --------------------------------------------------------------
 
@@ -70,9 +70,11 @@ code_error(Err) ->
 
 %% @doc Main entry point.
 compile(FCode, Options) ->
+    compile(#{}, FCode, Options).
+compile(ChildContracts, FCode, Options) ->
     #{ contract_name := ContractName,
        functions     := Functions } = FCode,
-    SFuns  = functions_to_scode(ContractName, Functions, Options),
+    SFuns  = functions_to_scode(ChildContracts, ContractName, Functions, Options),
     SFuns1 = optimize_scode(SFuns, Options),
     FateCode = to_basic_blocks(SFuns1),
     ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
@@ -85,19 +87,20 @@ make_function_name(event)              -> <<"Chain.event">>;
 make_function_name({entrypoint, Name}) -> Name;
 make_function_name({local_fun, Xs})    -> list_to_binary("." ++ string:join(Xs, ".")).
 
-functions_to_scode(ContractName, Functions, Options) ->
+functions_to_scode(ChildContracts, ContractName, Functions, Options) ->
     FunNames = maps:keys(Functions),
     maps:from_list(
-        [ {make_function_name(Name), function_to_scode(ContractName, FunNames, Name, Attrs, Args, Body, Type, Options)}
+        [ {make_function_name(Name), function_to_scode(ChildContracts, ContractName, FunNames, Name, Attrs, Args, Body, Type, Options)}
         || {Name, #{args   := Args,
                     body   := Body,
                     attrs  := Attrs,
                     return := Type}} <- maps:to_list(Functions)]).
 
-function_to_scode(ContractName, Functions, Name, Attrs0, Args, Body, ResType, _Options) ->
+function_to_scode(ChildContracts, ContractName, Functions, Name, Attrs0, Args, Body, ResType, Options) ->
     {ArgTypes, ResType1} = typesig_to_scode(Args, ResType),
     Attrs = Attrs0 -- [stateful], %% Only track private and payable from here.
-    SCode = to_scode(init_env(ContractName, Functions, Name, Args), Body),
+    Env = init_env(ChildContracts, ContractName, Functions, Name, Args, Options),
+    SCode = to_scode(Env, Body),
     {Attrs, {ArgTypes, ResType1}, SCode}.
 
 -define(tvars, '$tvars').
@@ -142,11 +145,13 @@ types_to_scode(Ts) -> lists:map(fun type_to_scode/1, Ts).
 
 %% -- Environment functions --
 
-init_env(ContractName, FunNames, Name, Args) ->
+init_env(ChildContracts, ContractName, FunNames, Name, Args, Options) ->
     #env{ vars      = [ {X, {arg, I}} || {I, {X, _}} <- with_ixs(Args) ],
           contract  = ContractName,
+          child_contracts = ChildContracts,
           locals    = FunNames,
           current_function = Name,
+          options = Options,
           tailpos   = true }.
 
 next_var(#env{ vars = Vars }) ->
@@ -169,7 +174,7 @@ lookup_var(#env{vars = Vars}, X) ->
 
 %% -- The compiler --
 
-lit_to_fate(L) ->
+lit_to_fate(Env, L) ->
     case L of
         {int, N}             -> aeb_fate_data:make_integer(N);
         {string, S}          -> aeb_fate_data:make_string(S);
@@ -179,63 +184,79 @@ lit_to_fate(L) ->
         {contract_pubkey, K} -> aeb_fate_data:make_contract(K);
         {oracle_pubkey, K}   -> aeb_fate_data:make_oracle(K);
         {oracle_query_id, H} -> aeb_fate_data:make_oracle_query(H);
+        {contract_code, C}   ->
+            FCode = maps:get(C, Env#env.child_contracts),
+            SCode = compile(Env#env.child_contracts, FCode, Env#env.options),
+            ByteCode = aeb_fate_code:serialize(SCode, []),
+            {ok, Version} = aeso_compiler:version(),
+            Code = #{byte_code => ByteCode,
+                     compiler_version => Version,
+                     contract_source => "child_contract_src_placeholder",
+                     type_info => [],
+                     fate_code => SCode,
+                     abi_version => aeb_fate_abi:abi_version(),
+                     payable => maps:get(payable, FCode)
+                   },
+            Serialized = aeser_contract_code:serialize(Code),
+            aeb_fate_data:make_contract_bytearray(Serialized);
         {typerep, T}         -> aeb_fate_data:make_typerep(type_to_scode(T))
      end.
 
-term_to_fate(E) -> term_to_fate(#{}, E).
+term_to_fate(E) -> term_to_fate(#env{}, #{}, E).
+term_to_fate(GlobEnv, E) -> term_to_fate(GlobEnv, #{}, E).
 
-term_to_fate(_Env, {lit, L}) ->
-    lit_to_fate(L);
+term_to_fate(GlobEnv, _Env, {lit, L}) ->
+    lit_to_fate(GlobEnv, L);
 %% negative literals are parsed as 0 - N
-term_to_fate(_Env, {op, '-', [{lit, {int, 0}}, {lit, {int, N}}]}) ->
+term_to_fate(_GlobEnv, _Env, {op, '-', [{lit, {int, 0}}, {lit, {int, N}}]}) ->
     aeb_fate_data:make_integer(-N);
-term_to_fate(_Env, nil) ->
+term_to_fate(_GlobEnv, _Env, nil) ->
     aeb_fate_data:make_list([]);
-term_to_fate(Env, {op, '::', [Hd, Tl]}) ->
+term_to_fate(GlobEnv, Env, {op, '::', [Hd, Tl]}) ->
     %% The Tl will translate into a list, because FATE lists are just lists
-    [term_to_fate(Env, Hd) | term_to_fate(Env, Tl)];
-term_to_fate(Env, {tuple, As}) ->
-    aeb_fate_data:make_tuple(list_to_tuple([ term_to_fate(Env, A) || A<-As]));
-term_to_fate(Env, {con, Ar, I, As}) ->
-    FateAs = [ term_to_fate(Env, A) || A <- As ],
+    [term_to_fate(GlobEnv, Env, Hd) | term_to_fate(GlobEnv, Env, Tl)];
+term_to_fate(GlobEnv, Env, {tuple, As}) ->
+    aeb_fate_data:make_tuple(list_to_tuple([ term_to_fate(GlobEnv, Env, A) || A<-As]));
+term_to_fate(GlobEnv, Env, {con, Ar, I, As}) ->
+    FateAs = [ term_to_fate(GlobEnv, Env, A) || A <- As ],
     aeb_fate_data:make_variant(Ar, I, list_to_tuple(FateAs));
-term_to_fate(_Env, {builtin, bits_all, []}) ->
+term_to_fate(_GlobEnv, _Env, {builtin, bits_all, []}) ->
     aeb_fate_data:make_bits(-1);
-term_to_fate(_Env, {builtin, bits_none, []}) ->
+term_to_fate(_GlobEnv, _Env, {builtin, bits_none, []}) ->
     aeb_fate_data:make_bits(0);
-term_to_fate(_Env, {op, bits_set, [B, I]}) ->
-    {bits, N} = term_to_fate(B),
-    J         = term_to_fate(I),
+term_to_fate(GlobEnv, _Env, {op, bits_set, [B, I]}) ->
+    {bits, N} = term_to_fate(GlobEnv, B),
+    J         = term_to_fate(GlobEnv, I),
     {bits, N bor (1 bsl J)};
-term_to_fate(_Env, {op, bits_clear, [B, I]}) ->
-    {bits, N} = term_to_fate(B),
-    J         = term_to_fate(I),
+term_to_fate(GlobEnv, _Env, {op, bits_clear, [B, I]}) ->
+    {bits, N} = term_to_fate(GlobEnv, B),
+    J         = term_to_fate(GlobEnv, I),
     {bits, N band bnot (1 bsl J)};
-term_to_fate(Env, {'let', X, E, Body}) ->
-    Env1 = Env#{ X => term_to_fate(Env, E) },
-    term_to_fate(Env1, Body);
-term_to_fate(Env, {var, X}) ->
+term_to_fate(GlobEnv, Env, {'let', X, E, Body}) ->
+    Env1 = Env#{ X => term_to_fate(GlobEnv, Env, E) },
+    term_to_fate(GlobEnv, Env1, Body);
+term_to_fate(_GlobEnv, Env, {var, X}) ->
     case maps:get(X, Env, undefined) of
         undefined -> throw(not_a_fate_value);
         V         -> V
     end;
-term_to_fate(_Env, {builtin, map_empty, []}) ->
+term_to_fate(_GlobEnv, _Env, {builtin, map_empty, []}) ->
     aeb_fate_data:make_map(#{});
-term_to_fate(Env, {op, map_set, [M, K, V]}) ->
-    Map = term_to_fate(Env, M),
-    Map#{term_to_fate(Env, K) => term_to_fate(Env, V)};
-term_to_fate(_Env, _) ->
+term_to_fate(GlobEnv, Env, {op, map_set, [M, K, V]}) ->
+    Map = term_to_fate(GlobEnv, Env, M),
+    Map#{term_to_fate(GlobEnv, Env, K) => term_to_fate(GlobEnv, Env, V)};
+term_to_fate(_GlobEnv, _Env, _) ->
     throw(not_a_fate_value).
 
 to_scode(Env, T) ->
-    try term_to_fate(T) of
+    try term_to_fate(Env, T) of
         V -> [push(?i(V))]
     catch throw:not_a_fate_value ->
         to_scode1(Env, T)
     end.
 
-to_scode1(_Env, {lit, L}) ->
-    [push(?i(lit_to_fate(L)))];
+to_scode1(Env, {lit, L}) ->
+    [push(?i(lit_to_fate(Env, L)))];
 
 to_scode1(_Env, nil) ->
     [aeb_fate_ops:nil(?a)];
@@ -564,10 +585,9 @@ builtin_to_scode(Env, chain_clone,
                   [Contract, TypeRep, Value, GasCap, Prot | InitArgs]
                  );
 builtin_to_scode(Env, chain_create,
-  [_GasCap = {con,[0,1],0,[]}, Prot, Value, Contract | InitArgs]) ->
-    TypeRep = xd,
-    call_to_scode(Env, aeb_fate_ops:clone(?a, ?a, ?a, ?a),
-                  [Contract, TypeRep, Value, Prot | InitArgs]
+                 [ Code, TypeRep | InitArgs]) ->
+    call_to_scode(Env, aeb_fate_ops:create(?a, ?a, ?a),
+                  [Code, TypeRep | InitArgs]
                  ).
 
 
