@@ -267,16 +267,21 @@ contract_call_type({fun_t, Ann, [], Args, Ret}) ->
 bind_contract({Contract, Ann, Id, Contents}, Env)
   when ?IS_CONTRACT_HEAD(Contract) ->
     Key    = name(Id),
-    io:format("BIND CONTRACT ~p\n", [Id]),
     Sys    = [{origin, system}],
     Fields =
         [ {field_t, AnnF, Entrypoint, contract_call_type(Type)}
           || {fun_decl, AnnF, Entrypoint, Type} <- Contents ] ++
-        [ {field_t, AnnF, Entrypoint,
-           contract_call_type(
-             {fun_t, AnnF, [], [ArgT || {typed, _, _, ArgT} <- if is_list(Args) -> Args; true -> [Args] end], RetT})
-          }
-          || {letfun, AnnF, Entrypoint, Args, _Type, {typed, _, _, RetT}} <- Contents
+        [ begin
+              AnnF1 = case {Contract, Name} of
+                          {contract_child, "init"} -> [stateful,payable|AnnF]; %% for create/clone
+                          _ -> AnnF
+                      end,
+              {field_t, AnnF1, Entrypoint,
+               contract_call_type(
+                 {fun_t, AnnF1, [], [ArgT || {typed, _, _, ArgT} <- if is_list(Args) -> Args; true -> [Args] end], RetT})
+              }
+          end
+          || {letfun, AnnF, Entrypoint = {id, _, Name}, Args, _Type, {typed, _, _, RetT}} <- Contents
         ] ++
         %% Predefined fields
         [ {field_t, Sys, {id, Sys, "address"}, {id, Sys, "address"}} ],
@@ -439,6 +444,7 @@ global_env() ->
     TxFlds    = [{"paying_for", Option(PayForTx)}, {"ga_metas", List(GAMetaTx)},
                  {"actor", Address}, {"fee", Int}, {"ttl", Int}, {"tx", BaseTx}],
     TxType    = {record_t, [FldT(N, T) || {N, T} <- TxFlds ]},
+    Stateful  = fun(T) -> setelement(2, T, [stateful|element(2, T)]) end,
 
     Fee       = Int,
     [A, Q, R, K, V] = lists:map(TVar, ["a", "q", "r", "k", "v"]),
@@ -480,14 +486,16 @@ global_env() ->
                      {"difficulty",   Int},
                      {"gas_limit",    Int},
                      {"bytecode_hash",FunC1(bytecode_hash, A, Option(Hash))},
-                     {"create",       FunN([ {named_arg_t, Ann, {id, Ann, "value"}, Int, {typed, Ann, {int, Ann, 0}, Int}}
-                                           ], var_args, A)},
-                     {"clone",        FunN([ {named_arg_t, Ann, {id, Ann, "gas"}, Int,
-                                              {qid, Ann, ["Call","gas_left"]}}
-                                           , {named_arg_t, Ann, {id, Ann, "value"}, Int, {typed, Ann, {int, Ann, 0}, Int}}
-                                           , {named_arg_t, Ann, {id, Ann, "protected"}, Bool, {typed, Ann, {bool, Ann, false}, Bool}}
-                                           , {named_arg_t, Ann, {id, Ann, "ref"}, A, undefined}
-                                           ], var_args, A)},
+                     {"create",       Stateful(
+                                        FunN([ {named_arg_t, Ann, {id, Ann, "value"}, Int, {typed, Ann, {int, Ann, 0}, Int}}
+                                             ], var_args, A))},
+                     {"clone",        Stateful(
+                                        FunN([ {named_arg_t, Ann, {id, Ann, "gas"}, Int,
+                                                {qid, Ann, ["Call","gas_left"]}}
+                                             , {named_arg_t, Ann, {id, Ann, "value"}, Int, {typed, Ann, {int, Ann, 0}, Int}}
+                                             , {named_arg_t, Ann, {id, Ann, "protected"}, Bool, {typed, Ann, {bool, Ann, false}, Bool}}
+                                             , {named_arg_t, Ann, {id, Ann, "ref"}, A, undefined}
+                                             ], var_args, A))},
                      %% Tx constructors
                      {"GAMetaTx",     Fun([Address, Int], GAMetaTx)},
                      {"PayingForTx",  Fun([Address, Int], PayForTx)},
@@ -751,9 +759,10 @@ infer1(Env, [{Contract, Ann, ConName, Code} | Rest], Acc, Options)
   when ?IS_CONTRACT_HEAD(Contract) ->
     %% do type inference on each contract independently.
     check_scope_name_clash(Env, contract, ConName),
-    What = case aeso_syntax:get_ann(interface, Ann, false) of
-               true -> contract_interface;
-               false -> contract
+    What = case Contract of
+               contract_main -> contract;
+               contract_child -> contract;
+               contract_interface -> contract_interface
            end,
     {Env1, Code1} = infer_contract_top(push_scope(contract, ConName, Env), What, Code, Options),
     Contract1 = {Contract, Ann, ConName, Code1},
@@ -769,23 +778,18 @@ infer1(Env, [{pragma, _, _} | Rest], Acc, Options) ->
     %% Pragmas are checked in check_modifiers
     infer1(Env, Rest, Acc, Options).
 
-%% Checks if the main contract is somehow defined.
-%% Performs some basic sorting to make the dependencies more happy.
+%% Asserts that the main contract is somehow defined.
 identify_main_contract(Contracts) ->
-    Childs     = [C || C = {contract_child, _, _, _} <- Contracts],
+    Children   = [C || C = {contract_child, _, _, _} <- Contracts],
     Mains      = [C || C = {contract_main, _, _, _} <- Contracts],
-    Interfaces = [C || C = {contract_interface, _, _, _} <- Contracts],
-    Namespaces = [N || N = {namespace, _, _, _} <- Contracts],
     case Mains of
-        [] -> case Childs of
+        [] -> case Children of
                   [] -> type_error({main_contract_undefined});
                   [{contract_child, Ann, Con, Body}] ->
-                      Interfaces ++ Namespaces ++
-                          [C || C = {_, _, Con1, _} <- Childs, Con1 /= Con] ++
-                          [{contract_main, Ann, Con, Body}];
+                      (Contracts -- Children) ++ [{contract_main, Ann, Con, Body}];
                   _ -> type_error({ambiguous_main_contract})
               end;
-        [_] -> Interfaces ++ Namespaces ++ Childs ++ Mains;
+        [_] -> Contracts;
         _ -> type_error({multiple_main_contracts})
     end.
 

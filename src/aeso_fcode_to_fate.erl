@@ -585,9 +585,9 @@ builtin_to_scode(Env, chain_clone,
                   [Contract, TypeRep, Value, GasCap, Prot | InitArgs]
                  );
 builtin_to_scode(Env, chain_create,
-                 [ Code, TypeRep | InitArgs]) ->
+                 [ Code, TypeRep, Value | InitArgs]) ->
     call_to_scode(Env, aeb_fate_ops:create(?a, ?a, ?a),
-                  [Code, TypeRep | InitArgs]
+                  [Code, TypeRep, Value | InitArgs]
                  ).
 
 
