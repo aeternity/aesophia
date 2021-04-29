@@ -2,7 +2,7 @@
 %%% @author Happi (Erik Stenman)
 %%% @copyright (C) 2017, Aeternity Anstalt
 %%% @doc
-%%%     Compiler from Aeterinty Sophia language to the Aeternity VM, aevm.
+%%%     Compiler from Aeterinty Sophia language to both AEVM and FATE VM.
 %%% @end
 %%% Created : 12 Dec 2017
 %%%-------------------------------------------------------------------
