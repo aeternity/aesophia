@@ -569,12 +569,15 @@ Call.caller : address
 
 The address of the entity (possibly another contract) calling the contract.
 
+
 ### value
 ```
 Call.value : int
 ```
 
-The amount of coins transferred to the contract in the call.
+The amount of coins transferred to the contract in the call. Note that in the `init`
+entrypoint this value will be always `0` – in order to get the contract creation value
+one needs to inspect `Contract.balance`.
 
 
 ### gas
