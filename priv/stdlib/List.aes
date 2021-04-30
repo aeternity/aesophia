@@ -235,11 +235,67 @@ namespace List =
       (h1::t1, h2::t2)
 
 
-  // TODO: Improve?
-  function sort(lesser_cmp : ('a, 'a) => bool, l : list('a)) : list('a) = switch(l)
-    []   => []
-    h::t => switch (partition((x) => lesser_cmp(x, h), t))
-      (lesser, bigger) => sort(lesser_cmp, lesser) ++ h::sort(lesser_cmp, bigger)
+  /** Merges two sorted lists using `lt` comparator
+   */
+  function
+    merge : (('a, 'a) => bool, list('a), list('a)) => list('a)
+    merge(lt, x::xs, y::ys) =
+      if(lt(x, y)) x::merge(lt, xs, y::ys)
+      else y::merge(lt, x::xs, ys)
+    merge(_, [], ys) = ys
+    merge(_, xs, []) = xs
+
+
+  /** Mergesort inspired by
+   * https://hackage.haskell.org/package/base-4.14.1.0/docs/src/Data.OldList.html#sort
+   */
+  function
+    sort : (('a, 'a) => bool, list('a)) => list('a)
+    sort(_, []) = []
+    sort(lt, l) =
+      merge_all(lt, monotonic_subs(lt, l))
+
+  /** Splits list into compound increasing sublists
+   */
+  private function
+    monotonic_subs : (('a, 'a) => bool, list('a)) => list(list('a))
+    monotonic_subs(lt, x::y::rest) =
+      if(lt(y, x)) desc(lt, y, [x], rest)
+      else asc(lt, y, [x], rest)
+    monotonic_subs(_, l) = [l]
+
+  /** Extracts the longest descending prefix and proceeds with monotonic split
+   */
+  private function
+    desc : (('a, 'a) => bool, 'a, list('a), list('a)) => list(list('a))
+    desc(lt, x, acc, h::t) =
+      if(lt(x, h)) (x::acc) :: monotonic_subs(lt, h::t)
+      else desc(lt, h, x::acc, t)
+    desc(_, x, acc, []) = [x::acc]
+
+  /** Extracts the longest ascending prefix and proceeds with monotonic split
+   */
+  private function
+    asc : (('a, 'a) => bool, 'a, list('a), list('a)) => list(list('a))
+    asc(lt, x, acc, h::t) =
+      if(lt(h, x)) List.reverse(x::acc) :: monotonic_subs(lt, h::t)
+      else asc(lt, h, x::acc, t)
+    asc(_, x, acc, []) = [List.reverse(x::acc)]
+
+  /** Merges list of sorted lists
+   */
+  private function
+    merge_all : (('a, 'a) => bool, list(list('a))) => list('a)
+    merge_all(_, [part]) = part
+    merge_all(lt, parts) = merge_all(lt, merge_pairs(lt, parts))
+
+  /** Single round of `merge_all` – pairs of lists in a list of list
+   */
+  private function
+    merge_pairs : (('a, 'a) => bool, list(list('a))) => list(list('a))
+    merge_pairs(lt, x::y::rest) = merge(lt, x, y) :: merge_pairs(lt, rest)
+    merge_pairs(_, l) = l
+
 
 /** Puts `delim` between every two members of the list
  */
