@@ -1,6 +1,6 @@
 {application, aesophia,
  [{description, "Contract Language for aeternity"},
-  {vsn, "4.3.0"},
+  {vsn, "5.0.0"},
   {registered, []},
   {applications,
    [kernel,
