@@ -74,25 +74,31 @@
                     %%   first argument. I.e. no backtracking to the second argument if the first
                     %%   fails.
 
+trampoline({bounce, Cont}) when is_function(Cont, 0) ->
+    trampoline(Cont());
+trampoline(Res) ->
+    Res.
+-define(BOUNCE(X), {bounce, fun() -> X end}).
+
 %% Apply a parser to its continuation. This compiles a parser to its low-level representation.
 -spec apply_p(parser(A), fun((A) -> parser1(B))) -> parser1(B).
 apply_p(?lazy(F), K)           -> apply_p(F(), K);
 apply_p(?fail(Err), _)         -> {fail, Err};
-apply_p(?choice([P | Ps]), K)  -> lists:foldl(fun(Q, R) -> choice1(apply_p(Q, K), R) end,
-                                             apply_p(P, K), Ps);
+apply_p(?choice([P | Ps]), K)  -> lists:foldl(fun(Q, R) -> choice1(trampoline(apply_p(Q, K)), R) end,
+                                              trampoline(apply_p(P, K)), Ps);
 apply_p(?bind(P, F), K)        -> apply_p(P, fun(X) -> apply_p(F(X), K) end);
 apply_p(?right(P, Q), K)       -> apply_p(P, fun(_) -> apply_p(Q, K) end);
 apply_p(?left(P, Q), K)        -> apply_p(P, fun(X) -> apply_p(Q, fun(_) -> K(X) end) end);
 apply_p(?map(F, P), K)         -> apply_p(P, fun(X) -> K(F(X)) end);
 apply_p(?layout, K)            -> {layout, K, {fail, {expected, layout_block}}};
 apply_p(?tok(Atom), K)         -> {tok_bind, #{Atom => K}};
-apply_p(?return(X), K)         -> K(X);
+apply_p(?return(X), K)         -> ?BOUNCE(K(X));
 apply_p([P | Q], K)            -> apply_p(P, fun(H) -> apply_p(Q, fun(T) -> K([H | T]) end) end);
 apply_p(T, K) when is_tuple(T) -> apply_p(tuple_to_list(T), fun(Xs) -> K(list_to_tuple(Xs)) end);
 apply_p(M, K) when is_map(M) ->
     {Keys, Ps} = lists:unzip(maps:to_list(M)),
     apply_p(Ps, fun(Vals) -> K(maps:from_list(lists:zip(Keys, Vals))) end);
-apply_p(X, K) -> K(X).
+apply_p(X, K) -> ?BOUNCE(K(X)).
 
 %% -- Primitive combinators --------------------------------------------------
 
@@ -160,7 +166,7 @@ layout() -> ?layout.
 %% @doc Parse a sequence of tokens using a parser. Fails if the parse is ambiguous.
 -spec parse(parser(A), tokens()) -> {ok, A} | {error, term()}.
 parse(P, S) ->
-  case parse1(apply_p(P, fun(X) -> {return_plus, X, {fail, no_error}} end), S) of
+  case parse1(trampoline(apply_p(P, fun(X) -> {return_plus, X, {fail, no_error}} end)), S) of
     {[], {Pos, Err}} -> {error, {add_current_file(Pos), parse_error, flatten_error(Err)}};
     {[A], _}         -> {ok, A};
     {As, _}          -> {error, {{1, 1}, ambiguous_parse, As}}
@@ -241,7 +247,7 @@ col(T)  when is_tuple(T) -> element(2, pos(T)).
 
 %% If both parsers want the next token we grab it and merge the continuations.
 choice1({tok_bind, Map1}, {tok_bind, Map2}) ->
-    {tok_bind, merge_with(fun(F, G) -> fun(T) -> choice1(F(T), G(T)) end end, Map1, Map2)};
+    {tok_bind, merge_with(fun(F, G) -> fun(T) -> choice1(trampoline(F(T)), trampoline(G(T))) end end, Map1, Map2)};
 
 %% If both parsers fail we combine the error messages. If only one fails we discard it.
 choice1({fail, E1}, {fail, E2})             -> {fail, add_error(E1, E2)};
@@ -255,7 +261,7 @@ choice1(P, {return_plus, X, Q})             -> {return_plus, X, choice1(P, Q)};
 %% If both sides want a layout block we combine them. If only one side wants a layout block we
 %% will commit to a layout block is there is one.
 choice1({layout, F, P}, {layout, G, Q})     ->
-    {layout, fun(N) -> choice1(F(N), G(N)) end, choice1(P, Q)};
+    {layout, fun(N) -> choice1(trampoline(F(N)), trampoline(G(N))) end, choice1(P, Q)};
 choice1({layout, F, P}, Q)                  -> {layout, F, choice1(P, Q)};
 choice1(P, {layout, G, Q})                  -> {layout, G, choice1(P, Q)}.
 
@@ -278,6 +284,8 @@ parse1(P, S) ->
 %% The main work horse. Returns a list of possible parses and an error message in case parsing
 %% fails.
 -spec parse1(parser1(A), #ts{}, [A], term()) -> {[A], error()}.
+parse1({bounce, F}, Ts, Acc, Err) ->
+    parse1(F(), Ts, Acc, Err);
 parse1({tok_bind, Map}, Ts, Acc, Err) ->
     case next_token(Ts) of
         {T, Ts1} ->
