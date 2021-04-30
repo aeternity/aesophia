@@ -9,6 +9,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 ### Removed
 
+## [5.0.0] 2021-04-30
+### Added
+- A new and improved [`String` standard library](https://github.com/aeternity/aesophia/blob/master/docs/sophia_stdlib.md#string)
+  has been added. Use it by `include "String.aes"`. It includes functions for
+  turning strings into lists of characters for detailed manipulation. For
+  example:
+  ```
+  include "String.aes"
+  contract C =
+    entrypoint filter_all_a(s: string) : string =
+      String.from_list(List.filter((c : char) => c != 'a', String.to_list(s)))
+  ```
+  will return a list with all `a`'s removed.
+
+  There are also convenience functions `split`, `concat`, `to_upper`,
+  `to_lower`, etc.
+
+  All String functions in FATEv2 operate on unicode code points.
+- Operations for pairing-based cryptography has been added the operations
+  are in the standard library [BLS12_381](https://github.com/aeternity/aesophia/blob/master/docs/sophia_stdlib.md#bls12_381).
+  With these operations it is possible to do Zero Knowledge-proofs, etc.
+  The operations are for the BLS12-381 curve (as the name suggests).
+- Calls to functions in other contracts (i.e. _remote calls_) can now be
+  [`protected`](https://github.com/aeternity/aesophia/blob/master/docs/sophia.md#protected-contract-calls).
+  If a contract call fails for any reason (for instance, the remote contract
+  crashes or runs out of gas, or the entrypoint doesn't exist or has the
+  wrong type) the parent call also fails. To make it possible to recover
+  from failures, contract calls takes a named argument `protected : bool`
+  (default `false`).
+
+  If `protected = true` the result of the contract call is wrapped in an
+  `option`, and `Some(value)` indicates a succesful execution and `None`
+  indicates that the contract call failed. Note: any gas consumed until
+  the failure is still charged, but all side effects in the remote
+  contract are rolled back on failure.
+- A new chain operation [`AENS.update`](https://github.com/aeternity/aesophia/blob/master/docs/sophia.md#aens-interface)
+  is supported.
+- New chain exploring operations `AENS.lookup` and `Oracle.expiry` to
+  look up an AENS record and the expiry of an Oracle respectively, are added.
+- Transaction introspection (`Auth.tx`) has been added. When a Generalized
+  account is authorized, the authorization function needs access to the
+  transaction (and the transaction hash) for the wrapped transaction. The
+  transaction and the transaction hash is available `Auth.tx`, it is only
+  available during authentication if invoked by a normal contract call
+  it returns `None`. Example:
+  ```
+  switch(Auth.tx)
+    None      => abort("Not in Auth context")
+    Some(tx0) =>
+      switch(tx0.tx)
+        Chain.SpendTx(_, amount, _)  => amount > 400
+        Chain.ContractCallTx(_, _)   => true
+        _                            => false
+  ```
+- A debug mode is a added to the compiler. Right now its only use is to
+  turn off hermetization.
+### Changed
+- The function `Chain.block_hash(height)` is now (in FATEv2) defined for
+  the current height - this used to be an error.
+- Standard library: Sort is optimized to do `mergesort` and a `contains`
+  function is added.
+- Improved type errors and explicit errors for some syntax errors (empty code
+  blocks, etc.).
+- Compiler optimization: The ACI is generated alongside bytecode. This means
+  that multiple compiler passes can be avoided.
+- Compiler optimization: Improved parsing (less stack used when transpiled).
+- A bug where constraints were handled out of order fixed.
+- Fixed calldata decoding for singleton records.
+- Improved the documentation w.r.t. signatures, especially stressing the fact that
+  the network ID is a part of what is signed.
+### Removed
+
 ## [4.3.0]
 ### Added
 - Added documentation (moved from `protocol`)
@@ -211,7 +283,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v4.3.0...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v5.0.0...HEAD
+[5.0.0]: https://github.com/aeternity/aesophia/compare/v4.3.0...v5.0.0
 [4.3.0]: https://github.com/aeternity/aesophia/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/aeternity/aesophia/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/aeternity/aesophia/compare/v4.0.0...v4.1.0
