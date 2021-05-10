@@ -329,6 +329,37 @@ Crypto.verify_sig_secp256k1(msg : hash, pubkey : bytes(64), sig : bytes(64)) : b
 
 ## Auth
 
+
+#### tx
+
+```
+Auth.tx : option(Chain.tx)
+```
+
+Where `Chain.tx` is (built-in) defined like:
+```
+namespace Chain =
+  record tx = { paying_for : option(Chain.paying_for_tx)
+              , ga_metas : list(Chain.ga_meta_tx)
+              , actor : address
+              , fee   : int
+              , ttl   : int
+              , tx    : Chain.base_tx }
+
+  datatype ga_meta_tx    = GAMetaTx(address, int)
+  datatype paying_for_tx = PayingForTx(address, int)
+  datatype base_tx = SpendTx(address, int, string)
+                   | OracleRegisterTx | OracleQueryTx | OracleResponseTx | OracleExtendTx
+                   | NamePreclaimTx | NameClaimTx(hash) | NameUpdateTx(string)
+                   | NameRevokeTx(hash) | NameTransferTx(address, string)
+                   | ChannelCreateTx(address) | ChannelDepositTx(address, int) | ChannelWithdrawTx(address, int) |
+                   | ChannelForceProgressTx(address) | ChannelCloseMutualTx(address) | ChannelCloseSoloTx(address)
+                   | ChannelSlashTx(address) | ChannelSettleTx(address) | ChannelSnapshotSoloTx(address)
+                   | ContractCreateTx(int) | ContractCallTx(address, int)
+                   | GAAttachTx
+```
+
+
 #### tx_hash
 ```
 Auth.tx_hash : option(Chain.tx)
