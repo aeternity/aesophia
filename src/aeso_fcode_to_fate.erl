@@ -328,7 +328,6 @@ to_scode1(Env, {remote, ArgsT, RetT, Ct, Fun, [Gas, Value, Protected | Args]}) -
     {ArgTypes, RetType0} = typesig_to_scode([{"_", T} || T <- ArgsT], RetT),
     ArgType = ?i(aeb_fate_data:make_typerep({tuple, ArgTypes})),
     RetType = ?i(aeb_fate_data:make_typerep(RetType0)),
-    io:format("GAS: ~p, VALUE: ~p, PROT: ~p\n", [Gas, Value, Protected]),
     case Protected of
         {lit, {bool, false}} ->
             case Gas of

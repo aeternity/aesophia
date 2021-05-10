@@ -26,14 +26,13 @@ run_test(Test) ->
 simple_compile_test_() ->
     [ {"Testing the " ++ ContractName ++ " contract with the " ++ atom_to_list(Backend) ++ " backend",
        fun() ->
-           case compile(Backend, ContractName, [pp_assembler]) of
+           case compile(Backend, ContractName) of
                #{byte_code := ByteCode,
                  contract_source := _,
                  type_info := _} when Backend == aevm ->
                    ?assertMatch(Code when is_binary(Code), ByteCode);
                #{fate_code := Code} when Backend == fate ->
                    Code1 = aeb_fate_code:deserialize(aeb_fate_code:serialize(Code)),
-                   error(xd),
                    ?assertMatch({X, X}, {Code1, Code});
                ErrBin ->
                    io:format("\n~s", [ErrBin]),
@@ -208,7 +207,6 @@ debug_mode_contracts() ->
 -define(TYPE_ERROR(Name, Errs), ?ERROR("Type", Name, Errs)).
 -define(PARSE_ERROR(Name, Errs), ?ERROR("Parse", Name, Errs)).
 
-failing_contracts() -> []; % FIXME remove
 failing_contracts() ->
     {ok, V} = aeso_compiler:numeric_version(),
     Version = list_to_binary(string:join([integer_to_list(N) || N <- V], ".")),

@@ -283,9 +283,9 @@ bind_contract({Contract, Ann, Id, Contents}, Env)
         [ {field_t, Sys, {id, Sys, "address"}, {id, Sys, "address"}} ] ++
         [ {field_t, Sys, {id, Sys, ?CONSTRUCTOR_MOCK_NAME},
            contract_call_type(
-             case [ {fun_t, [payable|Sys], [], [ArgT || {typed, _, _, ArgT} <- Args], {id, Sys, "void"}}
+             case [ {fun_t, [stateful,payable|Sys], [], [ArgT || {typed, _, _, ArgT} <- Args], {id, Sys, "void"}}
                     || {letfun, _, {id, _, "init"}, Args, _, _} <- Contents] of
-                 [] -> {fun_t, [payable|Sys], [], [], {id, Sys, "void"}};
+                 [] -> {fun_t, [stateful,payable|Sys], [], [], {id, Sys, "void"}};
                  [T] -> T
              end
             )
@@ -3089,6 +3089,10 @@ pp_why_record({var_args, Ann, Fun}) ->
      io_lib:format("arising from resolution of variadic function ~s (at ~s)",
                    [pp_expr("", Fun), pp_loc(Fun)])};
 pp_why_record(Fld = {field, _Ann, LV, _E}) ->
+    {pos(Fld),
+     io_lib:format("arising from an assignment of the field ~s (at ~s)",
+                   [pp_expr("", {lvalue, [], LV}), pp_loc(Fld)])};
+pp_why_record(Fld = {field, _Ann, LV, _Alias, _E}) ->
     {pos(Fld),
      io_lib:format("arising from an assignment of the field ~s (at ~s)",
                    [pp_expr("", {lvalue, [], LV}), pp_loc(Fld)])};
