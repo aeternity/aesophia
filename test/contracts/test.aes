@@ -1,6 +1,14 @@
-// If you need a quick compiler test — this file is for your playground
+contract T =
+  entrypoint f(x, y) = 3
+main contract IntegerAdderFactory =
+  stateful payable entrypoint calculateSomething(x, t) =
+//    let t = Chain.create(value = 5555) : T
+    t.f(protected = true, gas = 999999999, value = 777777, 111, 222)
+//    t.f()
+
+/* 
 contract IntegerAdder =
-  entrypoint init() = unit           
+  entrypoint init() = ()
   entrypoint addIntegers(x, y) = x + y
 
 contract IntegerAdderHolder =
@@ -17,4 +25,4 @@ main contract EnterpriseContract =
   entrypoint calculateSomething(x) =
     let adder = IntegerAdderFactory.new()
     adder.addIntegers(x, 2137)
-                              
+*/

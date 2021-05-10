@@ -133,6 +133,7 @@
 
 -define(PRINT_TYPES(Fmt, Args),
         when_option(pp_types, fun () -> io:format(Fmt, Args) end)).
+-define(CONSTRUCTOR_MOCK_NAME, "#__constructor__#").
 
 %% -- Environment manipulation -----------------------------------------------
 
@@ -271,20 +272,25 @@ bind_contract({Contract, Ann, Id, Contents}, Env)
     Fields =
         [ {field_t, AnnF, Entrypoint, contract_call_type(Type)}
           || {fun_decl, AnnF, Entrypoint, Type} <- Contents ] ++
-        [ begin
-              AnnF1 = case {Contract, Name} of
-                          {contract_child, "init"} -> [stateful,payable|AnnF]; %% for create/clone
-                          _ -> AnnF
-                      end,
-              {field_t, AnnF1, Entrypoint,
-               contract_call_type(
-                 {fun_t, AnnF1, [], [ArgT || {typed, _, _, ArgT} <- if is_list(Args) -> Args; true -> [Args] end], RetT})
-              }
-          end
-          || {letfun, AnnF, Entrypoint = {id, _, Name}, Args, _Type, {typed, _, _, RetT}} <- Contents
+        [ {field_t, AnnF, Entrypoint,
+           contract_call_type(
+             {fun_t, AnnF, [], [ArgT || {typed, _, _, ArgT} <- Args], RetT})
+          }
+          || {letfun, AnnF, Entrypoint = {id, _, Name}, Args, _Type, {typed, _, _, RetT}} <- Contents,
+             Name =/= "init"
         ] ++
         %% Predefined fields
-        [ {field_t, Sys, {id, Sys, "address"}, {id, Sys, "address"}} ],
+        [ {field_t, Sys, {id, Sys, "address"}, {id, Sys, "address"}} ] ++
+        [ {field_t, Sys, {id, Sys, ?CONSTRUCTOR_MOCK_NAME},
+           contract_call_type(
+             case [ {fun_t, [payable|Sys], [], [ArgT || {typed, _, _, ArgT} <- Args], {id, Sys, "void"}}
+                    || {letfun, _, {id, _, "init"}, Args, _, _} <- Contents] of
+                 [] -> {fun_t, [payable|Sys], [], [], {id, Sys, "void"}};
+                 [T] -> T
+             end
+            )
+          }
+        ],
     FieldInfo = [ {Entrypoint, #field_info{ ann      = FieldAnn,
                                             kind     = contract,
                                             field_t  = Type,
@@ -1626,7 +1632,7 @@ check_contract_construction(Env, ContractT, Fun, NamedArgsT, ArgTypes, RetT) ->
     unify(Env, RetT, ContractT, {return_contract, Fun, ContractT}),
     constrain([ #field_constraint{
                    record_t = unfold_types_in_type(Env, ContractT),
-                   field    = {id, Ann, "init"},
+                   field    = {id, Ann, ?CONSTRUCTOR_MOCK_NAME},
                    field_t  = InitT,
                    kind     = project,
                    context  = {var_args, Ann, Fun} }
@@ -2418,12 +2424,11 @@ unify1(_Env, {fun_t, _, _, var_args, _}, {fun_t, _, _, _, _}, When) ->
     error({unify_varargs, When});
 unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, When)
   when length(Args1) == length(Args2) ->
-    Named1_ = if is_list(Named1) -> lists:keysort(3, Named1);
-                 true -> Named1
-              end,
-    Named2_ = if is_list(Named2) -> lists:keysort(3, Named2);
-                 true -> Named2
-              end,
+    {Named1_, Named2_} =
+        if is_list(Named1) andalso is_list(Named2) ->
+                {lists:keysort(3, Named1), lists:keysort(3, Named2)};
+           true -> {Named1, Named2}
+        end,
     unify(Env, Named1_, Named2_, When) andalso
     unify(Env, Args1, Args2, When) andalso unify(Env, Result1, Result2, When);
 unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, When)
