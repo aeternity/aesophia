@@ -26,14 +26,14 @@ run_test(Test) ->
 simple_compile_test_() ->
     [ {"Testing the " ++ ContractName ++ " contract with the " ++ atom_to_list(Backend) ++ " backend",
        fun() ->
-           case compile(Backend, ContractName) of
+           case compile(Backend, ContractName, [pp_assembler]) of
                #{byte_code := ByteCode,
                  contract_source := _,
                  type_info := _} when Backend == aevm ->
                    ?assertMatch(Code when is_binary(Code), ByteCode);
                #{fate_code := Code} when Backend == fate ->
                    Code1 = aeb_fate_code:deserialize(aeb_fate_code:serialize(Code)),
-                   ?assertMatch({X, X}, {Code1, Code});
+                   ?assertMatch({X, X}, {Code1, Code}), error(xd);
                ErrBin ->
                    io:format("\n~s", [ErrBin]),
                    error(ErrBin)

@@ -500,7 +500,13 @@ global_env() ->
                                              ], var_args, A))},
                      {"clone",        Stateful(
                                         FunN([ {named_arg_t, Ann, {id, Ann, "gas"}, Int,
-                                                {qid, Ann, ["Call","gas_left"]}}
+                                                {typed, Ann,
+                                                 {app, Ann,
+                                                  {typed, Ann, {qid, Ann, ["Call","gas_left"]},
+                                                   typesig_to_fun_t(Fun([], Int))
+                                                  },
+                                                  []}, Int
+                                                }}
                                              , {named_arg_t, Ann, {id, Ann, "value"}, Int, {typed, Ann, {int, Ann, 0}, Int}}
                                              , {named_arg_t, Ann, {id, Ann, "protected"}, Bool, {typed, Ann, {bool, Ann, false}, Bool}}
                                              , {named_arg_t, Ann, {id, Ann, "ref"}, A, undefined}

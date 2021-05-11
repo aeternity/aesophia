@@ -580,9 +580,18 @@ builtin_to_scode(Env, chain_bytecode_hash, [_Addr] = Args) ->
     call_to_scode(Env, aeb_fate_ops:bytecode_hash(?a, ?a), Args);
 builtin_to_scode(Env, chain_clone,
                  [TypeRep, GasCap, Value, Prot, Contract | InitArgs]) ->
-    call_to_scode(Env, aeb_fate_ops:clone_g(?a, ?a, ?a, ?a, ?a),
-                  [Contract, TypeRep, Value, GasCap, Prot | InitArgs]
-                 );
+    case GasCap of
+        {builtin, call_gas_left, _} ->
+            call_to_scode(Env, aeb_fate_ops:clone(?a, ?a, ?a, ?a),
+                          [Contract, TypeRep, Value, Prot | InitArgs]
+                         );
+        _ ->
+            io:format("\n\n************* GAS CAP: ~p\n\n", [GasCap]),
+            call_to_scode(Env, aeb_fate_ops:clone_g(?a, ?a, ?a, ?a, ?a),
+                          [Contract, TypeRep, Value, GasCap, Prot | InitArgs]
+                         )
+    end;
+
 builtin_to_scode(Env, chain_create,
                  [ Code, TypeRep, Value | InitArgs]) ->
     call_to_scode(Env, aeb_fate_ops:create(?a, ?a, ?a),
