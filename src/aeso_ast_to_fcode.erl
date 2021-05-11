@@ -327,12 +327,12 @@ to_fcode(Env, [{Contract, Attrs, Con = {con, _, Name}, Decls}|Rest])
   when ?IS_CONTRACT_HEAD(Contract) ->
     case Contract =:= contract_interface of
         false ->
-
             #{ builtins := Builtins } = Env,
             ConEnv = Env#{ context  => {main_contract, Name},
                            builtins => Builtins#{[Name, "state"]          => {get_state, none},
                                                  [Name, "put"]            => {set_state, 1},
                                                  [Name, "Chain", "event"] => {chain_event, 1}} },
+            #{ functions := PrevFuns } = ConEnv,
             #{ functions := Funs } = Env1 =
                 decls_to_fcode(ConEnv, Decls),
             StateType   = lookup_type(Env1, [Name, "state"], [], {tuple, []}),
@@ -350,7 +350,8 @@ to_fcode(Env, [{Contract, Attrs, Con = {con, _, Name}, Decls}|Rest])
                 contract_main -> Rest = [], {Env1, ConFcode};
                 contract_child ->
                     Env2 = add_child_con(Env1, Name, ConFcode),
-                    to_fcode(Env2, Rest)
+                    Env3 = Env2#{ functions := PrevFuns },
+                    to_fcode(Env3, Rest)
             end;
         true ->
             Env1 = decls_to_fcode(Env#{ context => {abstract_contract, Con} }, Decls),
