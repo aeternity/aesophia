@@ -208,10 +208,13 @@ namespace List =
     []   => false
     h::t => if(p(h)) true else any(p, t)
 
-  function sum(l : list(int)) : int = foldl ((a, b) => a + b, 0, l)
+  function sum(l : list(int)) : int = switch(l)
+    []   => 0
+    h::t => h + sum(t)
 
-  function product(l : list(int)) : int = foldl((a, b) => a * b, 1, l)
-
+  function product(l : list(int)) : int = switch(l)
+    []   => 1
+    h::t => h * sum(t)
 
 /** Zips two list by applying bimapping function on respective elements.
  * Drops the tail of the longer list.

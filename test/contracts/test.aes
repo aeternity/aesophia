@@ -1,28 +1,14 @@
-contract T =
-  entrypoint f(x, y) = 3
-main contract IntegerAdderFactory =
-  stateful payable entrypoint calculateSomething(x, t) =
-//    let t = Chain.create(value = 5555) : T
-    t.f(protected = true, gas = 999999999, value = 777777, 111, 222)
-//    t.f()
+include "List.aes"
 
-/* 
-contract IntegerAdder =
-  entrypoint init() = ()
-  entrypoint addIntegers(x, y) = x + y
-
-contract IntegerAdderHolder =
-  type state = IntegerAdder
-  entrypoint init() = Chain.create() : IntegerAdder
+contract IntegerHolder =
+  type state = int
+  entrypoint init(x) = x
   entrypoint get() = state
 
-namespace IntegerAdderFactory =
-  function new() =
-    let i = Chain.create() : IntegerAdderHolder
-    i.get()
-
-main contract EnterpriseContract =
-  entrypoint calculateSomething(x) =
-    let adder = IntegerAdderFactory.new()
-    adder.addIntegers(x, 2137)
-*/
+main contract IntegerCollection =
+  record state = {template: IntegerHolder, payload: list(IntegerHolder)}
+  stateful entrypoint init() = {template = Chain.create(0), payload = []}
+  stateful entrypoint add(x) =
+    put(state{payload @ p = Chain.clone(ref=state.template, x) :: p})
+    x
+  entrypoint sum() = List.sum(List.map((h) => h.get(), state.payload))

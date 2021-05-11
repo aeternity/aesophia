@@ -715,14 +715,14 @@ expr_to_fcode(Env, Type, {app, _, Fun = {typed, _, FunE, {fun_t, _, NamedArgsT, 
             case ArgsT of
                 var_args -> fcode_error({var_args_not_set, FunE});
                 _ ->
-                    FInitArgsT = {typerep, {tuple, [type_to_fcode(Env, T) || T <- ArgsT]}},
+                    FInitArgsT = aeb_fate_data:make_typerep({tuple, [type_to_fcode(Env, T) || T <- ArgsT]}),
                     builtin_to_fcode(state_layout(Env), chain_clone, [{lit, FInitArgsT}|FArgs])
             end;
         {builtin_u, chain_create, _Ar}     ->
             case {ArgsT, Type} of
                 {var_args, _} -> fcode_error({var_args_not_set, FunE});
                 {_, {con, _, Contract}} ->
-                    FInitArgsT = {typerep, {tuple, [type_to_fcode(Env, T) || T <- ArgsT]}},
+                    FInitArgsT = aeb_fate_data:make_typerep({tuple, [type_to_fcode(Env, T) || T <- ArgsT]}),
                     builtin_to_fcode(state_layout(Env), chain_create, [{lit, {contract_code, Contract}}, {lit, FInitArgsT}|FArgs]);
                 {_, _} -> fcode_error({not_a_contract_type, Type})
             end;

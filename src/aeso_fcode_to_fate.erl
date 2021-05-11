@@ -125,7 +125,6 @@ type_to_scode(bits)            -> bits;
 type_to_scode(any)             -> any;
 type_to_scode({variant, Cons}) -> {variant, [{tuple, types_to_scode(Con)} || Con <- Cons]};
 type_to_scode({list, Type})    -> {list, type_to_scode(Type)};
-type_to_scode({tuple, [Type]}) -> type_to_scode(Type);
 type_to_scode({tuple, Types})  -> {tuple, types_to_scode(Types)};
 type_to_scode({map, Key, Val}) -> {map, type_to_scode(Key), type_to_scode(Val)};
 type_to_scode({function, _Args, _Res}) -> {tuple, [string, any]};
@@ -589,9 +588,6 @@ builtin_to_scode(Env, chain_create,
     call_to_scode(Env, aeb_fate_ops:create(?a, ?a, ?a),
                   [Code, TypeRep, Value | InitArgs]
                  ).
-
-
-
 
 %% -- Operators --
 

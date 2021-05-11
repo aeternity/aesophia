@@ -283,10 +283,13 @@ bind_contract({Contract, Ann, Id, Contents}, Env)
         [ {field_t, Sys, {id, Sys, "address"}, {id, Sys, "address"}} ] ++
         [ {field_t, Sys, {id, Sys, ?CONSTRUCTOR_MOCK_NAME},
            contract_call_type(
-             case [ {fun_t, [stateful,payable|Sys], [], [ArgT || {typed, _, _, ArgT} <- Args], {id, Sys, "void"}}
-                    || {letfun, _, {id, _, "init"}, Args, _, _} <- Contents] of
+             case [ [ArgT || {typed, _, _, ArgT} <- Args]
+                    || {letfun, _, {id, _, "init"}, Args, _, _} <- Contents]
+                 ++ [ Args || {fun_decl, _, {id, _, "init"}, {fun_t, _, _, Args, _}} <- Contents]
+                 ++ [ Args || {fun_decl, _, {id, _, "init"}, {type_sig, _, _, _, Args, _}} <- Contents]
+             of
                  [] -> {fun_t, [stateful,payable|Sys], [], [], {id, Sys, "void"}};
-                 [T] -> T
+                 [Args] -> {fun_t, [stateful,payable|Sys], [], Args, {id, Sys, "void"}}
              end
             )
           }
