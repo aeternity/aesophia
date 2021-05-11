@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Chain.create`
 - `Chain.bytecode_hash`
 - Minor support for variadic functions
+- `void` type that represents an empty type
 ### Changed
 - Contract interfaces must be now invocated by `contract interface` keywords
 - `main` keyword to indicate the main contract in case there are child contracts around
