@@ -26,7 +26,7 @@
 -type ann_format() :: '?:' | hex | infix | prefix | elif.
 
 -type ann() :: [ {line, ann_line()} | {col, ann_col()} | {format, ann_format()} | {origin, ann_origin()}
-               | stateful | private] | payable | main | interface.
+               | stateful | private | payable | main | interface].
 
 -type name() :: string().
 -type id()   :: {id,   ann(), name()}.

@@ -34,9 +34,7 @@ simple_compile_test_() ->
                #{fate_code := Code} when Backend == fate ->
                    Code1 = aeb_fate_code:deserialize(aeb_fate_code:serialize(Code)),
                    ?assertMatch({X, X}, {Code1, Code});
-               ErrBin ->
-                   io:format("\n~s", [ErrBin]),
-                   error(ErrBin)
+               Error -> print_and_throw(Error)
            end
        end} || ContractName <- compilable_contracts(), Backend <- [aevm, fate],
                not lists:member(ContractName, not_compilable_on(Backend))] ++
@@ -878,14 +876,26 @@ validation_fails() ->
          "Byte code contract is not payable, but source code contract is.">>]}].
 
 validate(Contract1, Contract2) ->
-    ByteCode = #{ fate_code := FCode } = compile(fate, Contract1),
-    FCode1   = aeb_fate_code:serialize(aeb_fate_code:strip_init_function(FCode)),
-    Source   = aeso_test_utils:read_contract(Contract2),
-    aeso_compiler:validate_byte_code(
-      ByteCode#{ byte_code := FCode1 }, Source,
-      case lists:member(Contract2, debug_mode_contracts()) of
-          true  -> [debug_mode];
-          false -> []
-      end ++
-      [{backend, fate}, {include, {file_system, [aeso_test_utils:contract_path()]}}]).
+    case compile(fate, Contract1) of
+        ByteCode = #{ fate_code := FCode } ->
+            FCode1   = aeb_fate_code:serialize(aeb_fate_code:strip_init_function(FCode)),
+            Source   = aeso_test_utils:read_contract(Contract2),
+            aeso_compiler:validate_byte_code(
+              ByteCode#{ byte_code := FCode1 }, Source,
+              case lists:member(Contract2, debug_mode_contracts()) of
+                  true  -> [debug_mode];
+                  false -> []
+              end ++
+                  [{backend, fate}, {include, {file_system, [aeso_test_utils:contract_path()]}}]);
+        Error -> print_and_throw(Error)
+    end.
 
+print_and_throw(Err) ->
+    case Err of
+        ErrBin when is_binary(ErrBin) ->
+            io:format("\n~s", [ErrBin]),
+            error(ErrBin);
+        Errors ->
+            io:format("Compilation error:\n~s", [string:join([aeso_errors:pp(E) || E <- Errors], "\n\n")]),
+            error(compilation_error)
+    end.

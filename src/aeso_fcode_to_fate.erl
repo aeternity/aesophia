@@ -184,15 +184,16 @@ lit_to_fate(Env, L) ->
         {oracle_pubkey, K}   -> aeb_fate_data:make_oracle(K);
         {oracle_query_id, H} -> aeb_fate_data:make_oracle_query(H);
         {contract_code, C}   ->
-            FCode = maps:get(C, Env#env.child_contracts),
-            SCode = compile(Env#env.child_contracts, FCode, Env#env.options),
-            ByteCode = aeb_fate_code:serialize(SCode, []),
+            Options = Env#env.options,
+            FCode    = maps:get(C, Env#env.child_contracts),
+            FateCode = compile(Env#env.child_contracts, FCode, Options),
+            ByteCode = aeb_fate_code:serialize(FateCode, []),
             {ok, Version} = aeso_compiler:version(),
+            OriginalSourceCode = proplists:get_value(original_src, Options, ""),
             Code = #{byte_code => ByteCode,
                      compiler_version => Version,
-                     contract_source => "child_contract_src_placeholder",
+                     source_hash => crypto:hash(sha256, OriginalSourceCode ++ [0] ++ C),
                      type_info => [],
-                     fate_code => SCode,
                      abi_version => aeb_fate_abi:abi_version(),
                      payable => maps:get(payable, FCode)
                    },
@@ -586,7 +587,6 @@ builtin_to_scode(Env, chain_clone,
                           [Contract, TypeRep, Value, Prot | InitArgs]
                          );
         _ ->
-            io:format("\n\n************* GAS CAP: ~p\n\n", [GasCap]),
             call_to_scode(Env, aeb_fate_ops:clone_g(?a, ?a, ?a, ?a, ?a),
                           [Contract, TypeRep, Value, GasCap, Prot | InitArgs]
                          )
@@ -985,7 +985,7 @@ attributes(I) ->
         {'CREATE', A, B, C}                   -> Impure(?a, [A, B, C]);
         {'CLONE', A, B, C, D}                 -> Impure(?a, [A, B, C, D]);
         {'CLONE_G', A, B, C, D, E}            -> Impure(?a, [A, B, C, D, E]);
-        {'BYTECODE_HASH', A, B}               -> Pure(A, [B]);
+        {'BYTECODE_HASH', A, B}               -> Impure(A, [B]);
         {'ABORT', A}                          -> Impure(pc, A);
         {'EXIT', A}                           -> Impure(pc, A);
         'NOP'                                 -> Pure(none, [])

@@ -1,3 +1,6 @@
+// This is a custom test file if you need to run a compiler without
+// changing aeso_compiler_tests.erl
+
 include "List.aes"
 
 contract IntegerHolder =
@@ -5,10 +8,5 @@ contract IntegerHolder =
   entrypoint init(x) = x
   entrypoint get() = state
 
-main contract IntegerCollection =
-  record state = {template: IntegerHolder, payload: list(IntegerHolder)}
-  stateful entrypoint init() = {template = Chain.create(0), payload = []}
-  stateful entrypoint add(x) =
-    put(state{payload @ p = Chain.clone(ref=state.template, x) :: p})
-    x
-  entrypoint sum() = List.sum(List.map((h) => h.get(), state.payload))
+main contract Test =
+  stateful entrypoint f(c) = Chain.clone(ref=c, 123)

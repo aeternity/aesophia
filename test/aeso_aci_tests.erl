@@ -103,17 +103,24 @@ aci_test_contract(Name) ->
                  true  -> [debug_mode];
                  false -> []
              end ++ [{include, {file_system, [aeso_test_utils:contract_path()]}}],
-    {ok, JSON} = aeso_aci:contract_interface(json, String, Opts),
-    {ok, #{aci := JSON1}} = aeso_compiler:from_string(String, [{aci, json}, {backend, fate} | Opts]),
-    ?assertEqual(JSON, JSON1),
+    JSON = case aeso_aci:contract_interface(json, String, Opts) of
+               {ok, J} -> J;
+               {error, ErrorStringJ} when is_binary(ErrorStringJ) -> error(ErrorStringJ);
+               {error, ErrorJ} -> aeso_compiler_tests:print_and_throw(ErrorJ)
+           end,
+    case aeso_compiler:from_string(String, [{aci, json}, {backend, fate} | Opts]) of
+        {ok, #{aci := JSON1}} ->
+            ?assertEqual(JSON, JSON1),
+            io:format("JSON:\n~p\n", [JSON]),
+            {ok, ContractStub} = aeso_aci:render_aci_json(JSON),
 
-    io:format("JSON:\n~p\n", [JSON]),
-    {ok, ContractStub} = aeso_aci:render_aci_json(JSON),
+            io:format("STUB:\n~s\n", [ContractStub]),
+            check_stub(ContractStub, [{src_file, Name}]),
 
-    io:format("STUB:\n~s\n", [ContractStub]),
-    check_stub(ContractStub, [{src_file, Name}]),
-
-    ok.
+            ok;
+        {error, ErrorString} when is_binary(ErrorString) -> error(ErrorString);
+        {error, Error} -> aeso_compiler_tests:print_and_throw(Error)
+    end.
 
 check_stub(Stub, Options) ->
     try aeso_parser:string(binary_to_list(Stub), Options) of

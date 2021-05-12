@@ -180,7 +180,7 @@ string_to_code(ContractString, Options) ->
              , type_env  => TypeEnv
              , ast => Ast };
         fate ->
-            {Env, Fcode} = aeso_ast_to_fcode:ast_to_fcode(UnfoldedTypedAst, Options),
+            {Env, Fcode} = aeso_ast_to_fcode:ast_to_fcode(UnfoldedTypedAst, [{original_src, ContractString}|Options]),
             #{ fcode => Fcode
              , fcode_env => Env
              , unfolded_typed_ast => UnfoldedTypedAst
