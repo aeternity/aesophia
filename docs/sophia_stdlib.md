@@ -770,9 +770,9 @@ The gas limit of the current block.
 Chain.bytecode_hash : 'c => option(hash)
 ```
 
-Returns hash of the contract's bytecode (or `None` if it is nonexistent or
-deployed before FATE2). The type `'c` must be instantiated with a contract.
-The charged gas is affine to the size of the serialized bytecode.
+Returns the hash of the contract's bytecode (or `None` if it is nonexistent or
+deployed before FATE2). The type `'c` must be instantiated with a contract. The
+charged gas is affine to the size of the serialized bytecode.
 
 
 #### create
