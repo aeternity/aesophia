@@ -790,14 +790,15 @@ of
 - single null byte
 - name of the child contract
 
+The resulting contract's public key can be predicted and in case it happens to
+have some funds before its creation, its balance will remain or be increased by
+the `value` parameter.
 
 The `value` argument (default `0`) is equivalent to the value in the contract
 creation transaction – it sets the initial value of the newly created contract
 charging the calling contract. Note that this won't be visible in `Call.value`
 in the `init` call of the new contract. It will be included in
-`Contract.balance`, however. The resulting contract's public key can be
-predicted and in case it happens to have some funds before its creation, its
-balance will remain or be increased by the `value` parameter.
+`Contract.balance`, however.
 
 
 The type `'c` must be instantiated with a contract.
@@ -845,13 +846,11 @@ remaining unnamed arguments. This operation is significantly cheaper than
 The `gas` argument (default `Call.gas_left`) limits the gas supply for the
 `init` call of the cloned contract.
 
-
 The `value` argument (default `0`) is equivalent to the value in the contract
 creation transaction – it sets the initial value of the newly created contract
 charging the calling contract. Note that this won't be visible in `Call.value`
 in the `init` call of the new contract. It will be included in
 `Contract.balance`, however.
-
 
 The `protected` argument (default `false`) works identically as in remote calls.
 If set to `true` it will change the return type to `option('c)` and will catch
@@ -859,9 +858,7 @@ all errors such as `abort`, out of gas and wrong arguments. Note that it can
 only take a boolean *literal*, so other expressions such as variables will be
 rejected by the compiler.
 
-
 The type `'c` must be instantiated with a contract.
-
 
 Example usage:
 
