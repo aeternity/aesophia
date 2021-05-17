@@ -782,8 +782,9 @@ Chain.create(value : int, ...) => 'c
 
 Creates and deploys a new instance of a contract `'c`. All of the unnamed
 arguments will be passed to the `init` function. The charged gas is affine to
-the size of the compiled child contract's bytecode. The `source_hash` onchain
-entry of the newly created contract will be a SHA256 hash over concatenation of 
+the size of the compiled child contract's bytecode. The `source_hash` on-chain
+entry of the newly created contract will be the SHA256 hash over concatenation
+of
 
 - whole contract source code
 - single null byte
