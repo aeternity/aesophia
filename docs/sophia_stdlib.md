@@ -791,7 +791,7 @@ of
 - name of the child contract
 
 The resulting contract's public key can be predicted and in case it happens to
-have some funds before its creation, its balance will remain or be increased by
+have some funds before its creation, its balance will be increased by
 the `value` parameter.
 
 The `value` argument (default `0`) is equivalent to the value in the contract
@@ -836,7 +836,7 @@ Chain.clone : ( ref : 'c, gas : int, value : int, protected : bool, ...
 Clones the contract under the mandatory named argument `ref`. That means a new
 contract of the same bytecode and the same `payable` parameter shall be created.
 The resulting contract's public key can be predicted and in case it happens to
-have some funds before its creation, its balance will remain or be increased by
+have some funds before its creation, its balance will be increased by
 the `value` parameter. **NOTE:** the `state` won't be copied and the contract
 will be initialized with a regular call to the `init` function with the
 remaining unnamed arguments. This operation is significantly cheaper than
