@@ -181,7 +181,7 @@ contracts. This can be done in two ways:
 
 These functions take variable number of arguments that must match the created
 contract's `init` function. Beside that they take some additional named
-arguments – please refer to their documentation for details.
+arguments – please refer to their documentation for the details.
 
 While `Chain.clone` requires only a `contract interface` and a living instance
 of a given contract on chain, `Chain.create` needs a full definition of a
