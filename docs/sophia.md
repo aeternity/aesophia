@@ -1,65 +1,6 @@
 <!-- IMPORTANT: REMEMBER TO UPDATE THE TABLE OF CONTENTS AFTER YOUR EDIT -->
 
-**Table of Contents**
-
-- [-](#-)
-- [Language Features](#language-features)
-    - [Contracts](#contracts)
-        - [Calling other contracts](#calling-other-contracts)
-        - [Protected contract calls](#protected-contract-calls)
-        - [Mutable state](#mutable-state)
-            - [Stateful functions](#stateful-functions)
-        - [Payable](#payable)
-            - [Payable contracts](#payable-contracts)
-            - [Payable entrypoints](#payable-entrypoints)
-        - [Namespaces](#namespaces)
-        - [Splitting code over multiple files](#splitting-code-over-multiple-files)
-        - [Standard library](#standard-library)
-        - [Types](#types)
-        - [Literals](#literals)
-        - [Arithmetic](#arithmetic)
-        - [Bit fields](#bit-fields)
-        - [Type aliases](#type-aliases)
-        - [Algebraic data types](#algebraic-data-types)
-        - [Lists](#lists)
-        - [Maps and records](#maps-and-records)
-            - [Constructing maps and records](#constructing-maps-and-records)
-            - [Accessing values](#accessing-values)
-            - [Updating a value](#updating-a-value)
-            - [Map implementation](#map-implementation)
-        - [Strings](#strings)
-        - [Chars](#chars)
-        - [Byte arrays](#byte-arrays)
-        - [Cryptographic builins](#cryptographic-builins)
-            - [AEVM note](#aevm-note)
-        - [Authorization interface](#authorization-interface)
-        - [Oracle interface](#oracle-interface)
-            - [Example](#example)
-            - [Sanity checks](#sanity-checks)
-        - [AENS interface](#aens-interface)
-            - [Example](#example-1)
-        - [Events](#events)
-            - [Argument order](#argument-order)
-        - [Compiler pragmas](#compiler-pragmas)
-        - [Exceptions](#exceptions)
-    - [Syntax](#syntax)
-        - [Lexical syntax](#lexical-syntax)
-            - [Comments](#comments)
-            - [Keywords](#keywords)
-            - [Tokens](#tokens)
-        - [Layout blocks](#layout-blocks)
-        - [Notation](#notation)
-        - [Declarations](#declarations)
-        - [Types](#types-1)
-        - [Statements](#statements)
-        - [Expressions](#expressions)
-        - [Operators types](#operators-types)
-        - [Operator precendences](#operator-precendences)
-    - [Examples](#examples)
-        - [Delegation signature](#delegation-signature)
-
-
-## The Sophia Language
+# The Sophia Language
 An Æternity BlockChain Language
 
 The Sophia is a language in the ML family. It is strongly typed and has
@@ -69,6 +10,65 @@ Sophia is customized for smart contracts, which can be published
 to a blockchain (the Æternity BlockChain). Thus some features of conventional
 languages, such as floating point arithmetic, are not present in Sophia, and
 some blockchain specific primitives, constructions and types have been added.
+
+**Table of Contents**
+
+  - [Language Features](#language-features)
+    - [Contracts](#contracts)
+      - [Calling other contracts](#calling-other-contracts)
+      - [Protected contract calls](#protected-contract-calls)
+      - [Contract factories and child contracts](#contract-factories-and-child-contracts)
+    - [Mutable state](#mutable-state)
+      - [Stateful functions](#stateful-functions)
+    - [Payable](#payable)
+      - [Payable contracts](#payable-contracts)
+      - [Payable entrypoints](#payable-entrypoints)
+    - [Namespaces](#namespaces)
+    - [Splitting code over multiple files](#splitting-code-over-multiple-files)
+    - [Standard library](#standard-library)
+    - [Types](#types)
+    - [Literals](#literals)
+    - [Arithmetic](#arithmetic)
+    - [Bit fields](#bit-fields)
+    - [Type aliases](#type-aliases)
+    - [Algebraic data types](#algebraic-data-types)
+    - [Lists](#lists)
+    - [Maps and records](#maps-and-records)
+      - [Constructing maps and records](#constructing-maps-and-records)
+      - [Accessing values](#accessing-values)
+      - [Updating a value](#updating-a-value)
+      - [Map implementation](#map-implementation)
+    - [Strings](#strings)
+    - [Chars](#chars)
+    - [Byte arrays](#byte-arrays)
+    - [Cryptographic builins](#cryptographic-builins)
+      - [AEVM note](#aevm-note)
+    - [Authorization interface](#authorization-interface)
+    - [Oracle interface](#oracle-interface)
+      - [Example](#example)
+      - [Sanity checks](#sanity-checks)
+    - [AENS interface](#aens-interface)
+      - [Example](#example)
+    - [Events](#events)
+      - [Argument order](#argument-order)
+    - [Compiler pragmas](#compiler-pragmas)
+    - [Exceptions](#exceptions)
+  - [Syntax](#syntax)
+    - [Lexical syntax](#lexical-syntax)
+      - [Comments](#comments)
+      - [Keywords](#keywords)
+      - [Tokens](#tokens)
+    - [Layout blocks](#layout-blocks)
+    - [Notation](#notation)
+    - [Declarations](#declarations)
+    - [Types](#types)
+    - [Statements](#statements)
+    - [Expressions](#expressions)
+    - [Operators types](#operators-types)
+    - [Operator precendences](#operator-precendences)
+  - [Examples](#examples)
+    - [Delegation signature](#delegation-signature)
+
 ## Language Features
 ### Contracts
 
@@ -171,7 +171,7 @@ However, note that errors that would normally consume all the gas in the
 transaction still only uses up the gas spent running the contract.
 
 
-### Contract factories and child contracts
+#### Contract factories and child contracts
 
 Since the version 5.0.0 Sophia supports deploying contracts by other
 contracts. This can be done in two ways:
