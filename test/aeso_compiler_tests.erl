@@ -34,7 +34,7 @@ simple_compile_test_() ->
                #{fate_code := Code} when Backend == fate ->
                    Code1 = aeb_fate_code:deserialize(aeb_fate_code:serialize(Code)),
                    ?assertMatch({X, X}, {Code1, Code});
-               Error -> print_and_throw(Error)
+               Error -> io:format("\n\n~p\n\n", [Error]), print_and_throw(Error)
            end
        end} || ContractName <- compilable_contracts(), Backend <- [aevm, fate],
                not lists:member(ContractName, not_compilable_on(Backend))] ++
@@ -126,8 +126,7 @@ compile(Backend, Name, Options) ->
 %%  The currently compilable contracts.
 
 compilable_contracts() ->
-    ["test",
-     "complex_types",
+    ["complex_types",
      "counter",
      "dutch_auction",
      "environment",
@@ -180,7 +179,10 @@ compilable_contracts() ->
      "protected_call",
      "hermetization_turnoff",
      "multiple_contracts",
-     "clone", "clone_simple", "create"
+     "clone",
+     "clone_simple",
+     "create",
+     "test" % Custom general-purpose test file. Keep it last on the list.
     ].
 
 not_compilable_on(fate) -> [];
@@ -728,6 +730,39 @@ failing_contracts() ->
     , ?TYPE_ERROR(bad_state,
                   [<<?Pos(4, 16)
                      "Conflicting updates for field 'foo'">>])
+    , ?TYPE_ERROR(factories_type_errors,
+                  [<<?Pos(10,18)
+                    "Chain.clone requires `ref` named argument of contract type.">>,
+                   <<?Pos(11,18)
+                     "Cannot unify (gas : int, value : int, protected : bool) => if(protected, option(void), void)\n         and (gas : int, value : int, protected : bool, int, bool) => 'b\n"
+                     "when checking contract construction of type\n  (gas : int, value : int, protected : bool) =>\n    if(protected, option(void), void) (at line 11, column 18)\nagainst the expected type\n  (gas : int, value : int, protected : bool, int, bool) => 'b">>,
+                   <<?Pos(12,37)
+                     "Cannot unify int\n         and bool\n"
+                     "when checking named argument\n  gas : int\nagainst inferred type\n  bool">>,
+                   <<?Pos(13,18),
+                     "Kaboom is not implemented.\n"
+                     "when resolving arguments of variadic function\n  Chain.create">>,
+                   <<?Pos(18,18)
+                     "Cannot unify (gas : int, value : int, protected : bool, int, bool) => if(protected, option(void), void)\n         and (gas : int, value : int, protected : bool) => 'a\n"
+                     "when checking contract construction of type\n  (gas : int, value : int, protected : bool, int, bool) =>\n    if(protected, option(void), void) (at line 18, column 18)\nagainst the expected type\n  (gas : int, value : int, protected : bool) => 'a">>,
+                   <<?Pos(19,42),
+                     "Named argument protected (at line 19, column 42) is not one of the expected named arguments\n  - value : int">>,
+                   <<?Pos(20,42),
+                     "Cannot unify int\n         and bool\n"
+                     "when checking named argument\n  value : int\nagainst inferred type\n  bool">>
+                  ])
+    , ?TYPE_ERROR(ambiguous_main,
+                  [<<?Pos(1,1)
+                    "Could not deduce the main contract. You can point it out manually with the `main` keyword.">>
+                  ])
+    , ?TYPE_ERROR(no_main_contract,
+                  [<<?Pos(0,0)
+                     "No contract defined.">>
+                  ])
+    , ?TYPE_ERROR(multiple_main_contracts,
+                   [<<?Pos(1,6)
+                      "Only one main contract can be defined.">>
+                   ])
     ].
 
 -define(Path(File), "code_errors/" ??File).
@@ -839,6 +874,8 @@ failing_code_gen_contracts() ->
             "Invalid state type\n"
             "  {f : (int) => int}\n"
             "The state cannot contain functions in the AEVM. Use FATE if you need this.")
+    , ?FATE(child_with_decls, 2, 14,
+            "Missing definition of function 'f'.")
     ].
 
 validation_test_() ->

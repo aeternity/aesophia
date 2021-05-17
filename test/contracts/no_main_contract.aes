@@ -1,0 +1,2 @@
+contract interface C =
+  entrypoint f : () => unit

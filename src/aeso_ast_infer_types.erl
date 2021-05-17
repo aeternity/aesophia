@@ -78,7 +78,8 @@
       context    :: {contract_literal, aeso_syntax:expr()} |
                     {address_to_contract, aeso_syntax:ann()} |
                     {bytecode_hash, aeso_syntax:ann()} |
-                    {var_args, aeso_syntax:ann(), aeso_syntax:expr()}
+                    {var_args, aeso_syntax:ann(), aeso_syntax:expr()},
+      force_def = false :: boolean()
     }).
 
 -type field_constraint() :: #field_constraint{} | #record_create_constraint{} | #is_contract_constraint{}.
@@ -754,10 +755,11 @@ infer(Contracts, Options) ->
     try
         Env = init_env(Options),
         create_options(Options),
+        ets_new(defined_contracts, [bag]),
         ets_new(type_vars, [set]),
         check_modifiers(Env, Contracts),
         create_type_errors(),
-        Contracts1 = identify_main_contract(Contracts),
+        Contracts1 = identify_main_contract(Contracts, Options),
         destroy_and_report_type_errors(Env),
         {Env1, Decls} = infer1(Env, Contracts1, [], Options),
         {Env2, DeclsFolded, DeclsUnfolded} =
@@ -786,6 +788,10 @@ infer1(Env, [{Contract, Ann, ConName, Code} | Rest], Acc, Options)
                contract_child -> contract;
                contract_interface -> contract_interface
            end,
+    case What of
+        contract -> ets_insert(defined_contracts, {qname(ConName)});
+        contract_interface -> ok
+    end,
     {Env1, Code1} = infer_contract_top(push_scope(contract, ConName, Env), What, Code, Options),
     Contract1 = {Contract, Ann, ConName, Code1},
     Env2 = pop_scope(Env1),
@@ -801,18 +807,22 @@ infer1(Env, [{pragma, _, _} | Rest], Acc, Options) ->
     infer1(Env, Rest, Acc, Options).
 
 %% Asserts that the main contract is somehow defined.
-identify_main_contract(Contracts) ->
+identify_main_contract(Contracts, Options) ->
     Children   = [C || C = {contract_child, _, _, _} <- Contracts],
     Mains      = [C || C = {contract_main, _, _, _} <- Contracts],
     case Mains of
         [] -> case Children of
-                  [] -> type_error({main_contract_undefined});
+                  [] -> type_error(
+                          {main_contract_undefined,
+                           [{file, File} || {src_file, File} <- Options]});
                   [{contract_child, Ann, Con, Body}] ->
                       (Contracts -- Children) ++ [{contract_main, Ann, Con, Body}];
-                  _ -> type_error({ambiguous_main_contract})
+                  [H|_] -> type_error({ambiguous_main_contract,
+                                       aeso_syntax:get_ann(H)})
               end;
         [_] -> (Contracts -- Mains) ++ Mains; %% Move to the end
-        _ -> type_error({multiple_main_contracts})
+        [H|_] -> type_error({multiple_main_contracts,
+                             aeso_syntax:get_ann(H)})
     end.
 
 check_scope_name_clash(Env, Kind, Name) ->
@@ -1627,7 +1637,7 @@ infer_var_args_fun(Env, {typed, Ann, Fun, FunType0}, NamedArgs, ArgTypes) ->
                                   % generally type error, but will be caught
                                   _ -> [GasCapMock, ProtectedMock|NamedArgsT]
                               end,
-                check_contract_construction(Env, RetT, Fun, NamedArgsT1, ArgTypes, RetT),
+                check_contract_construction(Env, true, RetT, Fun, NamedArgsT1, ArgTypes, RetT),
                 {fun_t, Ann, NamedArgsT, ArgTypes, RetT};
             {qid, _, ["Chain", "clone"]} ->
                 {fun_t, _, NamedArgsT, var_args, RetT} = FunType0,
@@ -1639,15 +1649,15 @@ infer_var_args_fun(Env, {typed, Ann, Fun, FunType0}, NamedArgs, ArgTypes) ->
                     end,
                 NamedArgsTNoRef =
                     lists:filter(fun({named_arg_t, _, {id, _, "ref"}, _, _}) -> false; (_) -> true end, NamedArgsT),
-                check_contract_construction(Env, ContractT, Fun, NamedArgsTNoRef, ArgTypes, RetT),
+                check_contract_construction(Env, false, ContractT, Fun, NamedArgsTNoRef, ArgTypes, RetT),
                 {fun_t, Ann, NamedArgsT, ArgTypes,
                  {if_t, Ann, {id, Ann, "protected"}, {app_t, Ann, {id, Ann, "option"}, [RetT]}, RetT}};
             _ -> FunType0
         end,
     {typed, Ann, Fun, FunType}.
 
--spec check_contract_construction(env(), utype(), utype(), named_args_t(), [utype()], utype()) -> ok.
-check_contract_construction(Env, ContractT, Fun, NamedArgsT, ArgTypes, RetT) ->
+-spec check_contract_construction(env(), boolean(), utype(), utype(), named_args_t(), [utype()], utype()) -> ok.
+check_contract_construction(Env, ForceDef, ContractT, Fun, NamedArgsT, ArgTypes, RetT) ->
     Ann = aeso_syntax:get_ann(Fun),
     InitT = fresh_uvar(Ann),
     unify(Env, InitT, {fun_t, Ann, NamedArgsT, ArgTypes, fresh_uvar(Ann)}, {checking_init_args, Ann, ContractT, ArgTypes}),
@@ -1660,7 +1670,9 @@ check_contract_construction(Env, ContractT, Fun, NamedArgsT, ArgTypes, RetT) ->
            kind     = project,
            context  = {var_args, Ann, Fun} }
       , #is_contract_constraint{ contract_t = ContractT,
-                                 context    = {var_args, Ann, Fun} }
+                                 context    = {var_args, Ann, Fun},
+                                 force_def  = ForceDef
+                               }
       ]),
     ok.
 
@@ -1836,7 +1848,7 @@ next_count() ->
 
 ets_tables() ->
     [options, type_vars, type_defs, record_fields, named_argument_constraints,
-     field_constraints, freshen_tvars, type_errors].
+     field_constraints, freshen_tvars, type_errors, defined_contracts].
 
 clean_up_ets() ->
     [ catch ets_delete(Tab) || Tab <- ets_tables() ],
@@ -2110,12 +2122,20 @@ check_record_create_constraints(Env, [C | Cs]) ->
     end,
     check_record_create_constraints(Env, Cs).
 
+is_contract_defined(C) ->
+    ets_lookup(defined_contracts, qname(C)) =/= [].
+
 check_is_contract_constraints(_Env, []) -> ok;
 check_is_contract_constraints(Env, [C | Cs]) ->
-    #is_contract_constraint{ contract_t = Type, context = Cxt } = C,
+    #is_contract_constraint{ contract_t = Type, context = Cxt, force_def = ForceDef } = C,
     Type1 = unfold_types_in_type(Env, instantiate(Type)),
-    case lookup_type(Env, record_type_name(Type1)) of
-        {_, {_Ann, {[], {contract_t, _}}}} -> ok;
+    TypeName = record_type_name(Type1),
+    case lookup_type(Env, TypeName) of
+        {_, {_Ann, {[], {contract_t, _}}}} ->
+            case not ForceDef orelse is_contract_defined(TypeName) of
+                true -> ok;
+                false -> type_error({contract_lacks_definition, Type1, Cxt})
+                end;
         _ -> type_error({not_a_contract_type, Type1, Cxt})
     end,
     check_is_contract_constraints(Env, Cs).
@@ -2943,15 +2963,15 @@ mk_error({named_argument_must_be_literal_bool, Name, Arg}) ->
 mk_error({conflicting_updates_for_field, Upd, Key}) ->
     Msg = io_lib:format("Conflicting updates for field '~s'\n", [Key]),
     mk_t_err(pos(Upd), Msg);
-mk_error({ambiguous_main_contract}) ->
+mk_error({ambiguous_main_contract, Ann}) ->
     Msg = "Could not deduce the main contract. You can point it out manually with the `main` keyword.",
-    mk_t_err(pos(0, 0), Msg);
-mk_error({main_contract_undefined}) ->
+    mk_t_err(pos(Ann), Msg);
+mk_error({main_contract_undefined, Ann}) ->
     Msg = "No contract defined.\n",
-    mk_t_err(pos(0, 0), Msg);
-mk_error({multiple_main_contracts}) ->
+    mk_t_err(pos(Ann), Msg);
+mk_error({multiple_main_contracts, Ann}) ->
     Msg = "Only one main contract can be defined.\n",
-    mk_t_err(pos(0, 0), Msg);
+    mk_t_err(pos(Ann), Msg);
 mk_error({unify_varargs, When}) ->
     Msg = "Cannot unify variable argument list.\n",
     {Pos, Ctxt} = pp_when(When),
@@ -2959,6 +2979,13 @@ mk_error({unify_varargs, When}) ->
 mk_error({clone_no_contract, Ann}) ->
     Msg = "Chain.clone requires `ref` named argument of contract type.\n",
     mk_t_err(pos(Ann), Msg);
+mk_error({contract_lacks_definition, Type, When}) ->
+    Msg = io_lib:format(
+            "~s is not implemented.\n",
+            [pp_type(Type)]
+           ),
+    {Pos, Ctxt} = pp_when(When),
+    mk_t_err(Pos, Msg, Ctxt);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p\n", [Err]),
     mk_t_err(pos(0, 0), Msg).

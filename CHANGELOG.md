@@ -17,7 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `main` keyword to indicate the main contract in case there are child contracts around
 - `List.sum` and `List.product` no longer use `List.foldl`
 ### Removed
-- Singleton tuples are no longer unwrapped (this was causing problems with arity 1 init functions)
 
 ## [5.0.0] 2021-04-30
 ### Added

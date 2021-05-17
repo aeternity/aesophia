@@ -1,0 +1,24 @@
+contract interface Kaboom =
+  entrypoint init : () => void
+
+contract Bakoom =
+  type state = int
+  entrypoint init(x, b) = if(b) x else 0
+
+main contract Test =
+  stateful entrypoint test(k : Kaboom) =
+    let k_bad1 = Chain.clone() : Kaboom
+    let k_bad2 = Chain.clone(ref=k, 123, true)
+    let k_bad3 = Chain.clone(ref=k, gas=true)
+    let k_bad4 = Chain.create() : Kaboom
+    let k_gud1 = Chain.clone(ref=k)
+    let Some(k_gud2) = Chain.clone(ref=k, protected=true)
+    let Some(k_gud3) = Chain.clone(ref=k, value=10, protected=true, gas=123)
+
+    let b_bad1 = Chain.create() : Bakoom
+    let b_bad2 = Chain.create(123, true, protected=true) : Bakoom
+    let b_bad3 = Chain.create(123, true, value=true) : Bakoom
+    let b_gud1 = Chain.create(123, true) : Bakoom
+    let b_gud2 = Chain.create(123, true, value=100) : Bakoom
+
+    b_gud1

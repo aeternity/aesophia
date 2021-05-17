@@ -1,0 +1,5 @@
+contract C =
+  entrypoint f() = 123
+
+contract D =
+  entrypoint f() = 123

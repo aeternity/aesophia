@@ -1,0 +1,5 @@
+contract C =
+  entrypoint f : () => unit
+
+main contract M =
+  entrypoint f() = 123
