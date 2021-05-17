@@ -346,17 +346,18 @@ to_fcode(Env, [{Contract, Attrs, Con = {con, _, Name}, Decls}|Rest])
                           state_layout  => StateLayout,
                           event_type    => EventType,
                           payable       => Payable,
-                          functions     => add_init_function(Env1, Con, StateType,
-                                                             add_event_function(Env1, EventType, Funs)) },
+                          functions     => add_init_function(
+                                             Env1, Con, StateType,
+                                             add_event_function(Env1, EventType, Funs)) },
             case Contract of
-                contract_main -> Rest = [], {Env1, ConFcode};
+                contract_main -> [] = Rest, {Env1, ConFcode};
                 contract_child ->
                     Env2 = add_child_con(Env1, Name, ConFcode),
                     Env3 = Env2#{ functions := PrevFuns },
                     to_fcode(Env3, Rest)
             end;
         true ->
-            Env1 = decls_to_fcode(Env#{ context => {abstract_contract, Con} }, Decls),
+            Env1 = decls_to_fcode(Env#{ context => {abstract_contract, Name} }, Decls),
             to_fcode(Env1, Rest)
     end;
 to_fcode(_Env, [NotMain = {NotMainHead, _ ,_ , _}]) when NotMainHead =/= contract_def ->
