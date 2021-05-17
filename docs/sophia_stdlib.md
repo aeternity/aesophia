@@ -772,7 +772,8 @@ Chain.bytecode_hash : 'c => option(hash)
 
 Returns the hash of the contract's bytecode (or `None` if it is nonexistent or
 deployed before FATE2). The type `'c` must be instantiated with a contract. The
-charged gas is affine to the size of the serialized bytecode.
+charged gas is affine to the size of the serialized bytecode of the deployed
+contract.
 
 
 #### create
@@ -835,12 +836,12 @@ Chain.clone : ( ref : 'c, gas : int, value : int, protected : bool, ...
 
 Clones the contract under the mandatory named argument `ref`. That means a new
 contract of the same bytecode and the same `payable` parameter shall be created.
-The resulting contract's public key can be predicted and in case it happens to
-have some funds before its creation, its balance will be increased by
-the `value` parameter. **NOTE:** the `state` won't be copied and the contract
-will be initialized with a regular call to the `init` function with the
-remaining unnamed arguments. This operation is significantly cheaper than
-`Chain.create` as it costs a fixed amount of gas.
+**NOTE:** the `state` won't be copied and the contract will be initialized with
+a regular call to the `init` function with the remaining unnamed arguments. The
+resulting contract's public key can be predicted and in case it happens to have
+some funds before its creation, its balance will be increased by the `value`
+parameter. This operation is significantly cheaper than `Chain.create` as it
+costs a fixed amount of gas.
 
 
 The `gas` argument (default `Call.gas_left`) limits the gas supply for the
