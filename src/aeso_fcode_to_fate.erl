@@ -125,6 +125,7 @@ type_to_scode(bits)            -> bits;
 type_to_scode(any)             -> any;
 type_to_scode({variant, Cons}) -> {variant, [{tuple, types_to_scode(Con)} || Con <- Cons]};
 type_to_scode({list, Type})    -> {list, type_to_scode(Type)};
+type_to_scode({tuple, [Type]}) -> type_to_scode(Type);
 type_to_scode({tuple, Types})  -> {tuple, types_to_scode(Types)};
 type_to_scode({map, Key, Val}) -> {map, type_to_scode(Key), type_to_scode(Val)};
 type_to_scode({function, _Args, _Res}) -> {tuple, [string, any]};
@@ -135,7 +136,9 @@ type_to_scode({tvar, X}) ->
             put(?tvars, {I + 1, Vars#{ X => I }}),
             {tvar, I};
         J -> {tvar, J}
-    end.
+    end;
+type_to_scode(L) when is_list(L) -> {tuple, types_to_scode(L)}.
+
 
 types_to_scode(Ts) -> lists:map(fun type_to_scode/1, Ts).
 
@@ -580,22 +583,22 @@ builtin_to_scode(_Env, auth_tx, []) ->
 builtin_to_scode(Env, chain_bytecode_hash, [_Addr] = Args) ->
     call_to_scode(Env, aeb_fate_ops:bytecode_hash(?a, ?a), Args);
 builtin_to_scode(Env, chain_clone,
-                 [TypeRep, GasCap, Value, Prot, Contract | InitArgs]) ->
+                 [InitArgsT, GasCap, Value, Prot, Contract | InitArgs]) ->
     case GasCap of
         {builtin, call_gas_left, _} ->
             call_to_scode(Env, aeb_fate_ops:clone(?a, ?a, ?a, ?a),
-                          [Contract, TypeRep, Value, Prot | InitArgs]
+                          [Contract, InitArgsT, Value, Prot | InitArgs]
                          );
         _ ->
             call_to_scode(Env, aeb_fate_ops:clone_g(?a, ?a, ?a, ?a, ?a),
-                          [Contract, TypeRep, Value, GasCap, Prot | InitArgs]
+                          [Contract, InitArgsT, Value, GasCap, Prot | InitArgs]
                          )
     end;
 
 builtin_to_scode(Env, chain_create,
-                 [ Code, TypeRep, Value | InitArgs]) ->
+                 [ Code, InitArgsT, Value | InitArgs]) ->
     call_to_scode(Env, aeb_fate_ops:create(?a, ?a, ?a),
-                  [Code, TypeRep, Value | InitArgs]
+                  [Code, InitArgsT, Value | InitArgs]
                  ).
 
 %% -- Operators --

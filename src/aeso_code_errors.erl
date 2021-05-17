@@ -10,7 +10,7 @@
 
 -export([format/1, pos/1]).
 
-format({last_declaration_must_be_contract, Decl = {Kind, _, {con, _, C}, _}}) ->
+format({last_declaration_must_be_main_contract, Decl = {Kind, _, {con, _, C}, _}}) ->
     Msg = io_lib:format("Expected a main contract as the last declaration instead of the ~p '~s'\n",
                         [Kind, C]),
     mk_err(pos(Decl), Msg);
