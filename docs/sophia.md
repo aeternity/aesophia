@@ -184,7 +184,7 @@ contract's `init` function. Beside that they take some additional named
 arguments – please refer to their documentation for the details.
 
 While `Chain.clone` requires only a `contract interface` and a living instance
-of a given contract on chain, `Chain.create` needs a full definition of a
+of a given contract on the chain, `Chain.create` needs a full definition of a
 to-create contract defined by the standard `contract` syntax, for example
 
 ```
