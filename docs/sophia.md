@@ -94,16 +94,16 @@ To call a function in another contract you need the address to an instance of
 the contract. The type of the address must be a contract type, which consists
 of a number of type definitions and entrypoint declarations. For instance,
 
-```javascript
+```sophia
 // A contract type
-contract VotingType =
+contract interface VotingType =
   entrypoint vote : string => unit
 ```
 
 Now given contract address of type `VotingType` you can call the `vote`
 entrypoint of that contract:
 
-```javascript
+```sophia
 contract VoteTwice =
   entrypoint voteTwice(v : VotingType, alt : string) =
     v.vote(alt)
@@ -114,7 +114,7 @@ Contract calls take two optional named arguments `gas : int` and `value : int`
 that lets you set a gas limit and provide tokens to a contract call. If omitted
 the defaults are no gas limit and no tokens. Suppose there is a fee for voting:
 
-```javascript
+```sophia
   entrypoint voteTwice(v : VotingType, fee : int, alt : string) =
     v.vote(value = fee, alt)
     v.vote(value = fee, alt)
@@ -136,7 +136,7 @@ To recover the underlying `address` of a contract instance there is a field
 `address : address`. For instance, to send tokens to the voting contract (given that it is payable)
 without calling it you can write
 
-```javascript
+```sophia
   entrypoint pay(v : VotingType, amount : int) =
     Chain.spend(v.address, amount)
 ```
@@ -154,7 +154,7 @@ If the call fails the result is `None`, otherwise it's `Some(r)` where `r` is
 the return value of the call.
 
 ```sophia
-contract VotingType =
+contract interface VotingType =
   entrypoint : vote : string => unit
 
 contract Voter =
@@ -171,10 +171,42 @@ However, note that errors that would normally consume all the gas in the
 transaction still only uses up the gas spent running the contract.
 
 
+### Contract factories and child contracts
+
+Since the version 5.0.0 Sophia supports deploying contracts by other
+contracts. This can be done in two ways:
+
+- Contract cloning via [`Chain.clone`](sophia_stdlib.md#clone)
+- Direct deploy via [`Chain.create`](sophia_stdlib.md#create)
+
+These functions take variable number of arguments that must match the created
+contract's `init` function. Beside that they take some additional named
+arguments – please refer to their documentation for details.
+
+While `Chain.clone` requires only a `contract interface` and a living instance
+of a given contract on chain, `Chain.create` needs a full definition of a
+to-create contract defined by the standard `contract` syntax, for example
+
+```
+contract IntHolder =
+  type state = int
+  entrypoint init(x) = x
+  entrypoint get() = state
+  
+main contract IntHolderFactory =
+  entrypoint new(x : int) : IntHolder =
+    let ih = Chain.create(x) : IntHolder
+    ih
+```
+
+In case of a presence of child contracts (`IntHolder` in this case), the main
+contract must be pointed out with the `main` keyword as shown in the example.
+
+
 ### Mutable state
 
-Sophia does not have arbitrary mutable state, but only a limited form of
-state associated with each contract instance.
+Sophia does not have arbitrary mutable state, but only a limited form of state
+associated with each contract instance.
 
 - Each contract defines a type `state` encapsulating its mutable state.
   The type `state` defaults to the `unit`.
@@ -200,7 +232,7 @@ Top-level functions and entrypoints must be annotated with the
 `stateful` keyword to be allowed to affect the state of the running contract.
 For instance,
 
-```javascript
+```sophia
   stateful entrypoint set_state(s : state) =
     put(s)
 ```
@@ -237,7 +269,7 @@ A concrete contract is by default *not* payable. Any attempt at spending to such
 a contract (either a `Chain.spend` or a normal spend transaction) will fail. If a
 contract shall be able to receive funds in this way it has to be declared `payable`:
 
-```javascript
+```sophia
 // A payable contract
 payable contract ExampleContract =
   stateful entrypoint do_stuff() = ...
@@ -253,7 +285,7 @@ A contract entrypoint is by default *not* payable. Any call to such a function
 that has a non-zero `value` will fail. Contract entrypoints that should be called
 with a non-zero value should be declared `payable`.
 
-```javascript
+```sophia
 payable stateful entrypoint buy(to : address) =
   if(Call.value > 42)
     transfer_item(to)
@@ -414,7 +446,7 @@ corresponding integer, so setting very high bits can be expensive).
 Type aliases can be introduced with the `type` keyword and can be
 parameterized. For instance
 
-```
+```sophia
 type number = int
 type string_map('a) = map(string, 'a)
 ```
@@ -434,7 +466,7 @@ datatype one_or_both('a, 'b) = Left('a) | Right('b) | Both('a, 'b)
 
 Elements of data types can be pattern matched against, using the `switch` construct:
 
-```
+```sophia
 function get_left(x : one_or_both('a, 'b)) : option('a) =
   switch(x)
     Left(x)    => Some(x)
@@ -443,7 +475,7 @@ function get_left(x : one_or_both('a, 'b)) : option('a) =
 ```
 
 or directly in the left-hand side:
-```
+```sophia
 function
   get_left : one_or_both('a, 'b) => option('a)
   get_left(Left(x))    = Some(x)
@@ -461,7 +493,7 @@ elements of a list can be any of datatype but they must have the same
 type. The type of lists with elements of type `'e` is written
 `list('e)`. For example we can have the following lists:
 
-```
+```sophia
 [1, 33, 2, 666]                                                   : list(int)
 [(1, "aaa"), (10, "jjj"), (666, "the beast")]                     : list(int * string)
 [{[1] = "aaa", [10] = "jjj"}, {[5] = "eee", [666] = "the beast"}] : list(map(int, string))
@@ -475,13 +507,13 @@ and returns the resulting list. So concatenating two lists
 
 Sophia supports list comprehensions known from languages like Python, Haskell or Erlang.
 Example syntax:
-```
+```sophia
 [x + y | x <- [1,2,3,4,5], let k = x*x, if (k > 5), y <- [k, k+1, k+2]]
 // yields [12,13,14,20,21,22,30,31,32]
 ```
 
 Lists can be constructed using the range syntax using special `..` operator:
-```
+```sophia
 [1..4] == [1,2,3,4]
 ```
 The ranges are always ascending and have step equal to 1.
@@ -493,7 +525,7 @@ Please refer to the [standard library](sophia_stdlib.md#List) for the predefined
 
 A Sophia record type is given by a fixed set of fields with associated,
 possibly different, types. For instance
-```
+```sophia
   record account = { name    : string,
                      balance : int,
                      history : list(transaction) }
@@ -510,12 +542,12 @@ Please refer to the [standard library](sophia_stdlib.md#Map) for the predefined 
 
 A value of record type is constructed by giving a value for each of the fields.
 For the example above,
-```
+```sophia
   function new_account(name) =
     {name = name, balance = 0, history = []}
 ```
 Maps are constructed similarly, with keys enclosed in square brackets
-```
+```sophia
   function example_map() : map(string, int) =
     {["key1"] = 1, ["key2"] = 2}
 ```
@@ -524,7 +556,7 @@ The empty map is written `{}`.
 #### Accessing values
 
 Record fields access is written `r.f` and map lookup `m[k]`. For instance,
-```
+```sophia
   function get_balance(a : address, accounts : map(address, account)) =
     accounts[a].balance
 ```
@@ -549,14 +581,14 @@ in the map or execution fails, but a default value can be provided:
 `k` is not in the map.
 
 Updates can be nested:
-```
+```sophia
 function clear_history(a : address, accounts : map(address, account)) : map(address, account) =
   accounts{ [a].history = [] }
 ```
 This is equivalent to `accounts{ [a] @ acc = acc{ history = [] } }` and thus
 requires `a` to be present in the accounts map. To have `clear_history` create
 an account if `a` is not in the map you can write (given a function `empty_account`):
-```
+```sophia
   accounts{ [a = empty_account()].history = [] }
 ```
 
@@ -627,7 +659,7 @@ For a functionality documentation refer to the [standard library](sophia_stdlib.
 #### Example
 
 Example for an oracle answering questions of type `string` with answers of type `int`:
-```
+```sophia
 contract Oracles =
 
   stateful entrypoint registerOracle(acct : address,
@@ -698,7 +730,7 @@ an account with address `addr`. In order to allow a contract `ct` to handle
 
 Armed with this information we can for example write a function that extends
 the name if it expires within 1000 blocks:
-```
+```sophia
   stateful entrypoint extend_if_necessary(addr : address, name : string, sig : signature) =
     switch(AENS.lookup(name))
       None => ()
@@ -709,7 +741,7 @@ the name if it expires within 1000 blocks:
 
 And we can write functions that adds and removes keys from the pointers of the
 name:
-```
+```sophia
   stateful entrypoint add_key(addr : address, name : string, key : string,
                               pt : AENS.pointee, sig : signature) =
     switch(AENS.lookup(name))
@@ -768,7 +800,7 @@ The fields can appear in any order.
 Events are emitted by using the `Chain.event` function. The following function
 will emit one Event of each kind in the example.
 
-```
+```sophia
   entrypoint emit_events() : () =
     Chain.event(TheFirstEvent(42))
     Chain.event(AnotherEvent(Contract.address, "This is not indexed"))
@@ -778,7 +810,7 @@ will emit one Event of each kind in the example.
 
 It is only possible to have one (1) `string` parameter in the event, but it can
 be placed in any position (and its value will end up in the `data` field), i.e.
-```
+```sophia
 AnotherEvent(string, indexed address)
 
 ...
@@ -837,7 +869,7 @@ and `*/` and can be nested.
 
 ```
 contract elif else entrypoint false function if import include let mod namespace
-private payable stateful switch true type record datatype
+private payable stateful switch true type record datatype main interface
 ```
 
 #### Tokens
@@ -941,7 +973,7 @@ Args ::= '(' Sep(Pattern, ',') ')'
 Contract declarations must appear at the top-level.
 
 For example,
-```
+```sophia
 contract Test =
   type t = int
   entrypoint add (x : t, y : t) = x + y
@@ -1089,7 +1121,7 @@ In order of highest to lowest precedence.
 
 ## Examples
 
-```
+```sophia
 /*
  * A simple crowd-funding example
  */
