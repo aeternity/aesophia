@@ -44,7 +44,9 @@ lexer() ->
         , {"[^/*]+|[/*]", skip()} ],
 
     Keywords = ["contract", "include", "let", "switch", "type", "record", "datatype", "if", "elif", "else", "function",
-                "stateful", "payable", "true", "false", "mod", "public", "entrypoint", "private", "indexed", "namespace"],
+                "stateful", "payable", "true", "false", "mod", "public", "entrypoint", "private", "indexed", "namespace",
+                "interface", "main"
+               ],
     KW = string:join(Keywords, "|"),
 
     Rules =

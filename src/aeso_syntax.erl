@@ -25,7 +25,8 @@
 -type ann_origin() :: system | user.
 -type ann_format() :: '?:' | hex | infix | prefix | elif.
 
--type ann() :: [{line, ann_line()} | {col, ann_col()} | {format, ann_format()} | {origin, ann_origin()} | stateful | private].
+-type ann() :: [ {line, ann_line()} | {col, ann_col()} | {format, ann_format()} | {origin, ann_origin()}
+               | stateful | private | payable | main | interface].
 
 -type name() :: string().
 -type id()   :: {id,   ann(), name()}.
@@ -34,7 +35,9 @@
 -type qcon() :: {qcon, ann(), [name()]}.
 -type tvar() :: {tvar, ann(), name()}.
 
--type decl() :: {contract, ann(), con(), [decl()]}
+-type decl() :: {contract_main, ann(), con(), [decl()]}
+              | {contract_child, ann(), con(), [decl()]}
+              | {contract_interface, ann(), con(), [decl()]}
               | {namespace, ann(), con(), [decl()]}
               | {pragma, ann(), pragma()}
               | {type_decl, ann(), id(), [tvar()]} % Only for error msgs

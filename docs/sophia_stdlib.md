@@ -765,6 +765,127 @@ Chain.gas_limit : int
 The gas limit of the current block.
 
 
+#### bytecode_hash
+```
+Chain.bytecode_hash : 'c => option(hash)
+```
+
+Returns the hash of the contract's bytecode (or `None` if it is
+nonexistent or deployed before FATE2). The type `'c` must be
+instantiated with a contract. The charged gas increases linearly to
+the size of the serialized bytecode of the deployed contract.
+
+
+#### create
+```
+Chain.create(value : int, ...) => 'c
+```
+
+Creates and deploys a new instance of a contract `'c`. All of the
+unnamed arguments will be passed to the `init` function. The charged
+gas increases linearly with the size of the compiled child contract's
+bytecode. The `source_hash` on-chain entry of the newly created
+contract will be the SHA256 hash over concatenation of
+
+- whole contract source code
+- single null byte
+- name of the child contract
+
+The resulting contract's public key can be predicted and in case it happens to
+have some funds before its creation, its balance will be increased by
+the `value` parameter.
+
+The `value` argument (default `0`) is equivalent to the value in the contract
+creation transaction – it sets the initial value of the newly created contract
+charging the calling contract. Note that this won't be visible in `Call.value`
+in the `init` call of the new contract. It will be included in
+`Contract.balance`, however.
+
+
+The type `'c` must be instantiated with a contract.
+
+
+Example usage:
+```
+payable contract Auction =
+  record state = {supply: int, name: string}
+  entrypoint init(supply, name) = {supply: supply, name: name}
+  stateful payable entrypoint buy(amount) =
+    require(Call.value == amount, "amount_value_mismatch")
+    ...
+  stateful entrypoint sell(amount) =
+    require(amount >= 0, "negative_amount")
+    ...
+  
+main contract Market =
+  type state = list(Auction)
+  entrypoint init() = []
+  stateful entrypoint new(name : string) =
+    let auction = Chain.create(0, name) : Auction
+    put(new_auction::state)
+```
+
+The typechecker must be certain about the created contract's type, so it is
+worth writing it explicitly as shown in the example.
+
+#### clone
+```
+Chain.clone : ( ref : 'c, gas : int, value : int, protected : bool, ...
+              ) => if(protected) option('c) else 'c
+```
+
+Clones the contract under the mandatory named argument `ref`. That means a new
+contract of the same bytecode and the same `payable` parameter shall be created.
+**NOTE:** the `state` won't be copied and the contract will be initialized with
+a regular call to the `init` function with the remaining unnamed arguments. The
+resulting contract's public key can be predicted and in case it happens to have
+some funds before its creation, its balance will be increased by the `value`
+parameter. This operation is significantly cheaper than `Chain.create` as it
+costs a fixed amount of gas.
+
+
+The `gas` argument (default `Call.gas_left`) limits the gas supply for the
+`init` call of the cloned contract.
+
+The `value` argument (default `0`) is equivalent to the value in the contract
+creation transaction – it sets the initial value of the newly created contract
+charging the calling contract. Note that this won't be visible in `Call.value`
+in the `init` call of the new contract. It will be included in
+`Contract.balance`, however.
+
+The `protected` argument (default `false`) works identically as in remote calls.
+If set to `true` it will change the return type to `option('c)` and will catch
+all errors such as `abort`, out of gas and wrong arguments. Note that it can
+only take a boolean *literal*, so other expressions such as variables will be
+rejected by the compiler.
+
+The type `'c` must be instantiated with a contract.
+
+Example usage:
+
+```
+payable contract interface Auction =
+  entrypoint init : (int, string) => void
+  stateful payable entrypoint buy : (int) => ()
+  stateful entrypoint sell : (int) => ()
+  
+main contract Market =
+  type state = list(Auction)
+  entrypoint init() = []
+  stateful entrypoint new_of(template : Auction, name : string) =
+    switch(Chain.clone(ref=template, protected=true, 0, name))
+      None => abort("Bad auction!")
+      Some(new_auction) =>
+        put(new_auction::state)
+```
+
+When cloning by an interface, `init` entrypoint declaration is required. It is a
+good practice to set its return type to `void` in order to indicate that this
+function is not supposed to be called and is state agnostic. Trivia: internal
+implementation of the `init` function does not actually return `state`, but
+calls `put` instead. Moreover, FATE prevents even handcrafted calls to `init`.
+
+
 #### event
 ```
 Chain.event(e : event) : unit

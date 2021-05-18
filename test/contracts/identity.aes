@@ -1,3 +1,2 @@
-
-contract Identity =
-  entrypoint main (x:int) = x
+main contract Identity =
+  entrypoint main_fun (x:int) = x

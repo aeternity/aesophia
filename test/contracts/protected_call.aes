@@ -1,4 +1,4 @@
-contract Remote =
+contract interface Remote =
   entrypoint id : int => int
 
 contract ProtectedCall =

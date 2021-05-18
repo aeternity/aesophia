@@ -1,2 +1,0 @@
-namespace LastDeclarationIsNotAContract =
-  function add(x, y) = x + y

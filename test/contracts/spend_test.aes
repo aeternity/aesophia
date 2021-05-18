@@ -1,5 +1,5 @@
 
-contract SpendContract =
+contract interface SpendContract =
   entrypoint withdraw : (int) => int
 
 contract SpendTest =

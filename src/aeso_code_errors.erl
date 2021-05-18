@@ -10,9 +10,9 @@
 
 -export([format/1, pos/1]).
 
-format({last_declaration_must_be_contract, Decl = {namespace, _, {con, _, C}, _}}) ->
-    Msg = io_lib:format("Expected a contract as the last declaration instead of the namespace '~s'\n",
-                        [C]),
+format({last_declaration_must_be_main_contract, Decl = {Kind, _, {con, _, C}, _}}) ->
+    Msg = io_lib:format("Expected a main contract as the last declaration instead of the ~p '~s'\n",
+                        [Kind, C]),
     mk_err(pos(Decl), Msg);
 format({missing_init_function, Con}) ->
     Msg = io_lib:format("Missing init function for the contract '~s'.\n", [pp_expr(Con)]),
@@ -87,6 +87,12 @@ format({higher_order_state, {type_def, Ann, _, _, State}}) ->
     Msg = io_lib:format("Invalid state type\n~s\n", [pp_type(2, State)]),
     Cxt = "The state cannot contain functions in the AEVM. Use FATE if you need this.\n",
     mk_err(pos(Ann), Msg, Cxt);
+format({var_args_not_set, Expr}) ->
+    mk_err( pos(Expr), "Could not deduce type of variable arguments list"
+          , "When compiling " ++ pp_expr(Expr)
+          );
+format({found_void, Ann}) ->
+    mk_err(pos(Ann), "Found a void-typed value.", "`void` is a restricted, uninhabited type. Did you mean `unit`?");
 
 format(Err) ->
     mk_err(aeso_errors:pos(0, 0), io_lib:format("Unknown error: ~p\n", [Err])).

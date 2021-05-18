@@ -22,7 +22,8 @@ test_cases(1) ->
     MapACI = #{contract =>
 		   #{name => <<"C">>,
 		     type_defs => [],
-                     payable => true,
+         payable => true,
+         kind => contract_main,
 		     functions =>
 			 [#{name => <<"a">>,
 			    arguments =>
@@ -31,56 +32,57 @@ test_cases(1) ->
 			    returns => <<"int">>,
 			    stateful => true,
                             payable  => true}]}},
-    DecACI = <<"payable contract C =\n"
+    DecACI = <<"payable main contract C =\n"
 	       "  payable entrypoint a : (int) => int\n">>,
     {Contract,MapACI,DecACI};
 
 test_cases(2) ->
-    Contract = <<"contract C =\n"
+    Contract = <<"main contract C =\n"
 		 "  type allan = int\n"
 		 "  entrypoint a(i : allan) = i+1\n">>,
     MapACI = #{contract =>
-                       #{name => <<"C">>, payable => false,
-                         type_defs =>
-                             [#{name => <<"allan">>,
-                                typedef => <<"int">>,
-                                vars => []}],
-			 functions =>
-                             [#{arguments =>
-                                    [#{name => <<"i">>,
-                                       type => <<"C.allan">>}],
-                                name => <<"a">>,
-                                returns => <<"int">>,
-                                stateful => false,
-                                payable  => false}]}},
-    DecACI = <<"contract C =\n"
+                   #{name => <<"C">>, payable => false,
+                     kind => contract_main,
+                     type_defs =>
+                         [#{name => <<"allan">>,
+                            typedef => <<"int">>,
+                            vars => []}],
+                     functions =>
+                         [#{arguments =>
+                                [#{name => <<"i">>,
+                                   type => <<"C.allan">>}],
+                            name => <<"a">>,
+                            returns => <<"int">>,
+                            stateful => false,
+                            payable  => false}]}},
+    DecACI = <<"main contract C =\n"
                "  type allan = int\n"
                "  entrypoint a : (C.allan) => int\n">>,
     {Contract,MapACI,DecACI};
 test_cases(3) ->
-    Contract = <<"contract C =\n"
+    Contract = <<"main contract C =\n"
                  "  type state = unit\n"
                  "  datatype event = SingleEventDefined\n"
-		 "  datatype bert('a) = Bin('a)\n"
-		 "  entrypoint a(i : bert(string)) = 1\n">>,
+                 "  datatype bert('a) = Bin('a)\n"
+                 "  entrypoint a(i : bert(string)) = 1\n">>,
     MapACI = #{contract =>
 		   #{functions =>
-			 [#{arguments =>
-				[#{name => <<"i">>,
-				   type =>
-				       #{<<"C.bert">> => [<<"string">>]}}],
-			    name => <<"a">>,returns => <<"int">>,
-			    stateful => false, payable  => false}],
-		     name => <<"C">>, payable => false,
-                     event => #{variant => [#{<<"SingleEventDefined">> => []}]},
-                     state => <<"unit">>,
+             [#{arguments =>
+                    [#{name => <<"i">>,
+                       type =>
+                           #{<<"C.bert">> => [<<"string">>]}}],
+                name => <<"a">>,returns => <<"int">>,
+                stateful => false, payable  => false}],
+		     name => <<"C">>, payable => false, kind => contract_main,
+         event => #{variant => [#{<<"SingleEventDefined">> => []}]},
+         state => <<"unit">>,
 		     type_defs =>
-			 [#{name => <<"bert">>,
-			    typedef =>
-				#{variant =>
-				      [#{<<"Bin">> => [<<"'a">>]}]},
-			    vars => [#{name => <<"'a">>}]}]}},
-    DecACI = <<"contract C =\n"
+             [#{name => <<"bert">>,
+                typedef =>
+                    #{variant =>
+                          [#{<<"Bin">> => [<<"'a">>]}]},
+                vars => [#{name => <<"'a">>}]}]}},
+    DecACI = <<"main contract C =\n"
                "  type state = unit\n"
                "  datatype event = SingleEventDefined\n"
                "  datatype bert('a) = Bin('a)\n"
@@ -101,17 +103,24 @@ aci_test_contract(Name) ->
                  true  -> [debug_mode];
                  false -> []
              end ++ [{include, {file_system, [aeso_test_utils:contract_path()]}}],
-    {ok, JSON} = aeso_aci:contract_interface(json, String, Opts),
-    {ok, #{aci := JSON1}} = aeso_compiler:from_string(String, [{aci, json}, {backend, fate} | Opts]),
-    ?assertEqual(JSON, JSON1),
+    JSON = case aeso_aci:contract_interface(json, String, Opts) of
+               {ok, J} -> J;
+               {error, ErrorStringJ} when is_binary(ErrorStringJ) -> error(ErrorStringJ);
+               {error, ErrorJ} -> aeso_compiler_tests:print_and_throw(ErrorJ)
+           end,
+    case aeso_compiler:from_string(String, [{aci, json}, {backend, fate} | Opts]) of
+        {ok, #{aci := JSON1}} ->
+            ?assertEqual(JSON, JSON1),
+            io:format("JSON:\n~p\n", [JSON]),
+            {ok, ContractStub} = aeso_aci:render_aci_json(JSON),
 
-    io:format("JSON:\n~p\n", [JSON]),
-    {ok, ContractStub} = aeso_aci:render_aci_json(JSON),
+            io:format("STUB:\n~s\n", [ContractStub]),
+            check_stub(ContractStub, [{src_file, Name}]),
 
-    io:format("STUB:\n~s\n", [ContractStub]),
-    check_stub(ContractStub, [{src_file, Name}]),
-
-    ok.
+            ok;
+        {error, ErrorString} when is_binary(ErrorString) -> error(ErrorString);
+        {error, Error} -> aeso_compiler_tests:print_and_throw(Error)
+    end.
 
 check_stub(Stub, Options) ->
     try aeso_parser:string(binary_to_list(Stub), Options) of

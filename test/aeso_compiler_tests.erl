@@ -34,9 +34,7 @@ simple_compile_test_() ->
                #{fate_code := Code} when Backend == fate ->
                    Code1 = aeb_fate_code:deserialize(aeb_fate_code:serialize(Code)),
                    ?assertMatch({X, X}, {Code1, Code});
-               ErrBin ->
-                   io:format("\n~s", [ErrBin]),
-                   error(ErrBin)
+               Error -> io:format("\n\n~p\n\n", [Error]), print_and_throw(Error)
            end
        end} || ContractName <- compilable_contracts(), Backend <- [aevm, fate],
                not lists:member(ContractName, not_compilable_on(Backend))] ++
@@ -179,17 +177,16 @@ compilable_contracts() ->
      "lhs_matching",
      "more_strings",
      "protected_call",
-     "hermetization_turnoff"
+     "hermetization_turnoff",
+     "multiple_contracts",
+     "clone",
+     "clone_simple",
+     "create",
+     "test" % Custom general-purpose test file. Keep it last on the list.
     ].
 
 not_compilable_on(fate) -> [];
-not_compilable_on(aevm) ->
-    [ "stdlib_include", "manual_stdlib_include", "pairing_crypto"
-    , "aens_update", "basic_auth_tx", "more_strings"
-    , "unapplied_builtins", "bytes_to_x", "state_handling", "protected_call"
-    , "hermetization_turnoff"
-
-    ].
+not_compilable_on(aevm) -> compilable_contracts().
 
 debug_mode_contracts() ->
     ["hermetization_turnoff"].
@@ -635,9 +632,9 @@ failing_contracts() ->
          <<?Pos(2, 1)
            "Cannot compile with this version of the compiler,\n"
            "because it does not satisfy the constraint ", Version/binary, " == 9.9.9">>])
-    , ?TYPE_ERROR(multiple_contracts,
+    , ?TYPE_ERROR(interface_with_defs,
          [<<?Pos(2, 3)
-            "Only the main contract can contain defined functions or entrypoints.\n"
+            "Contract interfaces cannot contain defined functions or entrypoints.\n"
             "Fix: replace the definition of 'foo' by a type signature.">>])
     , ?TYPE_ERROR(contract_as_namespace,
          [<<?Pos(5, 28)
@@ -733,6 +730,39 @@ failing_contracts() ->
     , ?TYPE_ERROR(bad_state,
                   [<<?Pos(4, 16)
                      "Conflicting updates for field 'foo'">>])
+    , ?TYPE_ERROR(factories_type_errors,
+                  [<<?Pos(10,18)
+                    "Chain.clone requires `ref` named argument of contract type.">>,
+                   <<?Pos(11,18)
+                     "Cannot unify (gas : int, value : int, protected : bool) => if(protected, option(void), void)\n         and (gas : int, value : int, protected : bool, int, bool) => 'b\n"
+                     "when checking contract construction of type\n  (gas : int, value : int, protected : bool) =>\n    if(protected, option(void), void) (at line 11, column 18)\nagainst the expected type\n  (gas : int, value : int, protected : bool, int, bool) => 'b">>,
+                   <<?Pos(12,37)
+                     "Cannot unify int\n         and bool\n"
+                     "when checking named argument\n  gas : int\nagainst inferred type\n  bool">>,
+                   <<?Pos(13,18),
+                     "Kaboom is not implemented.\n"
+                     "when resolving arguments of variadic function\n  Chain.create">>,
+                   <<?Pos(18,18)
+                     "Cannot unify (gas : int, value : int, protected : bool, int, bool) => if(protected, option(void), void)\n         and (gas : int, value : int, protected : bool) => 'a\n"
+                     "when checking contract construction of type\n  (gas : int, value : int, protected : bool, int, bool) =>\n    if(protected, option(void), void) (at line 18, column 18)\nagainst the expected type\n  (gas : int, value : int, protected : bool) => 'a">>,
+                   <<?Pos(19,42),
+                     "Named argument protected (at line 19, column 42) is not one of the expected named arguments\n  - value : int">>,
+                   <<?Pos(20,42),
+                     "Cannot unify int\n         and bool\n"
+                     "when checking named argument\n  value : int\nagainst inferred type\n  bool">>
+                  ])
+    , ?TYPE_ERROR(ambiguous_main,
+                  [<<?Pos(1,1)
+                    "Could not deduce the main contract. You can point it out manually with the `main` keyword.">>
+                  ])
+    , ?TYPE_ERROR(no_main_contract,
+                  [<<?Pos(0,0)
+                     "No contract defined.">>
+                  ])
+    , ?TYPE_ERROR(multiple_main_contracts,
+                   [<<?Pos(1,6)
+                      "Only one main contract can be defined.">>
+                   ])
     ].
 
 -define(Path(File), "code_errors/" ??File).
@@ -746,9 +776,7 @@ failing_contracts() ->
                        {fate, ?Msg(File, Line, Col, ErrFATE)}]}).
 
 failing_code_gen_contracts() ->
-    [ ?SAME(last_declaration_must_be_contract, 1, 1,
-            "Expected a contract as the last declaration instead of the namespace 'LastDeclarationIsNotAContract'")
-    , ?SAME(missing_definition, 2, 14,
+    [ ?SAME(missing_definition, 2, 14,
             "Missing definition of function 'foo'.")
     , ?AEVM(polymorphic_entrypoint, 2, 17,
             "The argument\n"
@@ -846,6 +874,8 @@ failing_code_gen_contracts() ->
             "Invalid state type\n"
             "  {f : (int) => int}\n"
             "The state cannot contain functions in the AEVM. Use FATE if you need this.")
+    , ?FATE(child_with_decls, 2, 14,
+            "Missing definition of function 'f'.")
     ].
 
 validation_test_() ->
@@ -883,14 +913,26 @@ validation_fails() ->
          "Byte code contract is not payable, but source code contract is.">>]}].
 
 validate(Contract1, Contract2) ->
-    ByteCode = #{ fate_code := FCode } = compile(fate, Contract1),
-    FCode1   = aeb_fate_code:serialize(aeb_fate_code:strip_init_function(FCode)),
-    Source   = aeso_test_utils:read_contract(Contract2),
-    aeso_compiler:validate_byte_code(
-      ByteCode#{ byte_code := FCode1 }, Source,
-      case lists:member(Contract2, debug_mode_contracts()) of
-          true  -> [debug_mode];
-          false -> []
-      end ++
-      [{backend, fate}, {include, {file_system, [aeso_test_utils:contract_path()]}}]).
+    case compile(fate, Contract1) of
+        ByteCode = #{ fate_code := FCode } ->
+            FCode1   = aeb_fate_code:serialize(aeb_fate_code:strip_init_function(FCode)),
+            Source   = aeso_test_utils:read_contract(Contract2),
+            aeso_compiler:validate_byte_code(
+              ByteCode#{ byte_code := FCode1 }, Source,
+              case lists:member(Contract2, debug_mode_contracts()) of
+                  true  -> [debug_mode];
+                  false -> []
+              end ++
+                  [{backend, fate}, {include, {file_system, [aeso_test_utils:contract_path()]}}]);
+        Error -> print_and_throw(Error)
+    end.
 
+print_and_throw(Err) ->
+    case Err of
+        ErrBin when is_binary(ErrBin) ->
+            io:format("\n~s", [ErrBin]),
+            error(ErrBin);
+        Errors ->
+            io:format("Compilation error:\n~s", [string:join([aeso_errors:pp(E) || E <- Errors], "\n\n")]),
+            error(compilation_error)
+    end.

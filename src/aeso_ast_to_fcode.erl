@@ -12,6 +12,8 @@
 -export([ast_to_fcode/2, format_fexpr/1]).
 -export_type([fcode/0, fexpr/0, fun_def/0]).
 
+-include("aeso_utils.hrl").
+
 %% -- Type definitions -------------------------------------------------------
 
 -type option() :: term().
@@ -53,6 +55,7 @@
               | {oracle_pubkey, binary()}
               | {oracle_query_id, binary()}
               | {bool, false | true}
+              | {contract_code, string()} %% for CREATE, by name
               | {typerep, ftype()}.
 
 -type fexpr() :: {lit, flit()}
@@ -136,24 +139,27 @@
 -type type_env() :: #{ sophia_name() => type_def() }.
 -type fun_env()  :: #{ sophia_name() => {fun_name(), non_neg_integer()} }.
 -type con_env()  :: #{ sophia_name() => con_tag() }.
--type builtins() :: #{ sophia_name() => {builtin(), non_neg_integer() | none} }.
+-type child_con_env() :: #{sophia_name() => fcode()}.
+-type builtins() :: #{ sophia_name() => {builtin(), non_neg_integer() | none | variable} }.
 
--type context() :: {main_contract, string()}
+-type context() :: {contract_def, string()}
                  | {namespace, string()}
                  | {abstract_contract, string()}.
 
 -type state_layout() :: {tuple, [state_layout()]} | {reg, state_reg()}.
 
--type env() :: #{ type_env     := type_env(),
-                  fun_env      := fun_env(),
-                  con_env      := con_env(),
-                  event_type   => aeso_syntax:typedef(),
-                  builtins     := builtins(),
-                  options      := [option()],
-                  state_layout => state_layout(),
-                  context      => context(),
-                  vars         => [var_name()],
-                  functions    := #{ fun_name() => fun_def() } }.
+-type env() :: #{ type_env      := type_env(),
+                  fun_env       := fun_env(),
+                  con_env       := con_env(),
+                  child_con_env := child_con_env(),
+                  event_type    => aeso_syntax:typedef(),
+                  builtins      := builtins(),
+                  options       := [option()],
+                  state_layout  => state_layout(),
+                  context       => context(),
+                  vars          => [var_name()],
+                  functions     := #{ fun_name() => fun_def() }
+               }.
 
 -define(HASH_BYTES, 32).
 
@@ -161,17 +167,26 @@
 
 %% Main entrypoint. Takes typed syntax produced by aeso_ast_infer_types:infer/1,2
 %% and produces Fate intermediate code.
--spec ast_to_fcode(aeso_syntax:ast(), [option()]) -> fcode().
+-spec ast_to_fcode(aeso_syntax:ast(), [option()]) -> {env(), fcode()}.
 ast_to_fcode(Code, Options) ->
-    Verbose = lists:member(pp_fcode, Options),
     init_fresh_names(),
-    FCode1 = to_fcode(init_env(Options), Code),
+    {Env1, FCode1} = to_fcode(init_env(Options), Code),
+    FCode2 = optimize(FCode1, Options),
+    Env2 = Env1#{ child_con_env :=
+                      maps:map(
+                        fun (_, FC) -> optimize(FC, Options) end,
+                        maps:get(child_con_env, Env1)
+                       )},
+    clear_fresh_names(),
+    {Env2, FCode2}.
+
+optimize(FCode1, Options) ->
+    Verbose = lists:member(pp_fcode, Options),
     [io:format("-- Before lambda lifting --\n~s\n\n", [format_fcode(FCode1)]) || Verbose],
     FCode2 = optimize_fcode(FCode1),
     [ io:format("-- After optimization --\n~s\n\n", [format_fcode(FCode2)]) || Verbose, FCode2 /= FCode1 ],
     FCode3 = lambda_lift(FCode2),
     [ io:format("-- After lambda lifting --\n~s\n\n", [format_fcode(FCode3)]) || Verbose, FCode3 /= FCode2 ],
-    clear_fresh_names(),
     FCode3.
 
 %% -- Environment ------------------------------------------------------------
@@ -182,6 +197,7 @@ init_env(Options) ->
     #{ type_env  => init_type_env(),
        fun_env   => #{},
        builtins  => builtins(),
+       child_con_env => #{},
        con_env   => #{["None"]        => #con_tag{ tag = 0, arities = [0, 1] },
                       ["Some"]        => #con_tag{ tag = 1, arities = [0, 1] },
                       ["RelativeTTL"] => #con_tag{ tag = 0, arities = [1, 1] },
@@ -217,7 +233,8 @@ init_env(Options) ->
                       ["Chain", "GAAttachTx"]             => #con_tag{ tag = 21, arities = ChainTxArities }
                      },
        options   => Options,
-       functions => #{} }.
+       functions => #{}
+    }.
 
 -spec builtins() -> builtins().
 builtins() ->
@@ -227,7 +244,7 @@ builtins() ->
     Scopes = [{[],           [{"abort", 1}, {"require", 2}]},
               {["Chain"],    [{"spend", 2}, {"balance", 1}, {"block_hash", 1}, {"coinbase", none},
                               {"timestamp", none}, {"block_height", none}, {"difficulty", none},
-                              {"gas_limit", none}]},
+                              {"gas_limit", none}, {"bytecode_hash", 1}, {"create", variable}, {"clone", variable}]},
               {["Contract"], [{"address", none}, {"balance", none}, {"creator", none}]},
               {["Call"],     [{"origin", none}, {"caller", none}, {"value", none}, {"gas_price", none},
                               {"gas_left", 0}]},
@@ -307,31 +324,44 @@ get_option(Opt, Env, Default) ->
 
 %% -- Compilation ------------------------------------------------------------
 
--spec to_fcode(env(), aeso_syntax:ast()) -> fcode().
-to_fcode(Env, [{contract, Attrs, MainCon = {con, _, Main}, Decls}]) ->
-    #{ builtins := Builtins } = Env,
-    MainEnv = Env#{ context  => {main_contract, Main},
-                    builtins => Builtins#{[Main, "state"]          => {get_state, none},
-                                          [Main, "put"]            => {set_state, 1},
-                                          [Main, "Chain", "event"] => {chain_event, 1}} },
-    #{ functions := Funs } = Env1 =
-        decls_to_fcode(MainEnv, Decls),
-    StateType   = lookup_type(Env1, [Main, "state"], [], {tuple, []}),
-    EventType   = lookup_type(Env1, [Main, "event"], [], none),
-    StateLayout = state_layout(Env1),
-    Payable     = proplists:get_value(payable, Attrs, false),
-    #{ contract_name => Main,
-       state_type    => StateType,
-       state_layout  => StateLayout,
-       event_type    => EventType,
-       payable       => Payable,
-       functions     => add_init_function(Env1, MainCon, StateType,
-                        add_event_function(Env1, EventType, Funs)) };
-to_fcode(_Env, [NotContract]) ->
-    fcode_error({last_declaration_must_be_contract, NotContract});
-to_fcode(Env, [{contract, _, {con, _, Con}, Decls} | Code]) ->
-    Env1 = decls_to_fcode(Env#{ context => {abstract_contract, Con} }, Decls),
-    to_fcode(Env1, Code);
+-spec to_fcode(env(), aeso_syntax:ast()) -> {env(), fcode()}.
+to_fcode(Env, [{Contract, Attrs, Con = {con, _, Name}, Decls}|Rest])
+  when ?IS_CONTRACT_HEAD(Contract) ->
+    case Contract =:= contract_interface of
+        false ->
+            #{ builtins := Builtins } = Env,
+            ConEnv = Env#{ context  => {contract_def, Name},
+                           builtins => Builtins#{[Name, "state"]          => {get_state, none},
+                                                 [Name, "put"]            => {set_state, 1},
+                                                 [Name, "Chain", "event"] => {chain_event, 1}} },
+            #{ functions := PrevFuns } = ConEnv,
+            #{ functions := Funs } = Env1 =
+                decls_to_fcode(ConEnv, Decls),
+            StateType   = lookup_type(Env1, [Name, "state"], [], {tuple, []}),
+            EventType   = lookup_type(Env1, [Name, "event"], [], none),
+            StateLayout = state_layout(Env1),
+            Payable     = proplists:get_value(payable, Attrs, false),
+            ConFcode = #{ contract_name => Name,
+                          state_type    => StateType,
+                          state_layout  => StateLayout,
+                          event_type    => EventType,
+                          payable       => Payable,
+                          functions     => add_init_function(
+                                             Env1, Con, StateType,
+                                             add_event_function(Env1, EventType, Funs)) },
+            case Contract of
+                contract_main -> [] = Rest, {Env1, ConFcode};
+                contract_child ->
+                    Env2 = add_child_con(Env1, Name, ConFcode),
+                    Env3 = Env2#{ functions := PrevFuns },
+                    to_fcode(Env3, Rest)
+            end;
+        true ->
+            Env1 = decls_to_fcode(Env#{ context => {abstract_contract, Name} }, Decls),
+            to_fcode(Env1, Rest)
+    end;
+to_fcode(_Env, [NotMain = {NotMainHead, _ ,_ , _}]) when NotMainHead =/= contract_def ->
+    fcode_error({last_declaration_must_be_contract_def, NotMain});
 to_fcode(Env, [{namespace, _, {con, _, Con}, Decls} | Code]) ->
     Env1 = decls_to_fcode(Env#{ context => {namespace, Con} }, Decls),
     to_fcode(Env1, Code).
@@ -341,13 +371,11 @@ decls_to_fcode(Env, Decls) ->
     %% First compute mapping from Sophia names to fun_names and add it to the
     %% environment.
     Env1 = add_fun_env(Env, Decls),
-    lists:foldl(fun(D, E) ->
-                    R = decl_to_fcode(E, D),
-                    R
+    lists:foldl(fun(D, E) -> decl_to_fcode(E, D)
                 end, Env1, Decls).
 
 -spec decl_to_fcode(env(), aeso_syntax:decl()) -> env().
-decl_to_fcode(Env = #{context := {main_contract, _}}, {fun_decl, _, Id, _}) ->
+decl_to_fcode(Env = #{context := {contract_def, _}}, {fun_decl, _, Id, _}) ->
     case is_no_code(Env) of
         false -> fcode_error({missing_definition, Id});
         true  -> Env
@@ -410,7 +438,7 @@ typedef_to_fcode(Env, Id = {id, _, Name}, Xs, Def) ->
     Env3 = compute_state_layout(Env2, Name, FDef),
     bind_type(Env3, Q, FDef).
 
-compute_state_layout(Env = #{ context := {main_contract, _} }, "state", Type) ->
+compute_state_layout(Env = #{ context := {contract_def, _} }, "state", Type) ->
     NoLayout = get_option(no_flatten_state, Env),
     Layout =
         case Type([]) of
@@ -436,7 +464,7 @@ compute_state_layout(R, [H | T]) ->
 compute_state_layout(R, _) ->
     {R + 1, {reg, R}}.
 
-check_state_and_event_types(#{ context := {main_contract, _} }, Id, [_ | _]) ->
+check_state_and_event_types(#{ context := {contract_def, _} }, Id, [_ | _]) ->
     case Id of
         {id, _, "state"} -> fcode_error({parameterized_state, Id});
         {id, _, "event"} -> fcode_error({parameterized_event, Id});
@@ -461,8 +489,12 @@ type_to_fcode(Env, Sub, {record_t, Fields}) ->
     type_to_fcode(Env, Sub, {tuple_t, [], lists:map(FieldType, Fields)});
 type_to_fcode(_Env, _Sub, {bytes_t, _, N}) ->
     {bytes, N};
+type_to_fcode(_Env, _Sub, {tvar, Ann, "void"}) ->
+    fcode_error({found_void, Ann});
 type_to_fcode(_Env, Sub, {tvar, _, X}) ->
     maps:get(X, Sub, {tvar, X});
+type_to_fcode(_Env, _Sub, {fun_t, Ann, _, var_args, _}) ->
+    fcode_error({var_args_not_set, {id, Ann, "a very suspicious function"}});
 type_to_fcode(Env, Sub, {fun_t, _, Named, Args, Res}) ->
     FNamed = [type_to_fcode(Env, Sub, Arg) || {named_arg_t, _, _, Arg, _} <- Named],
     FArgs  = [type_to_fcode(Env, Sub, Arg) || Arg <- Args],
@@ -678,14 +710,31 @@ expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
     end;
 
 %% Function calls
-expr_to_fcode(Env, _Type, {app, _, Fun = {typed, _, _, {fun_t, _, NamedArgsT, _, _}}, Args}) ->
+expr_to_fcode(Env, Type, {app, _, Fun = {typed, _, FunE, {fun_t, _, NamedArgsT, ArgsT, _}}, Args}) ->
     Args1 = get_named_args(NamedArgsT, Args),
     FArgs = [expr_to_fcode(Env, Arg) || Arg <- Args1],
     case expr_to_fcode(Env, Fun) of
         {builtin_u, B, _Ar, TypeArgs}     -> builtin_to_fcode(state_layout(Env), B, FArgs ++ TypeArgs);
+        {builtin_u, chain_clone, _Ar}     ->
+            case ArgsT of
+                var_args -> fcode_error({var_args_not_set, FunE});
+                _ ->
+                    %% Here we little cheat on the typechecker, but this inconsistency
+                    %% is to be solved in `aeso_fcode_to_fate:type_to_scode/1`
+                    FInitArgsT = aeb_fate_data:make_typerep([type_to_fcode(Env, T) || T <- ArgsT]),
+                    builtin_to_fcode(state_layout(Env), chain_clone, [{lit, FInitArgsT}|FArgs])
+            end;
+        {builtin_u, chain_create, _Ar}     ->
+            case {ArgsT, Type} of
+                {var_args, _} -> fcode_error({var_args_not_set, FunE});
+                {_, {con, _, Contract}} ->
+                    FInitArgsT = aeb_fate_data:make_typerep([type_to_fcode(Env, T) || T <- ArgsT]),
+                    builtin_to_fcode(state_layout(Env), chain_create, [{lit, {contract_code, Contract}}, {lit, FInitArgsT}|FArgs]);
+                {_, _} -> fcode_error({not_a_contract_type, Type})
+            end;
         {builtin_u, B, _Ar}               -> builtin_to_fcode(state_layout(Env), B, FArgs);
         {def_u, F, _Ar}                   -> {def, F, FArgs};
-        {remote_u, ArgsT, RetT, Ct, RFun} -> {remote, ArgsT, RetT, Ct, RFun, FArgs};
+        {remote_u, RArgsT, RRetT, Ct, RFun} -> {remote, RArgsT, RRetT, Ct, RFun, FArgs};
         FFun ->
             %% FFun is a closure, with first component the function name and
             %% second component the environment
@@ -1614,6 +1663,10 @@ bind_constructors(Env = #{ con_env := ConEnv }, NewCons) ->
 
 %% -- Names --
 
+-spec add_child_con(env(), sophia_name(), fcode()) -> env().
+add_child_con(Env = #{child_con_env := CEnv}, Name, Fcode) ->
+    Env#{ child_con_env := CEnv#{Name => Fcode} }.
+
 -spec add_fun_env(env(), [aeso_syntax:decl()]) -> env().
 add_fun_env(Env = #{ context := {abstract_contract, _} }, _) -> Env;  %% no functions from abstract contracts
 add_fun_env(Env = #{ fun_env := FunEnv }, Decls) ->
@@ -1628,7 +1681,7 @@ add_fun_env(Env = #{ fun_env := FunEnv }, Decls) ->
 make_fun_name(#{ context := Context }, Ann, Name) ->
     Entrypoint = proplists:get_value(entrypoint, Ann, false),
     case Context of
-        {main_contract, Main} ->
+        {contract_def, Main} ->
             if Entrypoint     -> {entrypoint, list_to_binary(Name)};
                true           -> {local_fun, [Main, Name]}
             end;
@@ -1640,7 +1693,7 @@ make_fun_name(#{ context := Context }, Ann, Name) ->
 current_namespace(#{ context := Cxt }) ->
     case Cxt of
         {abstract_contract, Con} -> Con;
-        {main_contract, Con}     -> Con;
+        {contract_def, Con}     -> Con;
         {namespace, NS}          -> NS
     end.
 
@@ -1987,8 +2040,11 @@ internal_error(Error) ->
 %% -- Pretty printing --------------------------------------------------------
 
 format_fcode(#{ functions := Funs }) ->
-    prettypr:format(pp_above(
-        [ pp_fun(Name, Def) || {Name, Def} <- maps:to_list(Funs) ])).
+    prettypr:format(format_funs(Funs)).
+
+format_funs(Funs) ->
+    pp_above(
+      [ pp_fun(Name, Def) || {Name, Def} <- maps:to_list(Funs) ]).
 
 format_fexpr(E) ->
     prettypr:format(pp_fexpr(E)).
@@ -2105,7 +2161,9 @@ pp_fexpr({set_state, R, A}) ->
     pp_call(pp_text("set_state"), [{lit, {int, R}}, A]);
 pp_fexpr({get_state, R}) ->
     pp_call(pp_text("get_state"), [{lit, {int, R}}]);
-pp_fexpr({switch, Split}) -> pp_split(Split).
+pp_fexpr({switch, Split}) -> pp_split(Split);
+pp_fexpr({contract_code, Contract}) ->
+    pp_beside(pp_text("contract "), pp_text(Contract)).
 
 pp_call(Fun, Args) ->
     pp_beside(Fun, pp_fexpr({tuple, Args})).

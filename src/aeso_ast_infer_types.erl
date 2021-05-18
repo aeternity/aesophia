@@ -18,7 +18,9 @@
         , pp_type/2
         ]).
 
--type utype() :: {fun_t, aeso_syntax:ann(), named_args_t(), [utype()], utype()}
+-include("aeso_utils.hrl").
+
+-type utype() :: {fun_t, aeso_syntax:ann(), named_args_t(), [utype()] | var_args, utype()}
                | {app_t, aeso_syntax:ann(), utype(), [utype()]}
                | {tuple_t, aeso_syntax:ann(), [utype()]}
                | aeso_syntax:id()  | aeso_syntax:qid()
@@ -39,6 +41,7 @@
                        element(1, T) =:= qcon).
 
 -type why_record() :: aeso_syntax:field(aeso_syntax:expr())
+                    | {var_args, aeso_syntax:ann(), aeso_syntax:expr()}
                     | {proj, aeso_syntax:ann(), aeso_syntax:expr(), aeso_syntax:id()}.
 
 -type pos() :: aeso_errors:pos().
@@ -73,7 +76,10 @@
 -record(is_contract_constraint,
     { contract_t :: utype(),
       context    :: {contract_literal, aeso_syntax:expr()} |
-                    {address_to_contract, aeso_syntax:ann()}
+                    {address_to_contract, aeso_syntax:ann()} |
+                    {bytecode_hash, aeso_syntax:ann()} |
+                    {var_args, aeso_syntax:ann(), aeso_syntax:expr()},
+      force_def = false :: boolean()
     }).
 
 -type field_constraint() :: #field_constraint{} | #record_create_constraint{} | #is_contract_constraint{}.
@@ -96,7 +102,7 @@
 -type qname() :: [string()].
 -type typesig() :: {type_sig, aeso_syntax:ann(), type_constraints(), [aeso_syntax:named_arg_t()], [type()], type()}.
 
--type type_constraints() :: none | bytes_concat | bytes_split | address_to_contract.
+-type type_constraints() :: none | bytes_concat | bytes_split | address_to_contract | bytecode_hash.
 
 -type fun_info()  :: {aeso_syntax:ann(), typesig() | type()}.
 -type type_info() :: {aeso_syntax:ann(), typedef()}.
@@ -123,13 +129,14 @@
     , in_pattern = false              :: boolean()
     , stateful   = false              :: boolean()
     , current_function = none         :: none | aeso_syntax:id()
-    , what       = top                :: top | namespace | contract | main_contract
+    , what       = top                :: top | namespace | contract | contract_interface
     }).
 
 -type env() :: #env{}.
 
 -define(PRINT_TYPES(Fmt, Args),
         when_option(pp_types, fun () -> io:format(Fmt, Args) end)).
+-define(CONSTRUCTOR_MOCK_NAME, "#__constructor__#").
 
 %% -- Environment manipulation -----------------------------------------------
 
@@ -191,9 +198,9 @@ bind_fun(X, Type, Env) ->
 force_bind_fun(X, Type, Env = #env{ what = What }) ->
     Ann    = aeso_syntax:get_ann(Type),
     NoCode = get_option(no_code, false),
-    Entry = if X == "init", What == main_contract, not NoCode ->
+    Entry = if X == "init", What == contract, not NoCode ->
                     {reserved_init, Ann, Type};
-               What == contract -> {contract_fun, Ann, Type};
+               What == contract_interface -> {contract_fun, Ann, Type};
                true -> {Ann, Type}
             end,
     on_current_scope(Env, fun(Scope = #scope{ funs = Funs }) ->
@@ -261,13 +268,40 @@ contract_call_type({fun_t, Ann, [], Args, Ret}) ->
      Args, {if_t, Ann, Id("protected"), {app_t, Ann, {id, Ann, "option"}, [Ret]}, Ret}}.
 
 -spec bind_contract(aeso_syntax:decl(), env()) -> env().
-bind_contract({contract, Ann, Id, Contents}, Env) ->
+bind_contract({Contract, Ann, Id, Contents}, Env)
+  when ?IS_CONTRACT_HEAD(Contract) ->
     Key    = name(Id),
     Sys    = [{origin, system}],
-    Fields = [ {field_t, AnnF, Entrypoint, contract_call_type(Type)}
-                || {fun_decl, AnnF, Entrypoint, Type} <- Contents ] ++
-              %% Predefined fields
-             [ {field_t, Sys, {id, Sys, "address"}, {id, Sys, "address"}} ],
+    Fields =
+        [ {field_t, AnnF, Entrypoint, contract_call_type(Type)}
+          || {fun_decl, AnnF, Entrypoint, Type} <- Contents ] ++
+        [ {field_t, AnnF, Entrypoint,
+           contract_call_type(
+             {fun_t, AnnF, [], [ArgT || {typed, _, _, ArgT} <- Args], RetT})
+          }
+          || {letfun, AnnF, Entrypoint = {id, _, Name}, Args, _Type, {typed, _, _, RetT}} <- Contents,
+             Name =/= "init"
+        ] ++
+        %% Predefined fields
+        [ {field_t, Sys, {id, Sys, "address"}, {id, Sys, "address"}} ] ++
+        [ {field_t, Sys, {id, Sys, ?CONSTRUCTOR_MOCK_NAME},
+           contract_call_type(
+             case [ [ArgT || {typed, _, _, ArgT} <- Args]
+                    || {letfun, AnnF, {id, _, "init"}, Args, _, _} <- Contents,
+                       aeso_syntax:get_ann(entrypoint, AnnF, false)]
+                 ++ [ Args
+                      || {fun_decl, AnnF, {id, _, "init"}, {fun_t, _, _, Args, _}} <- Contents,
+                         aeso_syntax:get_ann(entrypoint, AnnF, false)]
+                 ++ [ Args
+                      || {fun_decl, AnnF, {id, _, "init"}, {type_sig, _, _, _, Args, _}} <- Contents,
+                         aeso_syntax:get_ann(entrypoint, AnnF, false)]
+             of
+                 [] -> {fun_t, [stateful,payable|Sys], [], [], {id, Sys, "void"}};
+                 [Args] -> {fun_t, [stateful,payable|Sys], [], Args, {id, Sys, "void"}}
+             end
+            )
+          }
+        ],
     FieldInfo = [ {Entrypoint, #field_info{ ann      = FieldAnn,
                                             kind     = contract,
                                             field_t  = Type,
@@ -396,8 +430,11 @@ global_env() ->
     Map     = fun(A, B) -> {app_t, Ann, {id, Ann, "map"}, [A, B]} end,
     Pair    = fun(A, B) -> {tuple_t, Ann, [A, B]} end,
     FunC    = fun(C, Ts, T) -> {type_sig, Ann, C, [], Ts, T} end,
+    FunC1   = fun(C, S, T) -> {type_sig, Ann, C, [], [S], T} end,
     Fun     = fun(Ts, T) -> FunC(none, Ts, T) end,
     Fun1    = fun(S, T) -> Fun([S], T) end,
+    FunCN   = fun(C, Named, Normal, Ret) -> {type_sig, Ann, C, Named, Normal, Ret} end,
+    FunN    = fun(Named, Normal, Ret) -> FunCN(none, Named, Normal, Ret) end,
     %% Lambda    = fun(Ts, T) -> {fun_t, Ann, [], Ts, T} end,
     %% Lambda1   = fun(S, T) -> Lambda([S], T) end,
     StateFun  = fun(Ts, T) -> {type_sig, [stateful|Ann], none, [], Ts, T} end,
@@ -424,6 +461,7 @@ global_env() ->
     TxFlds    = [{"paying_for", Option(PayForTx)}, {"ga_metas", List(GAMetaTx)},
                  {"actor", Address}, {"fee", Int}, {"ttl", Int}, {"tx", BaseTx}],
     TxType    = {record_t, [FldT(N, T) || {N, T} <- TxFlds ]},
+    Stateful  = fun(T) -> setelement(2, T, [stateful|element(2, T)]) end,
 
     Fee       = Int,
     [A, Q, R, K, V] = lists:map(TVar, ["a", "q", "r", "k", "v"]),
@@ -443,6 +481,7 @@ global_env() ->
                      {"require", Fun([Bool, String], Unit)}])
         , types = MkDefs(
                     [{"int", 0}, {"bool", 0}, {"char", 0}, {"string", 0}, {"address", 0},
+                     {"void", 0},
                      {"unit", {[], {alias_t, Unit}}},
                      {"hash", {[], {alias_t, Bytes(32)}}},
                      {"signature", {[], {alias_t, Bytes(64)}}},
@@ -463,6 +502,23 @@ global_env() ->
                      {"block_height", Int},
                      {"difficulty",   Int},
                      {"gas_limit",    Int},
+                     {"bytecode_hash",FunC1(bytecode_hash, A, Option(Hash))},
+                     {"create",       Stateful(
+                                        FunN([ {named_arg_t, Ann, {id, Ann, "value"}, Int, {typed, Ann, {int, Ann, 0}, Int}}
+                                             ], var_args, A))},
+                     {"clone",        Stateful(
+                                        FunN([ {named_arg_t, Ann, {id, Ann, "gas"}, Int,
+                                                {typed, Ann,
+                                                 {app, Ann,
+                                                  {typed, Ann, {qid, Ann, ["Call","gas_left"]},
+                                                   typesig_to_fun_t(Fun([], Int))
+                                                  },
+                                                  []}, Int
+                                                }}
+                                             , {named_arg_t, Ann, {id, Ann, "value"}, Int, {typed, Ann, {int, Ann, 0}, Int}}
+                                             , {named_arg_t, Ann, {id, Ann, "protected"}, Bool, {typed, Ann, {bool, Ann, false}, Bool}}
+                                             , {named_arg_t, Ann, {id, Ann, "ref"}, A, undefined}
+                                             ], var_args, A))},
                      %% Tx constructors
                      {"GAMetaTx",     Fun([Address, Int], GAMetaTx)},
                      {"PayingForTx",  Fun([Address, Int], PayForTx)},
@@ -699,9 +755,13 @@ infer(Contracts, Options) ->
     try
         Env = init_env(Options),
         create_options(Options),
+        ets_new(defined_contracts, [bag]),
         ets_new(type_vars, [set]),
         check_modifiers(Env, Contracts),
-        {Env1, Decls} = infer1(Env, Contracts, [], Options),
+        create_type_errors(),
+        Contracts1 = identify_main_contract(Contracts, Options),
+        destroy_and_report_type_errors(Env),
+        {Env1, Decls} = infer1(Env, Contracts1, [], Options),
         {Env2, DeclsFolded, DeclsUnfolded} =
             case proplists:get_value(dont_unfold, Options, false) of
                 true  -> {Env1, Decls, Decls};
@@ -719,12 +779,21 @@ infer(Contracts, Options) ->
 -spec infer1(env(), [aeso_syntax:decl()], [aeso_syntax:decl()], list(option())) ->
     {env(), [aeso_syntax:decl()]}.
 infer1(Env, [], Acc, _Options) -> {Env, lists:reverse(Acc)};
-infer1(Env, [{contract, Ann, ConName, Code} | Rest], Acc, Options) ->
+infer1(Env, [{Contract, Ann, ConName, Code} | Rest], Acc, Options)
+  when ?IS_CONTRACT_HEAD(Contract) ->
     %% do type inference on each contract independently.
     check_scope_name_clash(Env, contract, ConName),
-    What = if Rest == [] -> main_contract; true -> contract end,
+    What = case Contract of
+               contract_main -> contract;
+               contract_child -> contract;
+               contract_interface -> contract_interface
+           end,
+    case What of
+        contract -> ets_insert(defined_contracts, {qname(ConName)});
+        contract_interface -> ok
+    end,
     {Env1, Code1} = infer_contract_top(push_scope(contract, ConName, Env), What, Code, Options),
-    Contract1 = {contract, Ann, ConName, Code1},
+    Contract1 = {Contract, Ann, ConName, Code1},
     Env2 = pop_scope(Env1),
     Env3 = bind_contract(Contract1, Env2),
     infer1(Env3, Rest, [Contract1 | Acc], Options);
@@ -737,6 +806,25 @@ infer1(Env, [{pragma, _, _} | Rest], Acc, Options) ->
     %% Pragmas are checked in check_modifiers
     infer1(Env, Rest, Acc, Options).
 
+%% Asserts that the main contract is somehow defined.
+identify_main_contract(Contracts, Options) ->
+    Children   = [C || C = {contract_child, _, _, _} <- Contracts],
+    Mains      = [C || C = {contract_main, _, _, _} <- Contracts],
+    case Mains of
+        [] -> case Children of
+                  [] -> type_error(
+                          {main_contract_undefined,
+                           [{file, File} || {src_file, File} <- Options]});
+                  [{contract_child, Ann, Con, Body}] ->
+                      (Contracts -- Children) ++ [{contract_main, Ann, Con, Body}];
+                  [H|_] -> type_error({ambiguous_main_contract,
+                                       aeso_syntax:get_ann(H)})
+              end;
+        [_] -> (Contracts -- Mains) ++ Mains; %% Move to the end
+        [H|_] -> type_error({multiple_main_contracts,
+                             aeso_syntax:get_ann(H)})
+    end.
+
 check_scope_name_clash(Env, Kind, Name) ->
     case get_scope(Env, qname(Name)) of
         false -> ok;
@@ -746,7 +834,7 @@ check_scope_name_clash(Env, Kind, Name) ->
             destroy_and_report_type_errors(Env)
     end.
 
--spec infer_contract_top(env(), main_contract | contract | namespace, [aeso_syntax:decl()], list(option())) ->
+-spec infer_contract_top(env(), contract_interface | contract | namespace, [aeso_syntax:decl()], list(option())) ->
     {env(), [aeso_syntax:decl()]}.
 infer_contract_top(Env, Kind, Defs0, Options) ->
     create_type_errors(),
@@ -756,7 +844,7 @@ infer_contract_top(Env, Kind, Defs0, Options) ->
 
 %% infer_contract takes a proplist mapping global names to types, and
 %% a list of definitions.
--spec infer_contract(env(), main_contract | contract | namespace, [aeso_syntax:decl()], list(option())) -> {env(), [aeso_syntax:decl()]}.
+-spec infer_contract(env(), contract_interface | contract | namespace, [aeso_syntax:decl()], list(option())) -> {env(), [aeso_syntax:decl()]}.
 infer_contract(Env0, What, Defs0, Options) ->
     create_type_errors(),
     Defs01 = process_blocks(Defs0),
@@ -772,19 +860,19 @@ infer_contract(Env0, What, Defs0, Options) ->
               ({fun_decl, _, _, _})       -> prototype;
               (_)                         -> unexpected
            end,
-    Get = fun(K) -> [ Def || Def <- Defs, Kind(Def) == K ] end,
-    {Env1, TypeDefs} = check_typedefs(Env, Get(type)),
+    Get = fun(K, In) -> [ Def || Def <- In, Kind(Def) == K ] end,
+    {Env1, TypeDefs} = check_typedefs(Env, Get(type, Defs)),
     create_type_errors(),
-    check_unexpected(Get(unexpected)),
+    check_unexpected(Get(unexpected, Defs)),
     Env2 =
         case What of
-            namespace     -> Env1;
-            contract      -> Env1;
-            main_contract -> bind_state(Env1)   %% bind state and put
+            namespace          -> Env1;
+            contract_interface -> Env1;
+            contract           -> bind_state(Env1)   %% bind state and put
         end,
-    {ProtoSigs, Decls} = lists:unzip([ check_fundecl(Env1, Decl) || Decl <- Get(prototype) ]),
+    {ProtoSigs, Decls} = lists:unzip([ check_fundecl(Env1, Decl) || Decl <- Get(prototype, Defs) ]),
     Env3      = bind_funs(ProtoSigs, Env2),
-    Functions = Get(function),
+    Functions = Get(function, Defs),
     %% Check for duplicates in Functions (we turn it into a map below)
     FunBind   = fun({letfun, Ann, {id, _, Fun}, _, _, _})   -> {Fun, {tuple_t, Ann, []}};
                    ({fun_clauses, Ann, {id, _, Fun}, _, _}) -> {Fun, {tuple_t, Ann, []}} end,
@@ -794,11 +882,11 @@ infer_contract(Env0, What, Defs0, Options) ->
     check_reserved_entrypoints(FunMap),
     DepGraph  = maps:map(fun(_, Def) -> aeso_syntax_utils:used_ids(Def) end, FunMap),
     SCCs      = aeso_utils:scc(DepGraph),
-    %% io:format("Dependency sorted functions:\n  ~p\n", [SCCs]),
     {Env4, Defs1} = check_sccs(Env3, FunMap, SCCs, []),
     %% Check that `init` doesn't read or write the state
     check_state_dependencies(Env4, Defs1),
     destroy_and_report_type_errors(Env4),
+    %% Add inferred types of definitions
     {Env4, TypeDefs ++ Decls ++ Defs1}.
 
 %% Restructure blocks into multi-clause fundefs (`fun_clauses`).
@@ -830,9 +918,9 @@ expose_internals(Defs, What) ->
     [ begin
           Ann = element(2, Def),
           NewAnn = case What of
-                       namespace -> [A ||A <- Ann, A /= {private, true}, A /= private];
-                       main_contract -> [{entrypoint, true}|Ann];  % minor duplication
-                       contract -> Ann
+                       namespace          -> [A ||A <- Ann, A /= {private, true}, A /= private];
+                       contract           -> [{entrypoint, true}|Ann];  % minor duplication
+                       contract_interface -> Ann
                    end,
           Def1 = setelement(2, Def, NewAnn),
           case Def1 of  % fix inner clauses
@@ -907,15 +995,16 @@ check_modifiers(Env, Contracts) ->
     check_modifiers_(Env, Contracts),
     destroy_and_report_type_errors(Env).
 
-check_modifiers_(Env, [{contract, _, Con, Decls} | Rest]) ->
-    IsMain = Rest == [],
+check_modifiers_(Env, [{Contract, _, Con, Decls} | Rest])
+  when ?IS_CONTRACT_HEAD(Contract) ->
+    IsInterface = Contract =:= contract_interface,
     check_modifiers1(contract, Decls),
     case {lists:keymember(letfun, 1, Decls),
             [ D || D <- Decls, aeso_syntax:get_ann(entrypoint, D, false) ]} of
         {true, []} -> type_error({contract_has_no_entrypoints, Con});
-        _ when not IsMain ->
-            case [ {Ann, Id} || {letfun, Ann, Id, _, _, _} <- Decls ] of
-                [{Ann, Id} | _] -> type_error({definition_in_non_main_contract, Ann, Id});
+        _ when IsInterface ->
+            case [ {AnnF, Id} || {letfun, AnnF, Id, _, _, _} <- Decls ] of
+                [{AnnF, Id} | _] -> type_error({definition_in_contract_interface, AnnF, Id});
                 [] -> ok
             end;
         _ -> ok
@@ -1408,8 +1497,7 @@ infer_expr(Env, {typed, As, Body, Type}) ->
     {typed, _, NewBody, NewType} = check_expr(Env, Body, Type1),
     {typed, As, NewBody, NewType};
 infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
-    NamedArgs  = [ Arg || Arg = {named_arg, _, _, _} <- Args0 ],
-    Args       = Args0 -- NamedArgs,
+    {NamedArgs, Args} = split_args(Args0),
     case aeso_syntax:get_ann(format, Ann) of
         infix ->
             infer_op(Env, Ann, Fun, Args, fun infer_infix/1);
@@ -1418,13 +1506,13 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
         _ ->
             NamedArgsVar = fresh_uvar(Ann),
             NamedArgs1 = [ infer_named_arg(Env, NamedArgsVar, Arg) || Arg <- NamedArgs ],
-            %% TODO: named args constraints
-            NewFun={typed, _, _, FunType} = infer_expr(Env, Fun),
+            NewFun0 = infer_expr(Env, Fun),
             NewArgs = [infer_expr(Env, A) || A <- Args],
             ArgTypes = [T || {typed, _, _, T} <- NewArgs],
+            NewFun1 = {typed, _, _, FunType} = infer_var_args_fun(Env, NewFun0, NamedArgs1, ArgTypes),
+            When = {infer_app, Fun, NamedArgs1, Args, FunType, ArgTypes},
             GeneralResultType = fresh_uvar(Ann),
             ResultType = fresh_uvar(Ann),
-            When = {infer_app, Fun, NamedArgs1, Args, FunType, ArgTypes},
             unify(Env, FunType, {fun_t, [], NamedArgsVar, ArgTypes, GeneralResultType}, When),
             add_named_argument_constraint(
               #dependent_type_constraint{ named_args_t = NamedArgsVar,
@@ -1432,7 +1520,7 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
                                           general_type = GeneralResultType,
                                           specialized_type = ResultType,
                                           context = {check_return, App} }),
-            {typed, Ann, {app, Ann, NewFun, NamedArgs1 ++ NewArgs}, dereference(ResultType)}
+            {typed, Ann, {app, Ann, NewFun1, NamedArgs1 ++ NewArgs}, dereference(ResultType)}
     end;
 infer_expr(Env, {'if', Attrs, Cond, Then, Else}) ->
     NewCond = check_expr(Env, Cond, {id, Attrs, "bool"}),
@@ -1536,6 +1624,62 @@ infer_expr(Env, Let = {letval, Attrs, _, _}) ->
 infer_expr(Env, Let = {letfun, Attrs, _, _, _, _}) ->
     type_error({missing_body_for_let, Attrs}),
     infer_expr(Env, {block, Attrs, [Let, abort_expr(Attrs, "missing body")]}).
+
+infer_var_args_fun(Env, {typed, Ann, Fun, FunType0}, NamedArgs, ArgTypes) ->
+    FunType =
+        case Fun of
+            {qid, _, ["Chain", "create"]} ->
+                {fun_t, _, NamedArgsT, var_args, RetT} = FunType0,
+                GasCapMock    = {named_arg_t, Ann, {id, Ann, "gas"}, {id, Ann, "int"}, {int, Ann, 0}},
+                ProtectedMock = {named_arg_t, Ann, {id, Ann, "protected"}, {id, Ann, "bool"}, {bool, Ann, false}},
+                NamedArgsT1 = case NamedArgsT of
+                                  [Value|Rest] -> [GasCapMock, Value, ProtectedMock|Rest];
+                                  % generally type error, but will be caught
+                                  _ -> [GasCapMock, ProtectedMock|NamedArgsT]
+                              end,
+                check_contract_construction(Env, true, RetT, Fun, NamedArgsT1, ArgTypes, RetT),
+                {fun_t, Ann, NamedArgsT, ArgTypes, RetT};
+            {qid, _, ["Chain", "clone"]} ->
+                {fun_t, _, NamedArgsT, var_args, RetT} = FunType0,
+                ContractT =
+                    case [ContractT || {named_arg, _, {id, _, "ref"}, {typed, _, _, ContractT}} <- NamedArgs] of
+                        [C] -> C;
+                        _ -> type_error({clone_no_contract, Ann}),
+                             fresh_uvar(Ann)
+                    end,
+                NamedArgsTNoRef =
+                    lists:filter(fun({named_arg_t, _, {id, _, "ref"}, _, _}) -> false; (_) -> true end, NamedArgsT),
+                check_contract_construction(Env, false, ContractT, Fun, NamedArgsTNoRef, ArgTypes, RetT),
+                {fun_t, Ann, NamedArgsT, ArgTypes,
+                 {if_t, Ann, {id, Ann, "protected"}, {app_t, Ann, {id, Ann, "option"}, [RetT]}, RetT}};
+            _ -> FunType0
+        end,
+    {typed, Ann, Fun, FunType}.
+
+-spec check_contract_construction(env(), boolean(), utype(), utype(), named_args_t(), [utype()], utype()) -> ok.
+check_contract_construction(Env, ForceDef, ContractT, Fun, NamedArgsT, ArgTypes, RetT) ->
+    Ann = aeso_syntax:get_ann(Fun),
+    InitT = fresh_uvar(Ann),
+    unify(Env, InitT, {fun_t, Ann, NamedArgsT, ArgTypes, fresh_uvar(Ann)}, {checking_init_args, Ann, ContractT, ArgTypes}),
+    unify(Env, RetT, ContractT, {return_contract, Fun, ContractT}),
+    constrain(
+      [ #field_constraint{
+           record_t = unfold_types_in_type(Env, ContractT),
+           field    = {id, Ann, ?CONSTRUCTOR_MOCK_NAME},
+           field_t  = InitT,
+           kind     = project,
+           context  = {var_args, Ann, Fun} }
+      , #is_contract_constraint{ contract_t = ContractT,
+                                 context    = {var_args, Ann, Fun},
+                                 force_def  = ForceDef
+                               }
+      ]),
+    ok.
+
+split_args(Args0) ->
+    NamedArgs = [ Arg || Arg = {named_arg, _, _, _} <- Args0 ],
+    Args      = Args0 -- NamedArgs,
+    {NamedArgs, Args}.
 
 infer_named_arg(Env, NamedArgs, {named_arg, Ann, Id, E}) ->
     CheckedExpr = {typed, _, _, ArgType} = infer_expr(Env, E),
@@ -1704,7 +1848,7 @@ next_count() ->
 
 ets_tables() ->
     [options, type_vars, type_defs, record_fields, named_argument_constraints,
-     field_constraints, freshen_tvars, type_errors].
+     field_constraints, freshen_tvars, type_errors, defined_contracts].
 
 clean_up_ets() ->
     [ catch ets_delete(Tab) || Tab <- ets_tables() ],
@@ -1814,7 +1958,7 @@ solve_named_argument_constraints(Env, Constraints0) ->
     [ C || C <- dereference_deep(Constraints0),
            unsolved == check_named_argument_constraint(Env, C) ].
 
-%% If false, a type error have been emitted, so it's safe to drop the constraint.
+%% If false, a type error has been emitted, so it's safe to drop the constraint.
 -spec check_named_argument_constraint(env(), named_argument_constraint()) -> true | false | unsolved.
 check_named_argument_constraint(_Env, #named_argument_constraint{ args = {uvar, _, _} }) ->
     unsolved;
@@ -1978,12 +2122,20 @@ check_record_create_constraints(Env, [C | Cs]) ->
     end,
     check_record_create_constraints(Env, Cs).
 
+is_contract_defined(C) ->
+    ets_lookup(defined_contracts, qname(C)) =/= [].
+
 check_is_contract_constraints(_Env, []) -> ok;
 check_is_contract_constraints(Env, [C | Cs]) ->
-    #is_contract_constraint{ contract_t = Type, context = Cxt } = C,
+    #is_contract_constraint{ contract_t = Type, context = Cxt, force_def = ForceDef } = C,
     Type1 = unfold_types_in_type(Env, instantiate(Type)),
-    case lookup_type(Env, record_type_name(Type1)) of
-        {_, {_Ann, {[], {contract_t, _}}}} -> ok;
+    TypeName = record_type_name(Type1),
+    case lookup_type(Env, TypeName) of
+        {_, {_Ann, {[], {contract_t, _}}}} ->
+            case not ForceDef orelse is_contract_defined(TypeName) of
+                true -> ok;
+                false -> type_error({contract_lacks_definition, Type1, Cxt})
+                end;
         _ -> type_error({not_a_contract_type, Type1, Cxt})
     end,
     check_is_contract_constraints(Env, Cs).
@@ -2309,8 +2461,13 @@ unify1(_Env, {bytes_t, _, Len}, {bytes_t, _, Len}, _When) ->
 unify1(Env, {if_t, _, {id, _, Id}, Then1, Else1}, {if_t, _, {id, _, Id}, Then2, Else2}, When) ->
     unify(Env, Then1, Then2, When) andalso
     unify(Env, Else1, Else2, When);
+
+unify1(_Env, {fun_t, _, _, _, _}, {fun_t, _, _, var_args, _}, When) ->
+    type_error({unify_varargs, When});
+unify1(_Env, {fun_t, _, _, var_args, _}, {fun_t, _, _, _, _}, When) ->
+    type_error({unify_varargs, When});
 unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, When)
-    when length(Args1) == length(Args2) ->
+  when length(Args1) == length(Args2) ->
     unify(Env, Named1, Named2, When) andalso
     unify(Env, Args1, Args2, When) andalso unify(Env, Result1, Result2, When);
 unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, When)
@@ -2319,6 +2476,9 @@ unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, When
 unify1(Env, {tuple_t, _, As}, {tuple_t, _, Bs}, When)
   when length(As) == length(Bs) ->
     unify(Env, As, Bs, When);
+unify1(Env, {named_arg_t, _, Id1, Type1, _}, {named_arg_t, _, Id2, Type2, _}, When) ->
+    unify1(Env, Id1, Id2, {arg_name, Id1, Id2, When}),
+    unify1(Env, Type1, Type2, When);
 %% The grammar is a bit inconsistent about whether types without
 %% arguments are represented as applications to an empty list of
 %% parameters or not. We therefore allow them to unify.
@@ -2376,8 +2536,6 @@ occurs_check1(R, [H | T]) ->
     occurs_check(R, H) orelse occurs_check(R, T);
 occurs_check1(_, []) -> false.
 
-fresh_uvar([{origin, system}]) ->
-    error(oh_no_you_dont);
 fresh_uvar(Attrs) ->
     {uvar, Attrs, make_ref()}.
 
@@ -2426,7 +2584,11 @@ apply_typesig_constraint(Ann, address_to_contract, {fun_t, _, [], [_], Type}) ->
 apply_typesig_constraint(Ann, bytes_concat, {fun_t, _, [], [A, B], C}) ->
     add_bytes_constraint({add_bytes, Ann, concat, A, B, C});
 apply_typesig_constraint(Ann, bytes_split, {fun_t, _, [], [C], {tuple_t, _, [A, B]}}) ->
-    add_bytes_constraint({add_bytes, Ann, split, A, B, C}).
+    add_bytes_constraint({add_bytes, Ann, split, A, B, C});
+apply_typesig_constraint(Ann, bytecode_hash, {fun_t, _, _, [Con], _}) ->
+    constrain([#is_contract_constraint{ contract_t = Con,
+                                        context    = {bytecode_hash, Ann} }]).
+
 
 %% Dereferences all uvars and replaces the uninstantiated ones with a
 %% succession of tvars.
@@ -2555,6 +2717,9 @@ mk_error({not_a_contract_type, Type, Cxt}) ->
         end,
     {Pos, Cxt1} =
         case Cxt of
+            {var_args, Ann, Fun} ->
+                {pos(Ann),
+                 io_lib:format("when calling variadic function\n~s\n", [pp_expr("  ", Fun)])};
             {contract_literal, Lit} ->
                 {pos(Lit),
                  io_lib:format("when checking that the contract literal\n~s\n"
@@ -2653,7 +2818,7 @@ mk_error({namespace, _Pos, {con, Pos, Name}, _Def}) ->
     Msg = io_lib:format("Nested namespaces are not allowed\nNamespace '~s' at ~s not defined at top level.\n",
                         [Name, pp_loc(Pos)]),
     mk_t_err(pos(Pos), Msg);
-mk_error({contract, _Pos, {con, Pos, Name}, _Def}) ->
+mk_error({Contract, _Pos, {con, Pos, Name}, _Def}) when ?IS_CONTRACT_HEAD(Contract) ->
     Msg = io_lib:format("Nested contracts are not allowed\nContract '~s' at ~s not defined at top level.\n",
                         [Name, pp_loc(Pos)]),
     mk_t_err(pos(Pos), Msg);
@@ -2728,8 +2893,8 @@ mk_error({contract_has_no_entrypoints, Con}) ->
                         "contract functions must be declared with the 'entrypoint' keyword instead of\n"
                         "'function'.\n", [pp_expr("", Con), pp_loc(Con)]),
     mk_t_err(pos(Con), Msg);
-mk_error({definition_in_non_main_contract, Ann, {id, _, Id}}) ->
-    Msg = "Only the main contract can contain defined functions or entrypoints.\n",
+mk_error({definition_in_contract_interface, Ann, {id, _, Id}}) ->
+    Msg = "Contract interfaces cannot contain defined functions or entrypoints.\n",
     Cxt = io_lib:format("Fix: replace the definition of '~s' by a type signature.\n", [Id]),
     mk_t_err(pos(Ann), Msg, Cxt);
 mk_error({unbound_type, Type}) ->
@@ -2798,6 +2963,29 @@ mk_error({named_argument_must_be_literal_bool, Name, Arg}) ->
 mk_error({conflicting_updates_for_field, Upd, Key}) ->
     Msg = io_lib:format("Conflicting updates for field '~s'\n", [Key]),
     mk_t_err(pos(Upd), Msg);
+mk_error({ambiguous_main_contract, Ann}) ->
+    Msg = "Could not deduce the main contract. You can point it out manually with the `main` keyword.",
+    mk_t_err(pos(Ann), Msg);
+mk_error({main_contract_undefined, Ann}) ->
+    Msg = "No contract defined.\n",
+    mk_t_err(pos(Ann), Msg);
+mk_error({multiple_main_contracts, Ann}) ->
+    Msg = "Only one main contract can be defined.\n",
+    mk_t_err(pos(Ann), Msg);
+mk_error({unify_varargs, When}) ->
+    Msg = "Cannot unify variable argument list.\n",
+    {Pos, Ctxt} = pp_when(When),
+    mk_t_err(Pos, Msg, Ctxt);
+mk_error({clone_no_contract, Ann}) ->
+    Msg = "Chain.clone requires `ref` named argument of contract type.\n",
+    mk_t_err(pos(Ann), Msg);
+mk_error({contract_lacks_definition, Type, When}) ->
+    Msg = io_lib:format(
+            "~s is not implemented.\n",
+            [pp_type(Type)]
+           ),
+    {Pos, Ctxt} = pp_when(When),
+    mk_t_err(Pos, Msg, Ctxt);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p\n", [Err]),
     mk_t_err(pos(0, 0), Msg).
@@ -2833,6 +3021,12 @@ pp_when({field_constraint, FieldType0, InferredType0, Fld}) ->
     InferredType = instantiate(InferredType0),
     {pos(Fld),
      case Fld of
+         {var_args, _Ann, _Fun} ->
+             io_lib:format("when checking contract construction of type\n~s (at ~s)\nagainst the expected type\n~s\n",
+                          [pp_type("  ", FieldType),
+                           pp_loc(Fld),
+                           pp_type("  ", InferredType)
+                          ]);
          {field, _Ann, LV, Id, E} ->
              io_lib:format("when checking the assignment of the field\n~s (at ~s)\nto the old value ~s and the new value\n~s\n",
                  [pp_typed("  ", {lvalue, [], LV}, FieldType),
@@ -2855,6 +3049,13 @@ pp_when({record_constraint, RecType0, InferredType0, Fld}) ->
     InferredType = instantiate(InferredType0),
     {Pos, WhyRec} = pp_why_record(Fld),
     case Fld of
+        {var_args, _Ann, _Fun} ->
+            {Pos,
+             io_lib:format("when checking that contract construction of type\n~s\n~s\n"
+                           "matches the expected type\n~s\n",
+                           [pp_type("  ", RecType), WhyRec, pp_type("  ", InferredType)]
+                          )
+            };
         {field, _Ann, _LV, _Id, _E} ->
             {Pos,
              io_lib:format("when checking that the record type\n~s\n~s\n"
@@ -2908,17 +3109,42 @@ pp_when({check_named_arg_constraint, C}) ->
     Err = io_lib:format("when checking named argument\n~s\nagainst inferred type\n~s",
                         [pp_typed("  ", Arg, Type), pp_type("  ", C#named_argument_constraint.type)]),
     {pos(Arg), Err};
+pp_when({checking_init_args, Ann, Con0, ArgTypes0}) ->
+    Con = instantiate(Con0),
+    ArgTypes = instantiate(ArgTypes0),
+    {pos(Ann),
+     io_lib:format("when checking arguments of ~s's init entrypoint to match\n(~s)",
+                   [pp_type(Con), string:join([pp_type(A) || A <- ArgTypes], ", ")])
+    };
+pp_when({return_contract, App, Con0}) ->
+    Con = instantiate(Con0),
+    {pos(App)
+    , io_lib:format("when checking that expression returns contract of type\n~s", [pp_type("  ", Con)])
+    };
+pp_when({arg_name, Id1, Id2, When}) ->
+    {Pos, Ctx} = pp_when(When),
+    {Pos
+    , io_lib:format("when unifying names of named arguments: ~s and ~s\n~s", [pp_expr(Id1), pp_expr(Id2), Ctx])
+    };
+pp_when({var_args, Ann, Fun}) ->
+    {pos(Ann)
+    , io_lib:format("when resolving arguments of variadic function\n~s\n", [pp_expr("  ", Fun)])
+    };
 pp_when(unknown) -> {pos(0,0), ""}.
 
 -spec pp_why_record(why_record()) -> {pos(), iolist()}.
-pp_why_record(Fld = {field, _Ann, LV, _Id, _E}) ->
-    {pos(Fld),
-     io_lib:format("arising from an assignment of the field ~s (at ~s)",
-         [pp_expr("", {lvalue, [], LV}), pp_loc(Fld)])};
+pp_why_record({var_args, Ann, Fun}) ->
+    {pos(Ann),
+     io_lib:format("arising from resolution of variadic function ~s (at ~s)",
+                   [pp_expr(Fun), pp_loc(Fun)])};
 pp_why_record(Fld = {field, _Ann, LV, _E}) ->
     {pos(Fld),
      io_lib:format("arising from an assignment of the field ~s (at ~s)",
-         [pp_expr("", {lvalue, [], LV}), pp_loc(Fld)])};
+                   [pp_expr({lvalue, [], LV}), pp_loc(Fld)])};
+pp_why_record(Fld = {field, _Ann, LV, _Alias, _E}) ->
+    {pos(Fld),
+     io_lib:format("arising from an assignment of the field ~s (at ~s)",
+                   [pp_expr({lvalue, [], LV}), pp_loc(Fld)])};
 pp_why_record({proj, _Ann, Rec, FldName}) ->
     {pos(Rec),
      io_lib:format("arising from the projection of the field ~s (at ~s)",
@@ -2938,9 +3164,13 @@ pp_typed(Label, {typed, _, Expr, _}, Type) ->
 pp_typed(Label, Expr, Type) ->
     pp_expr(Label, {typed, [], Expr, Type}).
 
+pp_expr(Expr) ->
+    pp_expr("", Expr).
 pp_expr(Label, Expr) ->
     prettypr:format(prettypr:beside(prettypr:text(Label), aeso_pretty:expr(Expr, [show_generated]))).
 
+pp_type(Type) ->
+    pp_type("", Type).
 pp_type(Label, Type) ->
     prettypr:format(prettypr:beside(prettypr:text(Label), aeso_pretty:type(Type, [show_generated]))).
 

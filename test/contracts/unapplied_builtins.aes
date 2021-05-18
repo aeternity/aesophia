@@ -9,7 +9,7 @@
 //    Oracle.extend
 include "String.aes"
 contract UnappliedBuiltins =
-  entrypoint main() = ()
+  entrypoint main_fun() = ()
   type o = oracle(int, int)
   type t = list(int * string)
   type m = map(int, int)

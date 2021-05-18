@@ -28,6 +28,7 @@
 
 -include_lib("aebytecode/include/aeb_opcodes.hrl").
 -include("aeso_icode.hrl").
+-include("aeso_utils.hrl").
 
 
 -type option() :: pp_sophia_code
@@ -137,8 +138,9 @@ from_string1(aevm, ContractString, Options) ->
     {ok, maybe_generate_aci(Res, FoldedTypedAst, Options)};
 from_string1(fate, ContractString, Options) ->
     #{ fcode := FCode
+     , fcode_env := #{child_con_env := ChildContracts}
      , folded_typed_ast := FoldedTypedAst } = string_to_code(ContractString, Options),
-    FateCode = aeso_fcode_to_fate:compile(FCode, Options),
+    FateCode = aeso_fcode_to_fate:compile(ChildContracts, FCode, Options),
     pp_assembler(fate, FateCode, Options),
     ByteCode = aeb_fate_code:serialize(FateCode, []),
     {ok, Version} = version(),
@@ -178,8 +180,9 @@ string_to_code(ContractString, Options) ->
              , type_env  => TypeEnv
              , ast => Ast };
         fate ->
-            Fcode = aeso_ast_to_fcode:ast_to_fcode(UnfoldedTypedAst, Options),
+            {Env, Fcode} = aeso_ast_to_fcode:ast_to_fcode(UnfoldedTypedAst, [{original_src, ContractString}|Options]),
             #{ fcode => Fcode
+             , fcode_env => Env
              , unfolded_typed_ast => UnfoldedTypedAst
              , folded_typed_ast => FoldedTypedAst
              , type_env  => TypeEnv
@@ -468,7 +471,7 @@ error_missing_call_function() ->
     Msg = "Internal error: missing '__call'-function",
     aeso_errors:throw(aeso_errors:new(internal_error, Msg)).
 
-get_call_type([{contract, _, _, Defs}]) ->
+get_call_type([{Contract, _, _, Defs}]) when ?IS_CONTRACT_HEAD(Contract) ->
     case [ {lists:last(QFunName), FunType}
           || {letfun, _, {id, _, ?CALL_NAME}, [], _Ret,
                 {typed, _,
@@ -482,7 +485,7 @@ get_call_type([_ | Contracts]) ->
     get_call_type(Contracts).
 
 -dialyzer({nowarn_function, get_decode_type/2}).
-get_decode_type(FunName, [{contract, Ann, _, Defs}]) ->
+get_decode_type(FunName, [{Contract, Ann, _, Defs}]) when ?IS_CONTRACT_HEAD(Contract) ->
     GetType = fun({letfun, _, {id, _, Name}, Args, Ret, _})               when Name == FunName -> [{Args, Ret}];
                  ({fun_decl, _, {id, _, Name}, {fun_t, _, _, Args, Ret}}) when Name == FunName -> [{Args, Ret}];
                  (_) -> [] end,

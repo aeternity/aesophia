@@ -1,5 +1,5 @@
 
-contract Remote =
+contract interface Remote =
   stateful entrypoint remote_spend : (address, int) => unit
   entrypoint remote_pure : int => int
 

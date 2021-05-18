@@ -2,4 +2,4 @@ contract HigherOrderQueryType =
   stateful function foo(o) : oracle_query(_, string ) =
     Oracle.query(o, (x) => x + 1, 100, RelativeTTL(100), RelativeTTL(100))
 
-  entrypoint main() = ()
+  entrypoint main_fun() = ()

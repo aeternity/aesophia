@@ -6,7 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Child contracts
+- `Chain.clone`
+- `Chain.create`
+- `Chain.bytecode_hash`
+- Minor support for variadic functions
+- `void` type that represents an empty type
 ### Changed
+- Contract interfaces must be now invocated by `contract interface` keywords
+- `main` keyword to indicate the main contract in case there are child contracts around
+- `List.sum` and `List.product` no longer use `List.foldl`
 ### Removed
 
 ## [5.0.0] 2021-04-30

@@ -13,6 +13,8 @@
 
 -export_type([options/0]).
 
+-include("aeso_utils.hrl").
+
 -type doc() :: prettypr:document().
 -type options() :: [{indent, non_neg_integer()} | show_generated].
 
@@ -131,6 +133,10 @@ typed(A, Type) ->
         false -> follow(hsep(A, text(":")), type(Type))
     end.
 
+contract_head(contract_main)      -> text("main contract");
+contract_head(contract_child)     -> text("contract");
+contract_head(contract_interface) -> text("contract interface").
+
 %% -- Exports ----------------------------------------------------------------
 
 -spec decls([aeso_syntax:decl()], options()) -> doc().
@@ -145,11 +151,11 @@ decl(D, Options) ->
     with_options(Options, fun() -> decl(D) end).
 
 -spec decl(aeso_syntax:decl()) -> doc().
-decl({contract, Attrs, C, Ds}) ->
+decl({Con, Attrs, C, Ds}) when ?IS_CONTRACT_HEAD(Con) ->
     Mod = fun({Mod, true}) when Mod == payable ->
                   text(atom_to_list(Mod));
              (_) -> empty() end,
-    block(follow( hsep(lists:map(Mod, Attrs) ++ [text("contract")])
+    block(follow( hsep(lists:map(Mod, Attrs) ++ [contract_head(Con)])
                 , hsep(name(C), text("="))), decls(Ds));
 decl({namespace, _, C, Ds}) ->
     block(follow(text("namespace"), hsep(name(C), text("="))), decls(Ds));
