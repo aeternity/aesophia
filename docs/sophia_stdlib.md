@@ -770,10 +770,10 @@ The gas limit of the current block.
 Chain.bytecode_hash : 'c => option(hash)
 ```
 
-Returns the hash of the contract's bytecode (or `None` if it is nonexistent or
-deployed before FATE2). The type `'c` must be instantiated with a contract. The
-charged gas is affine to the size of the serialized bytecode of the deployed
-contract.
+Returns the hash of the contract's bytecode (or `None` if it is
+nonexistent or deployed before FATE2). The type `'c` must be
+instantiated with a contract. The charged gas increases linearly to
+the size of the serialized bytecode of the deployed contract.
 
 
 #### create
@@ -781,11 +781,11 @@ contract.
 Chain.create(value : int, ...) => 'c
 ```
 
-Creates and deploys a new instance of a contract `'c`. All of the unnamed
-arguments will be passed to the `init` function. The charged gas is affine to
-the size of the compiled child contract's bytecode. The `source_hash` on-chain
-entry of the newly created contract will be the SHA256 hash over concatenation
-of
+Creates and deploys a new instance of a contract `'c`. All of the
+unnamed arguments will be passed to the `init` function. The charged
+gas increases linearly with the size of the compiled child contract's
+bytecode. The `source_hash` on-chain entry of the newly created
+contract will be the SHA256 hash over concatenation of
 
 - whole contract source code
 - single null byte
