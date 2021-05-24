@@ -173,7 +173,7 @@ transaction still only uses up the gas spent running the contract.
 
 #### Contract factories and child contracts
 
-Since the version 5.0.0 Sophia supports deploying contracts by other
+Since the version 5.1.0 Sophia supports deploying contracts by other
 contracts. This can be done in two ways:
 
 - Contract cloning via [`Chain.clone`](sophia_stdlib.md#clone)
