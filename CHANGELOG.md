@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+### Changed
+### Removed
+
+## [5.1.0] 2021-05-24
+### Added
 - Child contracts
 - `Chain.clone`
 - `Chain.create`
@@ -292,7 +297,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v5.0.0...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v5.1.0...HEAD
+[5.1.0]: https://github.com/aeternity/aesophia/compare/v5.0.0...v5.1.0
 [5.0.0]: https://github.com/aeternity/aesophia/compare/v4.3.0...v5.0.0
 [4.3.0]: https://github.com/aeternity/aesophia/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/aeternity/aesophia/compare/v4.1.0...v4.2.0
