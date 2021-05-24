@@ -246,7 +246,7 @@ builtins() ->
                               {"timestamp", none}, {"block_height", none}, {"difficulty", none},
                               {"gas_limit", none}, {"bytecode_hash", 1}, {"create", variable}, {"clone", variable}]},
               {["Contract"], [{"address", none}, {"balance", none}, {"creator", none}]},
-              {["Call"],     [{"origin", none}, {"caller", none}, {"value", none}, {"gas_price", none},
+              {["Call"],     [{"origin", none}, {"caller", none}, {"value", none}, {"gas_price", none}, {"fee", none},
                               {"gas_left", 0}]},
               {["Oracle"],   [{"register", 4}, {"expiry", 1}, {"query_fee", 1}, {"query", 5}, {"get_question", 2},
                               {"respond", 4}, {"extend", 3}, {"get_answer", 2},

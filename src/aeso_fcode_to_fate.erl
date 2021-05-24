@@ -527,6 +527,8 @@ builtin_to_scode(_Env, call_value, []) ->
     [aeb_fate_ops:call_value(?a)];
 builtin_to_scode(_Env, call_gas_price, []) ->
     [aeb_fate_ops:gasprice(?a)];
+builtin_to_scode(_Env, call_fee, []) ->
+    [aeb_fate_ops:fee(?a)];
 builtin_to_scode(_Env, call_gas_left, []) ->
     [aeb_fate_ops:gas(?a)];
 builtin_to_scode(Env, oracle_register, [_Sign,_Account,_QFee,_TTL,_QType,_RType] = Args) ->
@@ -925,6 +927,7 @@ attributes(I) ->
         {'ORIGIN', A}                         -> Pure(A, []);
         {'CALLER', A}                         -> Pure(A, []);
         {'GASPRICE', A}                       -> Pure(A, []);
+        {'FEE', A}                            -> Pure(A, []);
         {'BLOCKHASH', A, B}                   -> Pure(A, [B]);
         {'BENEFICIARY', A}                    -> Pure(A, []);
         {'TIMESTAMP', A}                      -> Pure(A, []);

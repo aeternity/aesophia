@@ -561,6 +561,7 @@ global_env() ->
                      {"caller",    Address},
                      {"value",     Int},
                      {"gas_price", Int},
+                     {"fee", Int},
                      {"gas_left",  Fun([], Int)}])
         },
 

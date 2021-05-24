@@ -44,6 +44,9 @@ contract Environment =
   // Gas price
   entrypoint call_gas_price() : int = Call.gas_price
 
+  // Fee
+  entrypoint call_fee() : int = Call.fee
+
   // -- Information about the chain ---
 
   // Account balances
