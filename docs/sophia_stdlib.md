@@ -645,7 +645,7 @@ Call.value : int
 The amount of coins transferred to the contract in the call.
 
 
-#### gas
+#### gas_price
 ```
 Call.gas_price : int
 ```
@@ -653,7 +653,15 @@ Call.gas_price : int
 The gas price of the current call.
 
 
-#### gas
+#### fee
+```
+Call.fee : int
+```
+
+The fee of the current call.
+
+
+#### gas_left
 ```
 Call.gas_left() : int
 ```
