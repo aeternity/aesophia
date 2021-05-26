@@ -15,11 +15,12 @@ The compiler is currently being used three places
 
 ## Versioning
 
-`aesophia` has a version that is only loosely connected to the version of the
-Aeternity node - in principle they will share the major version but not
-minor/patch version. The `aesophia` compiler version MUST be bumped whenever
-there is a change in how byte code is generated, but it MAY also be bumped upon
-API changes etc.
+Versioning should follow [semantic versioning](https://semver.org/spec/v2.0.0) guidelines. Id est, given a version number MAJOR.MINOR.PATCH, increment the:
+
+- MAJOR version when you make incompatible API changes
+- MINOR version when you add functionality in a backwards compatible manner
+- PATCH version when you make backwards compatible bug fixes
+
 
 ## Interface Modules
 
