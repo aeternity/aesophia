@@ -15,7 +15,7 @@ The compiler is currently being used three places
 
 ## Versioning
 
-Versioning should follow [semantic versioning](https://semver.org/spec/v2.0.0) guidelines. Id est, given a version number MAJOR.MINOR.PATCH, increment the:
+Versioning should follow the [semantic versioning](https://semver.org/spec/v2.0.0) guidelines. Id est, given a version number MAJOR.MINOR.PATCH, increment the:
 
 - MAJOR version when you make incompatible API changes
 - MINOR version when you add functionality in a backwards compatible manner
