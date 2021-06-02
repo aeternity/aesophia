@@ -92,8 +92,7 @@ simple_compile_test_() ->
 
 %% Check if all modules in the standard library compile
 stdlib_test_() ->
-    StdlibDir = filename:append(code:priv_dir(aesophia), "stdlib"),
-    {ok, Files} = file:list_dir(StdlibDir),
+    {ok, Files} = file:list_dir(aeso_stdlib:stdlib_include_path()),
     [ { "Testing " ++ File ++ " from the stdlib",
       fun() ->
           String = "include \"" ++ File ++ "\"\nmain contract Test =\n  entrypoint f(x) = x",
