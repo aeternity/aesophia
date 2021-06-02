@@ -90,6 +90,24 @@ simple_compile_test_() ->
        end} || Backend <- [aevm, fate] ] ++
     [].
 
+%% Check if all modules in the standard library compile
+stdlib_test_() ->
+    StdlibDir = filename:append(code:priv_dir(aesophia), "stdlib"),
+    {ok, Files} = file:list_dir(StdlibDir),
+    [ { "Testing " ++ File ++ " from the stdlib",
+      fun() ->
+          String = "include \"" ++ File ++ "\"\nmain contract Test =\n  entrypoint f(x) = x",
+          Options = [{src_file, File}, {backend, fate}],
+          case aeso_compiler:from_string(String, Options) of
+              {ok, #{fate_code := Code}} ->
+                  Code1 = aeb_fate_code:deserialize(aeb_fate_code:serialize(Code)),
+                  ?assertMatch({X, X}, {Code1, Code});
+              {error, Error} -> io:format("\n\n~p\n\n", [Error]), print_and_throw(Error)
+          end
+      end} || File <- Files,
+              lists:suffix(".aes", File)
+    ].
+
 check_errors(no_error, Actual) -> ?assertMatch(#{}, Actual);
 check_errors(Expect, #{}) ->
     ?assertEqual({error, Expect}, ok);
