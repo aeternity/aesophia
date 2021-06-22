@@ -194,7 +194,7 @@ contract IntHolder =
   entrypoint get() = state
   
 main contract IntHolderFactory =
-  entrypoint new(x : int) : IntHolder =
+  stateful entrypoint new(x : int) : IntHolder =
     let ih = Chain.create(x) : IntHolder
     ih
 ```
