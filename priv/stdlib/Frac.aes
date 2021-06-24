@@ -1,3 +1,5 @@
+include "String.aes"
+
 namespace Frac =
 
   private function gcd(a : int, b : int) =
