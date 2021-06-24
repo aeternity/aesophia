@@ -244,8 +244,9 @@ check_call1(ContractString0, FunName, Args, Options) ->
             fate ->
                 %% First check the contract without the __call function
                 #{ fcode := OrgFcode
+                 , fcode_env := #{child_con_env := ChildContracts}
                  , ast := Ast } = string_to_code(ContractString0, Options),
-                FateCode = aeso_fcode_to_fate:compile(OrgFcode, []),
+                FateCode = aeso_fcode_to_fate:compile(ChildContracts, OrgFcode, []),
                 %% collect all hashes and compute the first name without hash collision to
                 SymbolHashes = maps:keys(aeb_fate_code:symbols(FateCode)),
                 CallName = first_none_match(?CALL_NAME, SymbolHashes,

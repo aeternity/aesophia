@@ -21,3 +21,4 @@ rebar3.crashdump
 aesophia
 .qcci
 current_counterexample.eqc
+test/contracts/test.aes
