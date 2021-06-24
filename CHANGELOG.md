@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 ### Removed
 
+## [6.0.1] 2021-06-24
+### Changed
+- Fixed a bug in calldata encoding for contracts containing multiple contracts
+- Fixed a missing `include` in the `Frac` standard library
+
 ## [6.0.0] 2021-05-26
 ### Added
 - Child contracts
@@ -298,7 +303,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v6.0.0...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v6.0.1...HEAD
+[6.0.1]: https://github.com/aeternity/aesophia/compare/v6.0.0...v6.0.1
 [6.0.0]: https://github.com/aeternity/aesophia/compare/v5.0.0...v6.0.0
 [5.0.0]: https://github.com/aeternity/aesophia/compare/v4.3.0...v5.0.0
 [4.3.0]: https://github.com/aeternity/aesophia/compare/v4.2.0...v4.3.0
