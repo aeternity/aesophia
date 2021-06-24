@@ -1,6 +1,6 @@
 {application, aesophia,
- [{description, "Contract Language for aeternity"},
-  {vsn, "6.0.0"},
+ [{description, "Compiler for Aeternity Sophia language"},
+  {vsn, "6.0.1"},
   {registered, []},
   {applications,
    [kernel,
