@@ -80,6 +80,7 @@ namespace List =
  * `b` only if `(b - a) mod step == 0`. `step` should be bigger than 0.
  */
   function from_to_step(a : int, b : int, s : int) : list(int) =
+    require(step > 0, "List.from_to_step: non-positive step")
     from_to_step_(a, b - (b-a) mod s, s, [])
   private function from_to_step_(a : int, b : int, s : int, acc : list(int)) : list(int) =
     if(b < a) acc
