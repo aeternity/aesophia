@@ -1216,7 +1216,7 @@ List.unzip(l : list('a * 'b)) : list('a) * list('b)
 Opposite to the `zip` operation. Takes a list of pairs and returns pair of lists with respective elements on same indices.
 
 
-### merge
+#### merge
 ```
 List.merge(lesser_cmp : ('a, 'a) => bool, l1 : list('a), l2 : list('a)) : list('a)
 ```
@@ -1224,7 +1224,7 @@ List.merge(lesser_cmp : ('a, 'a) => bool, l1 : list('a), l2 : list('a)) : list('
 Merges two sorted lists into a single sorted list. O(length(l1) + length(l2))
 
 
-### sort
+#### sort
 ```
 List.sort(lesser_cmp : ('a, 'a) => bool, l : list('a)) : list('a)
 ```
