@@ -1,6 +1,6 @@
 {application, aesophia,
  [{description, "Compiler for Aeternity Sophia language"},
-  {vsn, "6.0.1"},
+  {vsn, "6.0.2"},
   {registered, []},
   {applications,
    [kernel,
