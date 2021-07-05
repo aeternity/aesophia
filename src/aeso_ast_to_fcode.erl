@@ -330,10 +330,11 @@ to_fcode(Env, [{Contract, Attrs, Con = {con, _, Name}, Decls}|Rest])
     case Contract =:= contract_interface of
         false ->
             #{ builtins := Builtins } = Env,
-            ConEnv = Env#{ context  => {contract_def, Name},
+            ConEnv = maps:remove(state_layout,
+                     Env#{ context  => {contract_def, Name},
                            builtins => Builtins#{[Name, "state"]          => {get_state, none},
                                                  [Name, "put"]            => {set_state, 1},
-                                                 [Name, "Chain", "event"] => {chain_event, 1}} },
+                                                 [Name, "Chain", "event"] => {chain_event, 1}} }),
             #{ functions := PrevFuns } = ConEnv,
             #{ functions := Funs } = Env1 =
                 decls_to_fcode(ConEnv, Decls),

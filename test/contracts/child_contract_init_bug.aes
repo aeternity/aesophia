@@ -1,0 +1,8 @@
+contract Identity =
+  record state = {foo: int, bar: string}
+  entrypoint init() = {foo = 0, bar = ""}
+
+main contract IdentityService =
+  stateful entrypoint createNewIdentity() : Identity =
+    put(())
+    Chain.create()
