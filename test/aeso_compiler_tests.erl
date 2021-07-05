@@ -199,6 +199,7 @@ compilable_contracts() ->
      "clone",
      "clone_simple",
      "create",
+     "child_contract_init_bug",
      "test" % Custom general-purpose test file. Keep it last on the list.
     ].
 
