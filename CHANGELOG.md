@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [6.0.2] 2021-07-05
 ### Changed
-- `List.from_to_step` now forbids non-positive step
+- `List.from_to_step` now forbids non-positive step (this change does
+  *not* alter the behavior of the previously deployed contracts)
 - Fixed leaking state between contracts
 
 ## [6.0.1] 2021-06-24
