@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 ### Removed
 
+## [6.0.2] 2021-07-05
+### Changed
+- `List.from_to_step` now forbids non-positive step (this change does
+  *not* alter the behavior of the previously deployed contracts)
+- Fixed leaking state between contracts
+
 ## [6.0.1] 2021-06-24
 ### Changed
 - Fixed a bug in calldata encoding for contracts containing multiple contracts
@@ -303,7 +309,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v6.0.1...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v6.0.2...HEAD
+[6.0.2]: https://github.com/aeternity/aesophia/compare/v6.0.1...v6.0.2
 [6.0.1]: https://github.com/aeternity/aesophia/compare/v6.0.0...v6.0.1
 [6.0.0]: https://github.com/aeternity/aesophia/compare/v5.0.0...v6.0.0
 [5.0.0]: https://github.com/aeternity/aesophia/compare/v4.3.0...v5.0.0
