@@ -362,7 +362,7 @@ namespace Chain =
 
 #### tx_hash
 ```
-Auth.tx_hash : option(Chain.tx)
+Auth.tx_hash : option(hash)
 ```
 
 Gets the transaction hash during authentication.
@@ -824,7 +824,7 @@ payable contract Auction =
   stateful entrypoint sell(amount) =
     require(amount >= 0, "negative_amount")
     ...
-  
+
 main contract Market =
   type state = list(Auction)
   entrypoint init() = []
@@ -876,7 +876,7 @@ payable contract interface Auction =
   entrypoint init : (int, string) => void
   stateful payable entrypoint buy : (int) => ()
   stateful entrypoint sell : (int) => ()
-  
+
 main contract Market =
   type state = list(Auction)
   entrypoint init() = []
