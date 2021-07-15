@@ -26,6 +26,12 @@ namespace Option =
     None    => abort("Forced None value")
     Some(x) => x
 
+/** Assume it is `Some` with custom error message
+ */
+  function force_msg(o : option('a), err : string) : 'a = switch(o)
+    None    => abort(err)
+    Some(x) => x
+
   function contains(e : 'a, o : option('a)) = o == Some(e)
 
   function on_elem(o : option('a), f : 'a => unit) : unit = match((), f, o)
