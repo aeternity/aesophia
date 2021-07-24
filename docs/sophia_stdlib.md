@@ -829,7 +829,7 @@ main contract Market =
   type state = list(Auction)
   entrypoint init() = []
   stateful entrypoint new(name : string) =
-    let auction = Chain.create(0, name) : Auction
+    let new_auction = Chain.create(0, name) : Auction
     put(new_auction::state)
 ```
 
