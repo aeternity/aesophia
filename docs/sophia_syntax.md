@@ -69,6 +69,7 @@ contract Layout =
 ## Notation
 
 In describing the syntax below, we use the following conventions:
+
 - Upper-case identifiers denote non-terminals (like `Expr`) or terminals with
   some associated value (like `Id`).
 - Keywords and symbols are enclosed in single quotes: `'let'` or `'='`.
