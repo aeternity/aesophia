@@ -65,3 +65,9 @@ contract FundMe =
            amount    = state.contributions[to]})
     put(state{ contributions @ c = Map.delete(to, c) })
 ```
+
+## Repositories
+This is a list with repositories that include smart contracts written in Sophia:
+
+- [aepp-sophia-examples](https://github.com/aeternity/aepp-sophia-examples)
+    - A repository that contains lots of different examples. The functionality of these examples is - to some extent - also covered by tests written in JavaScript.
