@@ -9,9 +9,13 @@ The compiler is currently being used three places
 
 ## Documentation
 
-* [Smart Contracts on aeternity Blockchain](https://github.com/aeternity/protocol/blob/master/contracts/contracts.md).
-* [Sophia Documentation](docs/sophia.md).
-* [Sophia Standard Library](docs/sophia_stdlib.md).
+* [Introduction](docs/index.md)
+* [Syntax](docs/sophia_syntax.md)
+* [Features](docs/sophia_features.md)
+* [Standard Library](docs/sophia_stdlib.md)
+* [Contract Examples](docs/sophia_examples.md)
+
+Additionally you can check out the [contracts section](https://github.com/aeternity/protocol/blob/master/contracts/contracts.md) of the aeternity blockchain specification.
 
 ## Versioning
 
@@ -26,5 +30,5 @@ Versioning should follow the [semantic versioning](https://semver.org/spec/v2.0.
 
 The basic modules for interfacing the compiler:
 
-* [aeso_compiler: the Sophia compiler](./docs/aeso_compiler.md)
-* [aeso_aci: the ACI interface](./docs/aeso_aci.md)
+* [aeso_compiler: the Sophia compiler](docs/aeso_compiler.md)
+* [aeso_aci: the ACI interface](docs/aeso_aci.md)
