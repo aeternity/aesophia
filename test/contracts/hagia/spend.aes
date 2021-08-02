@@ -1,0 +1,14 @@
+include "List.aes"
+
+contract C =
+
+  payable stateful entrypoint split(targets : list(address)) =
+    let value_per_person = Call.value / List.length(targets)
+    spend_to_all(value_per_person, targets)
+
+  stateful function
+    spend_to_all : (int, list(address)) => unit
+    spend_to_all(_, []) = ()
+    spend_to_all(value, addr::rest) =
+      Chain.spend(addr, value)
+      spend_to_all(value, rest)
