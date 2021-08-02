@@ -29,7 +29,7 @@ namespace Set =
   function filter(p : 'a => bool, s : set('a)) : set('a) =
     from_list(List.filter(p, to_list(s)))
 
-  function fold(f : ('a, 'b) => 'b, acc : 'b, l : set('a)) : 'b =
+  function fold(f : ('a, 'b) => 'b, acc : 'b, s : set('a)) : 'b =
     List.foldr(f, acc, to_list(l))
 
   function subtract(s1 : set('a), s2 : set('a)) : set('a) =
