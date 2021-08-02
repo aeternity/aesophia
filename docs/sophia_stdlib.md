@@ -2290,7 +2290,7 @@ Returns an empty set
 member(e : 'a, s : set('a)) : bool
 ```
 
-Checks if the element is present in the Set
+Checks if the element `e` is present in the set `s`
 
 #### insert
 
@@ -2298,7 +2298,7 @@ Checks if the element is present in the Set
 insert(e : 'a, s : set('a)) : set('a)
 ```
 
-Inserts the element in the set
+Inserts the element `e` in the set `s`
 
 #### delete
 
@@ -2306,7 +2306,7 @@ Inserts the element in the set
 Set.delete(e : 'a, s : set('a)) : set('a)
 ```
 
-Removes the element from the set
+Removes the element `e` from the set `s`
 
 #### size
 
@@ -2314,7 +2314,7 @@ Removes the element from the set
 size(s : set('a)) : int
 ```
 
-Returns the number of elements in the set
+Returns the number of elements in the set `s`
 
 #### to_list
 
@@ -2322,7 +2322,7 @@ Returns the number of elements in the set
 Set.to_list(s : set('a)) : list('a)
 ```
 
-Returns a list containing the elements of the set
+Returns a list containing the elements of the set `s`
 
 #### from_list
 
@@ -2330,7 +2330,7 @@ Returns a list containing the elements of the set
 Set.from_list(l : list('a)) : set('a)
 ```
 
-Turns a list into a set
+Turns the list `l` into a set
 
 #### filter
 
@@ -2346,7 +2346,7 @@ Filters out elements of `s` that fulfill predicate `p`
 Set.fold(f : ('a, 'b) => 'b, acc : 'b, s : set('a)) : 'b
 ```
 
-Folds the function `f` over every element in the set `s` and returns the final value of the accumulator.
+Folds the function `f` over every element in the set `s` and returns the final value of the accumulator `acc`.
 
 #### subtract
 
