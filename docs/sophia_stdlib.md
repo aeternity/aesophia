@@ -39,6 +39,7 @@ include "List.aes"
 - [Triple](#Triple)
 - [BLS12_381](#BLS12_381)
 - [Frac](#Frac)
+- [Set](#Set)
 
 # Builtin namespaces
 
@@ -2264,3 +2265,125 @@ accept arbitrary `frac`s from the surface you should report it as a
 
 If you expect getting calls with malformed `frac`s in your contract, you should use
 this function to verify the input.
+
+## Set
+
+### Types
+
+```
+record set('a) = { to_map : map('a, unit) }
+```
+
+### Functions
+
+#### new
+
+```
+Set.new() : set('a)
+```
+
+Returns an empty set
+
+#### member
+
+```
+member(e : 'a, s : set('a)) : bool
+```
+
+Checks if the element is present in the Set
+
+#### insert
+
+```
+insert(e : 'a, s : set('a)) : set('a)
+```
+
+Inserts the element in the set
+
+#### delete
+
+```
+Set.delete(e : 'a, s : set('a)) : set('a)
+```
+
+Removes the element from the set
+
+#### size
+
+```
+size(s : set('a)) : int
+```
+
+Returns the number of elements in the set
+
+#### to_list
+
+```
+Set.to_list(s : set('a)) : list('a)
+```
+
+Returns a list containing the elements of the set
+
+#### from_list
+
+```
+Set.from_list(l : list('a)) : set('a)
+```
+
+Turns a list into a set
+
+#### filter
+
+```
+Set.filter(p : 'a => bool, s : set('a)) : set('a)
+```
+
+Filters out elements of `s` that fulfill predicate `p`
+
+#### fold
+
+```
+Set.fold(f : ('a, 'b) => 'b, acc : 'b, s : set('a)) : 'b
+```
+
+Folds the function `f` over every element in the set `s` and returns the final value of the accumulator.
+
+#### subtract
+
+```
+Set.subtract(s1 : set('a), s2 : set('a)) : set('a)
+```
+
+Returns the elements of `s1` that are not members of `s2`
+
+#### intersection
+
+```
+Set.intersection(s1 : set('a), s2 : set('a)) : set('a)
+```
+
+Returns the intersection of the two sets `s1` and `s2`
+
+#### intersection_list
+
+```
+Set.intersection_list(sets : list(set('a))) : set('a)
+```
+
+Returns the intersection of all the sets in the given list
+
+#### union
+
+```
+Set.union(s1 : set('a), s2 : set('a)) : set('a)
+```
+
+Returns the union of the two sets `s1` and `s2`
+
+#### union_list
+
+```
+Set.union_list(sets : list(set('a))) : set('a)
+```
+
+Returns the union of all the sets in the given list
