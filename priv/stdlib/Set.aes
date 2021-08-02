@@ -25,12 +25,12 @@ namespace Set =
 
   function from_list(l : list('a)) : set('a) =
     { to_map = Map.from_list(List.map((x) => (x, ()), l)) }
-  
+
   function filter(p : 'a => bool, s : set('a)) : set('a) =
     from_list(List.filter(p, to_list(s)))
 
   function fold(f : ('a, 'b) => 'b, acc : 'b, s : set('a)) : 'b =
-    List.foldr(f, acc, to_list(l))
+    List.foldr(f, acc, to_list(s))
 
   function subtract(s1 : set('a), s2 : set('a)) : set('a) =
     filter((x) => !member(x, s2), s1)
