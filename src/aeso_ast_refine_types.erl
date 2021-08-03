@@ -995,9 +995,9 @@ refine_ast(TCEnv, AST) ->
         Env5 = register_ast_funs(AST, Env4),
         {AST1, CS0} = constr_ast(Env5, AST),
         CS1 = split_constr(CS0),
-        [ ?DBG("SUBTYPE ~p:\n~s\n<:\n~s", [Id, aeso_pretty:pp(type, strip_typed(T1)), aeso_pretty:pp(type, strip_typed(T2))])
-          || {subtype, Id, _, _, T1, T2} <- CS1
-        ],
+        %[ ?DBG("SUBTYPE ~p:\n~s\n<:\n~s", [Id, aeso_pretty:pp(type, strip_typed(T1)), aeso_pretty:pp(type, strip_typed(T2))])
+        %  || {subtype, Id, _, _, T1, T2} <- CS1
+        %],
         {Env5, solve(Env5, AST1, CS1)}
     of
         {EnvErlangSucks, {ok, AST2}} -> {ok, {EnvErlangSucks, AST2}};
@@ -1075,10 +1075,8 @@ constr_letfun(Env0, {letfun, Ann, Id, Args, RetT, Body}, S0) ->
                 end
         end,
     Body3 = a_normalize(Body2),
-    ?DBG("ANORM\n~s", [aeso_pretty:pp(expr, Body1)]),
-    ?DBG("PURI\n~s", [aeso_pretty:pp(expr, Body2)]),
-    ?DBG("PURIFIED\n~s", [aeso_pretty:pp(expr, Body3)]),
-    ?DBG("PURIFIED\n~p", [Body3]),
+    %?DBG("ANORM\n~s", [aeso_pretty:pp(expr, Body1)]),
+    %?DBG("PURIFIED\n~s", [aeso_pretty:pp(expr, Body3)]),
     {BodyT, S1} = constr_expr(Env3, Body3, S0),
     InnerFunT = {dep_fun_t, Ann, ArgsT, BodyT},
     S3 = [ {subtype, constr_id(letfun_top_decl), Ann, Env3, BodyT, GlobRetT}
@@ -1152,7 +1150,6 @@ constr_expr(Env, ?typed_p(Expr, Type), S0) ->
             %% Nothing interesting
             constr_expr(Env, Expr, Type, S0);
         true ->
-            ?DBG("TYPING CAUSE\n~p", [Type]),
             DType = fresh_liquid(Env, "typed", Type),
             {ExprT, S1} = constr_expr(Env, Expr, Base, S0),
             {ExprT,
@@ -1403,11 +1400,9 @@ constr_expr(Env, {app, Ann, F = ?typed_p(_, {fun_t, _, NamedT, _, _}), Args0}, _
          || {named_arg_t, _, TArgName, _, TArgDefault} <- NamedT
         ] ++ (Args0 -- NamedArgs),
     {_FDT = {dep_fun_t, _, ArgsFT, RetT}, S1} = constr_expr(Env, F, S0),
-    ?DBG("APP OF\n~s", [aeso_pretty:pp(type, _FDT)]),
     {ArgsT, S2} = constr_expr_list(Env, Args, S1),
     ArgSubst = [{X, Expr} || {{dep_arg_t, _, X, _}, Expr} <- lists:zip(ArgsFT, Args)],
     RetT1 = apply_subst(ArgSubst, RetT),
-    ?DBG("SUBST:\n~s\n->\n~s", [aeso_pretty:pp(type, RetT), aeso_pretty:pp(type, RetT1)]),
     { RetT1
     , [{subtype, constr_id(app), [{context, {app, Ann, F, N}}|?ann_of(ArgT)],
         Env, ArgT, ArgFT}
@@ -1791,7 +1786,6 @@ inst_pred(Env, SelfId, {refined_t, _, _, BaseT, _}) ->
 inst_pred(Env = #env{tc_env = TCEnv}, SelfId, BaseT) ->
     case BaseT of
         ?int_tp ->
-            %% ?DBG("INST PRED FOR ~s\n~s", [name(SelfId), aeso_pretty:pp(predicate, inst_pred_int(Env, SelfId))]),
             inst_pred_int(Env, SelfId);
         ?bool_tp ->
             inst_pred_bool(Env, SelfId);
@@ -2125,9 +2119,9 @@ valid_in({subtype, _Ref, Ann, Env,
         true ->
             true;
         false ->
-            ?DBG("~s -> ~s", [name(SupId), name(SubId)]),
-            ?DBG("CONTRADICT ON ~p \n~s\n<:\n~s", [_Ref, aeso_pretty:pp(predicate, strip_typed(pred_of(Assg, Env) ++ AssumpPred)), aeso_pretty:pp(predicate, strip_typed(ConclPred))]),
-            ?DBG("IN\n~s", [aeso_pretty:pp(predicate, strip_typed(pred_of(Assg, Env1)))]),
+            %?DBG("~s -> ~s", [name(SupId), name(SubId)]),
+            %?DBG("CONTRADICT ON ~p \n~s\n<:\n~s", [_Ref, aeso_pretty:pp(predicate, strip_typed(pred_of(Assg, Env) ++ AssumpPred)), aeso_pretty:pp(predicate, strip_typed(ConclPred))]),
+            %?DBG("IN\n~s", [aeso_pretty:pp(predicate, strip_typed(pred_of(Assg, Env1)))]),
             SimpAssump = simplify_pred(Assg, Env1,
                                        pred_of(Assg, Env1) ++ AssumpPred),
             add_error({contradict, {Ann, strip_typed(SimpAssump), strip_typed(ConclPred)}})
@@ -2812,7 +2806,6 @@ purify_typed(impure, E, T, ST) ->
     {impure, ?typed(E, wrap_state_t(purify_type(T, ST), ST))}.
 
 purify_expr(?typed_p(E, T), T1, ST) ->
-    ?DBG("PURI PYK\n~p\n~p",[T, T1]),
     {Pure, E1} = purify_expr(E, T, ST),
     purify_typed(Pure, E1, T1, ST);
 

@@ -12,6 +12,7 @@
 -export([ast_to_fcode/2, format_fexpr/1]).
 -export_type([fcode/0, fexpr/0, fun_def/0]).
 
+-include_lib("eunit/include/eunit.hrl").
 -include("aeso_utils.hrl").
 
 %% -- Type definitions -------------------------------------------------------
@@ -540,6 +541,10 @@ expr_to_fcode(Env, Expr) ->
 
 -spec expr_to_fcode(env(), aeso_syntax:type() | no_type, aeso_syntax:expr()) -> fexpr().
 
+% Untype op
+expr_to_fcode(Env, Type, {app, Ann, {typed, _, {Op, OpAnn}, _}, Args}) when is_atom(Op) ->
+    expr_to_fcode(Env, Type, {app, Ann, {Op, OpAnn}, Args});
+
 %% Literals
 expr_to_fcode(_Env, _Type, {int,             _, N}) -> {lit, {int, N}};
 expr_to_fcode(_Env, _Type, {char,            _, N}) -> {lit, {int, N}};
@@ -684,29 +689,32 @@ expr_to_fcode(Env, _Type, {'if', _, Cond, Then, Else}) ->
 %% Switch
 expr_to_fcode(Env, _, {switch, _, Expr = {typed, _, E, Type}, Alts}) ->
     Switch = fun(X) ->
-                {switch, alts_to_fcode(Env, type_to_fcode(Env, Type), X, Alts)}
+                     T = type_to_fcode(Env, Type),
+                     Rx = {switch, alts_to_fcode(Env, T, X, Alts)},
+                     Rx
              end,
-    case E of
+    R = case E of
         {id, _, X} -> Switch(X);
         _ ->
             X = fresh_name(),
             {'let', X, expr_to_fcode(Env, Expr),
              Switch(X)}
-    end;
+    end,
+    R;
 
 %% Blocks
 expr_to_fcode(Env, _Type, {block, _, Stmts}) ->
     stmts_to_fcode(Env, Stmts);
 
 %% Binary operator
-expr_to_fcode(Env, _Type, Expr = {app, _, {typed, _, {Op, _}, _}, [_, _]})
+expr_to_fcode(Env, _Type, Expr = {app, _, {Op, _}, [_, _]})
   when Op == '&&'; Op == '||' ->
     Tree = expr_to_decision_tree(Env, Expr),
     decision_tree_to_fcode(Tree);
-expr_to_fcode(Env, _Type, {app, _Ann, {typed, _, {Op, _}, _}, [A, B]})
+expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A, B]})
   when is_atom(Op) ->
     {op, Op, [expr_to_fcode(Env, A), expr_to_fcode(Env, B)]};
-expr_to_fcode(Env, _Type, {app, _Ann, {typed, _, {Op, _}, _}, [A]})
+expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]})
   when is_atom(Op) ->
     case Op of
         '-' -> {op, '-', [{lit, {int, 0}}, expr_to_fcode(Env, A)]};
@@ -1032,7 +1040,7 @@ pat_to_fcode(Env, _Type, {list, _, Ps}) ->
     lists:foldr(fun(P, Qs) ->
                     {'::', pat_to_fcode(Env, P), Qs}
                 end, nil, Ps);
-pat_to_fcode(Env, _Type, {app, _, {'::', _}, [P, Q]}) ->
+pat_to_fcode(Env, _Type, {app, _, {typed, _, {'::', _}, _}, [P, Q]}) ->
     {'::', pat_to_fcode(Env, P), pat_to_fcode(Env, Q)};
 pat_to_fcode(Env, {record_t, Fields}, {record, _, FieldPats}) ->
     FieldPat = fun(F) ->

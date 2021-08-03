@@ -29,6 +29,7 @@ unsetup(_) ->
     ok.
 
 hagia_test_() ->
+    ?IF(os:find_executable("z3") == false, [], % This turns off hagia tests on machines that don't have Z3
     {timeout, 100000000,
      {inorder,
       {foreach, local, fun setup/0, fun unsetup/1,
@@ -36,7 +37,7 @@ hagia_test_() ->
        , {timeout, 1000000, refiner_test_group()}
        ]
       }
-     }}.
+     }}).
 
 smt_solver_test_group() ->
     [ { "x == x"

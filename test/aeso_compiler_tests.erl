@@ -23,7 +23,6 @@ run_test(Test) ->
 %%  Very simply test compile the given contracts. Only basic checks
 %%  are made on the output, just that it is a binary which indicates
 %%  that the compilation worked.
-simple_compile_test_() -> [];
 simple_compile_test_() ->
     [ {"Testing the " ++ ContractName ++ " contract with the " ++ atom_to_list(Backend) ++ " backend",
        fun() ->
@@ -95,17 +94,19 @@ simple_compile_test_() ->
 stdlib_test_() ->
     {ok, Files} = file:list_dir(aeso_stdlib:stdlib_include_path()),
     [ { "Testing " ++ File ++ " from the stdlib",
-      fun() ->
-          String = "include \"" ++ File ++ "\"\nmain contract Test =\n  entrypoint f(x) = x",
-          Options = [{src_file, File}, {backend, fate}],
-          case aeso_compiler:from_string(String, Options) of
-              {ok, #{fate_code := Code}} ->
-                  Code1 = aeb_fate_code:deserialize(aeb_fate_code:serialize(Code)),
-                  ?assertMatch({X, X}, {Code1, Code});
-              {error, Error} -> io:format("\n\n~p\n\n", [Error]), print_and_throw(Error)
-          end
-      end} || File <- Files,
-              lists:suffix(".aes", File)
+        {timeout, 10,
+         fun() ->
+                 String = "include \"" ++ File ++ "\"\nmain contract Test =\n  entrypoint f(x) = x",
+                 Options = [{src_file, File}, {backend, fate}],
+                 case aeso_compiler:from_string(String, Options) of
+                     {ok, #{fate_code := Code}} ->
+                         Code1 = aeb_fate_code:deserialize(aeb_fate_code:serialize(Code)),
+                         ?assertMatch({X, X}, {Code1, Code});
+                     {error, Error} -> io:format("\n\n~p\n\n", [Error]), print_and_throw(Error)
+                 end
+         end}}
+      || File <- Files,
+         lists:suffix(".aes", File)
     ].
 
 check_errors(no_error, Actual) -> ?assertMatch(#{}, Actual);
@@ -142,7 +143,6 @@ compile(Backend, Name, Options) ->
 
 %% compilable_contracts() -> [ContractName].
 %%  The currently compilable contracts.
-compilable_contracts() -> ["hagia"];
 compilable_contracts() ->
     ["complex_types",
      "counter",
@@ -224,7 +224,6 @@ debug_mode_contracts() ->
 
 -define(TYPE_ERROR(Name, Errs), ?ERROR("Type", Name, Errs)).
 -define(PARSE_ERROR(Name, Errs), ?ERROR("Parse", Name, Errs)).
-failing_contracts() -> [];
 failing_contracts() ->
     {ok, V} = aeso_compiler:numeric_version(),
     Version = list_to_binary(string:join([integer_to_list(N) || N <- V], ".")),
@@ -910,7 +909,6 @@ validation_test_() ->
         ?assertEqual(ok, validate(C, C))
       end} || C <- compilable_contracts()].
 
-validation_fails() -> [];      
 validation_fails() ->
     [{"deadcode", "nodeadcode",
       [<<"Data error:\n"
