@@ -39,7 +39,7 @@ include "List.aes"
 - [Triple](#Triple)
 - [BLS12_381](#BLS12_381)
 - [Frac](#Frac)
-- [Set](#Set)
+- [Set](#set-stdlib)
 
 # Builtin namespaces
 
@@ -2266,7 +2266,7 @@ accept arbitrary `frac`s from the surface you should report it as a
 If you expect getting calls with malformed `frac`s in your contract, you should use
 this function to verify the input.
 
-## Set
+## <a name='set-stdlib'>Set</a>
 
 ### Types
 
