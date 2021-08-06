@@ -1294,7 +1294,17 @@ Escapes `option` wrapping by providing default value for `None`.
 Option.force(o : option('a)) : 'a
 ```
 
-Forcefully escapes `option` wrapping assuming it is `Some`. Throws error on `None`.
+Forcefully escapes the `option` wrapping assuming it is `Some`. 
+Aborts on `None`.
+
+
+#### force_msg
+```
+Option.force_msg(o : option('a), err : string) : 'a
+```
+
+Forcefully escapes the `option` wrapping assuming it is `Some`.
+Aborts with `err` error message on `None`.
 
 
 #### contains
