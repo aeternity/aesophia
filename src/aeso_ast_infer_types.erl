@@ -1703,6 +1703,9 @@ infer_expr(Env, {lam, Attrs, Args, Body}) ->
         infer_case(Env, Attrs, {tuple, Attrs, ArgPatterns}, {tuple_t, Attrs, ArgTypes}, Body, ResultType),
     NewArgs = [{arg, As, NewPat, NewT} || {typed, As, NewPat, NewT} <- NewArgPatterns],
     {typed, Attrs, {lam, Attrs, NewArgs, NewBody}, {fun_t, Attrs, [], ArgTypes, ResultType}};
+infer_expr(Env, {letpat, Attrs, Id, Pattern}) ->
+    NewPattern = {typed, _, _, PatType} = infer_expr(Env, Pattern),
+    {typed, Attrs, {letpat, Attrs, {typed, Attrs, Id, PatType}, NewPattern}, PatType};
 infer_expr(Env, Let = {letval, Attrs, _, _}) ->
     type_error({missing_body_for_let, Attrs}),
     infer_expr(Env, {block, Attrs, [Let, abort_expr(Attrs, "missing body")]});
@@ -1918,6 +1921,8 @@ free_vars({record, _, Fields}) ->
     free_vars([E || {field, _, _, E} <- Fields]);
 free_vars({typed, _, A, _}) ->
     free_vars(A);
+free_vars({letpat, _, Id, Pat}) ->
+    free_vars(Id) ++ free_vars(Pat);
 free_vars(L) when is_list(L) ->
     [V || Elem <- L,
           V <- free_vars(Elem)].
