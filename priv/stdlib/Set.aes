@@ -1,0 +1,51 @@
+include "List.aes"
+include "Option.aes"
+include "Pair.aes"
+
+namespace Set =
+  record set('a) = { to_map : map('a, unit) }
+
+  function new() : set('a) =
+    { to_map = {} }
+
+  function member(e : 'a, s : set('a)) : bool =
+    Map.member(e, s.to_map)
+
+  function insert(e : 'a, s : set('a)) : set('a) =
+    { to_map = s.to_map{[e] = ()} }
+
+  function delete(e : 'a, s : set('a)) : set('a) =
+    { to_map = Map.delete(e, s.to_map) }
+
+  function size(s : set('a)) : int =
+    Map.size(s.to_map)
+
+  function to_list(s : set('a)) : list('a) =
+    List.map(Pair.fst, Map.to_list(s.to_map))
+
+  function from_list(l : list('a)) : set('a) =
+    { to_map = Map.from_list(List.map((x) => (x, ()), l)) }
+
+  function filter(p : 'a => bool, s : set('a)) : set('a) =
+    from_list(List.filter(p, to_list(s)))
+
+  function fold(f : ('a, 'b) => 'b, acc : 'b, s : set('a)) : 'b =
+    List.foldr(f, acc, to_list(s))
+
+  function subtract(s1 : set('a), s2 : set('a)) : set('a) =
+    filter((x) => !member(x, s2), s1)
+
+  function intersection(s1 : set('a), s2 : set('a)) : set('a) =
+    filter((x) => member(x, s2), s1)
+
+  function intersection_list(sets : list(set('a))) : set('a) =
+    List.foldr(
+      intersection,
+      Option.default(new(), List.first(sets)),
+      Option.default([], List.tail(sets)))
+
+  function union(s1 : set('a), s2 : set('a)) : set('a) =
+    from_list(to_list(s1) ++ to_list(s2))
+
+  function union_list(sets : list(set('a))) : set('a) =
+    List.foldr(union, new(), sets)
