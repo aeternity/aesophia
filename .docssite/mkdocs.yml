@@ -1,9 +1,9 @@
-site_name: aeternity Sophia Language
+site_name: æternity Sophia Language
 plugins:
   - search
   - mkdocs-simple-hooks:
       hooks:
-        on_pre_build: 'docs.python.hooks:pre_build'
+        on_pre_build: 'hook:pre_build'
 repo_url: 'https://github.com/aeternity/aesophia'
 edit_uri: ''
 
@@ -12,9 +12,9 @@ extra:
     provider: mike
 
 theme:
-  favicon: images/favicon.png
+  favicon: favicon.png
   name: material
-  custom_dir: docs/mkdocs-overrides
+  custom_dir: overrides
   language: en
   palette:
     - scheme: default

@@ -5,7 +5,7 @@ This is the __sophia__ compiler for the æternity system which compiles contract
 The compiler is currently being used three places
  - [The command line compiler](https://github.com/aeternity/aesophia_cli)
  - [The HTTP compiler](https://github.com/aeternity/aesophia_http)
- - In [Aeternity node](https://github.com/aeternity/aeternity) tests
+ - In [æternity node](https://github.com/aeternity/aeternity) tests
 
 ## Documentation
 
@@ -15,7 +15,7 @@ The compiler is currently being used three places
 * [Standard Library](docs/sophia_stdlib.md)
 * [Contract Examples](docs/sophia_examples.md)
 
-Additionally you can check out the [contracts section](https://github.com/aeternity/protocol/blob/master/contracts/contracts.md) of the aeternity blockchain specification.
+Additionally you can check out the [contracts section](https://github.com/aeternity/protocol/blob/master/contracts/contracts.md) of the æternity blockchain specification.
 
 ## Versioning
 

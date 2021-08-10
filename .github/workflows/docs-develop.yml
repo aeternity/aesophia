@@ -16,8 +16,10 @@ jobs:
       - uses: actions/cache@v2
         with:
           path: ~/.cache/pip3
-          key: ${{ runner.os }}-pip-${{ hashFiles('docs/requirements.txt') }}
-      - run: pip3 install -r docs/python/requirements.txt
+          key: ${{ runner.os }}-pip-${{ hashFiles('.github/workflows/requirements.txt') }}
+      - run: pip3 install -r .github/workflows/requirements.txt
       - run: git config --global user.email "github-action@users.noreply.github.com"
       - run: git config --global user.name "GitHub Action"
-      - run: mike deploy --push master
+      - run: |
+          cd .docssite
+          mike deploy --push master

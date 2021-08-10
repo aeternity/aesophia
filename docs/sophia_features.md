@@ -222,7 +222,7 @@ payable stateful entrypoint buy(to : address) =
     abort("Value too low")
 ```
 
-Note: In the Aeternity VM (AEVM) contracts and entrypoints were by default
+Note: In the æternity VM (AEVM) contracts and entrypoints were by default
 payable until the Lima release.
 
 ## Namespaces
@@ -297,7 +297,7 @@ Sophia has the following types:
 | Type                 | Description                                                                                 | Example                                                      |
 |----------------------|---------------------------------------------------------------------------------------------|--------------------------------------------------------------|
 | int                  | A 2-complement integer                                                                      | ```-1```                                                     |
-| address              | Aeternity address, 32 bytes                                                                 | ```Call.origin```                                            |
+| address              | æternity address, 32 bytes                                                                 | ```Call.origin```                                            |
 | bool                 | A Boolean                                                                                   | ```true```                                                   |
 | bits                 | A bit field                                                                                 | ```Bits.none```                                              |
 | bytes(n)             | A byte array with `n` bytes                                                                 | ```#fedcba9876543210```                                      |
@@ -636,7 +636,7 @@ functions are provided.
 ## AENS interface
 
 Contracts can interact with the
-[Aeternity Naming System](https://github.com/aeternity/protocol/blob/master/AENS.md).
+[æternity naming system](https://github.com/aeternity/protocol/blob/master/AENS.md).
 For this purpose the [AENS](sophia_stdlib.md#aens) library was exposed.
 
 ### Example
@@ -713,7 +713,7 @@ field is indexed if it fits in a 32-byte word, i.e.
 The payload field must be either a string or a byte array of more than 32 bytes.
 The fields can appear in any order.
 
-*NOTE:* Indexing is not part of the core aeternity node.
+*NOTE:* Indexing is not part of the core æternity node.
 
 Events are emitted by using the `Chain.event` function. The following function
 will emit one Event of each kind in the example.
@@ -780,4 +780,4 @@ Some chain operations (`Oracle.<operation>` and `AENS.<operation>`) have an
 optional delegation signature. This is typically used when a user/accounts
 would like to allow a contract to act on it's behalf. The exact data to be
 signed varies for the different operations, but in all cases you should prepend
-the signature data with the `network_id` (`ae_mainnet` for the Aeternity mainnet, etc.).
+the signature data with the `network_id` (`ae_mainnet` for the æternity mainnet, etc.).

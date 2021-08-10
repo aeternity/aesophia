@@ -16,9 +16,11 @@ jobs:
       - uses: actions/cache@v2
         with:
           path: ~/.cache/pip3
-          key: ${{ runner.os }}-pip-${{ hashFiles('docs/requirements.txt') }}
-      - run: pip3 install -r docs/python/requirements.txt
+          key: ${{ runner.os }}-pip-${{ hashFiles('.github/workflows/requirements.txt') }}
+      - run: pip3 install -r .github/workflows/requirements.txt
       - run: git config --global user.email "github-action@users.noreply.github.com"
       - run: git config --global user.name "GitHub Action"
       - run: echo "RELEASE_VERSION=${GITHUB_REF:10}" >> $GITHUB_ENV
-      - run: mike deploy --push --update-aliases $RELEASE_VERSION latest
+      - run: |
+          cd .docssite
+          mike deploy --push --update-aliases $RELEASE_VERSION latest
