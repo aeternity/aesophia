@@ -1,4 +1,4 @@
-# Contract Examples
+# Contract examples
 
 ## Crowdfunding
 ```sophia

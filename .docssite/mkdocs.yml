@@ -50,6 +50,6 @@ nav:
   - Introduction: index.md
   - Syntax: sophia_syntax.md
   - Features: sophia_features.md
-  - Standard Library: sophia_stdlib.md
-  - Contract Examples: sophia_examples.md
+  - Standard library: sophia_stdlib.md
+  - Contract examples: sophia_examples.md
   - Changelog: CHANGELOG.md

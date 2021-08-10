@@ -5,7 +5,7 @@ check if the comments in the sources are up to date as well. You may find them
 in the priv/stdlib directory. Thanks!
 -->
 
-# Standard Library
+# Standard library
 
 Sophia language offers standard library that consists of several namespaces. Some of them are already
 in the scope and do not need any actions to be used, while the others require some files to be included.
