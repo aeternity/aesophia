@@ -1705,7 +1705,7 @@ infer_expr(Env, {lam, Attrs, Args, Body}) ->
     {typed, Attrs, {lam, Attrs, NewArgs, NewBody}, {fun_t, Attrs, [], ArgTypes, ResultType}};
 infer_expr(Env, {letpat, Attrs, Id, Pattern}) ->
     NewPattern = {typed, _, _, PatType} = infer_expr(Env, Pattern),
-    {typed, Attrs, {letpat, Attrs, {typed, Attrs, Id, PatType}, NewPattern}, PatType};
+    {typed, Attrs, {letpat, Attrs, check_expr(Env, Id, PatType), NewPattern}, PatType};
 infer_expr(Env, Let = {letval, Attrs, _, _}) ->
     type_error({missing_body_for_let, Attrs}),
     infer_expr(Env, {block, Attrs, [Let, abort_expr(Attrs, "missing body")]});
