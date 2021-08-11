@@ -1994,7 +1994,11 @@ rename_spat(Ren, {con, Ar, C, Xs}) ->
     {{con, Ar, C, Zs}, Ren1};
 rename_spat(Ren, {tuple, Xs}) ->
     {Zs, Ren1} = rename_bindings(Ren, Xs),
-    {{tuple, Zs}, Ren1}.
+    {{tuple, Zs}, Ren1};
+rename_spat(Ren, {assign, X, P}) ->
+    {X1, Ren1} = rename_binding(Ren, X),
+    {P1, Ren2} = rename_binding(Ren1, P),
+    {{assign, X1, P1}, Ren2}.
 
 rename_split(Ren, {split, Type, X, Cases}) ->
     {split, Type, rename_var(Ren, X), [rename_case(Ren, C) || C <- Cases]};
