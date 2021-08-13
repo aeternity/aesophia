@@ -1,0 +1,16 @@
+include "List.aes"
+
+contract AssignPatterns =
+
+  entrypoint test() = foo([1, 0, 2], (2, Some(3)), Some([4, 5]))
+
+  entrypoint foo(xs : list(int), p : int * option(int), some : option(list(int))) =
+    let x::(t = y::_)  = xs
+    let z::_ = t
+
+    let (a, (o = Some(b)))  = p
+
+    let Some((f = g::_)) = some
+    g + List.get(1, f)
+
+    x + y + z + a + b

@@ -1,0 +1,4 @@
+contract AssignPatternToPattern =
+    entrypoint f() =
+        let x::(t::z = y) = [1, 2, 3]
+        (x + t)::y

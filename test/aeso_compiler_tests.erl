@@ -201,6 +201,7 @@ compilable_contracts() ->
      "create",
      "child_contract_init_bug",
      "using_namespace",
+     "assign_patterns",
      "test" % Custom general-purpose test file. Keep it last on the list.
     ].
 
@@ -236,6 +237,7 @@ failing_contracts() ->
     , ?PARSE_ERROR(vsemi,  [<<?Pos(3, 3) "Unexpected indentation. Did you forget a '}'?">>])
     , ?PARSE_ERROR(vclose, [<<?Pos(4, 3) "Unexpected indentation. Did you forget a ']'?">>])
     , ?PARSE_ERROR(indent_fail, [<<?Pos(3, 2) "Unexpected token 'entrypoint'.">>])
+    , ?PARSE_ERROR(assign_pattern_to_pattern, [<<?Pos(3, 22) "Unexpected token '='.">>])
 
     %% Type errors
     , ?TYPE_ERROR(name_clash,
