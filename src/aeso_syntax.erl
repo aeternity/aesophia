@@ -44,6 +44,7 @@
               | {type_def, ann(), id(), [tvar()], typedef()}
               | {fun_clauses, ann(), id(), type(), [letfun() | fundecl()]}
               | {block, ann(), [decl()]}
+              | using()
               | fundecl()
               | letfun()
               | letval(). % Only for error msgs
@@ -52,6 +53,8 @@
 
 -type pragma() :: {compiler, '==' | '<' | '>' | '=<' | '>=', compiler_version()}.
 
+-type using() :: {using, ann(), con()}
+               | {using, ann(), con(), id()}.
 
 -type letval()  :: {letval, ann(), pat(), expr()}.
 -type letfun()  :: {letfun, ann(), id(), [pat()], type(), expr()}.
