@@ -1798,6 +1798,10 @@ infer_block(Env, _, [{letval, Attrs, Pattern, E}|Rest], BlockType) ->
     {'case', _, NewPattern, {typed, _, {block, _, NewRest}, _}} =
         infer_case(Env, Attrs, Pattern, PatType, {block, Attrs, Rest}, BlockType),
     [{letval, Attrs, NewPattern, NewE}|NewRest];
+infer_block(Env, Attrs, [Using = {using, _, _} | Rest], BlockType) ->
+    infer_block(check_usings(Env, [Using]), Attrs, Rest, BlockType);
+infer_block(Env, Attrs, [Using = {using, _, _, _} | Rest], BlockType) ->
+    infer_block(check_usings(Env, [Using]), Attrs, Rest, BlockType);
 infer_block(Env, Attrs, [E|Rest], BlockType) ->
     [infer_expr(Env, E)|infer_block(Env, Attrs, Rest, BlockType)].
 

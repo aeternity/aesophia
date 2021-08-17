@@ -263,7 +263,8 @@ body() ->
 
 stmt() ->
     ?LAZY_P(choice(
-    [ expr()
+    [ using()
+    , expr()
     , letdecl()
     , {switch, keyword(switch), parens(expr()), maybe_block(branch())}
     , {'if', keyword('if'), parens(expr()), body()}
