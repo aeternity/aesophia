@@ -1,0 +1,31 @@
+include "Option.aes"
+include "Pair.aes"
+include "String.aes"
+
+using Pair
+
+namespace Nsp =
+  using Option
+
+  function h() =
+    let op = Some(2)
+    is_some(op)
+
+contract Cntr =
+  using Nsp
+
+  entrypoint init() = ()
+
+  function f() =
+    let p = (1, 2)
+    if (h())
+      fst(p)
+    else
+      snd(p)
+
+  function g() =
+    using String
+
+    let s1 = "abc"
+    let s2 = "def"
+    concat(s1, s2)
