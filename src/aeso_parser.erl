@@ -137,12 +137,12 @@ fundef_or_decl() ->
             fundef()]).
 
 using() ->
-    ?RULE(keyword(using), con(), optional({keyword(as), id()}), using(get_ann(_1), _2, _3)).
+    ?RULE(keyword(using), con(), optional({keyword(as), con()}), using(get_ann(_1), _2, _3)).
 
 using(Ann, Con, none) ->
     {using, Ann, Con};
-using(Ann, Con, {ok, {_, Id}}) ->
-    {using, Ann, Con, Id}.
+using(Ann, Con, {ok, {_, Alias}}) ->
+    {using, Ann, Con, Alias}.
 
 pragma() ->
     Op = choice([token(T) || T <- ['<', '=<', '==', '>=', '>']]),

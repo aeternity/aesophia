@@ -54,7 +54,7 @@
 -type pragma() :: {compiler, '==' | '<' | '>' | '=<' | '>=', compiler_version()}.
 
 -type using() :: {using, ann(), con()}
-               | {using, ann(), con(), id()}.
+               | {using, ann(), con(), con()}.
 
 -type letval()  :: {letval, ann(), pat(), expr()}.
 -type letfun()  :: {letfun, ann(), id(), [pat()], type(), expr()}.
