@@ -102,6 +102,8 @@
 -type qname() :: [string()].
 -type typesig() :: {type_sig, aeso_syntax:ann(), type_constraints(), [aeso_syntax:named_arg_t()], [type()], type()}.
 
+-type namespace_alias() :: none | name().
+
 -type type_constraints() :: none | bytes_concat | bytes_split | address_to_contract | bytecode_hash.
 
 -type fun_info()  :: {aeso_syntax:ann(), typesig() | type()}.
@@ -121,15 +123,16 @@
 -type scope() :: #scope{}.
 
 -record(env,
-    { scopes     = #{ [] => #scope{}} :: #{ qname() => scope() }
-    , vars       = []                 :: [{name(), var_info()}]
-    , typevars   = unrestricted       :: unrestricted | [name()]
-    , fields     = #{}                :: #{ name() => [field_info()] }    %% fields are global
-    , namespace  = []                 :: qname()
-    , in_pattern = false              :: boolean()
-    , stateful   = false              :: boolean()
-    , current_function = none         :: none | aeso_syntax:id()
-    , what       = top                :: top | namespace | contract | contract_interface
+    { scopes           = #{ [] => #scope{}} :: #{ qname() => scope() }
+    , vars             = []                 :: [{name(), var_info()}]
+    , typevars         = unrestricted       :: unrestricted | [name()]
+    , fields           = #{}                :: #{ name() => [field_info()] }    %% fields are global
+    , namespace        = []                 :: qname()
+    , used_namespaces  = []                 :: list({qname(), namespace_alias()})
+    , in_pattern       = false              :: boolean()
+    , stateful         = false              :: boolean()
+    , current_function = none               :: none | aeso_syntax:id()
+    , what             = top                :: top | namespace | contract | contract_interface
     }).
 
 -type env() :: #env{}.
@@ -312,9 +315,16 @@ bind_contract({Contract, Ann, Id, Contents}, Env)
 
 %% What scopes could a given name come from?
 -spec possible_scopes(env(), qname()) -> [qname()].
-possible_scopes(#env{ namespace = Current}, Name) ->
+possible_scopes(#env{ namespace = Current, used_namespaces = UsedNamespaces }, Name) ->
     Qual = lists:droplast(Name),
-    [ lists:sublist(Current, I) ++ Qual || I <- lists:seq(0, length(Current)) ].
+    NewQual = case lists:keyfind(Qual, 2, UsedNamespaces) of
+                  {Namespace, _} ->
+                      Namespace;
+                  false ->
+                      Qual
+              end,
+    Ret = [ lists:sublist(Current, I) ++ NewQual || I <- lists:seq(0, length(Current)) ] ++ [ Namespace ++ NewQual || {Namespace, none} <- UsedNamespaces ],
+    Ret.
 
 -spec lookup_type(env(), type_id()) -> false | {qname(), type_info()}.
 lookup_type(Env, Id) ->
@@ -859,10 +869,13 @@ infer_contract(Env0, What, Defs0, Options) ->
               ({letfun, _, _, _, _, _})   -> function;
               ({fun_clauses, _, _, _, _}) -> function;
               ({fun_decl, _, _, _})       -> prototype;
+              ({using, _, _})             -> using;
+              ({using, _, _, _})          -> using;
               (_)                         -> unexpected
            end,
     Get = fun(K, In) -> [ Def || Def <- In, Kind(Def) == K ] end,
-    {Env1, TypeDefs} = check_typedefs(Env, Get(type, Defs)),
+    Env01 = check_usings(Env, Get(using, Defs)),
+    {Env1, TypeDefs} = check_typedefs(Env01, Get(type, Defs)),
     create_type_errors(),
     check_unexpected(Get(unexpected, Defs)),
     Env2 =
@@ -987,6 +1000,13 @@ check_typedef(Env, {record_t, Fields}) ->
 check_typedef(Env, {variant_t, Cons}) ->
     {variant_t, [ {constr_t, Ann, Con, [ check_type(Env, Arg) || Arg <- Args ]}
                 || {constr_t, Ann, Con, Args} <- Cons ]}.
+
+check_usings(Env, []) ->
+    Env;
+check_usings(Env = #env{ used_namespaces = UsedNamespaces }, [{using, Ann, Con} | Rest]) ->
+    check_usings(Env#env{ used_namespaces = UsedNamespaces ++ [{qname(Con), none}] }, Rest);
+check_usings(Env = #env{ used_namespaces = UsedNamespaces }, [{using, Ann, Con, Alias} | Rest]) ->
+    check_usings(Env#env{ used_namespaces = UsedNamespaces ++ [{qname(Con), qname(Alias)}] }, Rest).
 
 check_unexpected(Xs) ->
     [ type_error(X) || X <- Xs ].
