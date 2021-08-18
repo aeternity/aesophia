@@ -140,7 +140,7 @@ using() ->
     ?RULE(keyword(using), con(), optional({keyword(as), con()}), using(get_ann(_1), _2, _3)).
 
 using(Ann, Con, none) ->
-    {using, Ann, Con};
+    {using, Ann, Con, none};
 using(Ann, Con, {ok, {_, Alias}}) ->
     {using, Ann, Con, Alias}.
 

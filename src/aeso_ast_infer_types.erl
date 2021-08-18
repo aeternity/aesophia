@@ -813,10 +813,8 @@ infer1(Env, [{namespace, Ann, Name, Code} | Rest], Acc, Options) ->
     {Env1, Code1} = infer_contract_top(push_scope(namespace, Name, Env), namespace, Code, Options),
     Namespace1 = {namespace, Ann, Name, Code1},
     infer1(pop_scope(Env1), Rest, [Namespace1 | Acc], Options);
-infer1(Env, [Using = {using, _, _} | Rest], Acc, Options) ->
-    infer1(check_usings(Env, [Using]), Rest, Acc, Options);
 infer1(Env, [Using = {using, _, _, _} | Rest], Acc, Options) ->
-    infer1(check_usings(Env, [Using]), Rest, Acc, Options);
+    infer1(check_usings(Env, Using), Rest, Acc, Options);
 infer1(Env, [{pragma, _, _} | Rest], Acc, Options) ->
     %% Pragmas are checked in check_modifiers
     infer1(Env, Rest, Acc, Options).
@@ -873,7 +871,6 @@ infer_contract(Env0, What, Defs0, Options) ->
               ({letfun, _, _, _, _, _})   -> function;
               ({fun_clauses, _, _, _, _}) -> function;
               ({fun_decl, _, _, _})       -> prototype;
-              ({using, _, _})             -> using;
               ({using, _, _, _})          -> using;
               (_)                         -> unexpected
            end,
@@ -1010,10 +1007,16 @@ check_typedef(Env, {variant_t, Cons}) ->
 
 check_usings(Env, []) ->
     Env;
-check_usings(Env = #env{ used_namespaces = UsedNamespaces }, [{using, _, Con} | Rest]) ->
-    check_usings(Env#env{ used_namespaces = UsedNamespaces ++ [{qname(Con), none}] }, Rest);
 check_usings(Env = #env{ used_namespaces = UsedNamespaces }, [{using, _, Con, Alias} | Rest]) ->
-    check_usings(Env#env{ used_namespaces = UsedNamespaces ++ [{qname(Con), qname(Alias)}] }, Rest).
+    AliasName = case Alias of
+                    none ->
+                        none;
+                    _ ->
+                        qname(Alias)
+                end,
+    check_usings(Env#env{ used_namespaces = UsedNamespaces ++ [{qname(Con), AliasName}] }, Rest);
+check_usings(Env, Using = {using, _, _, _}) ->
+    check_usings(Env, [Using]).
 
 check_unexpected(Xs) ->
     [ type_error(X) || X <- Xs ].
@@ -1043,8 +1046,6 @@ check_modifiers_(Env, [{namespace, _, _, Decls} | Rest]) ->
     check_modifiers_(Env, Rest);
 check_modifiers_(Env, [{pragma, Ann, Pragma} | Rest]) ->
     check_pragma(Env, Ann, Pragma),
-    check_modifiers_(Env, Rest);
-check_modifiers_(Env, [{using, _, _} | Rest]) ->
     check_modifiers_(Env, Rest);
 check_modifiers_(Env, [{using, _, _, _} | Rest]) ->
     check_modifiers_(Env, Rest);
@@ -1801,10 +1802,8 @@ infer_block(Env, _, [{letval, Attrs, Pattern, E}|Rest], BlockType) ->
     {'case', _, NewPattern, {typed, _, {block, _, NewRest}, _}} =
         infer_case(Env, Attrs, Pattern, PatType, {block, Attrs, Rest}, BlockType),
     [{letval, Attrs, NewPattern, NewE}|NewRest];
-infer_block(Env, Attrs, [Using = {using, _, _} | Rest], BlockType) ->
-    infer_block(check_usings(Env, [Using]), Attrs, Rest, BlockType);
 infer_block(Env, Attrs, [Using = {using, _, _, _} | Rest], BlockType) ->
-    infer_block(check_usings(Env, [Using]), Attrs, Rest, BlockType);
+    infer_block(check_usings(Env, Using), Attrs, Rest, BlockType);
 infer_block(Env, Attrs, [E|Rest], BlockType) ->
     [infer_expr(Env, E)|infer_block(Env, Attrs, Rest, BlockType)].
 
