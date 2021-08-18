@@ -317,13 +317,13 @@ bind_contract({Contract, Ann, Id, Contents}, Env)
 -spec possible_scopes(env(), qname()) -> [qname()].
 possible_scopes(#env{ namespace = Current, used_namespaces = UsedNamespaces }, Name) ->
     Qual = lists:droplast(Name),
-    NewQual = case lists:keyfind(Qual, 2, UsedNamespaces) of
-                  {Namespace, _} ->
-                      Namespace;
-                  false ->
-                      Qual
-              end,
-    Ret = [ lists:sublist(Current, I) ++ NewQual || I <- lists:seq(0, length(Current)) ] ++ [ Namespace ++ NewQual || {Namespace, none} <- UsedNamespaces ],
+    NewQuals = case lists:filter(fun(X) -> element(2, X) == Qual end, UsedNamespaces) of
+                   [] ->
+                       [Qual];
+                   Namespaces ->
+                       lists:map(fun(X) -> element(1, X) end, Namespaces)
+               end,
+    Ret = [ lists:sublist(Current, I) ++ Q || I <- lists:seq(0, length(Current)), Q <- NewQuals ] ++ [ Namespace ++ Q || {Namespace, none} <- UsedNamespaces, Q <- NewQuals ],
     Ret.
 
 -spec lookup_type(env(), type_id()) -> false | {qname(), type_info()}.
