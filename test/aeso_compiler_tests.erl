@@ -788,6 +788,12 @@ failing_contracts() ->
                   , <<?Pos(13,23)
                       "Unbound variable A.f at line 13, column 23">>
                   ])
+    , ?TYPE_ERROR(using_namespace_wrong_scope,
+                  [ <<?Pos(19,5)
+                      "Unbound variable f at line 19, column 5">>
+                  , <<?Pos(21,23)
+                      "Unbound variable f at line 21, column 23">>
+                  ])
     ].
 
 -define(Path(File), "code_errors/" ??File).
