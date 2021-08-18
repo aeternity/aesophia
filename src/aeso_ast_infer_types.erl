@@ -3019,6 +3019,10 @@ mk_error({contract_lacks_definition, Type, When}) ->
            ),
     {Pos, Ctxt} = pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
+mk_error({ambiguous_name, QIds = [{qid, Ann, _} | _]}) ->
+    Names = lists:map(fun(QId) -> io_lib:format("~s at ~s\n", [pp(QId), pp_loc(QId)]) end, QIds),
+    Msg = "Ambiguous name: " ++ lists:concat(Names),
+    mk_t_err(pos(Ann), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p\n", [Err]),
     mk_t_err(pos(0, 0), Msg).
