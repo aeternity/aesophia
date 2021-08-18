@@ -794,6 +794,10 @@ failing_contracts() ->
                   , <<?Pos(21,23)
                       "Unbound variable f at line 21, column 23">>
                   ])
+    , ?TYPE_ERROR(using_namespace_undefined,
+                  [<<?Pos(2,3)
+                     "Cannot use undefined namespace MyUndefinedNamespace">>
+                  ])
     ].
 
 -define(Path(File), "code_errors/" ??File).
