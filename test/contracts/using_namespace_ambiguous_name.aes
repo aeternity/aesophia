@@ -1,0 +1,13 @@
+namespace Xa =
+  function f() = 1
+
+namespace Xb =
+  function f() = 2
+
+contract Cntr =
+  using Xa as A
+  using Xb as A
+
+  type state = int
+
+  entrypoint init() = A.f()

@@ -782,6 +782,12 @@ failing_contracts() ->
                    [<<?Pos(1,6)
                       "Only one main contract can be defined.">>
                    ])
+    , ?TYPE_ERROR(using_namespace_ambiguous_name,
+                  [ <<?Pos(2,3)
+                      "Ambiguous name: Xa.f at line 2, column 3\nXb.f at line 5, column 3">>
+                  , <<?Pos(13,23)
+                      "Unbound variable A.f at line 13, column 23">>
+                  ])
     ].
 
 -define(Path(File), "code_errors/" ??File).
