@@ -878,6 +878,7 @@ infer_contract(Env0, What, Defs0, Options) ->
               (_)                         -> unexpected
            end,
     Get = fun(K, In) -> [ Def || Def <- In, Kind(Def) == K ] end,
+    OldUsedNamespaces = Env#env.used_namespaces,
     Env01 = check_usings(Env, Get(using, Defs)),
     {Env1, TypeDefs} = check_typedefs(Env01, Get(type, Defs)),
     create_type_errors(),
@@ -901,11 +902,13 @@ infer_contract(Env0, What, Defs0, Options) ->
     DepGraph  = maps:map(fun(_, Def) -> aeso_syntax_utils:used_ids(Def) end, FunMap),
     SCCs      = aeso_utils:scc(DepGraph),
     {Env4, Defs1} = check_sccs(Env3, FunMap, SCCs, []),
+    %% Remove namespaces used in the current namespace
+    Env5 = Env4#env{ used_namespaces = OldUsedNamespaces },
     %% Check that `init` doesn't read or write the state
     check_state_dependencies(Env4, Defs1),
     destroy_and_report_type_errors(Env4),
     %% Add inferred types of definitions
-    {Env4, TypeDefs ++ Decls ++ Defs1}.
+    {Env5, TypeDefs ++ Decls ++ Defs1}.
 
 %% Restructure blocks into multi-clause fundefs (`fun_clauses`).
 -spec process_blocks([aeso_syntax:decl()]) -> [aeso_syntax:decl()].
