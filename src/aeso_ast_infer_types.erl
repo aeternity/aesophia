@@ -1008,14 +1008,21 @@ check_typedef(Env, {variant_t, Cons}) ->
 
 check_usings(Env, []) ->
     Env;
-check_usings(Env = #env{ used_namespaces = UsedNamespaces }, [{using, _, Con, Alias} | Rest]) ->
+check_usings(Env = #env{ used_namespaces = UsedNamespaces }, [{using, Ann, Con, Alias} | Rest]) ->
     AliasName = case Alias of
                     none ->
                         none;
                     _ ->
                         qname(Alias)
                 end,
-    check_usings(Env#env{ used_namespaces = UsedNamespaces ++ [{qname(Con), AliasName}] }, Rest);
+    case get_scope(Env, qname(Con)) of
+        false ->
+            create_type_errors(),
+            type_error({using_undefined_namespace, Ann, qname(Con)}),
+            destroy_and_report_type_errors(Env);
+        _ ->
+            check_usings(Env#env{ used_namespaces = UsedNamespaces ++ [{qname(Con), AliasName}] }, Rest)
+    end;
 check_usings(Env, Using = {using, _, _, _}) ->
     check_usings(Env, [Using]).
 
@@ -3025,6 +3032,9 @@ mk_error({contract_lacks_definition, Type, When}) ->
 mk_error({ambiguous_name, QIds = [{qid, Ann, _} | _]}) ->
     Names = lists:map(fun(QId) -> io_lib:format("~s at ~s\n", [pp(QId), pp_loc(QId)]) end, QIds),
     Msg = "Ambiguous name: " ++ lists:concat(Names),
+    mk_t_err(pos(Ann), Msg);
+mk_error({using_undefined_namespace, Ann, Namespace}) ->
+    Msg = io_lib:format("Cannot use undefined namespace ~s", [Namespace]),
     mk_t_err(pos(Ann), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p\n", [Err]),
