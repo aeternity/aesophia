@@ -323,8 +323,9 @@ possible_scopes(#env{ namespace = Current, used_namespaces = UsedNamespaces }, N
                    Namespaces ->
                        lists:map(fun(X) -> element(1, X) end, Namespaces)
                end,
-    Ret = [ lists:sublist(Current, I) ++ Q || I <- lists:seq(0, length(Current)), Q <- NewQuals ] ++ [ Namespace ++ Q || {Namespace, none} <- UsedNamespaces, Q <- NewQuals ],
-    Ret.
+    Ret1 = [ lists:sublist(Current, I) ++ Q || I <- lists:seq(0, length(Current)), Q <- NewQuals ],
+    Ret2 = [ Namespace ++ Q || {Namespace, none} <- UsedNamespaces, Q <- NewQuals ],
+    Ret1 ++ Ret2.
 
 -spec lookup_type(env(), type_id()) -> false | {qname(), type_info()}.
 lookup_type(Env, Id) ->
