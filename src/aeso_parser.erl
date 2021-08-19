@@ -137,12 +137,19 @@ fundef_or_decl() ->
             fundef()]).
 
 using() ->
-    ?RULE(keyword(using), con(), optional({keyword(as), con()}), using(get_ann(_1), _2, _3)).
+    Alias = {keyword(as), con()},
+    For = ?RULE(keyword(for), bracket_list(id()), {for, _2}),
+    Hiding = ?RULE(keyword(hiding), bracket_list(id()), {hiding, _2}),
+    ?RULE(keyword(using), con(), optional(Alias), optional(choice(For, Hiding)), using(get_ann(_1), _2, _3, _4)).
 
-using(Ann, Con, none) ->
-    {using, Ann, Con, none};
-using(Ann, Con, {ok, {_, Alias}}) ->
-    {using, Ann, Con, Alias}.
+using(Ann, Con, none, none) ->
+    {using, Ann, Con, none, none};
+using(Ann, Con, {ok, {_, Alias}}, none) ->
+    {using, Ann, Con, Alias, none};
+using(Ann, Con, none, {ok, List}) ->
+    {using, Ann, Con, none, List};
+using(Ann, Con, {ok, {_, Alias}}, {ok, List}) ->
+    {using, Ann, Con, Alias, List}.
 
 pragma() ->
     Op = choice([token(T) || T <- ['<', '=<', '==', '>=', '>']]),

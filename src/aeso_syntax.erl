@@ -36,6 +36,7 @@
 -type tvar() :: {tvar, ann(), name()}.
 
 -type namespace_alias() :: none | con().
+-type namespace_parts() :: none | {for, [id()]} | {hiding, [id()]}.
 
 -type decl() :: {contract_main, ann(), con(), [decl()]}
               | {contract_child, ann(), con(), [decl()]}
@@ -46,7 +47,7 @@
               | {type_def, ann(), id(), [tvar()], typedef()}
               | {fun_clauses, ann(), id(), type(), [letfun() | fundecl()]}
               | {block, ann(), [decl()]}
-              | {using, ann(), con(), namespace_alias()}
+              | {using, ann(), con(), namespace_alias(), namespace_parts()}
               | fundecl()
               | letfun()
               | letval(). % Only for error msgs
