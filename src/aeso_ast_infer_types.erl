@@ -128,7 +128,7 @@
     , typevars         = unrestricted       :: unrestricted | [name()]
     , fields           = #{}                :: #{ name() => [field_info()] }    %% fields are global
     , namespace        = []                 :: qname()
-    , used_namespaces  = []                 :: list({qname(), namespace_alias()})
+    , used_namespaces  = []                 :: [{qname(), namespace_alias()}]
     , in_pattern       = false              :: boolean()
     , stateful         = false              :: boolean()
     , current_function = none               :: none | aeso_syntax:id()
