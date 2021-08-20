@@ -31,14 +31,14 @@ The following ones need to be included as regular files with `.aes` suffix, for 
 include "List.aes"
 ```
 
-- [List](#List)
-- [Option](#Option)
-- [String](#String)
-- [Func](#Func)
-- [Pair](#Pair)
-- [Triple](#Triple)
-- [BLS12_381](#BLS12_381)
-- [Frac](#Frac)
+- [List](#list)
+- [Option](#option)
+- [String](#string)
+- [Func](#func)
+- [Pair](#pair)
+- [Triple](#triple)
+- [BLS12_381](bls12_381)
+- [Frac](#frac)
 - [Set](#set-stdlib)
 
 ## Builtin namespaces
