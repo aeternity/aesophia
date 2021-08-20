@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Set` stdlib
 - `Option.force_msg`
 - Loading namespaces into the current scope (e.g. `using Pair`)
-- Assign patterns to variables
+- Assign patterns to variables (e.g. `let x::(t = y::_) = [1, 2, 3, 4]` where `t == [2, 3, 4]`)
 ### Changed
 ### Removed
 
