@@ -1,0 +1,8 @@
+namespace Nsp =
+  function f() = 1
+  function g() = 2
+
+contract Cntr =
+  using Nsp for [f]
+
+  entrypoint init() = g()

@@ -1,15 +1,20 @@
 include "Option.aes"
 include "Pair.aes"
 include "String.aes"
+include "Triple.aes"
 
 using Pair
+using Triple hiding [fst, snd]
 
 namespace Nsp =
   using Option
 
   function h() =
-    let op = Some(2)
-    is_some(op)
+    let op = Some((2, 3, 4))
+    if (is_some(op))
+      thd(force(op)) == 4
+    else
+      false
 
 contract Cntr =
   using Nsp
@@ -24,7 +29,7 @@ contract Cntr =
       snd(p)
 
   function g() =
-    using String
+    using String for [concat]
 
     let s1 = "abc"
     let s2 = "def"

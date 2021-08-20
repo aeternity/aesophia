@@ -798,6 +798,14 @@ failing_contracts() ->
                   [<<?Pos(2,3)
                      "Cannot use undefined namespace MyUndefinedNamespace">>
                   ])
+    , ?TYPE_ERROR(using_namespace_undefined_parts,
+                  [<<?Pos(5,3)
+                     "The namespace Nsp does not define the following names: a">>
+                  ])
+    , ?TYPE_ERROR(using_namespace_hidden_parts,
+                  [<<?Pos(8,23)
+                     "Unbound variable g at line 8, column 23">>
+                  ])
     ].
 
 -define(Path(File), "code_errors/" ??File).
