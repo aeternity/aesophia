@@ -1,5 +1,5 @@
 # Introduction
-Sophia is a language in the ML family designed for smart contract development. It is strongly typed and has
+Sophia is a functional language designed for smart contract development. It is strongly typed and has
 restricted mutable state.
 
 Sophia is customized for smart contracts, which can be published
