@@ -248,6 +248,39 @@ Functions in namespaces have access to the same environment (including the
 with the exception of `state`, `put` and `Chain.event` since these are
 dependent on the specific state and event types of the contract.
 
+To avoid mentioning the namespace every time it is used, Sophia allows
+including the namespace in the current scope with the `using` keyword:
+```
+include "Pair.aes"
+using Pair
+contract C =
+  type state = int
+  entrypoint init() =
+    let p = (1, 2)
+    fst(p)  // this is the same as Pair.fst(p)
+```
+
+It is also possible to make an alias for the namespace with the `as` keyword:
+```
+include "Pair.aes"
+contract C =
+  using Pair as P
+  type state = int
+  entrypoint init() =
+    let p = (1, 2)
+    P.fst(p)  // this is the same as Pair.fst(p)
+```
+
+Importing specific parts of a namespace or hiding these parts can also be
+done like this:
+```
+using Pair for [fst, snd]       // this will only import fst and snd
+using Triple hiding [fst, snd]  // this will import everything except for fst and snd
+```
+
+Note that it is possible to use a namespace in the top level of the file, in the
+contract level, namespace level, or in the function level.
+
 ## Splitting code over multiple files
 
 Code from another file can be included in a contract using an `include`
