@@ -340,19 +340,9 @@ visible_in_used_namespaces(UsedNamespaces, QName) ->
             IsVisible = fun(Namespace) ->
                             case Namespace of
                                 {_, _, {for, Names}} ->
-                                    case lists:member(Name, Names) of
-                                        true ->
-                                            true;
-                                        false ->
-                                            false
-                                    end;
+                                    lists:member(Name, Names);
                                 {_, _, {hiding, Names}} ->
-                                    case lists:member(Name, Names) of
-                                        true ->
-                                            false;
-                                        false ->
-                                            true
-                                    end;
+                                    not lists:member(Name, Names);
                                 _ ->
                                     true
                             end
