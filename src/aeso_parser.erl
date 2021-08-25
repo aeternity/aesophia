@@ -282,8 +282,13 @@ stmt() ->
     , {else, keyword(else), body()}
     ])).
 
-branch() ->
+branch() -> choice(unguarded_branch(), guarded_branch()).
+
+unguarded_branch() ->
     ?RULE(pattern(), keyword('=>'), body(), {'case', _2, _1, _3}).
+
+guarded_branch() ->
+    ?RULE(pattern(), tok('|'), expr(), keyword('=>'), body(), {'case', _4, _1, _3, _5}).
 
 pattern() ->
     ?LET_P(E, expr(), parse_pattern(E)).

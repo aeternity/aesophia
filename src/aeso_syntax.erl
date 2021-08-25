@@ -145,7 +145,8 @@
 -type stmt() :: letbind()
               | expr().
 
--type alt() :: {'case', ann(), pat(), expr()}.
+-type alt() :: {'case', ann(), pat(), expr()}
+             | {'case', ann(), pat(), expr(), expr()}.
 
 -type lvalue() :: nonempty_list(elim()).
 
