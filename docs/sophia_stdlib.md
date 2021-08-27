@@ -12,40 +12,40 @@ in the scope and do not need any actions to be used, while the others require so
 
 The out-of-the-box namespaces are:
 
-- [Bits](#Bits)
-- [Bytes](#Bytes)
-- [Char](#Char)
-- [Int](#Int)
-- [Map](#Map)
-- [Address](#Address)
-- [Crypto](#Crypto)
-- [Auth](#Auth)
-- [Oracle](#Oracle)
-- [AENS](#AENS)
-- [Contract](#Contract)
-- [Call](#Call)
-- [Chain](#Chain)
+- [Bits](#bits)
+- [Bytes](#bytes)
+- [Char](#char)
+- [Int](#int)
+- [Map](#map)
+- [Address](#address)
+- [Crypto](#crypto)
+- [Auth](#auth)
+- [Oracle](#oracle)
+- [AENS](#aens)
+- [Contract](#contract)
+- [Call](#call)
+- [Chain](#chain)
 
 The following ones need to be included as regular files with `.aes` suffix, for example
 ```
 include "List.aes"
 ```
 
-- [List](#List)
-- [Option](#Option)
-- [String](#String)
-- [Func](#Func)
-- [Pair](#Pair)
-- [Triple](#Triple)
-- [BLS12_381](#BLS12_381)
-- [Frac](#Frac)
+- [List](#list)
+- [Option](#option)
+- [String](#string)
+- [Func](#func)
+- [Pair](#pair)
+- [Triple](#triple)
+- [BLS12_381](bls12_381)
+- [Frac](#frac)
 - [Set](#set-stdlib)
 
-# Builtin namespaces
+## Builtin namespaces
 
 They are available without any explicit includes.
 
-## Bits
+### Bits
 
 #### none
 ```
@@ -119,7 +119,7 @@ Bits.difference(a : bits, b : bits) : bits
 Each bit is true if and only if it was 1 in `a` and 0 in `b`
 
 
-## Bytes
+### Bytes
 
 #### to_int
 ```
@@ -153,7 +153,7 @@ Bytes.split(a : bytes(m + n)) : bytes(m) * bytes(n)
 Splits a byte array at given index
 
 
-## Char
+### Char
 
 #### to_int
  ```
@@ -172,7 +172,7 @@ Char.from_int(i : int) : option(char)
 Opposite of [to_int](#to_int). Returns `None` if the integer doesn't correspond to a single (normalized) codepoint.
 
 
-## Int
+### Int
 
 #### to_str
 ```
@@ -182,7 +182,7 @@ Int.to_str : int => string
 Casts integer to string using decimal representation
 
 
-## Map
+### Map
 
 #### lookup
 `Map.lookup(k : 'k, m : map('k, 'v)) : option('v)`
@@ -229,7 +229,7 @@ Turns a list of pairs of form `(key, value)` into a map
 
 
 
-## Address
+### Address
 
 #### to_str
 ```
@@ -271,7 +271,7 @@ Address.to_contract(a : address) : C
 Cast address to contract type C (where `C` is a contract)
 
 
-## Crypto
+### Crypto
 
 #### sha3
 ```
@@ -328,7 +328,7 @@ Crypto.verify_sig_secp256k1(msg : hash, pubkey : bytes(64), sig : bytes(64)) : b
 <!-- TODO -->
 
 
-## Auth
+### Auth
 
 
 #### tx
@@ -368,7 +368,7 @@ Auth.tx_hash : option(hash)
 
 Gets the transaction hash during authentication.
 
-## Oracle
+### Oracle
 
 #### register
 ```
@@ -380,7 +380,7 @@ Registers new oracle answering questions of type `'a` with answers of type `'b`.
 * The `acct` is the address of the oracle to register (can be the same as the contract).
 * `signature` is a signature proving that the contract is allowed to register the account -
   the `network id` + `account address` + `contract address` (concatenated as byte arrays) is
-  [signed](./sophia.md#delegation-signature) with the
+  [signed](./sophia_features.md#delegation-signature) with the
   private key of the account, proving you have the private key of the oracle to be. If the
   address is the same as the contract `sign` is ignored and can be left out entirely.
 * The `qfee` is the minimum query fee to be paid by a user when asking a question of the oracle.
@@ -413,7 +413,7 @@ Responds to the question `q` on `o`.
 Unless the contract address is the same as the oracle address the `signature`
 (which is an optional, named argument)
 needs to be provided. Proving that we have the private key of the oracle by
-[signing](./sophia.md#delegation-signature)
+[signing](./sophia_features.md#delegation-signature)
 the `network id` + `oracle query id` + `contract address`
 
 
@@ -481,25 +481,25 @@ Oracle.check_query(o : oracle('a, 'b), q : oracle_query('a, 'b)) : bool
 It returns `true` iff the oracle query exist and has the expected type.
 
 
-## AENS
+### AENS
 
-The following functionality is available for interacting with the Aeternity
-Naming System (AENS).
+The following functionality is available for interacting with the æternity
+naming system (AENS).
 If `owner` is equal to `Contract.address` the signature `signature` is
 ignored, and can be left out since it is a named argument. Otherwise we need
 a signature to prove that we are allowed to do AENS operations on behalf of
 `owner`. The [signature is tied to a network id](https://github.com/aeternity/protocol/blob/iris/consensus/consensus.md#transaction-signature),
 i.e. the signature material should be prefixed by the network id.
 
-### Types
+#### Types
 
-#### name
+##### name
 ```
 datatype name = Name(address, Chain.ttl, map(string, AENS.pointee))
 ```
 
 
-#### pointee
+##### pointee
 
 ```
 datatype pointee = AccountPt(address) | OraclePt(address)
@@ -507,9 +507,9 @@ datatype pointee = AccountPt(address) | OraclePt(address)
 ```
 
 
-### Functions
+#### Functions
 
-#### resolve
+##### resolve
 ```
 AENS.resolve(name : string, key : string) : option('a)
 ```
@@ -520,7 +520,7 @@ associated with this name (for instance `"account_pubkey"`). The return type
 type checked against this type at run time.
 
 
-#### lookup
+##### lookup
 ```
 AENS.lookup(name : string) : option(AENS.name)
 ```
@@ -534,53 +534,53 @@ let Some(Name(owner, FixedTTL(expiry), ptrs)) = AENS.lookup("example.chain")
 ```
 
 
-#### preclaim
+##### preclaim
 ```
 AENS.preclaim(owner : address, commitment_hash : hash, <signature : signature>) : unit
 ```
 
-The [signature](./sophia.md#delegation-signature) should be over
+The [signature](./sophia_features.md#delegation-signature) should be over
 `network id` + `owner address` + `Contract.address` (concatenated as byte arrays).
 
 
-#### claim
+##### claim
 ```
 AENS.claim(owner : address, name : string, salt : int, name_fee : int, <signature : signature>) : unit
 ```
 
-The [signature](./sophia.md#delegation-signature) should be over
+The [signature](./sophia_features.md#delegation-signature) should be over
 `network id` + `owner address` + `name_hash` + `Contract.address`
 (concatenated as byte arrays)
 using the private key of the `owner` account for signing.
 
 
-#### transfer
+##### transfer
 ```
 AENS.transfer(owner : address, new_owner : address, name : string, <signature : signature>) : unit
 ```
 
 Transfers name to the new owner.
 
-The [signature](./sophia.md#delegation-signature) should be over
+The [signature](./sophia_features.md#delegation-signature) should be over
 `network id` + `owner address` + `name_hash` + `Contract.address`
 (concatenated as byte arrays)
 using the private key of the `owner` account for signing.
 
 
-#### revoke
+##### revoke
 ```
 AENS.revoke(owner : address, name : string, <signature : signature>) : unit
 ```
 
 Revokes the name to extend the ownership time.
 
-The [signature](./sophia.md#delegation-signature) should be over
+The [signature](./sophia_features.md#delegation-signature) should be over
 `network id` + `owner address` + `name_hash` + `Contract.address`
 (concatenated as byte arrays)
 using the private key of the `owner` account for signing.
 
 
-#### update
+##### update
 ```
 AENS.update(owner : address, name : string, expiry : option(Chain.ttl), client_ttl : option(int),
             new_ptrs : map(string, AENS.pointee), <signature : signature>) : unit
@@ -591,7 +591,7 @@ will not be updated, for example if `None` is passed as `expiry` the expiry
 block of the name is not changed.
 
 
-## Contract
+### Contract
 
 Values related to the current contract
 
@@ -619,7 +619,7 @@ Contract.balance : int
 Amount of coins in the contract account
 
 
-## Call
+### Call
 
 Values related to the call to the current contract
 
@@ -670,13 +670,13 @@ Call.gas_left() : int
 The amount of gas left for the current call.
 
 
-## Chain
+### Chain
 
 Values and functions related to the chain itself and other entities that live on it.
 
-### Types
+#### Types
 
-#### tx
+##### tx
 ```
 record tx = { paying_for : option(Chain.paying_for_tx)
             , ga_metas : list(Chain.ga_meta_tx)
@@ -686,18 +686,18 @@ record tx = { paying_for : option(Chain.paying_for_tx)
             , tx    : Chain.base_tx }
 ```
 
-#### ga_meta_tx
+##### ga_meta_tx
 ```
 datatype ga_meta_tx    = GAMetaTx(address, int)
 ```
 
-#### paying_for_tx
+##### paying_for_tx
 ```
 datatype paying_for_tx = PayingForTx(address, int)
 ```
 
 
-#### base_tx
+##### base_tx
 ```
 datatype base_tx = SpendTx(address, int, string)
                  | OracleRegisterTx | OracleQueryTx | OracleResponseTx | OracleExtendTx
@@ -711,9 +711,9 @@ datatype base_tx = SpendTx(address, int, string)
 ```
 
 
-### Functions
+#### Functions
 
-#### balance
+##### balance
 ```
 Chain.balance(a : address) : int
 ```
@@ -721,7 +721,7 @@ Chain.balance(a : address) : int
 The balance of account `a`.
 
 
-#### block_hash
+##### block_hash
 ```
 Chain.block_hash(h : int) : option(bytes(32))
 ```
@@ -734,7 +734,7 @@ allowed height. From FATE VM version 2 (IRIS) it will return the block hash of
 the current generation.
 
 
-#### block_height
+##### block_height
 ```
 Chain.block_height : int"
 ```
@@ -742,7 +742,7 @@ Chain.block_height : int"
 The height of the current block (i.e. the block in which the current call will be included).
 
 
-#### coinbase
+##### coinbase
 ```
 Chain.coinbase : address
 ```
@@ -750,7 +750,7 @@ Chain.coinbase : address
 The address of the account that mined the current block.
 
 
-#### timestamp
+##### timestamp
 ```
 Chain.timestamp : int
 ```
@@ -758,7 +758,7 @@ Chain.timestamp : int
 The timestamp of the current block.
 
 
-#### difficulty
+##### difficulty
 ```
 Chain.difficulty : int
 ```
@@ -766,7 +766,7 @@ Chain.difficulty : int
 The difficulty of the current block.
 
 
-#### gas
+##### gas
 ```
 Chain.gas_limit : int
 ```
@@ -774,7 +774,7 @@ Chain.gas_limit : int
 The gas limit of the current block.
 
 
-#### bytecode_hash
+##### bytecode_hash
 ```
 Chain.bytecode_hash : 'c => option(hash)
 ```
@@ -785,7 +785,7 @@ instantiated with a contract. The charged gas increases linearly to
 the size of the serialized bytecode of the deployed contract.
 
 
-#### create
+##### create
 ```
 Chain.create(value : int, ...) => 'c
 ```
@@ -837,7 +837,7 @@ main contract Market =
 The typechecker must be certain about the created contract's type, so it is
 worth writing it explicitly as shown in the example.
 
-#### clone
+##### clone
 ```
 Chain.clone : ( ref : 'c, gas : int, value : int, protected : bool, ...
               ) => if(protected) option('c) else 'c
@@ -895,18 +895,18 @@ implementation of the `init` function does not actually return `state`, but
 calls `put` instead. Moreover, FATE prevents even handcrafted calls to `init`.
 
 
-#### event
+##### event
 ```
 Chain.event(e : event) : unit
 ```
 Emits the event. To use this function one needs to define the `event` type as a `datatype` in the contract.
 
 
-# Includable namespaces
+## Includable namespaces
 
 These need to be explicitly included (with `.aes` suffix)
 
-## List
+### List
 
 This module contains common operations on lists like constructing, querying, traversing etc.
 
@@ -1253,7 +1253,7 @@ List.enumerate(l : list('a)) : list(int * 'a)
 Equivalent to [zip](#zip) with `[0..length(l)]`, but slightly faster.
 
 
-## Option
+### Option
 
 Common operations on `option` types and lists of `option`s.
 
@@ -1438,7 +1438,7 @@ Option.choose_first(l : list(option('a))) : option('a)
 Same as [choose](#choose), but chooses from a list insted of two arguments.
 
 
-## String
+### String
 
 Operations on the `string` type. A `string` is a UTF-8 encoded byte array.
 
@@ -1554,7 +1554,7 @@ blake2b(s : string) : hash
 Computes the Blake2B hash of the string.
 
 
-## Func
+### Func
 
 Functional combinators.
 
@@ -1684,7 +1684,7 @@ Func.untuplify3(f : 'a * 'b * 'c => 'd) : ('a, 'b, 'c) => 'd
 Opposite to [tuplify](#tuplify).
 
 
-## Pair
+### Pair
 
 Common operations on 2-tuples.
 
@@ -1736,7 +1736,7 @@ Pair.swap(t : ('a * 'b)) : ('b * 'a)
 Swaps elements.
 
 
-## Triple
+### Triple
 
 #### fst
 ```
@@ -1817,234 +1817,234 @@ Triple.rotl(t : ('a * 'b * 'c)) : ('b * 'c * 'a)
 
 Cyclic rotation of the elements to the left.
 
-## BLS12\_381
+### BLS12\_381
 
-### Types
+#### Types
 
-#### fp
+##### fp
 
 Built-in (Montgomery) integer representation 32 bytes
 
 
-#### fr
+##### fr
 
 Built-in (Montgomery) integer representation 48 bytes
 
 
-#### fp2
+##### fp2
 ```
 record fp2 = { x1 : fp, x2 : fp }`
 ```
 
-#### g1
+##### g1
 ```
 record g1  = { x : fp, y : fp, z : fp }
 ```
 
 
-#### g2
+##### g2
 ```
 record g2  = { x : fp2, y : fp2, z : fp2 }
 ```
 
 
-#### gt
+##### gt
 ```
 record gt  = { x1 : fp, x2 : fp, x3 : fp, x4 : fp, x5 : fp, x6 : fp, x7 : fp, x8 : fp, x9 : fp, x10 : fp, x11 : fp, x12 : fp }
 ```
 
-### Functions
+#### Functions
 
-#### pairing\_check
+##### pairing\_check
 ```
 BLS12_381.pairing_check(xs : list(g1), ys : list(g2)) : bool
 ```
 
 Pairing check of a list of points, `xs` and `ys` should be of equal length.
 
-#### int_to_fr
+##### int_to_fr
 ```
 BLS12_381.int_to_fr(x : int) : fr
 ```
 
 Convert an integer to an `fr` - a 32 bytes internal (Montgomery) integer representation.
 
-#### int_to_fp
+##### int_to_fp
 ```
 BLS12_381.int_to_fp(x : int) : fp
 ```
 
 Convert an integer to an `fp` - a 48 bytes internal (Montgomery) integer representation.
 
-#### fr_to_int
+##### fr_to_int
 ```
 BLS12_381.fr_to_int(x : fr)  : int
 ```
 
 Convert a `fr` value into an integer.
 
-#### fp_to_int
+##### fp_to_int
 ```
 BLS12_381.fp_to_int(x : fp)  : int
 ```
 
 Convert a `fp` value into an integer.
 
-#### mk_g1
+##### mk_g1
 ```
 BLS12_381.mk_g1(x : int, y : int, z : int) : g1
 ```
 
 Construct a `g1` point from three integers.
 
-#### mk_g2
+##### mk_g2
 ```
 BLS12_381.mk_g2(x1 : int, x2 : int, y1 : int, y2 : int, z1 : int, z2 : int) : g2
 ```
 
 Construct a `g2` point from six integers.
 
-#### g1_neg
+##### g1_neg
 ```
 BLS12_381.g1_neg(p : g1) : g1
 ```
 
 Negate a `g1` value.
 
-#### g1_norm
+##### g1_norm
 ```
 BLS12_381.g1_norm(p : g1) : g1
 ```
 
 Normalize a `g1` value.
 
-#### g1_valid
+##### g1_valid
 ```
 BLS12_381.g1_valid(p : g1) : bool
 ```
 
 Check that a `g1` value is a group member.
 
-#### g1_is_zero
+##### g1_is_zero
 ```
 BLS12_381.g1_is_zero(p : g1) : bool
 ```
 
 Check if a `g1` value corresponds to the zero value of the group.
 
-#### g1_add
+##### g1_add
 ```
 BLS12_381.g1_add(p : g1, q : g1) : g1
 ```
 
 Add two `g1` values.
 
-#### g1_mul
+##### g1_mul
 ```
 BLS12_381.g1_mul(k : fr, p : g1) : g1
 ```
 
 Scalar multiplication for `g1`.
 
-#### g2_neg
+##### g2_neg
 ```
 BLS12_381.g2_neg(p : g2) : g2
 ```
 
 Negate a `g2` value.
 
-#### g2_norm
+##### g2_norm
 ```
 BLS12_381.g2_norm(p : g2) : g2
 ```
 
 Normalize a `g2` value.
 
-#### g2_valid
+##### g2_valid
 ```
 BLS12_381.g2_valid(p : g2) : bool
 ```
 
 Check that a `g2` value is a group member.
 
-#### g2_is_zero
+##### g2_is_zero
 ```
 BLS12_381.g2_is_zero(p : g2) : bool
 ```
 
 Check if a `g2` value corresponds to the zero value of the group.
 
-#### g2_add
+##### g2_add
 ```
 BLS12_381.g2_add(p : g2, q : g2) : g2
 ```
 
 Add two `g2` values.
 
-#### g2_mul
+##### g2_mul
 ```
 BLS12_381.g2_mul(k : fr, p : g2) : g2
 ```
 
 Scalar multiplication for `g2`.
 
-#### gt_inv
+##### gt_inv
 ```
 BLS12_381.gt_inv(p : gt) : gt
 ```
 
 Invert a `gt` value.
 
-#### gt_add
+##### gt_add
 ```
 BLS12_381.gt_add(p : gt, q : gt) : gt
 ```
 
 Add two `gt` values.
 
-#### gt_mul
+##### gt_mul
 ```
 BLS12_381.gt_mul(p : gt, q : gt) : gt
 ```
 
 Multiply two `gt` values.
 
-#### gt_pow
+##### gt_pow
 ```
 BLS12_381.gt_pow(p : gt, k : fr) : gt
 ```
 
 Calculate exponentiation `p ^ k`.
 
-#### gt_is_one
+##### gt_is_one
 ```
 BLS12_381.gt_is_one(p : gt) : bool
 ```
 
 Compare a `gt` value to the unit value of the Gt group.
 
-#### pairing
+##### pairing
 ```
 BLS12_381.pairing(p : g1, q : g2) : gt
 ```
 
 Compute the pairing of a `g1` value and a `g2` value.
 
-#### miller_loop
+##### miller_loop
 ```
 BLS12_381.miller_loop(p : g1, q : g2) : gt
 ```
 
 Do the Miller loop stage of pairing for `g1` and `g2`.
 
-#### final_exp
+##### final_exp
 ```
 BLS12_381.final_exp(p : gt) : gt
 ```
 
 Perform the final exponentiation step of pairing for a `gt` value.
 
-## Frac
+### Frac
 
 This namespace provides operations on rational numbers. A rational number is represented
 as a fraction of two integers which are stored internally in the `frac` datatype.
@@ -2068,9 +2068,9 @@ language provides checkers to prevent unintended usage of them. Therefore the ty
 **will** allow that and the results of such comparison will be unspecified.
 You should use [lt](#lt), [geq](#geq), [eq](#eq) etc instead.
 
-### Types
+#### Types
 
-#### frac
+##### frac
 ```
 datatype frac = Pos(int, int) | Zero | Neg(int, int)
 ```
@@ -2079,194 +2079,194 @@ Internal representation of fractional numbers. First integer encodes the numerat
 both must be always positive, as the sign is being handled by the choice of the constructor.
 
 
-### Functions
+#### Functions
 
-#### make_frac
+##### make_frac
 `Frac.make_frac(n : int, d : int) : frac`
 
 Creates a fraction out of numerator and denominator. Automatically normalizes, so
 `make_frac(2, 4)` and `make_frac(1, 2)` will yield same results.
 
 
-#### num
+##### num
 `Frac.num(f : frac) : int`
 
 Returns the numerator of a fraction.
 
 
-#### den
+##### den
 `Frac.den(f : frac) : int`
 
 Returns the denominator of a fraction.
 
 
-#### to_pair
+##### to_pair
 `Frac.to_pair(f : frac) : int * int`
 
 Turns a fraction into a pair of numerator and denominator.
 
 
-#### sign
+##### sign
 `Frac.sign(f : frac) : int`
 
 Returns the signum of a fraction, -1, 0, 1 if negative, zero, positive respectively.
 
 
-#### to_str
+##### to_str
 `Frac.to_str(f : frac) : string`
 
 Conversion to string. Does not display division by 1 or denominator if equals zero.
 
 
-#### simplify
+##### simplify
 `Frac.simplify(f : frac) : frac`
 
 Reduces fraction to normal form if for some reason it is not in it.
 
 
-#### eq
+##### eq
 `Frac.eq(a : frac, b : frac) : bool`
 
 Checks if `a` is equal to `b`.
 
 
-#### neq
+##### neq
 `Frac.neq(a : frac, b : frac) : bool`
 
 Checks if `a` is not equal to `b`.
 
 
-#### geq
+##### geq
 `Frac.geq(a : frac, b : frac) : bool`
 
 Checks if `a` is greater or equal to `b`.
 
 
-#### leq
+##### leq
 `Frac.leq(a : frac, b : frac) : bool`
 
 Checks if `a` is lesser or equal to `b`.
 
 
-#### gt
+##### gt
 `Frac.gt(a : frac, b : frac) : bool`
 
 Checks if `a` is greater than `b`.
 
 
-#### lt
+##### lt
 `Frac.lt(a : frac, b : frac) : bool`
 
 Checks if `a` is lesser than `b`.
 
 
-#### min
+##### min
 `Frac.min(a : frac, b : frac) : frac`
 
 Chooses lesser of the two fractions.
 
 
-#### max
+##### max
 `Frac.max(a : frac, b : frac) : frac`
 
 Chooses greater of the two fractions.
 
 
-#### abs
+##### abs
 `Frac.abs(f : frac) : frac`
 
 Absolute value.
 
 
-#### from_int
+##### from_int
 `Frac.from_int(n : int) : frac`
 
 From integer conversion. Effectively `make_frac(n, 1)`.
 
 
-#### floor
+##### floor
 `Frac.floor(f : frac) : int`
 
 Rounds a fraction to the nearest lesser or equal integer.
 
 
-#### ceil
+##### ceil
 `Frac.ceil(f : frac) : int`
 
 Rounds a fraction to the nearest greater or equal integer.
 
 
-#### round_to_zero
+##### round_to_zero
 `Frac.round_to_zero(f : frac) : int`
 
 Rounds a fraction towards zero.
 Effectively `ceil` if lesser than zero and `floor` if greater.
 
 
-#### round_from_zero
+##### round_from_zero
 `Frac.round_from_zero(f : frac) : int`
 
 Rounds a fraction from zero.
 Effectively `ceil` if greater than zero and `floor` if lesser.
 
 
-#### round
+##### round
 `Frac.round(f : frac) : int`
 
 Rounds a fraction to a nearest integer. If two integers are in the same distance it
 will choose the even one.
 
 
-#### add
+##### add
 `Frac.add(a : frac, b : frac) : frac`
 
 Sum of the fractions.
 
 
-#### neg
+##### neg
 `Frac.neg(a : frac) : frac`
 
 Negation of the fraction.
 
 
-#### sub
+##### sub
 `Frac.sub(a : frac, b : frac) : frac`
 
 Subtraction of two fractions.
 
 
-#### inv
+##### inv
 `Frac.inv(a : frac) : frac`
 
 Inverts a fraction. Throws error if `a` is zero.
 
 
-#### mul
+##### mul
 `Frac.mul(a : frac, b : frac) : frac`
 
 Multiplication of two fractions.
 
 
-#### div
+##### div
 `Frac.div(a : frac, b : frac) : frac`
 
 Division of two fractions.
 
 
-#### int_exp
+##### int_exp
 `Frac.int_exp(b : frac, e : int) : frac`
 
 Takes `b` to the power of `e`. The exponent can be a negative value.
 
 
-#### optimize
+##### optimize
 `Frac.optimize(f : frac, loss : frac) : frac`
 
 Shrink the internal size of a fraction as much as possible by approximating it to the
 point where the error would exceed the `loss` value.
 
 
-#### is_sane
+##### is_sane
 `Frac.is_sane(f : frac) : bool`
 
 For debugging. If it ever returns false in a code that doesn't call `frac` constructors or
