@@ -30,11 +30,11 @@ unsetup(_) ->
 
 hagia_test_() ->
     ?IF(os:find_executable("z3") == false, [], % This turns off hagia tests on machines that don't have Z3
-    {timeout, 100000000,
+    {timeout, 10000000000000000,
      {inorder,
       {foreach, local, fun setup/0, fun unsetup/1,
        [ {timeout, 5, smt_solver_test_group()}
-       , {timeout, 1000000, refiner_test_group()}
+       , {timeout, 1000000000000000, refiner_test_group()}
        ]
       }
      }}).
@@ -54,7 +54,7 @@ smt_solver_test_group() ->
 
 refiner_test_group() ->
     [ {"Testing type refinement of the " ++ ContractName ++ ".aes contract",
-       {timeout, 600,
+       {timeout, 60000,
         fun() ->
                 try {run_refine("hagia/" ++ ContractName), Expect} of
                     {{ok, {Env, AST}}, {success, Assertions}} ->

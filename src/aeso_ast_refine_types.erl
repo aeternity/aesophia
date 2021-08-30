@@ -92,6 +92,7 @@
         , namespaces       = #{}               :: #{qname() => namespace_type()}
         , stateful         = #{}               :: #{qname() => boolean()}
         , tc_env
+        , falsified        = false             :: boolean()
         }).
 -type env() :: #env{}.
 
@@ -771,6 +772,11 @@ fresh_liquid(Env, Hint, Type) ->
     fresh_liquid(Env, covariant, Hint, Type).
 
 -spec fresh_liquid(env(), variance(), name(), term()) -> term().
+%fresh_liquid(Env, Variance, Hint, {empty_sub, _, T}) ->
+%    Liq = fresh_liquid(Env, Variance, Hint, T),
+%    Empty = empty_type(Variance, Liq),
+%    ?DBG("EMPTY: ~s -> ~s", [aeso_pretty:pp(type, Liq), aeso_pretty:pp(type, Empty)]),
+%    Empty;
 fresh_liquid(_Env, _Variance, _Hint, Type = {refined_t, _, _, _, _}) ->
     Type;
 fresh_liquid(_Env, _Variance, _Hint, Type = {dep_fun_t, _, _, _}) ->
@@ -905,7 +911,7 @@ fresh_liquid_arg(Env, Variance, Id, Type) ->
                 {{refined_t, Ann, Id, Base, apply_subst(TId, Id, Pred)}, [{TId, Id}]};
             {dep_list_t, Ann, TId, Elem, Pred} ->
                 {{dep_list_t, Ann, Id, Elem, apply_subst(TId, Id, Pred)}, [{TId, Id}]};
-            {dep_variant_t, Ann, TId, Tag, Constrs} ->
+            {dep_variant_t, Ann, TId, Tag, Constrs} -> %% FIXME: TYPE?
                 {{dep_variant_t, Ann, Id, apply_subst(TId, Id, Tag), Constrs}, [{TId, Id}]};
             T -> {T, []}
         end,
@@ -953,6 +959,44 @@ fresh_wildcards([H|T]) ->
     [fresh_wildcards(H)|fresh_wildcards(T)];
 fresh_wildcards(X) -> X.
 
+empty_type(covariant, {refined_t, Ann, Self, Base, _}) ->
+    {refined_t, Ann, Self, Base, [{bool, Ann, false}]};
+empty_type(contravariant, {refined_t, Ann, Self, Base, _}) ->
+    {refined_t, Ann, Self, Base, []};
+empty_type(covariant, {dep_list_t, Ann, Self, Elem, _}) ->
+    {dep_list_t, Ann, Self, empty_type(covariant, Elem), [{bool, Ann, false}]};
+empty_type(contravariant, {dep_list_t, Ann, Self, Elem, _}) ->
+    {dep_list_t, Ann, Self, empty_type(contravariant, Elem), []};
+empty_type(Variance, {dep_fun_t, Ann, Args, Ret}) ->
+    {dep_fun_t, Ann, 
+     [{dep_arg_t, AAnn, Name, empty_type(switch_variance(Variance), ArgT)}
+      || {dep_arg_t, AAnn, Name, ArgT} <- Args],
+     empty_type(Variance, Ret)
+    };
+empty_type(Variance, {dep_record_t, Ann, Base, Fields}) ->
+    {dep_record_t, Ann, Base,
+     [ {field, FAnn, Name, empty_type(Variance, Type)}
+      || {field, FAnn, Name, Type} <- Fields
+     ]
+    };
+empty_type(Variance, {dep_variant_t, Ann, Id, Base, Tag, Constrs}) ->
+    Tag1 = case Variance of
+               covariant ->
+                   [{bool, Ann, false}];
+               contravariant ->
+                   []
+           end,
+    {dep_variant_t, Ann, Id, Base, Tag1,
+     [ {constr_t, CAnn, CName,
+        [empty_type(Variance, CArg) || CArg <- CArgs]
+       }
+      || {constr_t, CAnn, CName, CArgs} <- Constrs
+     ]
+    };
+empty_type(Variance, {tuple, Ann, Ts}) ->
+    {tuple, Ann, [empty_type(Variance, T) || T <- Ts]}.
+%empty_type(_, T) -> T.
+
 
 %% -- Utils --------------------------------------------------------------------
 
@@ -986,6 +1030,7 @@ add_error(Err) ->
 %% -- Entrypoint ---------------------------------------------------------------
 
 refine_ast(TCEnv, AST) ->
+    ?DBG("INITIALISING REFINER"),
     Env0 = init_env(TCEnv),
     Env1 = with_cool_ints_from(TCEnv, with_cool_ints_from(AST, Env0)),
     Env2 = register_namespaces(AST, Env1),
@@ -993,15 +1038,24 @@ refine_ast(TCEnv, AST) ->
     Env4 = register_stateful(AST, Env3),
     try
         Env5 = register_ast_funs(AST, Env4),
+        ?DBG("GENERATING CONSTRAINTS"),
         {AST1, CS0} = constr_ast(Env5, AST),
+        ?DBG("DONE:\n~s", [string:join([aeso_pretty:pp(constr, C)  || C <- CS0], "\n\n")]),
+        ?DBG("SPLITTING ~p CONSTRAINTS", [length(CS0)]),
         CS1 = split_constr(CS0),
-        %[ ?DBG("SUBTYPE ~p:\n~s\n<:\n~s", [Id, aeso_pretty:pp(type, strip_typed(T1)), aeso_pretty:pp(type, strip_typed(T2))])
-        %  || {subtype, Id, _, _, T1, T2} <- CS1
-        %],
+        ?DBG("DONE:\n~s", [string:join([aeso_pretty:pp(constr, C)  || C <- CS1], "\n\n")]),
+        [ ?DBG("SUBTYPE ~p:\n~s\n<:\n~s\n", [Id, aeso_pretty:pp(type, strip_typed(T1)), aeso_pretty:pp(type, strip_typed(T2))])
+          || {subtype, Id, _, _, T1, T2} <- CS1
+        ],
+        ?DBG("SOLVING ~p CONSTRAINTS", [length(CS1)]),
         {Env5, solve(Env5, AST1, CS1)}
     of
-        {EnvErlangSucks, {ok, AST2}} -> {ok, {EnvErlangSucks, AST2}};
-        {_, Err = {error, _}} -> Err
+        {EnvErlangSucks, {ok, AST2}} -> 
+            ?DBG("REFINEMENT FINISHED"),
+            ?DBG("LIQUID ACI:\n~s", [aeso_pretty:pp(decls, AST2)]),
+            {ok, {EnvErlangSucks, AST2}};
+        {_, Err = {error, _}} -> 
+            Err
     catch {ErrType, _}=E
                 when ErrType =:= refinement_errors;
                      ErrType =:= overwrite;
@@ -1075,8 +1129,11 @@ constr_letfun(Env0, {letfun, Ann, Id, Args, RetT, Body}, S0) ->
                 end
         end,
     Body3 = a_normalize(Body2),
-    %?DBG("ANORM\n~s", [aeso_pretty:pp(expr, Body1)]),
-    %?DBG("PURIFIED\n~s", [aeso_pretty:pp(expr, Body3)]),
+%    ?DBG("FUN\n~s", [aeso_pretty:pp(expr, Body0)]),
+    ?DBG("FUN\n~p", [Body0]),
+    ?DBG("ANORM\n~s", [aeso_pretty:pp(expr, Body1)]),
+    ?DBG("PURIFIED\n~p", [Body3]),
+%    ?DBG("PURIFIED\n~s", [aeso_pretty:pp(expr, Body3)]),
     {BodyT, S1} = constr_expr(Env3, Body3, S0),
     InnerFunT = {dep_fun_t, Ann, ArgsT, BodyT},
     S3 = [ {subtype, constr_id(letfun_top_decl), Ann, Env3, BodyT, GlobRetT}
@@ -1218,7 +1275,7 @@ constr_expr(_Env, I = {int, Ann, _}, T = ?int_tp, S) ->
     {?refined(T, [?op(Ann, ?nu(Ann), '==', I)]), S};
 constr_expr(_Env, I = {char, Ann, _}, T, S) ->
     {?refined(T, [?op(Ann, ?nu(Ann), '==', I)]), S};
-constr_expr(_Env, {address, _, _}, T, S0) ->
+constr_expr(_Env, {account_pubkey, _, _}, T, S0) ->
     {?refined(T), S0};
 constr_expr(_Env, {string, _, _}, T, S0) ->
     {?refined(T), S0};
@@ -1340,8 +1397,8 @@ constr_expr(Env, {app, Ann, ?typed_p({'++', OpAnn}), [OpL, OpR]}, {app_t, _, {id
 constr_expr(Env, {app, Ann, ?typed_p({id, _, "abort"}), _}, T, S0) ->
     ExprT = fresh_liquid(Env, "abort", T),
     {ExprT,
-     [ {unreachable, constr_id(abort), Ann, Env}
-     , {well_formed, constr_id(abort), Env, ExprT}
+     [ {well_formed, constr_id(abort), Env, ExprT}
+%     , {unreachable, constr_id(abort), Ann, Env}
      |S0
      ]
     };
@@ -1940,7 +1997,8 @@ split_constr([H|T], Acc) ->
     HC = split_constr1(H),
     split_constr(T, HC ++ Acc);
 split_constr([], Acc) ->
-    filter_obvious(Acc).
+    Acc.
+%    filter_obvious(Acc).
 
 split_constr1(C = {subtype, Ref, Ann, Env0, SubT, SupT}) ->
     case {SubT, SupT} of
@@ -2011,9 +2069,19 @@ split_constr1(C = {subtype, Ref, Ann, Env0, SubT, SupT}) ->
                ?refined(IdSub, BaseSub, LenQualSub),
                ?refined(IdSup, ?int_t(?ann_of(DepElemSup)), LenQualSup)}
              );
+        { {empty_sub, _, _}
+        , _
+        } ->
+            [];
+        { _
+        , {empty_sub, _, T}
+        } -> 
+            split_constr1({subtype, Ref, Ann, Env0, SubT, empty_type(covariant, T)});
         _ ->
             [C]
     end;
+%    ?DBG("SPLIT ~s\nINTO (LEN ~p)\n~s\n\n-----", [aeso_pretty:pp(constr, C), length(R), string:join([aeso_pretty:pp(constr, ASD) || ASD <- R], "\n")]),
+%    R;
 split_constr1(C = {well_formed, Ref, Env0, T}) ->
     case T of
         {dep_fun_t, _, Args, Ret} ->
@@ -2043,6 +2111,8 @@ split_constr1(C = {well_formed, Ref, Env0, T}) ->
               [ {well_formed, Ref, Env0, ?refined(Id, ?int_t(Ann), LenQual)}
               , {well_formed, Ref, Env0, DepElem}
               ]);
+        {empty_sub, _, T} ->
+            split_constr1(T);
         _ ->
             [C]
     end;
@@ -2068,6 +2138,7 @@ filter_obvious([H|T], Acc) ->
 solve(Env, AST0, CS) ->
     case aeso_smt:scoped(
            fun() ->
+                   declare_constants(),
                    declare_tuples(find_tuple_sizes(AST0)),
                    declare_datatypes(type_defs(Env)),
                    run_solve(CS)
@@ -2124,7 +2195,7 @@ valid_in({subtype, _Ref, Ann, Env,
             %?DBG("IN\n~s", [aeso_pretty:pp(predicate, strip_typed(pred_of(Assg, Env1)))]),
             SimpAssump = simplify_pred(Assg, Env1,
                                        pred_of(Assg, Env1) ++ AssumpPred),
-            add_error({contradict, {Ann, strip_typed(SimpAssump), strip_typed(ConclPred)}})
+            add_error({contradict, {[_Ref|Ann], strip_typed(SimpAssump), strip_typed(ConclPred)}})
     end;
 valid_in({subtype, _Ref, _, Env,
           {refined_t, _, SubId, _, SubPredVar},
@@ -2187,6 +2258,9 @@ check_reachable(_, []) ->
 
 
 %% -- SMT Solving --------------------------------------------------------------
+
+declare_constants() ->
+    aeso_smt:declare_const({var, "Call.caller"}, {var, "Int"}).
 
 declare_tuples([]) ->
     ok;
@@ -2314,6 +2388,8 @@ is_smt_type(Expr) ->
             false
     end.
 
+type_to_smt({empty_sub, _, T}) ->
+    type_to_smt(T);
 type_to_smt({refined_t, _, _, T, _}) ->
     type_to_smt(T);
 type_to_smt(?bool_tp) ->
@@ -2373,6 +2449,8 @@ expr_to_smt({bool, _, false}) ->
     {var, "false"};
 expr_to_smt({int, _, I}) ->
     {int, I};
+expr_to_smt({account_pubkey, _, Key}) ->
+    {int, binary:decode_unsigned(Key)};
 expr_to_smt({string, _, S}) ->
     %% FIXME this sucks as it doesn't play well with the concatenation
     {int, binary:decode_unsigned(crypto:hash(md5, S))};
@@ -2678,6 +2756,8 @@ a_normalize_to_simpl(Expr = {con, _, _}, Type, Decls) ->
     {?typed(Expr, Type), Decls};
 a_normalize_to_simpl(Expr = {qcon, _, _}, Type, Decls) ->
     {?typed(Expr, Type), Decls};
+a_normalize_to_simpl(Expr = {account_pubkey, _, _}, Type, Decls) ->
+    {?typed(Expr, Type), Decls};
 a_normalize_to_simpl(Expr = {int, _, _}, Type, Decls) ->
     {?typed(Expr, Type), Decls};
 a_normalize_to_simpl(Expr = {bool, _, _}, Type, Decls) ->
@@ -2862,6 +2942,16 @@ purify_expr({app, Ann, Fun = ?typed_p({id, _, FName}), Args}, T, ST)
   when FName == "require" orelse FName == "abort" ->
     Args1 = [drop_purity(purify_expr(A, ST)) || A <- Args],
     {pure, ?typed({app, Ann, Fun, Args1}, T)};
+%% Spend
+purify_expr({app, Ann, Fun = ?typed_p({qid, _, ["Chain", "spend"]}), [Addr, Value]}, T, ST) ->
+    {pure, Addr1} = purify_expr(Addr, ST),
+    {pure, Value1} = purify_expr(Value, ST),
+    {impure, wrap_state(
+               ?typed({app, Ann, Fun, [Addr1, Value1]}, purify_type(T, ST)),
+               ST#purifier_st{
+                 balance = ?typed(?op(Ann, ST#purifier_st.balance, '-', Value1),
+                                  ?d_nonneg_int(Ann))}
+              )};
 %% Put
 purify_expr({app, _, ?typed_p({qid, QAnn, [_, "put"]}), [State]}, T, ST) ->
     {pure, ?typed_p(State1)} = purify_expr(State, ST),
@@ -3055,8 +3145,7 @@ purify_expr_to_pure(Expr, ST) ->
 %% -- Errors -------------------------------------------------------------------
 
 pp_error({contradict, {Ann, Assump, Promise}}) ->
-    io_lib:format("Could not prove the promise at ~s ~p:~p\n"
-              "~s:\n"
+    io_lib:format("Could not prove the promise at ~s ~p:~p ~s:\n"
               "  ~s\n"
               "from the assumption\n"
               "  ~s\n",

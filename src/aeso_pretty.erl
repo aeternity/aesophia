@@ -289,7 +289,8 @@ type(T = {tvar, _, _}) -> name(T);
 
 type(T) -> dep_type(T).
 
-
+dep_type({empty_sub, _, T}) ->
+    beside([text("<"), type(T), text(">")]);
 dep_type({refined_t, _, Id, BaseType, []}) ->
     beside(
       [ text("{")

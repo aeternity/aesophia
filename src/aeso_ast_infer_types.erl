@@ -1181,16 +1181,16 @@ check_type(Env, T = {dep_variant_t, Ann, TId, Base, undefined, Constrs}, Arity) 
       || {constr_t, CAnn, Con, CArgs} <- Constrs
     ],
     Constrs1 =
-        [ case [ ConstrNew
-                 || ConstrNew = {constr_t, _, CNameNew, _} <- Constrs,
-                    name(CNameNew) == name(CNameOld)] of
+        [ case [ ConstrNew || ConstrNew = {constr_t, _, CNameNew, _} <- Constrs,
+                              name(CNameNew) == name(CNameOld)] of
               [{constr_t, FAnn, CName, CArgs}] ->
                   {constr_t, FAnn, CName,
                    [ check_type(Env, CArg) || CArg <- CArgs ]
                   };
-              _ -> ConstrOld
+              _ -> {constr_t, CAnnOld, CNameOld,
+                    [{empty_sub, CAnnOld, CArgOld} || CArgOld <- CArgsOld]}
           end
-          || ConstrOld = {constr_t, _, CNameOld, _} <- TrueConstrs
+          || {constr_t, CAnnOld, CNameOld, CArgsOld} <- TrueConstrs
         ],
     OnQcon = fun(A) -> qcon(aeso_syntax:get_ann(QId), lists:droplast(qname(QId)) ++ qname(A)) end,
     TagPred =
@@ -2684,6 +2684,8 @@ occurs_check1(R, {if_t, _, _, Then, Else}) ->
 occurs_check1(R, [H | T]) ->
     occurs_check(R, H) orelse occurs_check(R, T);
 occurs_check1(R, {named_t, _, _, T}) ->
+    occurs_check1(R, T);
+occurs_check1(R, {empty_sub, _, T}) ->
     occurs_check1(R, T);
 occurs_check1(R, {refined_t, _, _, T, _}) ->
     occurs_check1(R, T);
