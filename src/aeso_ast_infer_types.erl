@@ -1616,8 +1616,16 @@ infer_expr(Env, {'if', Attrs, Cond, Then, Else}) ->
 infer_expr(Env, {switch, Attrs, Expr, Cases}) ->
     NewExpr = {typed, _, _, ExprType} = infer_expr(Env, Expr),
     SwitchType = fresh_uvar(Attrs),
-    NewCases = [infer_case(Env, As, Pattern, ExprType, Branch, SwitchType)
-                || {'case', As, Pattern, Branch} <- Cases],
+    ApplyInferCase =
+        fun(Case) ->
+            case Case of
+                {'case', As, Pattern, Branch} ->
+                    infer_case(Env, As, Pattern, ExprType, Branch, SwitchType);
+                {'case', As, Pattern, Guard, Branch} ->
+                    infer_case(Env, As, Pattern, Guard, ExprType, Branch, SwitchType)
+            end
+        end,
+    NewCases = lists:map(ApplyInferCase, Cases),
     {typed, Attrs, {switch, Attrs, NewExpr, NewCases}, SwitchType};
 infer_expr(Env, {record, Attrs, Fields}) ->
     RecordType = fresh_uvar(Attrs),
@@ -1837,10 +1845,19 @@ infer_pattern(Env, Pattern) ->
     {NewEnv#env{ in_pattern = Env#env.in_pattern }, NewPattern}.
 
 infer_case(Env, Attrs, Pattern, ExprType, Branch, SwitchType) ->
+    infer_case(Env, Attrs, Pattern, none, ExprType, Branch, SwitchType).
+
+infer_case(Env, Attrs, Pattern, Guard, ExprType, Branch, SwitchType) ->
     {NewEnv, NewPattern = {typed, _, _, PatType}} = infer_pattern(Env, Pattern),
     NewBranch  = check_expr(NewEnv#env{ in_pattern = false }, Branch, SwitchType),
     unify(Env, PatType, ExprType, {case_pat, Pattern, PatType, ExprType}),
-    {'case', Attrs, NewPattern, NewBranch}.
+    case Guard of
+        none ->
+            {'case', Attrs, NewPattern, NewBranch};
+        _ ->
+            NewGuard = check_expr(NewEnv, Guard, {id, Attrs, "bool"}),
+            {'case', Attrs, NewPattern, NewGuard, NewBranch}
+    end.
 
 %% NewStmts = infer_block(Env, Attrs, Stmts, BlockType)
 infer_block(_Env, Attrs, [], BlockType) ->

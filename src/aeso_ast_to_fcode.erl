@@ -683,9 +683,9 @@ expr_to_fcode(Env, _Type, {'if', _, Cond, Then, Else}) ->
             expr_to_fcode(Env, Else));
 
 %% Switch
-expr_to_fcode(Env, _, {switch, _, Expr = {typed, _, E, Type}, Alts}) ->
+expr_to_fcode(Env, _, S = {switch, _, Expr = {typed, _, E, Type}, Alts}) ->
     Switch = fun(X) ->
-                {switch, alts_to_fcode(Env, type_to_fcode(Env, Type), X, Alts)}
+                {switch, alts_to_fcode(Env, type_to_fcode(Env, Type), X, Alts, S)}
              end,
     case E of
         {id, _, X} -> Switch(X);
@@ -863,9 +863,9 @@ is_first_order(_)                      -> true.
 
 %% -- Pattern matching --
 
--spec alts_to_fcode(env(), ftype(), var_name(), [aeso_syntax:alt()]) -> fsplit().
-alts_to_fcode(Env, Type, X, Alts) ->
-    FAlts = [alt_to_fcode(Env, Alt) || Alt <- Alts],
+-spec alts_to_fcode(env(), ftype(), var_name(), [aeso_syntax:alt()], aeso_syntax:expr()) -> fsplit().
+alts_to_fcode(Env, Type, X, Alts, Switch) ->
+    FAlts = remove_guards(Env, Alts, Switch),
     split_tree(Env, [{X, Type}], FAlts).
 
 %% Intermediate format before case trees (fcase() and fsplit()).
@@ -878,6 +878,17 @@ alts_to_fcode(Env, Type, X, Alts) ->
               | {tuple, [fpat()]}
               | {con, arities(), tag(), [fpat()]}
               | {assign, fpat(), fpat()}.
+
+remove_guards(_Env, [], _Switch) ->
+    [];
+remove_guards(Env, [Alt = {'case', _, _, _} | Rest], Switch) ->
+    [alt_to_fcode(Env, Alt) | remove_guards(Env, Rest, Switch)];
+remove_guards(Env, [{'case', _, Pat, Guard, Body} | Rest], {switch, Ann, Expr, _}) ->
+    FPat  = pat_to_fcode(Env, Pat),
+    FSwitch = expr_to_fcode(Env, {switch, Ann, Expr, Rest}),
+    FGuard = expr_to_fcode(bind_vars(Env, pat_vars(FPat)), Guard),
+    FBody = expr_to_fcode(bind_vars(Env, pat_vars(FPat)), Body),
+    [{'case', [FPat], make_if(FGuard, FBody, FSwitch)}].
 
 %% %% Invariant: the number of variables matches the number of patterns in each falt.
 -spec split_tree(env(), [{var_name(), ftype()}], [falt()]) -> fsplit().
