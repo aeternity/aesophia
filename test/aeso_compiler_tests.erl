@@ -202,6 +202,7 @@ compilable_contracts() ->
      "child_contract_init_bug",
      "using_namespace",
      "assign_patterns",
+     "patterns_guards",
      "test" % Custom general-purpose test file. Keep it last on the list.
     ].
 

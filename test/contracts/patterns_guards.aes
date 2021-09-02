@@ -1,0 +1,15 @@
+include "List.aes"
+
+contract C =
+  type state = int
+
+  entrypoint init() = f([1, 2, 3, 4])
+
+  function
+    f(x::[]) = 1
+    f(x::y::[]) = 2
+    f(x::y::z) = switch(z)
+      [] => 4
+      a::[] | a > 10 => 5
+      b | List.length(b) > 5 => 6
+      c => 7
