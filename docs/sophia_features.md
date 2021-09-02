@@ -121,7 +121,7 @@ contract IntHolder =
   type state = int
   entrypoint init(x) = x
   entrypoint get() = state
-  
+
 main contract IntHolderFactory =
   stateful entrypoint new(x : int) : IntHolder =
     let ih = Chain.create(x) : IntHolder
@@ -480,6 +480,25 @@ function f(x) = switch(x)
 function g(p : int * option(int)) : int =
   let (a, (o = Some(b))) = p  // o is equal to Pair.snd(p)
   b
+```
+
+Guards are boolean functions that can be used on patterns in both switch
+statements and functions definitions:
+
+```sophia
+function get_left_if_positive(x : one_or_both('a, 'b)) : option('a) =
+  switch(x)
+    Left(x)    | x > 0 => Some(x)
+    Both(x, _) | x > 0 => Some(x)
+    _                  => None
+```
+
+```sophia
+function
+  get_left_if_positive : one_or_both('a, 'b) => option('a)
+  get_left(Left(x))    | x > 0 = Some(x)
+  get_left(Both(x, _)) | x > 0 = Some(x)
+  get_left(_)                  = None
 ```
 
 *NOTE: Data types cannot currently be recursive.*
