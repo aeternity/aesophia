@@ -211,10 +211,18 @@ letdef() -> choice(valdef(), fundef()).
 valdef() ->
     ?RULE(pattern(), tok('='), body(), {letval, [], _1, _3}).
 
-fundef() ->
+fundef() -> choice(unguarded_fundef(), guarded_fundef()).
+
+unguarded_fundef() ->
     choice(
     [ ?RULE(id(), args(),                   tok('='), body(), {letfun, get_ann(_1), _1, _2, type_wildcard(get_ann(_1)), _4})
     , ?RULE(id(), args(), tok(':'), type(), tok('='), body(), {letfun, get_ann(_1), _1, _2, _4, _6})
+    ]).
+
+guarded_fundef() ->
+    choice(
+    [ ?RULE(id(), args(),                   tok('|'), expr(), tok('='), body(), {letfun, get_ann(_1), _1, _2, type_wildcard(get_ann(_1)), _4, _6})
+    , ?RULE(id(), args(), tok(':'), type(), tok('|'), expr(), tok('='), body(), {letfun, get_ann(_1), _1, _2, _4, _6, _8})
     ]).
 
 args() -> paren_list(pattern()).

@@ -798,6 +798,13 @@ make_if(Cond, Then, Else) ->
     X = fresh_name(),
     {'let', X, Cond, make_if({var, X}, Then, Else)}.
 
+make_if_no_else({var, X}, Then) ->
+    {switch, {split, boolean, X,
+        [{'case', {bool, true},  {nosplit, Then}}]}};
+make_if_no_else(Cond, Then) ->
+    X = fresh_name(),
+    {'let', X, Cond, make_if_no_else({var, X}, Then)}.
+
 -spec make_tuple([fexpr()]) -> fexpr().
 make_tuple([E]) -> E;
 make_tuple(Es) -> {tuple, Es}.
@@ -885,10 +892,15 @@ remove_guards(Env, [Alt = {'case', _, _, _} | Rest], Switch) ->
     [alt_to_fcode(Env, Alt) | remove_guards(Env, Rest, Switch)];
 remove_guards(Env, [{'case', _, Pat, Guard, Body} | Rest], {switch, Ann, Expr, _}) ->
     FPat  = pat_to_fcode(Env, Pat),
-    FSwitch = expr_to_fcode(Env, {switch, Ann, Expr, Rest}),
     FGuard = expr_to_fcode(bind_vars(Env, pat_vars(FPat)), Guard),
     FBody = expr_to_fcode(bind_vars(Env, pat_vars(FPat)), Body),
-    [{'case', [FPat], make_if(FGuard, FBody, FSwitch)}].
+    case Rest of
+        [] ->
+            [{'case', [FPat], make_if_no_else(FGuard, FBody)}];
+        _ ->
+            FSwitch = expr_to_fcode(Env, {switch, Ann, Expr, Rest}),
+            [{'case', [FPat], make_if(FGuard, FBody, FSwitch)}]
+    end.
 
 %% %% Invariant: the number of variables matches the number of patterns in each falt.
 -spec split_tree(env(), [{var_name(), ftype()}], [falt()]) -> fsplit().

@@ -287,6 +287,13 @@ bind_contract({Contract, Ann, Id, Contents}, Env)
           || {letfun, AnnF, Entrypoint = {id, _, Name}, Args, _Type, {typed, _, _, RetT}} <- Contents,
              Name =/= "init"
         ] ++
+        [ {field_t, AnnF, Entrypoint,
+           contract_call_type(
+             {fun_t, AnnF, [], [ArgT || {typed, _, _, ArgT} <- Args], RetT})
+          }
+          || {letfun, AnnF, Entrypoint = {id, _, Name}, Args, _Type, _Guard, {typed, _, _, RetT}} <- Contents,
+             Name =/= "init"
+        ] ++
         %% Predefined fields
         [ {field_t, Sys, {id, Sys, "address"}, {id, Sys, "address"}} ] ++
         [ {field_t, Sys, {id, Sys, ?CONSTRUCTOR_MOCK_NAME},
@@ -294,6 +301,9 @@ bind_contract({Contract, Ann, Id, Contents}, Env)
              case [ [ArgT || {typed, _, _, ArgT} <- Args]
                     || {letfun, AnnF, {id, _, "init"}, Args, _, _} <- Contents,
                        aeso_syntax:get_ann(entrypoint, AnnF, false)]
+                 ++ [ [ArgT || {typed, _, _, ArgT} <- Args]
+                      || {letfun, AnnF, {id, _, "init"}, Args, _, _, _} <- Contents,
+                         aeso_syntax:get_ann(entrypoint, AnnF, false)]
                  ++ [ Args
                       || {fun_decl, AnnF, {id, _, "init"}, {fun_t, _, _, Args, _}} <- Contents,
                          aeso_syntax:get_ann(entrypoint, AnnF, false)]
@@ -895,12 +905,13 @@ infer_contract(Env0, What, Defs0, Options) ->
            end,
     destroy_and_report_type_errors(Env0),
     Env  = Env0#env{ what = What },
-    Kind = fun({type_def, _, _, _, _})    -> type;
-              ({letfun, _, _, _, _, _})   -> function;
-              ({fun_clauses, _, _, _, _}) -> function;
-              ({fun_decl, _, _, _})       -> prototype;
-              ({using, _, _, _, _})       -> using;
-              (_)                         -> unexpected
+    Kind = fun({type_def, _, _, _, _})     -> type;
+              ({letfun, _, _, _, _, _})    -> function;
+              ({letfun, _, _, _, _, _, _}) -> function;
+              ({fun_clauses, _, _, _, _})  -> function;
+              ({fun_decl, _, _, _})        -> prototype;
+              ({using, _, _, _, _})        -> using;
+              (_)                          -> unexpected
            end,
     Get = fun(K, In) -> [ Def || Def <- In, Kind(Def) == K ] end,
     OldUsedNamespaces = Env#env.used_namespaces,
@@ -918,8 +929,9 @@ infer_contract(Env0, What, Defs0, Options) ->
     Env3      = bind_funs(ProtoSigs, Env2),
     Functions = Get(function, Defs),
     %% Check for duplicates in Functions (we turn it into a map below)
-    FunBind   = fun({letfun, Ann, {id, _, Fun}, _, _, _})   -> {Fun, {tuple_t, Ann, []}};
-                   ({fun_clauses, Ann, {id, _, Fun}, _, _}) -> {Fun, {tuple_t, Ann, []}} end,
+    FunBind   = fun({letfun, Ann, {id, _, Fun}, _, _, _})    -> {Fun, {tuple_t, Ann, []}};
+                   ({letfun, Ann, {id, _, Fun}, _, _, _, _}) -> {Fun, {tuple_t, Ann, []}};
+                   ({fun_clauses, Ann, {id, _, Fun}, _, _})  -> {Fun, {tuple_t, Ann, []}} end,
     FunName   = fun(Def) -> {Name, _} = FunBind(Def), Name end,
     _         = bind_funs(lists:map(FunBind, Functions), #env{}),
     FunMap    = maps:from_list([ {FunName(Def), Def} || Def <- Functions ]),
@@ -946,7 +958,8 @@ process_blocks(Decls) ->
 process_block(_, []) -> [];
 process_block(_, [Decl]) -> [Decl];
 process_block(_Ann, [Decl | Decls]) ->
-    IsThis = fun(Name) -> fun({letfun, _, {id, _, Name1}, _, _, _}) -> Name == Name1;
+    IsThis = fun(Name) -> fun({letfun, _, {id, _, Name1}, _, _, _})    -> Name == Name1;
+                             ({letfun, _, {id, _, Name1}, _, _, _, _}) -> Name == Name1;
                              (_) -> false end end,
     case Decl of
         {fun_decl, Ann1, Id = {id, _, Name}, Type} ->
@@ -954,6 +967,10 @@ process_block(_Ann, [Decl | Decls]) ->
             [type_error({mismatched_decl_in_funblock, Name, D1}) || D1 <- Rest],
             [{fun_clauses, Ann1, Id, Type, Clauses}];
         {letfun, Ann1, Id = {id, _, Name}, _, _, _} ->
+            {Clauses, Rest} = lists:splitwith(IsThis(Name), [Decl | Decls]),
+            [type_error({mismatched_decl_in_funblock, Name, D1}) || D1 <- Rest],
+            [{fun_clauses, Ann1, Id, {id, [{origin, system} | Ann1], "_"}, Clauses}];
+        {letfun, Ann1, Id = {id, _, Name}, _, _, _, _} ->
             {Clauses, Rest} = lists:splitwith(IsThis(Name), [Decl | Decls]),
             [type_error({mismatched_decl_in_funblock, Name, D1}) || D1 <- Rest],
             [{fun_clauses, Ann1, Id, {id, [{origin, system} | Ann1], "_"}, Clauses}]
@@ -1086,7 +1103,11 @@ check_modifiers_(Env, [{Contract, _, Con, Decls} | Rest])
             [ D || D <- Decls, aeso_syntax:get_ann(entrypoint, D, false) ]} of
         {true, []} -> type_error({contract_has_no_entrypoints, Con});
         _ when IsInterface ->
-            case [ {AnnF, Id} || {letfun, AnnF, Id, _, _, _} <- Decls ] of
+            GetAnnId = fun({letfun, AnnF, Id, _, _, _})    -> {true, {AnnF, Id}};
+                          ({letfun, AnnF, Id, _, _, _, _}) -> {true, {AnnF, Id}};
+                          (_) -> false
+                       end,
+            case lists:filtermap(GetAnnId, Decls) of
                 [{AnnF, Id} | _] -> type_error({definition_in_contract_interface, AnnF, Id});
                 [] -> ok
             end;
@@ -1323,8 +1344,9 @@ typesig_to_fun_t({type_sig, Ann, _Constr, Named, Args, Res}) ->
 
 infer_letrec(Env, Defs) ->
     create_constraints(),
-    Funs = lists:map(fun({letfun, _, {id, Ann, Name}, _, _, _})   -> {Name, fresh_uvar(Ann)};
-                        ({fun_clauses, _, {id, Ann, Name}, _, _}) -> {Name, fresh_uvar(Ann)}
+    Funs = lists:map(fun({letfun, _, {id, Ann, Name}, _, _, _})    -> {Name, fresh_uvar(Ann)};
+                        ({letfun, _, {id, Ann, Name}, _, _, _, _}) -> {Name, fresh_uvar(Ann)};
+                        ({fun_clauses, _, {id, Ann, Name}, _, _})  -> {Name, fresh_uvar(Ann)}
                      end, Defs),
     ExtendEnv = bind_funs(Funs, Env),
     Inferred =
@@ -1355,6 +1377,9 @@ infer_letfun(Env, {fun_clauses, Ann, Fun = {id, _, Name}, Type, Clauses}) ->
     {{Name, Sig}, desugar_clauses(Ann, Fun, Sig, Clauses1)};
 infer_letfun(Env, LetFun = {letfun, Ann, Fun, _, _, _}) ->
     {{Name, Sig}, Clause} = infer_letfun1(Env, LetFun),
+    {{Name, Sig}, desugar_clauses(Ann, Fun, Sig, [Clause])};
+infer_letfun(Env, LetFun = {letfun, Ann, Fun, _, _, _, _}) ->
+    {{Name, Sig}, Clause} = infer_letfun1(Env, LetFun),
     {{Name, Sig}, desugar_clauses(Ann, Fun, Sig, [Clause])}.
 
 infer_letfun1(Env0, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, Body}) ->
@@ -1366,13 +1391,25 @@ infer_letfun1(Env0, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, B
     NamedArgs = [],
     TypeSig = {type_sig, Attrib, none, NamedArgs, ArgTypes, ResultType},
     {{Name, TypeSig},
-     {letfun, Attrib, {id, NameAttrib, Name}, TypedArgs, ResultType, NewBody}}.
+     {letfun, Attrib, {id, NameAttrib, Name}, TypedArgs, ResultType, NewBody}};
+infer_letfun1(Env0, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, Guard, Body}) ->
+    Env = Env0#env{ stateful = aeso_syntax:get_ann(stateful, Attrib, false),
+                    current_function = Fun },
+    {NewEnv, {typed, _, {tuple, _, TypedArgs}, {tuple_t, _, ArgTypes}}} = infer_pattern(Env, {tuple, [{origin, system} | NameAttrib], Args}),
+    NewGuard = check_expr(NewEnv, Guard, {id, Attrib, "bool"}),
+    ExpectedType = check_type(Env, arg_type(NameAttrib, What)),
+    NewBody={typed, _, _, ResultType} = check_expr(NewEnv, Body, ExpectedType),
+    NamedArgs = [],
+    TypeSig = {type_sig, Attrib, none, NamedArgs, ArgTypes, ResultType},
+    {{Name, TypeSig},
+     {letfun, Attrib, {id, NameAttrib, Name}, TypedArgs, ResultType, NewGuard, NewBody}}.
 
 desugar_clauses(Ann, Fun, {type_sig, _, _, _, ArgTypes, RetType}, Clauses) ->
     NeedDesugar =
         case Clauses of
-            [{letfun, _, _, As, _, _}] -> lists:any(fun({typed, _, {id, _, _}, _}) -> false; (_) -> true end, As);
-            _                          -> true
+            [{letfun, _, _, As, _, _}]    -> lists:any(fun({typed, _, {id, _, _}, _}) -> false; (_) -> true end, As);
+            [{letfun, _, _, As, _, _, _}] -> lists:any(fun({typed, _, {id, _, _}, _}) -> false; (_) -> true end, As);
+            _                             -> true
         end,
     case NeedDesugar of
         false -> [Clause] = Clauses, Clause;
@@ -1383,11 +1420,14 @@ desugar_clauses(Ann, Fun, {type_sig, _, _, _, ArgTypes, RetType}, Clauses) ->
             Tuple = fun([X]) -> X;
                        (As) -> {typed, NoAnn, {tuple, NoAnn, As}, {tuple_t, NoAnn, ArgTypes}}
                     end,
+            ToCase = fun({letfun, AnnC, _, ArgsC, _, Body})        -> {true, {'case', AnnC, Tuple(ArgsC), Body}};
+                        ({letfun, AnnC, _, ArgsC, _, Guard, Body}) -> {true, {'case', AnnC, Tuple(ArgsC), Guard, Body}};
+                        (_) -> false
+                     end,
             {letfun, Ann, Fun, Args, RetType,
              {typed, NoAnn,
-              {switch, NoAnn, Tuple(Args),
-                [ {'case', AnnC, Tuple(ArgsC), Body}
-                || {letfun, AnnC, _, ArgsC, _, Body} <- Clauses ]}, RetType}}
+              {switch, NoAnn, Tuple(Args), lists:filtermap(ToCase, Clauses)},
+              RetType}}
     end.
 
 print_typesig({Name, TypeSig}) ->
@@ -1449,7 +1489,11 @@ check_state_dependencies(Env, Defs) ->
     SetState  = Top ++ ["put"],
     Init      = Top ++ ["init"],
     UsedNames = fun(X) -> [{Xs, Ann} || {{term, Xs}, Ann} <- aeso_syntax_utils:used(X)] end,
-    Funs      = [ {Top ++ [Name], Fun} || Fun = {letfun, _, {id, _, Name}, _Args, _Type, _Body} <- Defs ],
+    GetFun    = fun(F = {letfun, _, {id, _, Name}, _, _, _})    -> {true, {Top ++ [Name], F}};
+                   (F = {letfun, _, {id, _, Name}, _, _, _, _}) -> {true, {Top ++ [Name], F}};
+                   (_) -> false
+                end,
+    Funs      = lists:filtermap(GetFun, Defs),
     Deps      = maps:from_list([{Name, UsedNames(Def)} || {Name, Def} <- Funs]),
     case maps:get(Init, Deps, false) of
         false -> ok;    %% No init, so nothing to check
@@ -1567,6 +1611,17 @@ infer_expr(Env, {list_comp, AsLC, Yield, [{letval, AsLV, Pattern, E}|Rest]}) ->
     , ResType
     };
 infer_expr(Env, {list_comp, AsLC, Yield, [Def={letfun, AsLF, _, _, _, _}|Rest]}) ->
+    {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
+    FunT = typesig_to_fun_t(TypeSig),
+    NewE = bind_var({id, AsLF, Name}, FunT, Env),
+    {typed, _, {list_comp, _, TypedYield, TypedRest}, ResType} =
+        infer_expr(NewE, {list_comp, AsLC, Yield, Rest}),
+    { typed
+    , AsLC
+    , {list_comp, AsLC, TypedYield, [LetFun|TypedRest]}
+    , ResType
+    };
+infer_expr(Env, {list_comp, AsLC, Yield, [Def={letfun, AsLF, _, _, _, _, _}|Rest]}) ->
     {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
     FunT = typesig_to_fun_t(TypeSig),
     NewE = bind_var({id, AsLF, Name}, FunT, Env),
@@ -1719,6 +1774,9 @@ infer_expr(Env, Let = {letval, Attrs, _, _}) ->
     infer_expr(Env, {block, Attrs, [Let, abort_expr(Attrs, "missing body")]});
 infer_expr(Env, Let = {letfun, Attrs, _, _, _, _}) ->
     type_error({missing_body_for_let, Attrs}),
+    infer_expr(Env, {block, Attrs, [Let, abort_expr(Attrs, "missing body")]});
+infer_expr(Env, Let = {letfun, Attrs, _, _, _, _, _}) ->
+    type_error({missing_body_for_let, Attrs}),
     infer_expr(Env, {block, Attrs, [Let, abort_expr(Attrs, "missing body")]}).
 
 infer_var_args_fun(Env, {typed, Ann, Fun, FunType0}, NamedArgs, ArgTypes) ->
@@ -1865,6 +1923,11 @@ infer_block(_Env, Attrs, [], BlockType) ->
 infer_block(Env, _, [E], BlockType) ->
     [check_expr(Env, E, BlockType)];
 infer_block(Env, Attrs, [Def={letfun, Ann, _, _, _, _}|Rest], BlockType) ->
+    {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
+    FunT = typesig_to_fun_t(TypeSig),
+    NewE = bind_var({id, Ann, Name}, FunT, Env),
+    [LetFun|infer_block(NewE, Attrs, Rest, BlockType)];
+infer_block(Env, Attrs, [Def={letfun, Ann, _, _, _, _, _}|Rest], BlockType) ->
     {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
     FunT = typesig_to_fun_t(TypeSig),
     NewE = bind_var({id, Ann, Name}, FunT, Env),
@@ -2443,6 +2506,8 @@ unfold_types(Env, {fun_decl, Ann, Name, Type}, Options) ->
     {fun_decl, Ann, Name, unfold_types(Env, Type, Options)};
 unfold_types(Env, {letfun, Ann, Name, Args, Type, Body}, Options) ->
     {letfun, Ann, Name, unfold_types(Env, Args, Options), unfold_types_in_type(Env, Type, Options), unfold_types(Env, Body, Options)};
+unfold_types(Env, {letfun, Ann, Name, Args, Type, Guard, Body}, Options) ->
+    {letfun, Ann, Name, unfold_types(Env, Args, Options), unfold_types_in_type(Env, Type, Options), unfold_types(Env, Guard, Options), unfold_types(Env, Body, Options)};
 unfold_types(Env, T, Options) when is_tuple(T) ->
     list_to_tuple(unfold_types(Env, tuple_to_list(T), Options));
 unfold_types(Env, [H|T], Options) ->

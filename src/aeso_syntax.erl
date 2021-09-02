@@ -57,7 +57,8 @@
 -type pragma() :: {compiler, '==' | '<' | '>' | '=<' | '>=', compiler_version()}.
 
 -type letval()  :: {letval, ann(), pat(), expr()}.
--type letfun()  :: {letfun, ann(), id(), [pat()], type(), expr()}.
+-type letfun()  :: {letfun, ann(), id(), [pat()], type(), expr()}
+                 | {letfun, ann(), id(), [pat()], type(), expr(), expr()}.
 -type letpat()  :: {letpat, ann(), id(), pat()}.
 -type fundecl() :: {fun_decl, ann(), id(), type()}.
 

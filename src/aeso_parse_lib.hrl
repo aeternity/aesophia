@@ -9,12 +9,14 @@
         false -> fail()
     end).
 
--define(RULE(A,                Do), map(fun(_1) ->                       Do end, A                 )).
--define(RULE(A, B,             Do), map(fun({_1, _2}) ->                 Do end, {A, B}            )).
--define(RULE(A, B, C,          Do), map(fun({_1, _2, _3}) ->             Do end, {A, B, C}         )).
--define(RULE(A, B, C, D,       Do), map(fun({_1, _2, _3, _4}) ->         Do end, {A, B, C, D}      )).
--define(RULE(A, B, C, D, E,    Do), map(fun({_1, _2, _3, _4, _5}) ->     Do end, {A, B, C, D, E}   )).
--define(RULE(A, B, C, D, E, F, Do), map(fun({_1, _2, _3, _4, _5, _6}) -> Do end, {A, B, C, D, E, F})).
+-define(RULE(A,                      Do), map(fun(_1) ->                               Do end, A                       )).
+-define(RULE(A, B,                   Do), map(fun({_1, _2}) ->                         Do end, {A, B}                  )).
+-define(RULE(A, B, C,                Do), map(fun({_1, _2, _3}) ->                     Do end, {A, B, C}               )).
+-define(RULE(A, B, C, D,             Do), map(fun({_1, _2, _3, _4}) ->                 Do end, {A, B, C, D}            )).
+-define(RULE(A, B, C, D, E,          Do), map(fun({_1, _2, _3, _4, _5}) ->             Do end, {A, B, C, D, E}         )).
+-define(RULE(A, B, C, D, E, F,       Do), map(fun({_1, _2, _3, _4, _5, _6}) ->         Do end, {A, B, C, D, E, F}      )).
+-define(RULE(A, B, C, D, E, F, G,    Do), map(fun({_1, _2, _3, _4, _5, _6, _7}) ->     Do end, {A, B, C, D, E, F, G}   )).
+-define(RULE(A, B, C, D, E, F, G, H, Do), map(fun({_1, _2, _3, _4, _5, _6, _7, _8}) -> Do end, {A, B, C, D, E, F, G, H})).
 
 -import(aeso_parse_lib,
         [tok/1, tok/2, between/3, many/1, many1/1, sep/2, sep1/2,
