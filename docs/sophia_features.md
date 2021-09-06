@@ -271,6 +271,33 @@ contract C =
     P.fst(p)  // this is the same as Pair.fst(p)
 ```
 
+Having the same alias for multiple namespaces is possible and it allows
+referening functions that are defined in different namespaces and have
+different names with the same alias:
+```
+namespace Xa = function f() = 1
+namespace Xb = function g() = 2
+contract Cntr =
+  using Xa as A
+  using Xb as A
+  type state = int
+  entrypoint init() = A.f() + A.g()
+```
+
+Note that using functions with the same name would result in an ambiguous name
+error:
+```
+namespace Xa = function f() = 1
+namespace Xb = function f() = 2
+contract Cntr =
+  using Xa as A
+  using Xb as A
+  type state = int
+
+  // the next line has an error because f is defined in both Xa and Xb
+  entrypoint init() = A.f()
+```
+
 Importing specific parts of a namespace or hiding these parts can also be
 done like this:
 ```
