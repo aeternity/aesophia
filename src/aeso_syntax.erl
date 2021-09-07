@@ -35,6 +35,9 @@
 -type qcon() :: {qcon, ann(), [name()]}.
 -type tvar() :: {tvar, ann(), name()}.
 
+-type namespace_alias() :: none | con().
+-type namespace_parts() :: none | {for, [id()]} | {hiding, [id()]}.
+
 -type decl() :: {contract_main, ann(), con(), [decl()]}
               | {contract_child, ann(), con(), [decl()]}
               | {contract_interface, ann(), con(), [decl()]}
@@ -44,6 +47,7 @@
               | {type_def, ann(), id(), [tvar()], typedef()}
               | {fun_clauses, ann(), id(), type(), [letfun() | fundecl()]}
               | {block, ann(), [decl()]}
+              | {using, ann(), con(), namespace_alias(), namespace_parts()}
               | fundecl()
               | letfun()
               | letval(). % Only for error msgs
@@ -51,7 +55,6 @@
 -type compiler_version() :: [non_neg_integer()].
 
 -type pragma() :: {compiler, '==' | '<' | '>' | '=<' | '>=', compiler_version()}.
-
 
 -type letval()  :: {letval, ann(), pat(), expr()}.
 -type letfun()  :: {letfun, ann(), id(), [pat()], type(), expr()}.

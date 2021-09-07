@@ -1,0 +1,36 @@
+include "Option.aes"
+include "Pair.aes"
+include "String.aes"
+include "Triple.aes"
+
+using Pair
+using Triple hiding [fst, snd]
+
+namespace Nsp =
+  using Option
+
+  function h() =
+    let op = Some((2, 3, 4))
+    if (is_some(op))
+      thd(force(op)) == 4
+    else
+      false
+
+contract Cntr =
+  using Nsp
+
+  entrypoint init() = ()
+
+  function f() =
+    let p = (1, 2)
+    if (h())
+      fst(p)
+    else
+      snd(p)
+
+  function g() =
+    using String for [concat]
+
+    let s1 = "abc"
+    let s2 = "def"
+    concat(s1, s2)

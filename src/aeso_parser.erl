@@ -109,6 +109,7 @@ decl() ->
 
     , ?RULE(keyword(namespace), con(), tok('='), maybe_block(decl()), {namespace, _1, _2, _4})
     , ?RULE(keyword(include),   str(), {include, get_ann(_1), _2})
+    , using()
     , pragma()
 
       %% Type declarations  TODO: format annotation for "type bla" vs "type bla()"
@@ -134,6 +135,21 @@ fun_block(Mods, Kind, Decls) ->
 fundef_or_decl() ->
     choice([?RULE(id(), tok(':'), type(), {fun_decl, get_ann(_1), _1, _3}),
             fundef()]).
+
+using() ->
+    Alias = {keyword(as), con()},
+    For = ?RULE(keyword(for), bracket_list(id()), {for, _2}),
+    Hiding = ?RULE(keyword(hiding), bracket_list(id()), {hiding, _2}),
+    ?RULE(keyword(using), con(), optional(Alias), optional(choice(For, Hiding)), using(get_ann(_1), _2, _3, _4)).
+
+using(Ann, Con, none, none) ->
+    {using, Ann, Con, none, none};
+using(Ann, Con, {ok, {_, Alias}}, none) ->
+    {using, Ann, Con, Alias, none};
+using(Ann, Con, none, {ok, List}) ->
+    {using, Ann, Con, none, List};
+using(Ann, Con, {ok, {_, Alias}}, {ok, List}) ->
+    {using, Ann, Con, Alias, List}.
 
 pragma() ->
     Op = choice([token(T) || T <- ['<', '=<', '==', '>=', '>']]),
@@ -254,7 +270,8 @@ body() ->
 
 stmt() ->
     ?LAZY_P(choice(
-    [ expr()
+    [ using()
+    , expr()
     , letdecl()
     , {switch, keyword(switch), parens(expr()), maybe_block(branch())}
     , {'if', keyword('if'), parens(expr()), body()}

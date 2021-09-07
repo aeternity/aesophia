@@ -1,0 +1,21 @@
+namespace Nsp1 =
+  function f() = 1
+
+namespace Nsp2 =
+  using Nsp1
+
+  function g() = 1
+
+contract Cntr =
+  using Nsp2
+
+  type state = int
+
+  function x() =
+    using Nsp1
+    f()
+
+  function y() =
+    f()
+
+  entrypoint init() = f()

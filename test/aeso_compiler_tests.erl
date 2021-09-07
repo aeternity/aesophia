@@ -200,6 +200,7 @@ compilable_contracts() ->
      "clone_simple",
      "create",
      "child_contract_init_bug",
+     "using_namespace",
      "test" % Custom general-purpose test file. Keep it last on the list.
     ].
 
@@ -781,6 +782,30 @@ failing_contracts() ->
                    [<<?Pos(1,6)
                       "Only one main contract can be defined.">>
                    ])
+    , ?TYPE_ERROR(using_namespace_ambiguous_name,
+                  [ <<?Pos(2,3)
+                      "Ambiguous name: Xa.f at line 2, column 3\nXb.f at line 5, column 3">>
+                  , <<?Pos(13,23)
+                      "Unbound variable A.f at line 13, column 23">>
+                  ])
+    , ?TYPE_ERROR(using_namespace_wrong_scope,
+                  [ <<?Pos(19,5)
+                      "Unbound variable f at line 19, column 5">>
+                  , <<?Pos(21,23)
+                      "Unbound variable f at line 21, column 23">>
+                  ])
+    , ?TYPE_ERROR(using_namespace_undefined,
+                  [<<?Pos(2,3)
+                     "Cannot use undefined namespace MyUndefinedNamespace">>
+                  ])
+    , ?TYPE_ERROR(using_namespace_undefined_parts,
+                  [<<?Pos(5,3)
+                     "The namespace Nsp does not define the following names: a">>
+                  ])
+    , ?TYPE_ERROR(using_namespace_hidden_parts,
+                  [<<?Pos(8,23)
+                     "Unbound variable g at line 8, column 23">>
+                  ])
     ].
 
 -define(Path(File), "code_errors/" ??File).

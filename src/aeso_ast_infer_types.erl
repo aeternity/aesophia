@@ -102,6 +102,10 @@
 -type qname() :: [string()].
 -type typesig() :: {type_sig, aeso_syntax:ann(), type_constraints(), [aeso_syntax:named_arg_t()], [type()], type()}.
 
+-type namespace_alias() :: none | name().
+-type namespace_parts() :: none | {for, [name()]} | {hiding, [name()]}.
+-type used_namespaces() :: [{qname(), namespace_alias(), namespace_parts()}].
+
 -type type_constraints() :: none | bytes_concat | bytes_split | address_to_contract | bytecode_hash.
 
 -type fun_info()  :: {aeso_syntax:ann(), typesig() | type()}.
@@ -121,15 +125,16 @@
 -type scope() :: #scope{}.
 
 -record(env,
-    { scopes     = #{ [] => #scope{}} :: #{ qname() => scope() }
-    , vars       = []                 :: [{name(), var_info()}]
-    , typevars   = unrestricted       :: unrestricted | [name()]
-    , fields     = #{}                :: #{ name() => [field_info()] }    %% fields are global
-    , namespace  = []                 :: qname()
-    , in_pattern = false              :: boolean()
-    , stateful   = false              :: boolean()
-    , current_function = none         :: none | aeso_syntax:id()
-    , what       = top                :: top | namespace | contract | contract_interface
+    { scopes           = #{ [] => #scope{}} :: #{ qname() => scope() }
+    , vars             = []                 :: [{name(), var_info()}]
+    , typevars         = unrestricted       :: unrestricted | [name()]
+    , fields           = #{}                :: #{ name() => [field_info()] }    %% fields are global
+    , namespace        = []                 :: qname()
+    , used_namespaces  = []                 :: used_namespaces()
+    , in_pattern       = false              :: boolean()
+    , stateful         = false              :: boolean()
+    , current_function = none               :: none | aeso_syntax:id()
+    , what             = top                :: top | namespace | contract | contract_interface
     }).
 
 -type env() :: #env{}.
@@ -312,9 +317,38 @@ bind_contract({Contract, Ann, Id, Contents}, Env)
 
 %% What scopes could a given name come from?
 -spec possible_scopes(env(), qname()) -> [qname()].
-possible_scopes(#env{ namespace = Current}, Name) ->
+possible_scopes(#env{ namespace = Current, used_namespaces = UsedNamespaces }, Name) ->
     Qual = lists:droplast(Name),
-    [ lists:sublist(Current, I) ++ Qual || I <- lists:seq(0, length(Current)) ].
+    NewQuals = case lists:filter(fun(X) -> element(2, X) == Qual end, UsedNamespaces) of
+                   [] ->
+                       [Qual];
+                   Namespaces ->
+                       lists:map(fun(X) -> element(1, X) end, Namespaces)
+               end,
+    Ret1 = [ lists:sublist(Current, I) ++ Q || I <- lists:seq(0, length(Current)), Q <- NewQuals ],
+    Ret2 = [ Namespace ++ Q || {Namespace, none, _} <- UsedNamespaces, Q <- NewQuals ],
+    lists:usort(Ret1 ++ Ret2).
+
+-spec visible_in_used_namespaces(used_namespaces(), qname()) -> boolean().
+visible_in_used_namespaces(UsedNamespaces, QName) ->
+    Qual = lists:droplast(QName),
+    Name = lists:last(QName),
+    case lists:filter(fun({Ns, _, _}) -> Qual == Ns end, UsedNamespaces) of
+        [] ->
+            true;
+        Namespaces ->
+            IsVisible = fun(Namespace) ->
+                            case Namespace of
+                                {_, _, {for, Names}} ->
+                                    lists:member(Name, Names);
+                                {_, _, {hiding, Names}} ->
+                                    not lists:member(Name, Names);
+                                _ ->
+                                    true
+                            end
+                        end,
+            lists:any(IsVisible, Namespaces)
+    end.
 
 -spec lookup_type(env(), type_id()) -> false | {qname(), type_info()}.
 lookup_type(Env, Id) ->
@@ -341,7 +375,7 @@ lookup_env(Env, Kind, Ann, Name) ->
     end.
 
 -spec lookup_env1(env(), type | term, aeso_syntax:ann(), qname()) -> false | {qname(), fun_info()}.
-lookup_env1(#env{ namespace = Current, scopes = Scopes }, Kind, Ann, QName) ->
+lookup_env1(#env{ namespace = Current, used_namespaces = UsedNamespaces, scopes = Scopes }, Kind, Ann, QName) ->
     Qual = lists:droplast(QName),
     Name = lists:last(QName),
     AllowPrivate = lists:prefix(Qual, Current),
@@ -365,7 +399,11 @@ lookup_env1(#env{ namespace = Current, scopes = Scopes }, Kind, Ann, QName) ->
                 {Ann1, _} = E ->
                     %% Check that it's not private (or we can see private funs)
                     case not is_private(Ann1) orelse AllowPrivate of
-                        true  -> {QName, E};
+                        true  ->
+                            case visible_in_used_namespaces(UsedNamespaces, QName) of
+                                true -> {QName, E};
+                                false -> false
+                            end;
                         false -> false
                     end
             end
@@ -803,6 +841,8 @@ infer1(Env, [{namespace, Ann, Name, Code} | Rest], Acc, Options) ->
     {Env1, Code1} = infer_contract_top(push_scope(namespace, Name, Env), namespace, Code, Options),
     Namespace1 = {namespace, Ann, Name, Code1},
     infer1(pop_scope(Env1), Rest, [Namespace1 | Acc], Options);
+infer1(Env, [Using = {using, _, _, _, _} | Rest], Acc, Options) ->
+    infer1(check_usings(Env, Using), Rest, Acc, Options);
 infer1(Env, [{pragma, _, _} | Rest], Acc, Options) ->
     %% Pragmas are checked in check_modifiers
     infer1(Env, Rest, Acc, Options).
@@ -859,10 +899,13 @@ infer_contract(Env0, What, Defs0, Options) ->
               ({letfun, _, _, _, _, _})   -> function;
               ({fun_clauses, _, _, _, _}) -> function;
               ({fun_decl, _, _, _})       -> prototype;
+              ({using, _, _, _, _})       -> using;
               (_)                         -> unexpected
            end,
     Get = fun(K, In) -> [ Def || Def <- In, Kind(Def) == K ] end,
-    {Env1, TypeDefs} = check_typedefs(Env, Get(type, Defs)),
+    OldUsedNamespaces = Env#env.used_namespaces,
+    Env01 = check_usings(Env, Get(using, Defs)),
+    {Env1, TypeDefs} = check_typedefs(Env01, Get(type, Defs)),
     create_type_errors(),
     check_unexpected(Get(unexpected, Defs)),
     Env2 =
@@ -884,11 +927,13 @@ infer_contract(Env0, What, Defs0, Options) ->
     DepGraph  = maps:map(fun(_, Def) -> aeso_syntax_utils:used_ids(Def) end, FunMap),
     SCCs      = aeso_utils:scc(DepGraph),
     {Env4, Defs1} = check_sccs(Env3, FunMap, SCCs, []),
+    %% Remove namespaces used in the current namespace
+    Env5 = Env4#env{ used_namespaces = OldUsedNamespaces },
     %% Check that `init` doesn't read or write the state
     check_state_dependencies(Env4, Defs1),
     destroy_and_report_type_errors(Env4),
     %% Add inferred types of definitions
-    {Env4, TypeDefs ++ Decls ++ Defs1}.
+    {Env5, TypeDefs ++ Decls ++ Defs1}.
 
 %% Restructure blocks into multi-clause fundefs (`fun_clauses`).
 -spec process_blocks([aeso_syntax:decl()]) -> [aeso_syntax:decl()].
@@ -988,6 +1033,43 @@ check_typedef(Env, {variant_t, Cons}) ->
     {variant_t, [ {constr_t, Ann, Con, [ check_type(Env, Arg) || Arg <- Args ]}
                 || {constr_t, Ann, Con, Args} <- Cons ]}.
 
+check_usings(Env, []) ->
+    Env;
+check_usings(Env = #env{ used_namespaces = UsedNamespaces }, [{using, Ann, Con, Alias, Parts} | Rest]) ->
+    AliasName = case Alias of
+                    none ->
+                        none;
+                    _ ->
+                        qname(Alias)
+                end,
+    case get_scope(Env, qname(Con)) of
+        false ->
+            create_type_errors(),
+            type_error({using_undefined_namespace, Ann, qname(Con)}),
+            destroy_and_report_type_errors(Env);
+        Scope ->
+            Nsp = case Parts of
+                      none ->
+                          {qname(Con), AliasName, none};
+                      {ForOrHiding, Ids} ->
+                          IsUndefined = fun(Id) ->
+                                            proplists:lookup(name(Id), Scope#scope.funs) == none
+                                        end,
+                          UndefinedIds = lists:filter(IsUndefined, Ids),
+                          case UndefinedIds of
+                              [] ->
+                                  {qname(Con), AliasName, {ForOrHiding, lists:map(fun name/1, Ids)}};
+                              _ ->
+                                  create_type_errors(),
+                                  type_error({using_undefined_namespace_parts, Ann, qname(Con), lists:map(fun qname/1, UndefinedIds)}),
+                                  destroy_and_report_type_errors(Env)
+                          end
+                  end,
+            check_usings(Env#env{ used_namespaces = UsedNamespaces ++ [Nsp] }, Rest)
+    end;
+check_usings(Env, Using = {using, _, _, _, _}) ->
+    check_usings(Env, [Using]).
+
 check_unexpected(Xs) ->
     [ type_error(X) || X <- Xs ].
 
@@ -1016,6 +1098,8 @@ check_modifiers_(Env, [{namespace, _, _, Decls} | Rest]) ->
     check_modifiers_(Env, Rest);
 check_modifiers_(Env, [{pragma, Ann, Pragma} | Rest]) ->
     check_pragma(Env, Ann, Pragma),
+    check_modifiers_(Env, Rest);
+check_modifiers_(Env, [{using, _, _, _, _} | Rest]) ->
     check_modifiers_(Env, Rest);
 check_modifiers_(Env, [Decl | Rest]) ->
     type_error({bad_top_level_decl, Decl}),
@@ -1770,6 +1854,8 @@ infer_block(Env, _, [{letval, Attrs, Pattern, E}|Rest], BlockType) ->
     {'case', _, NewPattern, {typed, _, {block, _, NewRest}, _}} =
         infer_case(Env, Attrs, Pattern, PatType, {block, Attrs, Rest}, BlockType),
     [{letval, Attrs, NewPattern, NewE}|NewRest];
+infer_block(Env, Attrs, [Using = {using, _, _, _, _} | Rest], BlockType) ->
+    infer_block(check_usings(Env, Using), Attrs, Rest, BlockType);
 infer_block(Env, Attrs, [E|Rest], BlockType) ->
     [infer_expr(Env, E)|infer_block(Env, Attrs, Rest, BlockType)].
 
@@ -2987,6 +3073,17 @@ mk_error({contract_lacks_definition, Type, When}) ->
            ),
     {Pos, Ctxt} = pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
+mk_error({ambiguous_name, QIds = [{qid, Ann, _} | _]}) ->
+    Names = lists:map(fun(QId) -> io_lib:format("~s at ~s\n", [pp(QId), pp_loc(QId)]) end, QIds),
+    Msg = "Ambiguous name: " ++ lists:concat(Names),
+    mk_t_err(pos(Ann), Msg);
+mk_error({using_undefined_namespace, Ann, Namespace}) ->
+    Msg = io_lib:format("Cannot use undefined namespace ~s", [Namespace]),
+    mk_t_err(pos(Ann), Msg);
+mk_error({using_undefined_namespace_parts, Ann, Namespace, Parts}) ->
+    PartsStr = lists:concat(lists:join(", ", Parts)),
+    Msg = io_lib:format("The namespace ~s does not define the following names: ~s", [Namespace, PartsStr]),
+    mk_t_err(pos(Ann), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p\n", [Err]),
     mk_t_err(pos(0, 0), Msg).
