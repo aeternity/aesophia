@@ -88,7 +88,7 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
             {map_get, _, A, B}     -> Expr([A, B]);
             {map_get, _, A, B, C}  -> Expr([A, B, C]);
             {block, _, Ss}         -> Expr(Ss);
-            {letpat, _, X, P}      -> Scoped(BindExpr(X), Expr(P));
+            {letpat, _, X, P}      -> Plus(BindExpr(X), Expr(P));
             %% field()
             {field, _, LV, E}    -> Expr([LV, E]);
             {field, _, LV, _, E} -> Expr([LV, E]);
