@@ -1202,6 +1202,55 @@ contract MyContract =
 <code>Chain</code>, <code>Call</code>, and <code>Contract</code>, builtin namespaces) as function in a contract,
 with the exception of <code>state</code>, <code>put</code> and <code>Chain.event</code> since these are
 dependent on the specific state and event types of the contract.</p>
+<p>To avoid mentioning the namespace every time it is used, Sophia allows
+including the namespace in the current scope with the <code>using</code> keyword:
+<div class="highlight"><pre><span></span><code>include &quot;Pair.aes&quot;
+using Pair
+contract C =
+  type state = int
+  entrypoint init() =
+    let p = (1, 2)
+    fst(p)  // this is the same as Pair.fst(p)
+</code></pre></div></p>
+<p>It is also possible to make an alias for the namespace with the <code>as</code> keyword:
+<div class="highlight"><pre><span></span><code>include &quot;Pair.aes&quot;
+contract C =
+  using Pair as P
+  type state = int
+  entrypoint init() =
+    let p = (1, 2)
+    P.fst(p)  // this is the same as Pair.fst(p)
+</code></pre></div></p>
+<p>Having the same alias for multiple namespaces is possible and it allows
+referening functions that are defined in different namespaces and have
+different names with the same alias:
+<div class="highlight"><pre><span></span><code>namespace Xa = function f() = 1
+namespace Xb = function g() = 2
+contract Cntr =
+  using Xa as A
+  using Xb as A
+  type state = int
+  entrypoint init() = A.f() + A.g()
+</code></pre></div></p>
+<p>Note that using functions with the same name would result in an ambiguous name
+error:
+<div class="highlight"><pre><span></span><code>namespace Xa = function f() = 1
+namespace Xb = function f() = 2
+contract Cntr =
+  using Xa as A
+  using Xb as A
+  type state = int
+
+  // the next line has an error because f is defined in both Xa and Xb
+  entrypoint init() = A.f()
+</code></pre></div></p>
+<p>Importing specific parts of a namespace or hiding these parts can also be
+done like this:
+<div class="highlight"><pre><span></span><code>using Pair for [fst, snd]       // this will only import fst and snd
+using Triple hiding [fst, snd]  // this will import everything except for fst and snd
+</code></pre></div></p>
+<p>Note that it is possible to use a namespace in the top level of the file, in the
+contract level, namespace level, or in the function level.</p>
 <h2 id="splitting-code-over-multiple-files">Splitting code over multiple files</h2>
 <p>Code from another file can be included in a contract using an <code>include</code>
 statement. These must appear at the top-level (outside the main contract). The
