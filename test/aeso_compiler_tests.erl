@@ -46,7 +46,7 @@ simple_compile_test_() ->
        end} ] ++
     [ {"Testing error messages of " ++ ContractName,
        fun() ->
-           Errors = compile(aevm, ContractName),
+           Errors = compile(aevm, ContractName, [warn_all, warn_error]),
            check_errors(ExpectedErrors, Errors)
        end} ||
            {ContractName, ExpectedErrors} <- failing_contracts() ] ++
@@ -88,6 +88,11 @@ simple_compile_test_() ->
            ?assertMatch({_, _, true}, {SizeDeadCode, SizeNoDeadCode, SizeDeadCode + Delta < SizeNoDeadCode}),
            ok
        end} || Backend <- [aevm, fate] ] ++
+    [ {"Testing warning messages",
+       fun() ->
+           #{ warnings := Warnings } = compile(Backend, "warnings", [warn_all]),
+           check_warnings(warnings(), Warnings)
+       end} || Backend <- [aevm, fate] ] ++
     [].
 
 %% Check if all modules in the standard library compile
@@ -113,6 +118,15 @@ check_errors(Expect, #{}) ->
 check_errors(Expect0, Actual0) ->
     Expect = lists:sort(Expect0),
     Actual = [ list_to_binary(string:trim(aeso_errors:pp(Err))) || Err <- Actual0 ],
+    case {Expect -- Actual, Actual -- Expect} of
+        {[], Extra}   -> ?assertMatch({unexpected, []}, {unexpected, Extra});
+        {Missing, []} -> ?assertMatch({missing, []}, {missing, Missing});
+        {Missing, Extra} -> ?assertEqual(Missing, Extra)
+    end.
+
+check_warnings(Expect0, Actual0) ->
+    Expect = lists:sort(Expect0),
+    Actual = [ list_to_binary(string:trim(aeso_warnings:pp(Warn))) || Warn <- Actual0 ],
     case {Expect -- Actual, Actual -- Expect} of
         {[], Extra}   -> ?assertMatch({unexpected, []}, {unexpected, Extra});
         {Missing, []} -> ?assertMatch({missing, []}, {missing, Missing});
@@ -227,6 +241,49 @@ debug_mode_contracts() ->
 
 -define(TYPE_ERROR(Name, Errs), ?ERROR("Type", Name, Errs)).
 -define(PARSE_ERROR(Name, Errs), ?ERROR("Parse", Name, Errs)).
+
+-define(PosW(Kind, File, Line, Col), (list_to_binary(Kind))/binary, " in '",
+                                     (list_to_binary(File))/binary, ".aes' at line " ??Line ", col " ??Col ":\n").
+-define(PosW(Line, Col), ?PosW(__Kind, __File, Line, Col)).
+
+-define(WARNING(Name, Warns),
+    (fun() ->
+        __Kind = "Warning",
+        __File = ??Name,
+        Warns
+     end)()).
+
+warnings() ->
+    ?WARNING(warnings,
+     [<<?PosW(0, 0)
+        "The file Triple.aes is included but not used">>,
+      <<?PosW(13, 3)
+        "The function h is defined at line 13, column 3 but never used">>,
+      <<?PosW(19, 3)
+        "The type unused_type is defined at line 19, column 3 but never used">>,
+      <<?PosW(23, 54)
+        "Negative spend at line 23, column 54">>,
+      <<?PosW(27, 9)
+        "The definition of x at line 27, column 9 shadows an older definition at line 26, column 9">>,
+      <<?PosW(30, 36)
+        "Division by zero at line 30, column 36">>,
+      <<?PosW(32, 3)
+        "The function unused_stateful is unnecessarily marked as stateful at line 32, column 3">>,
+      <<?PosW(35, 31)
+        "The variable unused_arg is defined at line 35, column 31 but never used">>,
+      <<?PosW(36, 9)
+        "The variable unused_var is defined at line 36, column 9 but never used">>,
+      <<?PosW(41, 3)
+        "The function unused_function is defined at line 41, column 3 but never used">>,
+      <<?PosW(42, 3)
+        "The function recursive_unused_function is defined at line 42, column 3 but never used">>,
+      <<?PosW(43, 3)
+        "The function called_unused_function1 is defined at line 43, column 3 but never used">>,
+      <<?PosW(44, 3)
+        "The function called_unused_function2 is defined at line 44, column 3 but never used">>,
+      <<?PosW(48, 5)
+        "Unused return value at line 48, column 5">>
+     ]).
 
 failing_contracts() ->
     {ok, V} = aeso_compiler:numeric_version(),
@@ -816,6 +873,36 @@ failing_contracts() ->
     , ?TYPE_ERROR(non_boolean_pattern_guard,
                   [<<?Pos(4,24)
                      "Cannot unify string\n         and bool\nwhen checking the type of the expression at line 4, column 24\n  \"y\" : string\nagainst the expected type\n  bool">>
+                  ])
+    , ?TYPE_ERROR(warnings,
+                  [<<?Pos(0, 0)
+                     "The file Triple.aes is included but not used">>,
+                   <<?Pos(13, 3)
+                     "The function h is defined at line 13, column 3 but never used">>,
+                   <<?Pos(19, 3)
+                     "The type unused_type is defined at line 19, column 3 but never used">>,
+                   <<?Pos(23, 54)
+                     "Negative spend at line 23, column 54">>,
+                   <<?Pos(27, 9)
+                     "The definition of x at line 27, column 9 shadows an older definition at line 26, column 9">>,
+                   <<?Pos(30, 36)
+                     "Division by zero at line 30, column 36">>,
+                   <<?Pos(32, 3)
+                     "The function unused_stateful is unnecessarily marked as stateful at line 32, column 3">>,
+                   <<?Pos(35, 31)
+                     "The variable unused_arg is defined at line 35, column 31 but never used">>,
+                   <<?Pos(36, 9)
+                     "The variable unused_var is defined at line 36, column 9 but never used">>,
+                   <<?Pos(41, 3)
+                     "The function unused_function is defined at line 41, column 3 but never used">>,
+                   <<?Pos(42, 3)
+                     "The function recursive_unused_function is defined at line 42, column 3 but never used">>,
+                   <<?Pos(43, 3)
+                     "The function called_unused_function1 is defined at line 43, column 3 but never used">>,
+                   <<?Pos(44, 3)
+                     "The function called_unused_function2 is defined at line 44, column 3 but never used">>,
+                   <<?Pos(48, 5)
+                     "Unused return value at line 48, column 5">>
                   ])
     ].
 

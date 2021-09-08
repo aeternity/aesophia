@@ -1,0 +1,49 @@
+// Used include
+include "Pair.aes"
+// Unused include
+include "Triple.aes"
+
+namespace UnusedNamespace =
+  function f() = 1 + g()
+
+  // Used in f
+  private function g() = 2
+
+  // Unused
+  private function h() = 3
+
+contract Warnings =
+
+  type state = int
+
+  type unused_type = bool
+
+  entrypoint init(p) = Pair.fst(p) + Pair.snd(p)
+
+  stateful entrypoint negative_spend(to : address) = Chain.spend(to, -1)
+
+  entrypoint shadowing() =
+    let x = 1
+    let x = 2
+    x
+
+  entrypoint division_by_zero(x) = x / 0
+
+  stateful entrypoint unused_stateful() = 1
+  stateful entrypoint used_stateful(x : int) = put(x)
+
+  entrypoint unused_variables(unused_arg : int) =
+    let unused_var = 10
+    let z = 20
+    z
+
+  // Unused functions
+  function unused_function() = ()
+  function recursive_unused_function() = recursive_unused_function()
+  function called_unused_function1() = called_unused_function2()
+  function called_unused_function2() = called_unused_function1()
+
+  function rv() = 1
+  entrypoint unused_return_value() =
+    rv()
+    2

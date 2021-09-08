@@ -1,0 +1,27 @@
+-module(aeso_warnings).
+
+-record(warn, { pos     :: aeso_errors:pos()
+              , message :: iolist()
+              }).
+
+-opaque warning() :: #warn{}.
+
+-export_type([warning/0]).
+
+-export([ new/1
+        , new/2
+        , warn_to_err/2
+        , pp/1
+        ]).
+
+new(Msg) ->
+    new(aeso_errors:pos(0, 0), Msg).
+
+new(Pos, Msg) ->
+    #warn{ pos = Pos, message = Msg }.
+
+warn_to_err(Kind, #warn{ pos = Pos, message = Msg }) ->
+    aeso_errors:new(Kind, Pos, lists:flatten(Msg)).
+
+pp(#warn{ pos = Pos, message = Msg }) ->
+    lists:flatten(io_lib:format("Warning~s:\n~s", [aeso_errors:pp_pos(Pos), Msg])).

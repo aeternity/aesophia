@@ -120,7 +120,8 @@ from_string(Backend, ContractString, Options) ->
 
 from_string1(aevm, ContractString, Options) ->
     #{ icode := Icode
-     , folded_typed_ast := FoldedTypedAst } = string_to_code(ContractString, Options),
+     , folded_typed_ast := FoldedTypedAst
+     , warnings := Warnings } = string_to_code(ContractString, Options),
     TypeInfo  = extract_type_info(Icode),
     Assembler = assemble(Icode, Options),
     pp_assembler(aevm, Assembler, Options),
@@ -133,13 +134,15 @@ from_string1(aevm, ContractString, Options) ->
             contract_source => ContractString,
             type_info => TypeInfo,
             abi_version => aeb_aevm_abi:abi_version(),
-            payable => maps:get(payable, Icode)
+            payable => maps:get(payable, Icode),
+            warnings => Warnings
            },
     {ok, maybe_generate_aci(Res, FoldedTypedAst, Options)};
 from_string1(fate, ContractString, Options) ->
     #{ fcode := FCode
      , fcode_env := #{child_con_env := ChildContracts}
-     , folded_typed_ast := FoldedTypedAst } = string_to_code(ContractString, Options),
+     , folded_typed_ast := FoldedTypedAst
+     , warnings := Warnings } = string_to_code(ContractString, Options),
     FateCode = aeso_fcode_to_fate:compile(ChildContracts, FCode, Options),
     pp_assembler(fate, FateCode, Options),
     ByteCode = aeb_fate_code:serialize(FateCode, []),
@@ -150,7 +153,8 @@ from_string1(fate, ContractString, Options) ->
             type_info => [],
             fate_code => FateCode,
             abi_version => aeb_fate_abi:abi_version(),
-            payable => maps:get(payable, FCode)
+            payable => maps:get(payable, FCode),
+            warnings => Warnings
            },
     {ok, maybe_generate_aci(Res, FoldedTypedAst, Options)}.
 
@@ -168,7 +172,7 @@ string_to_code(ContractString, Options) ->
     Ast = parse(ContractString, Options),
     pp_sophia_code(Ast, Options),
     pp_ast(Ast, Options),
-    {TypeEnv, FoldedTypedAst, UnfoldedTypedAst} = aeso_ast_infer_types:infer(Ast, [return_env | Options]),
+    {TypeEnv, FoldedTypedAst, UnfoldedTypedAst, Warnings} = aeso_ast_infer_types:infer(Ast, [return_env | Options]),
     pp_typed_ast(UnfoldedTypedAst, Options),
     case proplists:get_value(backend, Options, aevm) of
         aevm ->
@@ -178,7 +182,8 @@ string_to_code(ContractString, Options) ->
              , unfolded_typed_ast => UnfoldedTypedAst
              , folded_typed_ast => FoldedTypedAst
              , type_env  => TypeEnv
-             , ast => Ast };
+             , ast => Ast
+             , warnings => Warnings};
         fate ->
             {Env, Fcode} = aeso_ast_to_fcode:ast_to_fcode(UnfoldedTypedAst, [{original_src, ContractString}|Options]),
             #{ fcode => Fcode
@@ -186,7 +191,8 @@ string_to_code(ContractString, Options) ->
              , unfolded_typed_ast => UnfoldedTypedAst
              , folded_typed_ast => FoldedTypedAst
              , type_env  => TypeEnv
-             , ast => Ast }
+             , ast => Ast
+             , warnings => Warnings }
     end.
 
 -define(CALL_NAME,   "__call").

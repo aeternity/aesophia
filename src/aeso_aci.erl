@@ -70,7 +70,7 @@ do_contract_interface(Type, Contract, Options) when is_binary(Contract) ->
 do_contract_interface(Type, ContractString, Options) ->
     try
         Ast = aeso_compiler:parse(ContractString, Options),
-        {TypedAst, _} = aeso_ast_infer_types:infer(Ast, [dont_unfold | Options]),
+        {TypedAst, _, _} = aeso_ast_infer_types:infer(Ast, [dont_unfold | Options]),
         from_typed_ast(Type, TypedAst)
     catch
         throw:{error, Errors} -> {error, Errors}
