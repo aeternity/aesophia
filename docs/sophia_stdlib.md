@@ -37,6 +37,7 @@ include "List.aes"
 - [Func](#func)
 - [Pair](#pair)
 - [Triple](#triple)
+- [Bitwise](#bitwise)
 - [BLS12_381](bls12_381)
 - [Frac](#frac)
 - [Set](#set-stdlib)
@@ -1294,7 +1295,7 @@ Escapes `option` wrapping by providing default value for `None`.
 Option.force(o : option('a)) : 'a
 ```
 
-Forcefully escapes the `option` wrapping assuming it is `Some`. 
+Forcefully escapes the `option` wrapping assuming it is `Some`.
 Aborts on `None`.
 
 
@@ -1816,6 +1817,90 @@ Triple.rotl(t : ('a * 'b * 'c)) : ('b * 'c * 'a)
 ```
 
 Cyclic rotation of the elements to the left.
+
+### Bitwise
+
+Bitwise operations on arbitary precision integers.
+
+#### bsr
+```
+Bitwise.bsr(n : int, x : int) : int
+```
+
+Logical bit shift `x` right `n` positions.
+
+
+#### bsl
+```
+Bitwise.bsl(n : int, x : int) : int
+```
+
+Logical bit shift `x` left `n` positions.
+
+
+#### bsli
+```
+Bitwise.bsli(n : int, x : int, lim : int) : int
+```
+
+Logical bit shift `x` left `n` positions, limit to `lim` bits.
+
+
+#### band
+```
+Bitwise.band(x : int, y : int) : int
+```
+
+Bitwise `and` of `x` and `y`.
+
+
+#### bor
+```
+Bitwise.bor(x : int, y : int) : int
+```
+
+Bitwise `or` of `x` and `y`.
+
+
+#### bxor
+```
+Bitwise.bxor(x : int, y : int) : int
+```
+
+Bitwise `xor` of `x` and `y`.
+
+
+#### bnot
+```
+Bitwise.bnot(x : int) : int
+```
+
+Bitwise `not` of `x`. Defined and implemented as `bnot(x) = bxor(x, -1)`.
+
+
+#### uband
+```
+Bitwise.uband(x : int, y : int) : int
+```
+
+Bitwise `and` of _non-negative_ numbers `x` and `y`.
+
+
+#### ubor
+```
+Bitwise.ubor(x : int, y : int) : int
+```
+
+Bitwise `or` of _non-negative_ `x` and `y`.
+
+
+#### ubxor
+```
+Bitwise.ubxor(x : int, y : int) : int
+```
+
+Bitwise `xor` of _non-negative_ `x` and `y`.
+
 
 ### BLS12\_381
 
