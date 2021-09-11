@@ -1533,6 +1533,15 @@ their respective arguments. For instance,</p>
   get_left(Right(_))   = None
   get_left(Both(x, _)) = Some(x)
 </code></pre></div></p>
+<p>Sophia also supports the assignment of patterns to variables:
+<div class="highlight"><pre><span></span><code>function f(x) = switch(x)
+  h1::(t = h2::_) =&gt; (h1 + h2)::t  // same as `h1::h2::k =&gt; (h1 + h2)::h2::k`
+  _ =&gt; x
+
+function g(p : int * option(int)) : int =
+  let (a, (o = Some(b))) = p  // o is equal to Pair.snd(p)
+  b
+</code></pre></div></p>
 <p><em>NOTE: Data types cannot currently be recursive.</em></p>
 <h2 id="lists">Lists</h2>
 <p>A Sophia list is a dynamically sized, homogenous, immutable, singly
