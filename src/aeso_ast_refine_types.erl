@@ -1211,7 +1211,7 @@ constr_expr(Env, ?typed_p(Expr, Type), S0) ->
             {ExprT, S1} = constr_expr(Env, Expr, Base, S0),
             {ExprT,
              %% Inferred type <: Declared type, because the user can generalize Cat to Animal
-             [ {subtype, constr_id(typed), ?ann_of(Type), Env, ExprT, DType}
+             [ {subtype, constr_id(typed), ?ann_of(ExprT), Env, ExprT, DType}
              , {well_formed, constr_id(typed), Env, DType}
              | S1
              ]
@@ -2191,7 +2191,7 @@ valid_in({subtype, _Ref, Ann, Env,
             true;
         false ->
             %?DBG("~s -> ~s", [name(SupId), name(SubId)]),
-            %?DBG("CONTRADICT ON ~p \n~s\n<:\n~s", [_Ref, aeso_pretty:pp(predicate, strip_typed(pred_of(Assg, Env) ++ AssumpPred)), aeso_pretty:pp(predicate, strip_typed(ConclPred))]),
+            ?DBG("CONTRADICT ON ~p \n~s\n<:\n~s", [_Ref, aeso_pretty:pp(predicate, strip_typed(pred_of(Assg, Env) ++ AssumpPred)), aeso_pretty:pp(predicate, strip_typed(ConclPred))]),
             %?DBG("IN\n~s", [aeso_pretty:pp(predicate, strip_typed(pred_of(Assg, Env1)))]),
             SimpAssump = simplify_pred(Assg, Env1,
                                        pred_of(Assg, Env1) ++ AssumpPred),
@@ -2228,9 +2228,13 @@ weaken({subtype, _Ref, _, Env,
     AssumpPred = apply_subst(SubId, Id, SubPred),
     Env1 = bind_var(Id, Base, Env),
     Filtered =
-        [Q || Q <- Pred,
-             impl_holds(Assg, Env1, AssumpPred, apply_subst([{SupId, Id}|Subst], Q))
-        ],
+        partial_impl_assump(
+          Assg, Env1, AssumpPred,
+          fun() ->
+                  [Q || Q <- Pred,
+                        partial_impl_holds(apply_subst([{SupId, Id}|Subst], Q))
+                  ]
+          end),
     %% ?DBG("WEAKENED (~s <: ~s  --> ~s) ~p\nUNDER\n~s\nFROM\n~s\nTO\n~s", [name(SubId), name(SupId), name(Id), _Ref, aeso_pretty:pp(predicate, AssumpPred), aeso_pretty:pp(predicate, Pred), aeso_pretty:pp(predicate, Filtered)]),
     NewLtinfo = Ltinfo#ltinfo{
                  predicate = Filtered
@@ -2365,13 +2369,24 @@ impl_holds(Assg, Env, Assump, Concl) when not is_list(Concl) ->
     impl_holds(Assg, Env, Assump, [Concl]);
 impl_holds(_, _, _, []) -> true;
 impl_holds(Assg, Env, Assump, Concl) ->
-    ConclExpr  = {app, ?ann(), {'&&', ?ann()}, Concl}, %% Improper Sophia expr but who cares
+    partial_impl_assump(Assg, Env, Assump, fun() -> partial_impl_holds(Concl) end).
+
+partial_impl_assump(Assg, Env, Assump, Callback) ->
     aeso_smt:scoped(
       fun() ->
               declare_type_binds(Assg, Env),
               [ aeso_smt:assert(expr_to_smt(Expr))
                 || Expr <- Assump
               ],
+              Callback()
+      end).
+
+partial_impl_holds([]) -> true;
+partial_impl_holds(E) when not is_list(E) -> partial_impl_holds([E]);
+partial_impl_holds(Concl) ->
+    aeso_smt:scoped(
+      fun() ->
+              ConclExpr  = {app, ?ann(), {'&&', ?ann()}, Concl}, %% Improper Sophia expr but who cares
               aeso_smt:assert(expr_to_smt(?op(?ann(), '!', ConclExpr))),
               case aeso_smt:check_sat() of
                   {error, Err} -> throw({smt_error, Err});

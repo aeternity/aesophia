@@ -1,5 +1,15 @@
-contract XD =
+contract DoubleStore =
+  type state = {x1 : int | x1 >= 0} * {x2 : int | x2 >= 0}
 
-  entrypoint gasdas() = 123
 
-  function f() = Some(() => ())
+  stateful entrypoint withdraw(amount : int) =
+    require(amount > 0 && amount =< Contract.balance, "INVALID_AMOUNT")
+    let (s1, s2) = state
+    if(amount =< s1 && Call.caller == ak_2nqfyixM9K5oKApAroETHEV4rxTTCAhAJvjYcUV3PF1326LUsx)
+      put((s1 - amount, s2))
+      Chain.spend(Call.caller, amount)
+    elif(amount =< s1 && Call.caller == ak_2CvLDbcJaw3CkyderTCgahzb6LpibPYgeodmCGcje8WuV5kiXR)
+      put((s1, s2 - amount))
+      Chain.spend(Call.caller, amount)
+    else
+      abort("INVALID_WITHDRAW")

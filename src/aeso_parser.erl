@@ -85,7 +85,8 @@ mk_error({Pos, include_error, File}) ->
     mk_p_err(Pos, Msg).
 
 mk_pos({Line, Col})       -> aeso_errors:pos(Line, Col);
-mk_pos({File, Line, Col}) -> aeso_errors:pos(File, Line, Col).
+mk_pos({File, Line, Col}) -> aeso_errors:pos(File, Line, Col);
+mk_pos([H|T]) -> try mk_pos(H) catch _:_ -> mk_pos(T) end.
 
 %% -- Parsing rules ----------------------------------------------------------
 
