@@ -96,7 +96,8 @@
                      | nil
                      | {'::', var_name(), var_name()}
                      | {con, arities(), tag(), [var_name()]}
-                     | {tuple, [var_name()]}.
+                     | {tuple, [var_name()]}
+                     | {assign, var_name(), var_name()}.
 
 -type ftype() :: integer
                | boolean
@@ -875,7 +876,8 @@ alts_to_fcode(Env, Type, X, Alts) ->
               | {string, binary()}
               | nil | {'::', fpat(), fpat()}
               | {tuple, [fpat()]}
-              | {con, arities(), tag(), [fpat()]}.
+              | {con, arities(), tag(), [fpat()]}
+              | {assign, fpat(), fpat()}.
 
 %% %% Invariant: the number of variables matches the number of patterns in each falt.
 -spec split_tree(env(), [{var_name(), ftype()}], [falt()]) -> fsplit().
@@ -975,6 +977,8 @@ split_pat({'::', P, Q}) -> {{'::', fresh_name(), fresh_name()}, [P, Q]};
 split_pat({con, As, I, Pats}) ->
     Xs = [fresh_name() || _ <- Pats],
     {{con, As, I, Xs}, Pats};
+split_pat({assign, X = {var, _}, P}) ->
+    {{assign, fresh_name(), fresh_name()}, [X, P]};
 split_pat({tuple, Pats}) ->
     Xs = [fresh_name() || _ <- Pats],
     {{tuple, Xs}, Pats}.
@@ -985,6 +989,7 @@ split_vars({int, _},    integer)     -> [];
 split_vars({string, _}, string)      -> [];
 split_vars(nil,         {list, _})   -> [];
 split_vars({'::', X, Xs}, {list, T}) -> [{X, T}, {Xs, {list, T}}];
+split_vars({assign, X, P}, T)        -> [{X, T}, {P, T}];
 split_vars({con, _, I, Xs}, {variant, Cons}) ->
     lists:zip(Xs, lists:nth(I + 1, Cons));
 split_vars({tuple, Xs}, {tuple, Ts}) ->
@@ -1040,6 +1045,8 @@ pat_to_fcode(Env, {record_t, Fields}, {record, _, FieldPats}) ->
                     end end,
     make_tuple([pat_to_fcode(Env, FieldPat(Field))
                 || Field <- Fields]);
+pat_to_fcode(Env, _Type, {letpat, _, Id = {typed, _, {id, _, _}, _}, Pattern}) ->
+    {assign, pat_to_fcode(Env, Id), pat_to_fcode(Env, Pattern)};
 
 pat_to_fcode(_Env, Type, Pat) ->
     error({todo, Pat, ':', Type}).
@@ -1530,6 +1537,7 @@ match_pat(L, {lit, L})                      -> [];
 match_pat(nil, nil)                         -> [];
 match_pat({'::', X, Y}, {op, '::', [A, B]}) -> [{X, A}, {Y, B}];
 match_pat({var, X}, E)                      -> [{X, E}];
+match_pat({assign, X, P}, E)                -> [{X, E}, {P, E}];
 match_pat(_, _)                             -> false.
 
 constructor_form(Env, Expr) ->
@@ -1765,6 +1773,7 @@ pat_vars(nil)                 -> [];
 pat_vars({'::', P, Q})        -> pat_vars(P) ++ pat_vars(Q);
 pat_vars({tuple, Ps})         -> pat_vars(Ps);
 pat_vars({con, _, _, Ps})     -> pat_vars(Ps);
+pat_vars({assign, X, P})      -> pat_vars(X) ++ pat_vars(P);
 pat_vars(Ps) when is_list(Ps) -> [X || P <- Ps, X <- pat_vars(P)].
 
 -spec fsplit_pat_vars(fsplit_pat()) -> [var_name()].
@@ -1985,7 +1994,11 @@ rename_spat(Ren, {con, Ar, C, Xs}) ->
     {{con, Ar, C, Zs}, Ren1};
 rename_spat(Ren, {tuple, Xs}) ->
     {Zs, Ren1} = rename_bindings(Ren, Xs),
-    {{tuple, Zs}, Ren1}.
+    {{tuple, Zs}, Ren1};
+rename_spat(Ren, {assign, X, P}) ->
+    {X1, Ren1} = rename_binding(Ren, X),
+    {P1, Ren2} = rename_binding(Ren1, P),
+    {{assign, X1, P1}, Ren2}.
 
 rename_split(Ren, {split, Type, X, Cases}) ->
     {split, Type, rename_var(Ren, X), [rename_case(Ren, C) || C <- Cases]};

@@ -299,6 +299,8 @@ tuple_type(Factors) ->
       ]).
 
 -spec expr_p(integer(), aeso_syntax:arg_expr()) -> doc().
+expr_p(P, {letpat, _, Id, Pat}) ->
+    paren(P > 100, follow(hsep(expr(Id), text("=")), expr(Pat)));
 expr_p(P, {named_arg, _, Name, E}) ->
     paren(P > 100, follow(hsep(expr(Name), text("=")), expr(E)));
 expr_p(P, {lam, _, Args, E}) ->

@@ -58,6 +58,7 @@
 
 -type letval()  :: {letval, ann(), pat(), expr()}.
 -type letfun()  :: {letfun, ann(), id(), [pat()], type(), expr()}.
+-type letpat()  :: {letpat, ann(), id(), pat()}.
 -type fundecl() :: {fun_decl, ann(), id(), type()}.
 
 -type letbind()
@@ -122,7 +123,8 @@
      | {block, ann(), [stmt()]}
      | {op(), ann()}
      | id() | qid() | con() | qcon()
-     | constant().
+     | constant()
+     | letpat().
 
 -type record_or_map() :: record | map | record_or_map_error.
 
@@ -156,6 +158,7 @@
              | {list, ann(), [pat()]}
              | {typed, ann(), pat(), type()}
              | {record, ann(), [field(pat())]}
+             | letpat()
              | constant()
              | con()
              | id().

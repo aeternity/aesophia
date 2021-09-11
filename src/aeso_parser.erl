@@ -224,6 +224,9 @@ arg() -> choice(
     ?RULE(id(),                   {arg, get_ann(_1), _1, type_wildcard(get_ann(_1))}),
     ?RULE(id(), tok(':'), type(), {arg, get_ann(_1), _1, _3})).
 
+letpat() ->
+    ?RULE(keyword('('), id(), tok('='), pattern(), tok(')'), {letpat, get_ann(_1), _2, _4}).
+
 %% -- Types ------------------------------------------------------------------
 
 type_vars() -> paren_list(tvar()).
@@ -328,6 +331,7 @@ exprAtom() ->
         , ?RULE(keyword('['), Expr, token('|'), comma_sep(comprehension_exp()), tok(']'), list_comp_e(_1, _2, _4))
         , ?RULE(tok('['), Expr, binop('..'), Expr, tok(']'), _3(_2, _4))
         , ?RULE(keyword('('), comma_sep(Expr), tok(')'), tuple_e(_1, _2))
+        , letpat()
         ])
     end).
 
@@ -588,6 +592,8 @@ tuple_e(Ann, Exprs)   -> {tuple, Ann, Exprs}.
 list_comp_e(Ann, Expr, Binds) -> {list_comp, Ann, Expr, Binds}.
 
 -spec parse_pattern(aeso_syntax:expr()) -> aeso_parse_lib:parser(aeso_syntax:pat()).
+parse_pattern({letpat, Ann, Id, Pat}) ->
+    {letpat, Ann, Id, parse_pattern(Pat)};
 parse_pattern({app, Ann, Con = {'::', _}, Es}) ->
     {app, Ann, Con, lists:map(fun parse_pattern/1, Es)};
 parse_pattern({app, Ann, {'-', _}, [{int, _, N}]}) ->

@@ -471,6 +471,17 @@ function
   get_left(Both(x, _)) = Some(x)
 ```
 
+Sophia also supports the assignment of patterns to variables:
+```sophia
+function f(x) = switch(x)
+  h1::(t = h2::_) => (h1 + h2)::t  // same as `h1::h2::k => (h1 + h2)::h2::k`
+  _ => x
+
+function g(p : int * option(int)) : int =
+  let (a, (o = Some(b))) = p  // o is equal to Pair.snd(p)
+  b
+```
+
 *NOTE: Data types cannot currently be recursive.*
 
 ## Lists
