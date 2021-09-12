@@ -1820,7 +1820,7 @@ Cyclic rotation of the elements to the left.
 
 ### Bitwise
 
-Bitwise operations on arbitary precision integers.
+Bitwise operations on arbitrary precision integers.
 
 #### bsr
 ```

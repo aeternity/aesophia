@@ -63,7 +63,7 @@ namespace Bitwise =
   // bitwise 'not' for arbitrary precision integers
   function bnot(a : int) = bxor(a, -1)
 
-  // Bitwise 'and' for positive integers
+  // Bitwise 'and' for non-negative integers
   function uband(a : int, b : int) : int =
     require(a >= 0 && b >= 0, "uband is only defined for non-negative integers")
     switch((a, b))
@@ -81,7 +81,7 @@ namespace Bitwise =
         2 => uband__(a / 2, b / 2, val * 2, acc + val)
         _ => uband__(a / 2, b / 2, val * 2, acc)
 
-  // Bitwise or for positive integers
+  // Bitwise 'or' for non-negative integers
   function ubor(a, b) =
     require(a >= 0 && b >= 0, "ubor is only defined for non-negative integers")
     switch((a, b))
@@ -98,7 +98,7 @@ namespace Bitwise =
         0 => ubor__(a / 2, b / 2, val * 2, acc)
         _ => ubor__(a / 2, b / 2, val * 2, acc + val)
 
-  //Bitwise xor for positive integers
+  //Bitwise 'xor' for non-negative integers
   function
     ubxor : (int, int) => int
     ubxor(0, b) = b
