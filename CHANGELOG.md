@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- `Bitwise` stdlib
 - `Set` stdlib
 - `Option.force_msg`
 - Loading namespaces into the current scope (e.g. `using Pair`)
