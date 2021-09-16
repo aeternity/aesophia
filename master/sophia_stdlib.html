@@ -455,6 +455,13 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#bitwise" class="md-nav__link">
+    Bitwise
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#bls12_381" class="md-nav__link">
     BLS12_381
   </a>
@@ -718,6 +725,13 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#bitwise" class="md-nav__link">
+    Bitwise
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#bls12_381" class="md-nav__link">
     BLS12_381
   </a>
@@ -812,6 +826,7 @@ in the scope and do not need any actions to be used, while the others require so
 <li><a href="#func">Func</a></li>
 <li><a href="#pair">Pair</a></li>
 <li><a href="#triple">Triple</a></li>
+<li><a href="#bitwise">Bitwise</a></li>
 <li><a href="bls12_381">BLS12_381</a></li>
 <li><a href="#frac">Frac</a></li>
 <li><a href="#set-stdlib">Set</a></li>
@@ -1537,7 +1552,7 @@ will yield <code>[1, 0, 2, 0, 3, 0, 4]</code></p>
 <h4 id="force">force</h4>
 <div class="highlight"><pre><span></span><code>Option.force(o : option(&#39;a)) : &#39;a
 </code></pre></div>
-<p>Forcefully escapes the <code>option</code> wrapping assuming it is <code>Some</code>. 
+<p>Forcefully escapes the <code>option</code> wrapping assuming it is <code>Some</code>.
 Aborts on <code>None</code>.</p>
 <h4 id="force_msg">force_msg</h4>
 <div class="highlight"><pre><span></span><code>Option.force_msg(o : option(&#39;a), err : string) : &#39;a
@@ -1828,6 +1843,48 @@ Func.untuplify3(f : &#39;a * &#39;b * &#39;c =&gt; &#39;d) : (&#39;a, &#39;b, &#
 <div class="highlight"><pre><span></span><code>Triple.rotl(t : (&#39;a * &#39;b * &#39;c)) : (&#39;b * &#39;c * &#39;a)
 </code></pre></div>
 <p>Cyclic rotation of the elements to the left.</p>
+<h3 id="bitwise">Bitwise</h3>
+<p>Bitwise operations on arbitrary precision integers.</p>
+<h4 id="bsr">bsr</h4>
+<div class="highlight"><pre><span></span><code>Bitwise.bsr(n : int, x : int) : int
+</code></pre></div>
+<p>Logical bit shift <code>x</code> right <code>n</code> positions.</p>
+<h4 id="bsl">bsl</h4>
+<div class="highlight"><pre><span></span><code>Bitwise.bsl(n : int, x : int) : int
+</code></pre></div>
+<p>Logical bit shift <code>x</code> left <code>n</code> positions.</p>
+<h4 id="bsli">bsli</h4>
+<div class="highlight"><pre><span></span><code>Bitwise.bsli(n : int, x : int, lim : int) : int
+</code></pre></div>
+<p>Logical bit shift <code>x</code> left <code>n</code> positions, limit to <code>lim</code> bits.</p>
+<h4 id="band">band</h4>
+<div class="highlight"><pre><span></span><code>Bitwise.band(x : int, y : int) : int
+</code></pre></div>
+<p>Bitwise <code>and</code> of <code>x</code> and <code>y</code>.</p>
+<h4 id="bor">bor</h4>
+<div class="highlight"><pre><span></span><code>Bitwise.bor(x : int, y : int) : int
+</code></pre></div>
+<p>Bitwise <code>or</code> of <code>x</code> and <code>y</code>.</p>
+<h4 id="bxor">bxor</h4>
+<div class="highlight"><pre><span></span><code>Bitwise.bxor(x : int, y : int) : int
+</code></pre></div>
+<p>Bitwise <code>xor</code> of <code>x</code> and <code>y</code>.</p>
+<h4 id="bnot">bnot</h4>
+<div class="highlight"><pre><span></span><code>Bitwise.bnot(x : int) : int
+</code></pre></div>
+<p>Bitwise <code>not</code> of <code>x</code>. Defined and implemented as <code>bnot(x) = bxor(x, -1)</code>.</p>
+<h4 id="uband">uband</h4>
+<div class="highlight"><pre><span></span><code>Bitwise.uband(x : int, y : int) : int
+</code></pre></div>
+<p>Bitwise <code>and</code> of <em>non-negative</em> numbers <code>x</code> and <code>y</code>.</p>
+<h4 id="ubor">ubor</h4>
+<div class="highlight"><pre><span></span><code>Bitwise.ubor(x : int, y : int) : int
+</code></pre></div>
+<p>Bitwise <code>or</code> of <em>non-negative</em> <code>x</code> and <code>y</code>.</p>
+<h4 id="ubxor">ubxor</h4>
+<div class="highlight"><pre><span></span><code>Bitwise.ubxor(x : int, y : int) : int
+</code></pre></div>
+<p>Bitwise <code>xor</code> of <em>non-negative</em> <code>x</code> and <code>y</code>.</p>
 <h3 id="bls12_381">BLS12_381</h3>
 <h4 id="types_2">Types</h4>
 <h5 id="fp">fp</h5>
