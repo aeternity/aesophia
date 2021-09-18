@@ -1,0 +1,12 @@
+include "List.aes"
+
+contract C =
+  type state = int
+
+  entrypoint init() = f(4)
+
+  function
+    f(x) | x > 0 = 1
+    f(x) | g(x) = 2
+
+  stateful function g(x) = x < 0

@@ -132,6 +132,7 @@
     , namespace        = []                 :: qname()
     , used_namespaces  = []                 :: used_namespaces()
     , in_pattern       = false              :: boolean()
+    , in_guard         = false              :: boolean()
     , stateful         = false              :: boolean()
     , current_function = none               :: none | aeso_syntax:id()
     , what             = top                :: top | namespace | contract | contract_interface
@@ -1396,7 +1397,7 @@ infer_letfun1(Env0, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, G
     Env = Env0#env{ stateful = aeso_syntax:get_ann(stateful, Attrib, false),
                     current_function = Fun },
     {NewEnv, {typed, _, {tuple, _, TypedArgs}, {tuple_t, _, ArgTypes}}} = infer_pattern(Env, {tuple, [{origin, system} | NameAttrib], Args}),
-    NewGuard = check_expr(NewEnv#env{ stateful = false }, Guard, {id, Attrib, "bool"}),
+    NewGuard = check_expr(NewEnv#env{ in_guard = true }, Guard, {id, Attrib, "bool"}),
     ExpectedType = check_type(Env, arg_type(NameAttrib, What)),
     NewBody={typed, _, _, ResultType} = check_expr(NewEnv, Body, ExpectedType),
     NamedArgs = [],
@@ -1465,6 +1466,12 @@ lookup_name(Env, As, Id, Options) ->
             {set_qname(QId, Id), Ty1}
     end.
 
+check_stateful(#env{ in_guard = true }, Id, Type = {type_sig, _, _, _, _, _}) ->
+    case aeso_syntax:get_ann(stateful, Type, false) of
+        false -> ok;
+        true  ->
+            type_error({stateful_not_allowed_in_guards, Id})
+    end;
 check_stateful(#env{ stateful = false, current_function = Fun }, Id, Type = {type_sig, _, _, _, _, _}) ->
     case aeso_syntax:get_ann(stateful, Type, false) of
         false -> ok;
@@ -1913,7 +1920,7 @@ infer_case(Env, Attrs, Pattern, Guard, ExprType, Branch, SwitchType) ->
         none ->
             {'case', Attrs, NewPattern, NewBranch};
         _ ->
-            NewGuard = check_expr(NewEnv#env{ stateful = false }, Guard, {id, Attrs, "bool"}),
+            NewGuard = check_expr(NewEnv#env{ in_guard = true }, Guard, {id, Attrs, "bool"}),
             {'case', Attrs, NewPattern, NewGuard, NewBranch}
     end.
 
@@ -3007,6 +3014,10 @@ mk_error({letval, _Pos, {id, Pos, Name}, _Def}) ->
 mk_error({stateful_not_allowed, Id, Fun}) ->
     Msg = io_lib:format("Cannot reference stateful function ~s (at ~s)\nin the definition of non-stateful function ~s.\n",
                         [pp(Id), pp_loc(Id), pp(Fun)]),
+    mk_t_err(pos(Id), Msg);
+mk_error({stateful_not_allowed_in_guards, Id}) ->
+    Msg = io_lib:format("Cannot reference stateful function ~s (at ~s) in a pattern guard.\n",
+                        [pp(Id), pp_loc(Id)]),
     mk_t_err(pos(Id), Msg);
 mk_error({value_arg_not_allowed, Value, Fun}) ->
     Msg = io_lib:format("Cannot pass non-zero value argument ~s (at ~s)\nin the definition of non-stateful function ~s.\n",

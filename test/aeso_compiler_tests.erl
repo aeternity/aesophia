@@ -809,6 +809,10 @@ failing_contracts() ->
                   [<<?Pos(8,23)
                      "Unbound variable g at line 8, column 23">>
                   ])
+    , ?TYPE_ERROR(stateful_pattern_guard,
+                  [<<?Pos(10,12)
+                     "Cannot reference stateful function g (at line 10, column 12) in a pattern guard.">>
+                  ])
     ].
 
 -define(Path(File), "code_errors/" ??File).
