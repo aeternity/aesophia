@@ -471,6 +471,8 @@ function
   get_left(Both(x, _)) = Some(x)
 ```
 
+*NOTE: Data types cannot currently be recursive.*
+
 Sophia also supports the assignment of patterns to variables:
 ```sophia
 function f(x) = switch(x)
@@ -482,8 +484,10 @@ function g(p : int * option(int)) : int =
   b
 ```
 
-Guards are boolean functions that can be used on patterns in both switch
-statements and functions definitions:
+Guards are boolean expressions that can be used on patterns in both switch
+statements and functions definitions, if a guard expression evalutaes to
+`true`, then the corresponding body will be used, otherwise, the next pattern
+will be checked:
 
 ```sophia
 function get_left_if_positive(x : one_or_both('a, 'b)) : option('a) =
@@ -501,7 +505,7 @@ function
   get_left(_)                  = None
 ```
 
-*NOTE: Data types cannot currently be recursive.*
+Guards cannot be stateful even when used inside a stateful function.
 
 ## Lists
 
