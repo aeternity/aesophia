@@ -1396,7 +1396,7 @@ infer_letfun1(Env0, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, G
     Env = Env0#env{ stateful = aeso_syntax:get_ann(stateful, Attrib, false),
                     current_function = Fun },
     {NewEnv, {typed, _, {tuple, _, TypedArgs}, {tuple_t, _, ArgTypes}}} = infer_pattern(Env, {tuple, [{origin, system} | NameAttrib], Args}),
-    NewGuard = check_expr(NewEnv, Guard, {id, Attrib, "bool"}),
+    NewGuard = check_expr(NewEnv#env{ stateful = false }, Guard, {id, Attrib, "bool"}),
     ExpectedType = check_type(Env, arg_type(NameAttrib, What)),
     NewBody={typed, _, _, ResultType} = check_expr(NewEnv, Body, ExpectedType),
     NamedArgs = [],
@@ -1913,7 +1913,7 @@ infer_case(Env, Attrs, Pattern, Guard, ExprType, Branch, SwitchType) ->
         none ->
             {'case', Attrs, NewPattern, NewBranch};
         _ ->
-            NewGuard = check_expr(NewEnv, Guard, {id, Attrs, "bool"}),
+            NewGuard = check_expr(NewEnv#env{ stateful = false }, Guard, {id, Attrs, "bool"}),
             {'case', Attrs, NewPattern, NewGuard, NewBranch}
     end.
 
