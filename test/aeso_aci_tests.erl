@@ -33,7 +33,7 @@ test_cases(1) ->
 			    stateful => true,
                             payable  => true}]}},
     DecACI = <<"payable main contract C =\n"
-	       "  payable entrypoint a : (int) => int\n">>,
+	       "  payable stateful entrypoint a : (int) => int\n">>,
     {Contract,MapACI,DecACI};
 
 test_cases(2) ->

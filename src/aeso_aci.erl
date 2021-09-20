@@ -254,8 +254,8 @@ decode_contract(_) -> [].
 decode_funcs(Fs) -> [ decode_func(F) || F <- Fs ].
 
 %% decode_func(#{name := init}) -> [];
-decode_func(#{name := Name, payable := Payable, arguments := As, returns := T}) ->
-    ["  ", payable(Payable), "entrypoint ", io_lib:format("~s", [Name]), " : ",
+decode_func(#{name := Name, stateful:= Stateful, payable := Payable, arguments := As, returns := T}) ->
+    ["  ", payable(Payable), stateful(Stateful), "entrypoint ", io_lib:format("~s", [Name]), " : ",
      decode_args(As), " => ", decode_type(T), $\n].
 
 decode_args(As) ->
@@ -335,6 +335,9 @@ decode_tvar(#{name := N}) -> io_lib:format("~s", [N]).
 
 payable(true)  -> "payable ";
 payable(false) -> "".
+
+stateful(true)  -> "stateful ";
+stateful(false) -> "".
 
 %% #contract{Ann, Con, [Declarations]}.
 
