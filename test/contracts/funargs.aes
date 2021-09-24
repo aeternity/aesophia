@@ -50,3 +50,10 @@ contract FunctionArguments =
 
   entrypoint singleton_rec(r : singleton_r) =
     r.x
+
+  entrypoint aens_name(n : AENS.name) = true
+  entrypoint aens_pointee(p : AENS.pointee) = true
+
+  entrypoint chain_ga_meta_tx(tx : Chain.ga_meta_tx) = true
+  entrypoint chain_paying_for_tx(tx : Chain.paying_for_tx) = true
+  entrypoint chain_base_tx(tx : Chain.base_tx) = true

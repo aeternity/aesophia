@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Option.force_msg`
 - Loading namespaces into the current scope (e.g. `using Pair`)
 - Assign patterns to variables (e.g. `let x::(t = y::_) = [1, 2, 3, 4]` where `t == [2, 3, 4]`)
+- Add builtin types (`AENS.name, AENS.pointee, Chain.ttl, Chain.base_tx, Chain.ga_meta_tx, Chain.paying_for_tx`) to
+  the calldata and result decoder
 ### Changed
 - Fixed the ACI renderer, it shouldn't drop the `stateful` modifier
 ### Removed
