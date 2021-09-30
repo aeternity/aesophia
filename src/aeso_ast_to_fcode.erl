@@ -287,7 +287,7 @@ state_layout(Env) -> maps:get(state_layout, Env, {reg, 1}).
 -spec init_type_env() -> type_env().
 init_type_env() ->
     BaseTx = {variant, [[address, integer, string], [], [], [], [], [], [string],
-                        [hash], [hash], [address, hash], [address],
+                        [{bytes, 32}], [{bytes, 32}], [address, {bytes, 32}], [address],
                         [address, integer], [address, integer], [address],
                         [address], [address], [address], [address], [address],
                         [integer], [address, integer], []]},

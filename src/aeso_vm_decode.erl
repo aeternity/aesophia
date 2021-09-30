@@ -120,9 +120,97 @@ from_fate({constr_t, _, Con, Types}, Args)
         when length(Types) == length(Args) ->
     {app, [], Con, [ from_fate(Type, Arg)
                      || {Type, Arg} <- lists:zip(Types, Args) ]};
+from_fate({qid, _, QType}, Val) ->
+    from_fate_builtin(QType, Val);
 from_fate(_Type, _Data) ->
     throw(cannot_translate_to_sophia).
 
+
+from_fate_builtin(QType, Val) ->
+    Con = fun([Name | _] = Names) when is_list(Name) -> {qcon, [], Names};
+             (Name) -> {con, [], Name} end,
+    App = fun(Name, []) -> Con(Name);
+             (Name, Value) -> {app, [], Con(Name), Value} end,
+    Chk = fun(Type, Value) -> from_fate(Type, Value) end,
+    Int = {id, [], "int"},
+    Str = {id, [], "string"},
+    Adr = {id, [], "address"},
+    Hsh = {bytes_t, [], 32},
+    Qid = fun(Name) -> {qid, [], Name} end,
+    Map = fun(KT, VT) -> {app_t, [], {id, [], "map"}, [KT, VT]} end,
+    ChainTxArities = [3, 0, 0, 0, 0, 0, 1, 1, 1, 2, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2, 0],
+
+    case {QType, Val} of
+        {["Chain", "ttl"], {variant, [1, 1], 0, {X}}} -> App("RelativeTTL", [Chk(Int, X)]);
+        {["Chain", "ttl"], {variant, [1, 1], 1, {X}}} -> App("FixedTTL", [Chk(Int, X)]);
+
+        {["AENS", "name"], {variant, [3], 0, {Addr, TTL, Ptrs}}} ->
+            App(["AENS","Name"], [Chk(Adr, Addr), Chk(Qid(["Chain", "ttl"]), TTL),
+                              Chk(Map(Str, Qid(["AENS", "pointee"])), Ptrs)]);
+
+        {["AENS", "pointee"], {variant, [1, 1, 1, 1], 0, {Addr}}} ->
+            App(["AENS","AccountPt"], [Chk(Adr, Addr)]);
+        {["AENS", "pointee"], {variant, [1, 1, 1, 1], 1, {Addr}}} ->
+            App(["AENS","OraclePt"], [Chk(Adr, Addr)]);
+        {["AENS", "pointee"], {variant, [1, 1, 1, 1], 2, {Addr}}} ->
+            App(["AENS","ContractPt"], [Chk(Adr, Addr)]);
+        {["AENS", "pointee"], {variant, [1, 1, 1, 1], 3, {Addr}}} ->
+            App(["AENS","ChannelPt"], [Chk(Adr, Addr)]);
+
+        {["Chain", "ga_meta_tx"], {variant, [2], 0, {Addr, X}}} ->
+            App(["Chain","GAMetaTx"], [Chk(Adr, Addr), Chk(Int, X)]);
+
+        {["Chain", "paying_for_tx"], {variant, [2], 0, {Addr, X}}} ->
+            App(["Chain","PayingForTx"], [Chk(Adr, Addr), Chk(Int, X)]);
+
+        {["Chain", "base_tx"], {variant, ChainTxArities, 0, {Addr, Fee, Payload}}} ->
+            App(["Chain","SpendTx"], [Chk(Adr, Addr), Chk(Int, Fee), Chk(Str, Payload)]);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 1, {}}} ->
+            App(["Chain","OracleRegisterTx"], []);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 2, {}}} ->
+            App(["Chain","OracleQueryTx"], []);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 3, {}}} ->
+            App(["Chain","OracleResponseTx"], []);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 4, {}}} ->
+            App(["Chain","OracleExtendTx"], []);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 5, {}}} ->
+            App(["Chain","NamePreclaimTx"], []);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 6, {Name}}} ->
+            App(["Chain","NameClaimTx"], [Chk(Str, Name)]);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 7, {NameHash}}} ->
+            App(["Chain","NameUpdateTx"], [Chk(Hsh, NameHash)]);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 8, {NameHash}}} ->
+            App(["Chain","NameRevokeTx"], [Chk(Hsh, NameHash)]);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 9, {NewOwner, NameHash}}} ->
+            App(["Chain","NameTransferTx"], [Chk(Adr, NewOwner), Chk(Hsh, NameHash)]);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 10, {Addr}}} ->
+            App(["Chain","ChannelCreateTx"], [Chk(Adr, Addr)]);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 11, {Addr, Amount}}} ->
+            App(["Chain","ChannelDepositTx"], [Chk(Adr, Addr), Chk(Int, Amount)]);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 12, {Addr, Amount}}} ->
+            App(["Chain","ChannelWithdrawTx"], [Chk(Adr, Addr), Chk(Int, Amount)]);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 13, {Addr}}} ->
+            App(["Chain","ChannelForceProgressTx"], [Chk(Adr, Addr)]);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 14, {Addr}}} ->
+            App(["Chain","ChannelCloseMutualTx"], [Chk(Adr, Addr)]);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 15, {Addr}}} ->
+            App(["Chain","ChannelCloseSoloTx"], [Chk(Adr, Addr)]);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 16, {Addr}}} ->
+            App(["Chain","ChannelSlashTx"], [Chk(Adr, Addr)]);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 17, {Addr}}} ->
+            App(["Chain","ChannelSettleTx"], [Chk(Adr, Addr)]);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 18, {Addr}}} ->
+            App(["Chain","ChannelSnapshotSoloTx"], [Chk(Adr, Addr)]);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 19, {Amount}}} ->
+            App(["Chain","ContractCreateTx"], [Chk(Int, Amount)]);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 20, {Addr, Amount}}} ->
+            App(["Chain","ContractCallTx"], [Chk(Adr, Addr), Chk(Int, Amount)]);
+        {["Chain", "base_tx"], {variant, ChainTxArities, 21, {}}} ->
+            App(["Chain","GAAttachTx"], []);
+
+        _ ->
+            throw(cannot_translate_to_sophia)
+    end.
 
 make_bits(N) ->
     Id = fun(F) -> {qid, [], ["Bits", F]} end,
