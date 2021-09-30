@@ -1256,6 +1256,8 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li><code>Option.force_msg</code></li>
 <li>Loading namespaces into the current scope (e.g. <code>using Pair</code>)</li>
 <li>Assign patterns to variables (e.g. <code>let x::(t = y::_) = [1, 2, 3, 4]</code> where <code>t == [2, 3, 4]</code>)</li>
+<li>Add builtin types (<code>AENS.name, AENS.pointee, Chain.ttl, Chain.base_tx, Chain.ga_meta_tx, Chain.paying_for_tx</code>) to
+  the calldata and result decoder</li>
 </ul>
 <h3 id="changed">Changed</h3>
 <ul>
