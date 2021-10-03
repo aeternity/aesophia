@@ -662,8 +662,8 @@ expr_to_fcode(Env, _Type, {list_comp, As, Yield, [{comprehension_bind, Pat = {ty
     Arg  = fresh_name(),
     Env1 = bind_var(Env, Arg),
     Bind = {lam, [Arg], expr_to_fcode(Env1, {switch, As, {typed, As, {id, As, Arg}, PatType},
-                                                [{'case', As, Pat, {list_comp, As, Yield, Rest}},
-                                                 {'case', As, {id, As, "_"}, {list, As, []}}]})},
+                                                [{'case', As, Pat, [], [{list_comp, As, Yield, Rest}]},
+                                                 {'case', As, {id, As, "_"}, [], [{list, As, []}]}]})},
     {def_u, FlatMap, _} = resolve_fun(Env, ["ListInternal", "flat_map"]),
     {def, FlatMap, [Bind, expr_to_fcode(Env, BindExpr)]};
 expr_to_fcode(Env, Type, {list_comp, As, Yield, [{comprehension_if, _, Cond}|Rest]}) ->
@@ -888,17 +888,21 @@ alts_to_fcode(Env, Type, X, Alts, Switch) ->
 
 remove_guards(_Env, [], _Switch) ->
     [];
-remove_guards(Env, [Alt = {'case', _, _, _} | Rest], Switch) ->
+remove_guards(Env, [Alt = {'case', _, _, [], [_Expr]} | Rest], Switch) ->
     [alt_to_fcode(Env, Alt) | remove_guards(Env, Rest, Switch)];
-remove_guards(Env, [{'case', _, Pat, Guard, Body} | Rest], {switch, Ann, Expr, _}) ->
-    FPat  = pat_to_fcode(Env, Pat),
+remove_guards(Env, [{'case', AnnC, Pat, [Guard | Guards], [Body | Bodies]} | Rest], {switch, Ann, Expr, _}) ->
+    FPat = pat_to_fcode(Env, Pat),
     FGuard = expr_to_fcode(bind_vars(Env, pat_vars(FPat)), Guard),
     FBody = expr_to_fcode(bind_vars(Env, pat_vars(FPat)), Body),
-    case Rest of
+    R = case {Guards, Bodies} of
+            {[], []} -> Rest;
+            _        -> [{'case', AnnC, Pat, Guards, Bodies} | Rest]
+        end,
+    case R of
         [] ->
             [{'case', [FPat], make_if_no_else(FGuard, FBody)}];
         _ ->
-            FSwitch = expr_to_fcode(Env, {switch, Ann, Expr, Rest}),
+            FSwitch = expr_to_fcode(Env, {switch, Ann, Expr, R}),
             [{'case', [FPat], make_if(FGuard, FBody, FSwitch)}]
     end.
 
@@ -1028,7 +1032,7 @@ next_split(Pats) ->
     end.
 
 -spec alt_to_fcode(env(), aeso_syntax:alt()) -> falt().
-alt_to_fcode(Env, {'case', _, Pat, Expr}) ->
+alt_to_fcode(Env, {'case', _, Pat, _, [Expr]}) ->
     FPat  = pat_to_fcode(Env, Pat),
     FExpr = expr_to_fcode(bind_vars(Env, pat_vars(FPat)), Expr),
     {'case', [FPat], FExpr}.
@@ -1106,7 +1110,7 @@ decision_tree_to_fcode({'if', A, Then, Else}) ->
 stmts_to_fcode(Env, [{letval, _, {typed, _, {id, _, X}, _}, Expr} | Stmts]) ->
     {'let', X, expr_to_fcode(Env, Expr), stmts_to_fcode(bind_var(Env, X), Stmts)};
 stmts_to_fcode(Env, [{letval, Ann, Pat, Expr} | Stmts]) ->
-    expr_to_fcode(Env, {switch, Ann, Expr, [{'case', Ann, Pat, {block, Ann, Stmts}}]});
+    expr_to_fcode(Env, {switch, Ann, Expr, [{'case', Ann, Pat, [], [{block, Ann, Stmts}]}]});
 stmts_to_fcode(Env, [{letfun, Ann, {id, _, X}, Args, _Type, Expr} | Stmts]) ->
     LamArgs = [ case Arg of
                     {typed, Ann1, Id, T} -> {arg, Ann1, Id, T};

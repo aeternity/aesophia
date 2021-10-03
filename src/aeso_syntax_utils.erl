@@ -41,15 +41,16 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
     Top = Fun(K, X),
     Rec = case X of
             %% lists (bound things in head scope over tail)
-            [A | As]                 -> Scoped(Same(A), Same(As));
+            [A | As]                      -> Scoped(Same(A), Same(As));
             %% decl()
-            {contract, _, _, Ds}     -> Decl(Ds);
-            {namespace, _, _, Ds}    -> Decl(Ds);
-            {type_def, _, I, _, D}   -> Plus(BindType(I), Decl(D));
-            {fun_decl, _, _, T}      -> Type(T);
-            {letval, _, P, E}        -> Scoped(BindExpr(P), Expr(E));
-            {letfun, _, F, Xs, T, E} -> Sum([BindExpr(F), Type(T), Expr(Xs ++ [E])]);
-            {fun_clauses, _, _, T, Cs} -> Sum([Type(T) | [Decl(C) || C <- Cs]]);
+            {contract, _, _, Ds}          -> Decl(Ds);
+            {namespace, _, _, Ds}         -> Decl(Ds);
+            {type_def, _, I, _, D}        -> Plus(BindType(I), Decl(D));
+            {fun_decl, _, _, T}           -> Type(T);
+            {letval, _, P, E}             -> Scoped(BindExpr(P), Expr(E));
+            {letfun, _, F, Xs, T, E}      -> Sum([BindExpr(F), Type(T), Expr(Xs ++ [E])]);
+            {letfun, _, F, Xs, T, Gs, Es} -> Sum([BindExpr(F), Type(T), Expr(Xs ++ Gs ++ Es)]);
+            {fun_clauses, _, _, T, Cs}    -> Sum([Type(T) | [Decl(C) || C <- Cs]]);
             %% typedef()
             {alias_t, T}    -> Type(T);
             {record_t, Fs}  -> Type(Fs);
@@ -78,7 +79,7 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
                 Plus(Expr(E), Expr({list_comp, A, Y, R}));
             {list_comp, A, Y, [D = {letval, _, Pat, _} | R]} ->
                 Plus(Decl(D), Scoped(BindExpr(Pat), Expr({list_comp, A, Y, R})));
-            {list_comp, A, Y, [D = {letfun, _, F, _, _, _} | R]} ->
+            {list_comp, A, Y, [D = {letfun, _, F, _, _, _, _} | R]} ->
                 Plus(Decl(D), Scoped(BindExpr(F), Expr({list_comp, A, Y, R})));
             {typed, _, E, T}       -> Plus(Expr(E), Type(T));
             {record, _, Fs}        -> Expr(Fs);
@@ -95,7 +96,7 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
             %% arg()
             {arg, _, Y, T} -> Plus(BindExpr(Y), Type(T));
             %% alt()
-            {'case', _, P, E} -> Scoped(BindExpr(P), Expr(E));
+            {'case', _, P, Gs, Es} -> Scoped(BindExpr(P), Expr(Gs ++ Es));
             %% elim()
             {proj, _, _}    -> Zero;
             {map_get, _, E} -> Expr(E);

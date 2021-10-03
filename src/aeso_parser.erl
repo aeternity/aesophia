@@ -215,14 +215,19 @@ fundef() -> choice(unguarded_fundef(), guarded_fundef()).
 
 unguarded_fundef() ->
     choice(
-    [ ?RULE(id(), args(),                   tok('='), body(), {letfun, get_ann(_1), _1, _2, type_wildcard(get_ann(_1)), _4})
-    , ?RULE(id(), args(), tok(':'), type(), tok('='), body(), {letfun, get_ann(_1), _1, _2, _4, _6})
+    [ ?RULE(id(), args(),                   tok('='), body(), {letfun, get_ann(_1), _1, _2, type_wildcard(get_ann(_1)), [], [_4]})
+    , ?RULE(id(), args(), tok(':'), type(), tok('='), body(), {letfun, get_ann(_1), _1, _2, _4, [], [_6]})
     ]).
 
+fundef_guard() ->
+    ?RULE(tok('|'), expr(), tok('='), body(), {_2, _4}).
+
 guarded_fundef() ->
+    GetGuards = fun(Xs) -> lists:map(fun({Guard, _}) -> Guard end, Xs) end,
+    GetBodies = fun(Xs) -> lists:map(fun({_, Body}) -> Body end, Xs) end,
     choice(
-    [ ?RULE(id(), args(),                   tok('|'), expr(), tok('='), body(), {letfun, get_ann(_1), _1, _2, type_wildcard(get_ann(_1)), _4, _6})
-    , ?RULE(id(), args(), tok(':'), type(), tok('|'), expr(), tok('='), body(), {letfun, get_ann(_1), _1, _2, _4, _6, _8})
+    [ ?RULE(id(), args(),                   maybe_block(fundef_guard()), {letfun, get_ann(_1), _1, _2, type_wildcard(get_ann(_1)), GetGuards(_3), GetBodies(_3)})
+    , ?RULE(id(), args(), tok(':'), type(), maybe_block(fundef_guard()), {letfun, get_ann(_1), _1, _2, _4, GetGuards(_5), GetBodies(_5)})
     ]).
 
 args() -> paren_list(pattern()).
@@ -293,10 +298,16 @@ stmt() ->
 branch() -> choice(unguarded_branch(), guarded_branch()).
 
 unguarded_branch() ->
-    ?RULE(pattern(), keyword('=>'), body(), {'case', _2, _1, _3}).
+    ?RULE(pattern(), keyword('=>'), body(), {'case', _2, _1, [], [_3]}).
+
+branch_guard() ->
+    ?RULE(tok('|'), expr(), keyword('=>'), body(), {_3, _2, _4}).
 
 guarded_branch() ->
-    ?RULE(pattern(), tok('|'), expr(), keyword('=>'), body(), {'case', _4, _1, _3, _5}).
+    GetFirstAnn = fun([{Ann, _, _} | _]) -> Ann end,
+    GetGuards = fun(Xs) -> lists:map(fun({_, Guard, _}) -> Guard end, Xs) end,
+    GetBodies = fun(Xs) -> lists:map(fun({_, _, Body}) -> Body end, Xs) end,
+    ?RULE(pattern(), maybe_block(branch_guard()), {'case', GetFirstAnn(_2), _1, GetGuards(_2), GetBodies(_2)}).
 
 pattern() ->
     ?LET_P(E, expr(), parse_pattern(E)).
