@@ -48,7 +48,6 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
             {type_def, _, I, _, D}        -> Plus(BindType(I), Decl(D));
             {fun_decl, _, _, T}           -> Type(T);
             {letval, _, P, E}             -> Scoped(BindExpr(P), Expr(E));
-            {letfun, _, F, Xs, T, E}      -> Sum([BindExpr(F), Type(T), Expr(Xs ++ [E])]);
             {letfun, _, F, Xs, T, Gs, Es} -> Sum([BindExpr(F), Type(T), Expr(Xs ++ Gs ++ Es)]);
             {fun_clauses, _, _, T, Cs}    -> Sum([Type(T) | [Decl(C) || C <- Cs]]);
             %% typedef()

@@ -115,7 +115,7 @@ encode_contract(Namespace = {namespace, _, {con, _, Name}, _}) ->
 
 %%  Encode a function definition. Currently we are only interested in
 %%  the interface and type.
-encode_function(FDef = {letfun, _, {id, _, Name}, Args, Type, _}) ->
+encode_function(FDef = {letfun, _, {id, _, Name}, Args, Type, _, _}) ->
     #{name      => encode_name(Name),
       arguments => encode_args(Args),
       returns   => encode_type(Type),
@@ -347,9 +347,9 @@ contract_funcs({C, _, _, Decls}) when ?IS_CONTRACT_HEAD(C); C == namespace ->
 contract_types({C, _, _, Decls}) when ?IS_CONTRACT_HEAD(C); C == namespace ->
     [ D || D <- Decls, is_type(D) ].
 
-is_fun({letfun, _, _, _, _, _}) -> true;
-is_fun({fun_decl, _, _, _})     -> true;
-is_fun(_)                       -> false.
+is_fun({letfun, _, _, _, _, _, _}) -> true;
+is_fun({fun_decl, _, _, _})        -> true;
+is_fun(_)                          -> false.
 
 is_type({type_def, _, _, _, _}) -> true;
 is_type(_)                      -> false.

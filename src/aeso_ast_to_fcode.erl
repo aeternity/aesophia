@@ -385,7 +385,7 @@ decl_to_fcode(Env = #{context := {contract_def, _}}, {fun_decl, _, Id, _}) ->
 decl_to_fcode(Env, {fun_decl, _, _, _})  -> Env;
 decl_to_fcode(Env, {type_def, _Ann, Name, Args, Def}) ->
     typedef_to_fcode(Env, Name, Args, Def);
-decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, Id = {id, _, Name}, Args, Ret, Body}) ->
+decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, Id = {id, _, Name}, Args, Ret, [], [Body]}) ->
     Attrs = get_attributes(Ann),
     FName = lookup_fun(Env, qname(Env, Name)),
     FArgs = args_to_fcode(Env, Args),
@@ -673,7 +673,7 @@ expr_to_fcode(Env, Type, {list_comp, As, Yield, [{comprehension_if, _, Cond}|Res
            );
 expr_to_fcode(Env, Type, {list_comp, As, Yield, [LV = {letval, _, _, _}|Rest]}) ->
     expr_to_fcode(Env, Type, {block, As, [LV, {list_comp, As, Yield, Rest}]});
-expr_to_fcode(Env, Type, {list_comp, As, Yield, [LF = {letfun, _, _, _, _, _}|Rest]}) ->
+expr_to_fcode(Env, Type, {list_comp, As, Yield, [LF = {letfun, _, _, _, _, _, _}|Rest]}) ->
     expr_to_fcode(Env, Type, {block, As, [LF, {list_comp, As, Yield, Rest}]});
 
 %% Conditionals
@@ -1111,7 +1111,7 @@ stmts_to_fcode(Env, [{letval, _, {typed, _, {id, _, X}, _}, Expr} | Stmts]) ->
     {'let', X, expr_to_fcode(Env, Expr), stmts_to_fcode(bind_var(Env, X), Stmts)};
 stmts_to_fcode(Env, [{letval, Ann, Pat, Expr} | Stmts]) ->
     expr_to_fcode(Env, {switch, Ann, Expr, [{'case', Ann, Pat, [], [{block, Ann, Stmts}]}]});
-stmts_to_fcode(Env, [{letfun, Ann, {id, _, X}, Args, _Type, Expr} | Stmts]) ->
+stmts_to_fcode(Env, [{letfun, Ann, {id, _, X}, Args, _Type, [], [Expr]} | Stmts]) ->
     LamArgs = [ case Arg of
                     {typed, Ann1, Id, T} -> {arg, Ann1, Id, T};
                     _ -> internal_error({bad_arg, Arg})   %% pattern matching has been desugared
@@ -1706,7 +1706,7 @@ add_child_con(Env = #{child_con_env := CEnv}, Name, Fcode) ->
 -spec add_fun_env(env(), [aeso_syntax:decl()]) -> env().
 add_fun_env(Env = #{ context := {abstract_contract, _} }, _) -> Env;  %% no functions from abstract contracts
 add_fun_env(Env = #{ fun_env := FunEnv }, Decls) ->
-    Entry = fun({letfun, Ann, {id, _, Name}, Args, _, _}) ->
+    Entry = fun({letfun, Ann, {id, _, Name}, Args, _, _, _}) ->
                 [{qname(Env, Name), {make_fun_name(Env, Ann, Name), length(Args)}}];
                ({fun_decl, Ann, {id, _, Name}, {fun_t, _, _, ArgTypes, _}}) ->
                 [{qname(Env, Name), {make_fun_name(Env, Ann, Name), length(ArgTypes)}}];

@@ -285,7 +285,7 @@ bind_contract({Contract, Ann, Id, Contents}, Env)
            contract_call_type(
              {fun_t, AnnF, [], [ArgT || {typed, _, _, ArgT} <- Args], RetT})
           }
-          || {letfun, AnnF, Entrypoint = {id, _, Name}, Args, _Type, {typed, _, _, RetT}} <- Contents,
+          || {letfun, AnnF, Entrypoint = {id, _, Name}, Args, _Type, [], [{typed, _, _, RetT}]} <- Contents,
              Name =/= "init"
         ] ++
         %% Predefined fields
@@ -293,7 +293,7 @@ bind_contract({Contract, Ann, Id, Contents}, Env)
         [ {field_t, Sys, {id, Sys, ?CONSTRUCTOR_MOCK_NAME},
            contract_call_type(
              case [ [ArgT || {typed, _, _, ArgT} <- Args]
-                    || {letfun, AnnF, {id, _, "init"}, Args, _, _} <- Contents,
+                    || {letfun, AnnF, {id, _, "init"}, Args, _, _, _} <- Contents,
                        aeso_syntax:get_ann(entrypoint, AnnF, false)]
                  ++ [ Args
                       || {fun_decl, AnnF, {id, _, "init"}, {fun_t, _, _, Args, _}} <- Contents,
@@ -1376,9 +1376,7 @@ desugar_clauses(Ann, Fun, {type_sig, _, _, _, ArgTypes, RetType}, Clauses) ->
             _                             -> true
         end,
     case NeedDesugar of
-        false ->
-            [{letfun, AnnF, FunF, Args, RetTypeF, [], [Expr]}] = Clauses,
-            {letfun, AnnF, FunF, Args, RetTypeF, Expr};
+        false -> [Clause] = Clauses, Clause;
         true  ->
             NoAnn = [{origin, system}],
             Args = [ {typed, NoAnn, {id, NoAnn, "x#" ++ integer_to_list(I)}, Type}
@@ -1386,11 +1384,11 @@ desugar_clauses(Ann, Fun, {type_sig, _, _, _, ArgTypes, RetType}, Clauses) ->
             Tuple = fun([X]) -> X;
                        (As) -> {typed, NoAnn, {tuple, NoAnn, As}, {tuple_t, NoAnn, ArgTypes}}
                     end,
-            {letfun, Ann, Fun, Args, RetType,
-             {typed, NoAnn,
-              {switch, NoAnn, Tuple(Args),
-                [ {'case', AnnC, Tuple(ArgsC), Guards, Bodies}
-                || {letfun, AnnC, _, ArgsC, _, Guards, Bodies} <- Clauses ]}, RetType}}
+            {letfun, Ann, Fun, Args, RetType, [],
+             [{typed, NoAnn,
+               {switch, NoAnn, Tuple(Args),
+                 [ {'case', AnnC, Tuple(ArgsC), Guards, Bodies}
+                 || {letfun, AnnC, _, ArgsC, _, Guards, Bodies} <- Clauses ]}, RetType}]}
     end.
 
 print_typesig({Name, TypeSig}) ->
@@ -1458,7 +1456,7 @@ check_state_dependencies(Env, Defs) ->
     SetState  = Top ++ ["put"],
     Init      = Top ++ ["init"],
     UsedNames = fun(X) -> [{Xs, Ann} || {{term, Xs}, Ann} <- aeso_syntax_utils:used(X)] end,
-    Funs      = [ {Top ++ [Name], Fun} || Fun = {letfun, _, {id, _, Name}, _Args, _Type, _Body} <- Defs ],
+    Funs      = [ {Top ++ [Name], Fun} || Fun = {letfun, _, {id, _, Name}, _Args, _Type, [], _Bodies} <- Defs ],
     Deps      = maps:from_list([{Name, UsedNames(Def)} || {Name, Def} <- Funs]),
     case maps:get(Init, Deps, false) of
         false -> ok;    %% No init, so nothing to check
@@ -2435,8 +2433,8 @@ unfold_types(Env, {type_def, Ann, Name, Args, Def}, Options) ->
     {type_def, Ann, Name, Args, unfold_types_in_type(Env, Def, Options)};
 unfold_types(Env, {fun_decl, Ann, Name, Type}, Options) ->
     {fun_decl, Ann, Name, unfold_types(Env, Type, Options)};
-unfold_types(Env, {letfun, Ann, Name, Args, Type, Body}, Options) ->
-    {letfun, Ann, Name, unfold_types(Env, Args, Options), unfold_types_in_type(Env, Type, Options), unfold_types(Env, Body, Options)};
+unfold_types(Env, {letfun, Ann, Name, Args, Type, [], [Body]}, Options) ->
+    {letfun, Ann, Name, unfold_types(Env, Args, Options), unfold_types_in_type(Env, Type, Options), [], [unfold_types(Env, Body, Options)]};
 unfold_types(Env, T, Options) when is_tuple(T) ->
     list_to_tuple(unfold_types(Env, tuple_to_list(T), Options));
 unfold_types(Env, [H|T], Options) ->
