@@ -485,7 +485,7 @@ function g(p : int * option(int)) : int =
 ```
 
 Guards are boolean expressions that can be used on patterns in both switch
-statements and functions definitions. If a guard expression evalutaes to
+statements and functions definitions. If a guard expression evaluates to
 `true`, then the corresponding body will be used. Otherwise, the next pattern
 will be checked:
 
