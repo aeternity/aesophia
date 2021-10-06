@@ -385,7 +385,7 @@ decl_to_fcode(Env = #{context := {contract_def, _}}, {fun_decl, _, Id, _}) ->
 decl_to_fcode(Env, {fun_decl, _, _, _})  -> Env;
 decl_to_fcode(Env, {type_def, _Ann, Name, Args, Def}) ->
     typedef_to_fcode(Env, Name, Args, Def);
-decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, Id = {id, _, Name}, Args, Ret, [], [Body]}) ->
+decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, Id = {id, _, Name}, Args, Ret, [{guarded, _, [], Body}]}) ->
     Attrs = get_attributes(Ann),
     FName = lookup_fun(Env, qname(Env, Name)),
     FArgs = args_to_fcode(Env, Args),
@@ -662,8 +662,8 @@ expr_to_fcode(Env, _Type, {list_comp, As, Yield, [{comprehension_bind, Pat = {ty
     Arg  = fresh_name(),
     Env1 = bind_var(Env, Arg),
     Bind = {lam, [Arg], expr_to_fcode(Env1, {switch, As, {typed, As, {id, As, Arg}, PatType},
-                                                [{'case', As, Pat, [], [{list_comp, As, Yield, Rest}]},
-                                                 {'case', As, {id, As, "_"}, [], [{list, As, []}]}]})},
+                                                [{'case', As, Pat, [{guarded, As, [], {list_comp, As, Yield, Rest}}]},
+                                                 {'case', As, {id, As, "_"}, [{guarded, As, [], {list, As, []}}]}]})},
     {def_u, FlatMap, _} = resolve_fun(Env, ["ListInternal", "flat_map"]),
     {def, FlatMap, [Bind, expr_to_fcode(Env, BindExpr)]};
 expr_to_fcode(Env, Type, {list_comp, As, Yield, [{comprehension_if, _, Cond}|Rest]}) ->
@@ -673,7 +673,7 @@ expr_to_fcode(Env, Type, {list_comp, As, Yield, [{comprehension_if, _, Cond}|Res
            );
 expr_to_fcode(Env, Type, {list_comp, As, Yield, [LV = {letval, _, _, _}|Rest]}) ->
     expr_to_fcode(Env, Type, {block, As, [LV, {list_comp, As, Yield, Rest}]});
-expr_to_fcode(Env, Type, {list_comp, As, Yield, [LF = {letfun, _, _, _, _, _, _}|Rest]}) ->
+expr_to_fcode(Env, Type, {list_comp, As, Yield, [LF = {letfun, _, _, _, _, _}|Rest]}) ->
     expr_to_fcode(Env, Type, {block, As, [LF, {list_comp, As, Yield, Rest}]});
 
 %% Conditionals
@@ -888,15 +888,18 @@ alts_to_fcode(Env, Type, X, Alts, Switch) ->
 
 remove_guards(_Env, [], _Switch) ->
     [];
-remove_guards(Env, [Alt = {'case', _, _, [], [_Expr]} | Rest], Switch) ->
+remove_guards(Env, [Alt = {'case', _, _, [{guarded, _, [], _Expr}]} | Rest], Switch) ->
     [alt_to_fcode(Env, Alt) | remove_guards(Env, Rest, Switch)];
-remove_guards(Env, [{'case', AnnC, Pat, [Guard | Guards], [Body | Bodies]} | Rest], {switch, Ann, Expr, _}) ->
+remove_guards(Env, [{'case', AnnC, Pat, [{guarded, AnnG, [Guard | Guards], Body} | GuardedBodies]} | Rest], {switch, Ann, Expr, _}) ->
     FPat = pat_to_fcode(Env, Pat),
     FGuard = expr_to_fcode(bind_vars(Env, pat_vars(FPat)), Guard),
     FBody = expr_to_fcode(bind_vars(Env, pat_vars(FPat)), Body),
-    R = case {Guards, Bodies} of
-            {[], []} -> Rest;
-            _        -> [{'case', AnnC, Pat, Guards, Bodies} | Rest]
+    R = case Guards of
+            [] -> case GuardedBodies of
+                      [] -> Rest;
+                      _  -> [{'case', AnnC, Pat, GuardedBodies} | Rest]
+                  end;
+            _  -> [{'case', AnnC, Pat, [{guarded, AnnG, Guards, Body} | GuardedBodies]} | Rest]
         end,
     case R of
         [] ->
@@ -1032,7 +1035,7 @@ next_split(Pats) ->
     end.
 
 -spec alt_to_fcode(env(), aeso_syntax:alt()) -> falt().
-alt_to_fcode(Env, {'case', _, Pat, _, [Expr]}) ->
+alt_to_fcode(Env, {'case', _, Pat, [{guarded, _, [], Expr}]}) ->
     FPat  = pat_to_fcode(Env, Pat),
     FExpr = expr_to_fcode(bind_vars(Env, pat_vars(FPat)), Expr),
     {'case', [FPat], FExpr}.
@@ -1110,8 +1113,8 @@ decision_tree_to_fcode({'if', A, Then, Else}) ->
 stmts_to_fcode(Env, [{letval, _, {typed, _, {id, _, X}, _}, Expr} | Stmts]) ->
     {'let', X, expr_to_fcode(Env, Expr), stmts_to_fcode(bind_var(Env, X), Stmts)};
 stmts_to_fcode(Env, [{letval, Ann, Pat, Expr} | Stmts]) ->
-    expr_to_fcode(Env, {switch, Ann, Expr, [{'case', Ann, Pat, [], [{block, Ann, Stmts}]}]});
-stmts_to_fcode(Env, [{letfun, Ann, {id, _, X}, Args, _Type, [], [Expr]} | Stmts]) ->
+    expr_to_fcode(Env, {switch, Ann, Expr, [{'case', Ann, Pat, [{guarded, Ann, [], {block, Ann, Stmts}}]}]});
+stmts_to_fcode(Env, [{letfun, Ann, {id, _, X}, Args, _Type, [{guarded, _, [], Expr}]} | Stmts]) ->
     LamArgs = [ case Arg of
                     {typed, Ann1, Id, T} -> {arg, Ann1, Id, T};
                     _ -> internal_error({bad_arg, Arg})   %% pattern matching has been desugared
@@ -1706,7 +1709,7 @@ add_child_con(Env = #{child_con_env := CEnv}, Name, Fcode) ->
 -spec add_fun_env(env(), [aeso_syntax:decl()]) -> env().
 add_fun_env(Env = #{ context := {abstract_contract, _} }, _) -> Env;  %% no functions from abstract contracts
 add_fun_env(Env = #{ fun_env := FunEnv }, Decls) ->
-    Entry = fun({letfun, Ann, {id, _, Name}, Args, _, _, _}) ->
+    Entry = fun({letfun, Ann, {id, _, Name}, Args, _, _}) ->
                 [{qname(Env, Name), {make_fun_name(Env, Ann, Name), length(Args)}}];
                ({fun_decl, Ann, {id, _, Name}, {fun_t, _, _, ArgTypes, _}}) ->
                 [{qname(Env, Name), {make_fun_name(Env, Ann, Name), length(ArgTypes)}}];

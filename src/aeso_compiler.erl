@@ -474,10 +474,10 @@ error_missing_call_function() ->
 
 get_call_type([{Contract, _, _, Defs}]) when ?IS_CONTRACT_HEAD(Contract) ->
     case [ {lists:last(QFunName), FunType}
-          || {letfun, _, {id, _, ?CALL_NAME}, [], _Ret, [],
-                [{typed, _,
+          || {letfun, _, {id, _, ?CALL_NAME}, [], _Ret,
+                [{guarded, _, [], {typed, _,
                      {app, _,
-                         {typed, _, {qid, _, QFunName}, FunType}, _}, _}]} <- Defs ] of
+                         {typed, _, {qid, _, QFunName}, FunType}, _}, _}}]} <- Defs ] of
         [Call] -> {ok, Call};
         []     -> error_missing_call_function()
     end;
@@ -487,7 +487,7 @@ get_call_type([_ | Contracts]) ->
 
 -dialyzer({nowarn_function, get_decode_type/2}).
 get_decode_type(FunName, [{Contract, Ann, _, Defs}]) when ?IS_CONTRACT_HEAD(Contract) ->
-    GetType = fun({letfun, _, {id, _, Name}, Args, Ret, _, _})            when Name == FunName -> [{Args, Ret}];
+    GetType = fun({letfun, _, {id, _, Name}, Args, Ret, _})               when Name == FunName -> [{Args, Ret}];
                  ({fun_decl, _, {id, _, Name}, {fun_t, _, _, Args, Ret}}) when Name == FunName -> [{Args, Ret}];
                  (_) -> [] end,
     case lists:flatmap(GetType, Defs) of

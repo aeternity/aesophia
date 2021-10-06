@@ -56,8 +56,11 @@
 
 -type pragma() :: {compiler, '==' | '<' | '>' | '=<' | '>=', compiler_version()}.
 
+-type guard() :: expr().
+-type guarded_expr() :: {guarded, ann(), [guard()], expr()}.
+
 -type letval()  :: {letval, ann(), pat(), expr()}.
--type letfun()  :: {letfun, ann(), id(), [pat()], type(), [expr()], [expr()]}.
+-type letfun()  :: {letfun, ann(), id(), [pat()], type(), [guarded_expr(),...]}.
 -type letpat()  :: {letpat, ann(), id(), pat()}.
 -type fundecl() :: {fun_decl, ann(), id(), type()}.
 
@@ -145,7 +148,7 @@
 -type stmt() :: letbind()
               | expr().
 
--type alt() :: {'case', ann(), pat(), [expr()], [expr()]}.
+-type alt() :: {'case', ann(), pat(), [guarded_expr(),...]}.
 
 -type lvalue() :: nonempty_list(elim()).
 

@@ -16,8 +16,8 @@ simple_contracts_test_() ->
                    "  function id(x) = x\n",
             ?assertMatch(
                 [{contract_main, _, {con, _, "Identity"},
-                    [{letfun, _, {id, _, "id"}, [{id, _, "x"}], {id, _, "_"}, [],
-                        [{id, _, "x"}]}]}], parse_string(Text)),
+                    [{letfun, _, {id, _, "id"}, [{id, _, "x"}], {id, _, "_"},
+                        [{guarded, _, [], {id, _, "x"}}]}]}], parse_string(Text)),
             ok
        end},
       {"Operator precedence test.",

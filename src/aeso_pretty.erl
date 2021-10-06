@@ -173,7 +173,7 @@ decl({fun_decl, Ann, F, T}) ->
             false -> text("function")
           end,
     hsep(lists:map(Mod, Ann) ++ [Fun, typed(name(F), T)]);
-decl(D = {letfun, Attrs, _, _, _, _, _}) ->
+decl(D = {letfun, Attrs, _, _, _, _}) ->
     Mod = fun({Mod, true}) when Mod == private; Mod == stateful; Mod == payable ->
                             text(atom_to_list(Mod));
              (_) -> empty() end,
@@ -212,7 +212,7 @@ name({typed, _, Name, _}) -> name(Name).
 -spec letdecl(string(), aeso_syntax:letbind()) -> doc().
 letdecl(Let, {letval, _, P, E}) ->
     block_expr(0, hsep([text(Let), expr(P), text("=")]), E);
-letdecl(Let, {letfun, _, F, Args, T, _, [E | _]}) ->
+letdecl(Let, {letfun, _, F, Args, T, [{guarded, _, _Guards, E} | _]}) ->
     block_expr(0, hsep([text(Let), typed(beside(name(F), expr({tuple, [], Args})), T), text("=")]), E).
 
 -spec args([aeso_syntax:arg()]) -> doc().
@@ -482,7 +482,7 @@ elim1(Proj={proj, _, _})      -> beside(text("."), elim(Proj));
 elim1(Get={map_get, _, _})    -> elim(Get);
 elim1(Get={map_get, _, _, _}) -> elim(Get).
 
-alt({'case', _, Pat, _, [Body | _]}) ->
+alt({'case', _, Pat, [{guarded, _, _Guards, Body} | _]}) ->
     block_expr(0, hsep(expr(Pat), text("=>")), Body).
 
 block_expr(_, Header, {block, _, Ss}) ->
@@ -494,7 +494,7 @@ statements(Stmts) ->
     above([ statement(S) || S <- Stmts ]).
 
 statement(S = {letval, _, _, _})       -> letdecl("let", S);
-statement(S = {letfun, _, _, _, _, _, _}) -> letdecl("let", S);
+statement(S = {letfun, _, _, _, _, _}) -> letdecl("let", S);
 statement(E) -> expr(E).
 
 get_elifs(Expr) -> get_elifs(Expr, []).
