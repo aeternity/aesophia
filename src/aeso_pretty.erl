@@ -212,8 +212,10 @@ name({typed, _, Name, _}) -> name(Name).
 -spec letdecl(string(), aeso_syntax:letbind()) -> doc().
 letdecl(Let, {letval, _, P, E}) ->
     block_expr(0, hsep([text(Let), expr(P), text("=")]), E);
-letdecl(Let, {letfun, _, F, Args, T, [{guarded, _, _Guards, E} | _]}) ->
-    block_expr(0, hsep([text(Let), typed(beside(name(F), expr({tuple, [], Args})), T), text("=")]), E).
+letdecl(Let, {letfun, _, F, Args, T, [GuardedBody]}) ->
+    beside(hsep([text(Let), typed(beside(name(F), expr({tuple, [], Args})), T)]), guarded_body(GuardedBody, "="));
+letdecl(Let, {letfun, _, F, Args, T, GuardedBodies}) ->
+    block(hsep([text(Let), typed(beside(name(F), expr({tuple, [], Args})), T)]), above(lists:map(fun(GB) -> guarded_body(GB, "=") end, GuardedBodies))).
 
 -spec args([aeso_syntax:arg()]) -> doc().
 args(Args) ->
@@ -482,8 +484,18 @@ elim1(Proj={proj, _, _})      -> beside(text("."), elim(Proj));
 elim1(Get={map_get, _, _})    -> elim(Get);
 elim1(Get={map_get, _, _, _}) -> elim(Get).
 
-alt({'case', _, Pat, [{guarded, _, _Guards, Body} | _]}) ->
-    block_expr(0, hsep(expr(Pat), text("=>")), Body).
+alt({'case', _, Pat, [GuardedBody]}) ->
+    beside(expr(Pat), guarded_body(GuardedBody, "=>"));
+alt({'case', _, Pat, GuardedBodies}) ->
+    block(expr(Pat), above(lists:map(fun(GB) -> guarded_body(GB, "=>") end, GuardedBodies))).
+
+guarded_body({guarded, _, Guards, Body}, Then) ->
+    block_expr(0, hsep(guards(Guards), text(Then)), Body).
+
+guards([]) ->
+    text("");
+guards(Guards) ->
+    hsep([text(" |"), par(punctuate(text(","), lists:map(fun expr/1, Guards)), 0)]).
 
 block_expr(_, Header, {block, _, Ss}) ->
     block(Header, statements(Ss));
