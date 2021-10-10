@@ -6,10 +6,14 @@ contract C =
   entrypoint init() = f([1, 2, 3, 4])
 
   function
-    f(x::[]) = 1
+    f(x::[])
+      | x > 1, x < 10 = 1
+      | x < 1 = 9
     f(x::y::[]) = 2
     f(x::y::z) = switch(z)
       [] => 4
-      a::[] | a > 10 => 5
+      a::[]
+        | a > 10, a < 20 => 5
+        | a > 5 => 8
       b | List.length(b) > 5 => 6
       c => 7

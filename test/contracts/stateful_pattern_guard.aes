@@ -1,5 +1,3 @@
-include "List.aes"
-
 contract C =
   type state = int
 
