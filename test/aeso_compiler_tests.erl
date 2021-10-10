@@ -813,6 +813,9 @@ failing_contracts() ->
                   [<<?Pos(8,12)
                      "Cannot reference stateful function g (at line 8, column 12) in a pattern guard.">>
                   ])
+    , ?TYPE_ERROR(non_boolean_pattern_guard,
+                  [<<?Pos(4,24)
+                     "Cannot unify string\n         and bool\nwhen checking the type of the expression at line 4, column 24\n  \"y\" : string\nagainst the expected type\n  bool">>
                   ])
     ].
 

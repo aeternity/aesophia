@@ -1,0 +1,4 @@
+contract C =
+  type state = int
+
+  entrypoint init(x) | "y" = 1
