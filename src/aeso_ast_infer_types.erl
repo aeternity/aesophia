@@ -1378,8 +1378,8 @@ infer_letfun1(Env0, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, G
 desugar_clauses(Ann, Fun, {type_sig, _, _, _, ArgTypes, RetType}, Clauses) ->
     NeedDesugar =
         case Clauses of
-            [{letfun, _, _, As, _, _}] -> lists:any(fun({typed, _, {id, _, _}, _}) -> false; (_) -> true end, As);
-            _                          -> true
+            [{letfun, _, _, As, _, [{guarded, _, [], _}]}] -> lists:any(fun({typed, _, {id, _, _}, _}) -> false; (_) -> true end, As);
+            _                                              -> true
         end,
     case NeedDesugar of
         false -> [Clause] = Clauses, Clause;
