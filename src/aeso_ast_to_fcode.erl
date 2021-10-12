@@ -890,23 +890,35 @@ remove_guards(_Env, [], _Switch) ->
     [];
 remove_guards(Env, [Alt = {'case', _, _, [{guarded, _, [], _Expr}]} | Rest], Switch) ->
     [alt_to_fcode(Env, Alt) | remove_guards(Env, Rest, Switch)];
-remove_guards(Env, [{'case', AnnC, Pat, [{guarded, AnnG, [Guard | Guards], Body} | GuardedBodies]} | Rest], {switch, Ann, Expr, _}) ->
+remove_guards(Env, [{'case', AnnC, Pat, [{guarded, AnnG, [Guard | Guards], Body} | GuardedBodies]} | Rest], Switch = {switch, Ann, Expr, _}) ->
     FPat = pat_to_fcode(Env, Pat),
     FGuard = expr_to_fcode(bind_vars(Env, pat_vars(FPat)), Guard),
     FBody = expr_to_fcode(bind_vars(Env, pat_vars(FPat)), Body),
-    R = case Guards of
-            [] -> case GuardedBodies of
-                      [] -> Rest;
-                      _  -> [{'case', AnnC, Pat, GuardedBodies} | Rest]
-                  end;
-            _  -> [{'case', AnnC, Pat, [{guarded, AnnG, Guards, Body} | GuardedBodies]} | Rest]
-        end,
-    case R of
+    case Guards of
         [] ->
-            [{'case', [FPat], make_if_no_else(FGuard, FBody)}];
+            R = case GuardedBodies of
+                    [] -> Rest;
+                    _  -> [{'case', AnnC, Pat, GuardedBodies} | Rest]
+                end,
+            case R of
+                [] ->
+                    [{'case', [FPat], make_if_no_else(FGuard, FBody)} | remove_guards(Env, Rest, Switch)];
+                _ ->
+                    FSwitch = expr_to_fcode(Env, {switch, Ann, Expr, R}),
+                    [{'case', [FPat], make_if(FGuard, FBody, FSwitch)} | remove_guards(Env, Rest, Switch)]
+            end;
         _ ->
-            FSwitch = expr_to_fcode(Env, {switch, Ann, Expr, R}),
-            [{'case', [FPat], make_if(FGuard, FBody, FSwitch)}]
+            R1 = case GuardedBodies of
+                     [] -> [{'case', AnnC, Pat, [{guarded, AnnG, Guards, Body}]} | Rest];
+                     _  -> [{'case', AnnC, Pat, [{guarded, AnnG, Guards, Body} | GuardedBodies]} | Rest]
+                 end,
+            R2 = case GuardedBodies of
+                     [] -> Rest;
+                     _  -> [{'case', AnnC, Pat, GuardedBodies} | Rest]
+                 end,
+            FSwitch1 = expr_to_fcode(Env, {switch, Ann, Expr, R1}),
+            FSwitch2 = expr_to_fcode(Env, {switch, Ann, Expr, R2}),
+            [{'case', [FPat], make_if(FGuard, FSwitch1, FSwitch2)} | remove_guards(Env, Rest, Switch)]
     end.
 
 %% %% Invariant: the number of variables matches the number of patterns in each falt.
