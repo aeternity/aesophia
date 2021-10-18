@@ -96,7 +96,7 @@ contract_to_icode([Decl = {type_def, _Attrib, Id = {id, _, Name}, Args, Def} | R
                 _                       -> Icode1
              end,
     contract_to_icode(Rest, Icode2);
-contract_to_icode([{letfun, Attrib, Name, Args, _What, Body={typed,_,_,T}}|Rest], Icode) ->
+contract_to_icode([{letfun, Attrib, Name, Args, _What, [{guarded, _, [], Body={typed,_,_,T}}]}|Rest], Icode) ->
     FunAttrs = [ stateful || proplists:get_value(stateful, Attrib, false) ] ++
                [ payable  || proplists:get_value(payable, Attrib, false) ] ++
                [ private  || is_private(Attrib, Icode) ],
@@ -323,8 +323,8 @@ ast_body({list_comp, _, Yield, []}, Icode) ->
 ast_body({list_comp, As, Yield, [{comprehension_bind, {typed, _, Pat, ArgType}, BindExpr}|Rest]}, Icode) ->
     Arg  = "%lc",
     Body = {switch, As, {typed, As, {id, As, Arg}, ArgType},
-                [{'case', As, Pat, {list_comp, As, Yield, Rest}},
-                 {'case', As, {id, As, "_"}, {list, As, []}}]},
+                [{'case', As, Pat, [{guarded, As, [], {list_comp, As, Yield, Rest}}]},
+                 {'case', As, {id, As, "_"}, [{guarded, As, [], {list, As, []}}]}]},
     #funcall
         { function = #var_ref{ name = ["ListInternal", "flat_map"] }
         , args =
@@ -349,14 +349,14 @@ ast_body({switch,_,A,Cases}, Icode) ->
     %% patterns appear in cases.
     #switch{expr=ast_body(A, Icode),
             cases=[{ast_body(Pat, Icode),ast_body(Body, Icode)}
-              || {'case',_,Pat,Body} <- Cases]};
+              || {'case',_,Pat,[{guarded, _, [], Body}]} <- Cases]};
 ast_body({block, As, [{letval, _, Pat, E} | Rest]}, Icode) ->
     E1    = ast_body(E, Icode),
     Pat1  = ast_body(Pat, Icode),
     Rest1 = ast_body({block, As, Rest}, Icode),
     #switch{expr  = E1,
             cases = [{Pat1, Rest1}]};
-ast_body({block, As, [{letfun, Ann, F, Args, _Type, Expr} | Rest]}, Icode) ->
+ast_body({block, As, [{letfun, Ann, F, Args, _Type, [{guarded, _, [], Expr}]} | Rest]}, Icode) ->
     ToArg   = fun({typed, Ann1, Id, T}) -> {arg, Ann1, Id, T} end,    %% Pattern matching has been desugared
     LamArgs = lists:map(ToArg, Args),
     ast_body({block, As, [{letval, Ann, F, {lam, Ann, LamArgs, Expr}} | Rest]}, Icode);
