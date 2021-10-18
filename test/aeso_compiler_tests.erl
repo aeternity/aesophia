@@ -65,7 +65,7 @@ simple_compile_test_() ->
            check_errors(Expect, Errors)
        end} ||
            {ContractName, ExpectedError} <- failing_code_gen_contracts(),
-           Backend <- [fate] ] ++
+           Backend <- [aevm, fate] ] ++
     [ {"Testing include with explicit files",
        fun() ->
            FileSystem = maps:from_list(
@@ -87,7 +87,7 @@ simple_compile_test_() ->
                                Backend == fate -> 20 end,
            ?assertMatch({_, _, true}, {SizeDeadCode, SizeNoDeadCode, SizeDeadCode + Delta < SizeNoDeadCode}),
            ok
-       end} || Backend <- [fate] ] ++
+       end} || Backend <- [aevm, fate] ] ++
     [].
 
 %% Check if all modules in the standard library compile
