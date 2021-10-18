@@ -490,7 +490,7 @@ statements and functions definitions. If a guard expression evaluates to
 will be checked:
 
 ```sophia
-function get_left_if_positive(x : one_or_both('a, 'b)) : option('a) =
+function get_left_if_positive(x : one_or_both(int, 'b)) : option(int) =
   switch(x)
     Left(x)    | x > 0 => Some(x)
     Both(x, _) | x > 0 => Some(x)
@@ -499,10 +499,10 @@ function get_left_if_positive(x : one_or_both('a, 'b)) : option('a) =
 
 ```sophia
 function
-  get_left_if_positive : one_or_both('a, 'b) => option('a)
-  get_left(Left(x))    | x > 0 = Some(x)
-  get_left(Both(x, _)) | x > 0 = Some(x)
-  get_left(_)                  = None
+  get_left_if_positive : one_or_both(int, 'b) => option(int)
+  get_left_if_positive(Left(x))    | x > 0 = Some(x)
+  get_left_if_positive(Both(x, _)) | x > 0 = Some(x)
+  get_left_if_positive(_)                  = None
 ```
 
 Guards cannot be stateful even when used inside a stateful function.
