@@ -9,8 +9,8 @@
       
       
       
-      <link rel="icon" href="favicon.png">
-      <meta name="generator" content="mkdocs-1.2.1, mkdocs-material-7.1.9">
+      <link rel="icon" href="../favicon.png">
+      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-7.1.9">
     
     
       
@@ -18,10 +18,10 @@
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.ca7ac06f.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ca7ac06f.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.f1a3b89f.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.f1a3b89f.min.css">
         
       
     
@@ -55,7 +55,7 @@
     <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="pink" data-md-color-accent="pink">
   
     
-    <script>function __prefix(e){return new URL(".",location).pathname+"."+e}function __get(e,t=localStorage){return JSON.parse(t.getItem(__prefix(e)))}</script>
+    <script>function __prefix(e){return new URL("..",location).pathname+"."+e}function __get(e,t=localStorage){return JSON.parse(t.getItem(__prefix(e)))}</script>
     
       <script>var palette=__get("__palette");if(null!==palette&&"object"==typeof palette.color)for(var key in palette.color)document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
     
@@ -76,7 +76,7 @@
     
       <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="index.html" title="æternity Sophia Language" class="md-header__button md-logo" aria-label="æternity Sophia Language" data-md-component="logo">
+    <a href=".." title="æternity Sophia Language" class="md-header__button md-logo" aria-label="æternity Sophia Language" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54z"/></svg>
@@ -191,7 +191,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="index.html" title="æternity Sophia Language" class="md-nav__button md-logo" aria-label="æternity Sophia Language" data-md-component="logo">
+    <a href=".." title="æternity Sophia Language" class="md-nav__button md-logo" aria-label="æternity Sophia Language" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54z"/></svg>
@@ -223,7 +223,7 @@
   
   
     <li class="md-nav__item">
-      <a href="index.html" class="md-nav__link">
+      <a href=".." class="md-nav__link">
         Introduction
       </a>
     </li>
@@ -238,7 +238,7 @@
   
   
     <li class="md-nav__item">
-      <a href="sophia_syntax.html" class="md-nav__link">
+      <a href="../sophia_syntax/" class="md-nav__link">
         Syntax
       </a>
     </li>
@@ -253,7 +253,7 @@
   
   
     <li class="md-nav__item">
-      <a href="sophia_features.html" class="md-nav__link">
+      <a href="../sophia_features/" class="md-nav__link">
         Features
       </a>
     </li>
@@ -282,7 +282,7 @@
           <span class="md-nav__icon md-icon"></span>
         </label>
       
-      <a href="sophia_stdlib.html" class="md-nav__link md-nav__link--active">
+      <a href="./" class="md-nav__link md-nav__link--active">
         Standard library
       </a>
       
@@ -523,7 +523,7 @@
   
   
     <li class="md-nav__item">
-      <a href="sophia_examples.html" class="md-nav__link">
+      <a href="../sophia_examples/" class="md-nav__link">
         Contract examples
       </a>
     </li>
@@ -538,7 +538,7 @@
   
   
     <li class="md-nav__item">
-      <a href="CHANGELOG.html" class="md-nav__link">
+      <a href="../CHANGELOG/" class="md-nav__link">
         Changelog
       </a>
     </li>
@@ -1016,7 +1016,7 @@ the <code>pubkey</code></p>
 <li>The <code>acct</code> is the address of the oracle to register (can be the same as the contract).</li>
 <li><code>signature</code> is a signature proving that the contract is allowed to register the account -
   the <code>network id</code> + <code>account address</code> + <code>contract address</code> (concatenated as byte arrays) is
-  <a href="sophia_features.html#delegation-signature">signed</a> with the
+  <a href="../sophia_features/#delegation-signature">signed</a> with the
   private key of the account, proving you have the private key of the oracle to be. If the
   address is the same as the contract <code>sign</code> is ignored and can be left out entirely.</li>
 <li>The <code>qfee</code> is the minimum query fee to be paid by a user when asking a question of the oracle.</li>
@@ -1040,7 +1040,7 @@ the <code>pubkey</code></p>
 Unless the contract address is the same as the oracle address the <code>signature</code>
 (which is an optional, named argument)
 needs to be provided. Proving that we have the private key of the oracle by
-<a href="sophia_features.html#delegation-signature">signing</a>
+<a href="../sophia_features/#delegation-signature">signing</a>
 the <code>network id</code> + <code>oracle query id</code> + <code>contract address</code></p>
 <h4 id="extend">extend</h4>
 <div class="highlight"><pre><span></span><code>Oracle.extend(&lt;signature : bytes(64)&gt;, o : oracle(&#39;a, &#39;b), ttl : Chain.ttl) : unit
@@ -1114,12 +1114,12 @@ For example:
 <h5 id="preclaim">preclaim</h5>
 <div class="highlight"><pre><span></span><code>AENS.preclaim(owner : address, commitment_hash : hash, &lt;signature : signature&gt;) : unit
 </code></pre></div>
-<p>The <a href="sophia_features.html#delegation-signature">signature</a> should be over
+<p>The <a href="../sophia_features/#delegation-signature">signature</a> should be over
 <code>network id</code> + <code>owner address</code> + <code>Contract.address</code> (concatenated as byte arrays).</p>
 <h5 id="claim">claim</h5>
 <div class="highlight"><pre><span></span><code>AENS.claim(owner : address, name : string, salt : int, name_fee : int, &lt;signature : signature&gt;) : unit
 </code></pre></div>
-<p>The <a href="sophia_features.html#delegation-signature">signature</a> should be over
+<p>The <a href="../sophia_features/#delegation-signature">signature</a> should be over
 <code>network id</code> + <code>owner address</code> + <code>name_hash</code> + <code>Contract.address</code>
 (concatenated as byte arrays)
 using the private key of the <code>owner</code> account for signing.</p>
@@ -1127,7 +1127,7 @@ using the private key of the <code>owner</code> account for signing.</p>
 <div class="highlight"><pre><span></span><code>AENS.transfer(owner : address, new_owner : address, name : string, &lt;signature : signature&gt;) : unit
 </code></pre></div>
 <p>Transfers name to the new owner.</p>
-<p>The <a href="sophia_features.html#delegation-signature">signature</a> should be over
+<p>The <a href="../sophia_features/#delegation-signature">signature</a> should be over
 <code>network id</code> + <code>owner address</code> + <code>name_hash</code> + <code>Contract.address</code>
 (concatenated as byte arrays)
 using the private key of the <code>owner</code> account for signing.</p>
@@ -1135,7 +1135,7 @@ using the private key of the <code>owner</code> account for signing.</p>
 <div class="highlight"><pre><span></span><code>AENS.revoke(owner : address, name : string, &lt;signature : signature&gt;) : unit
 </code></pre></div>
 <p>Revokes the name to extend the ownership time.</p>
-<p>The <a href="sophia_features.html#delegation-signature">signature</a> should be over
+<p>The <a href="../sophia_features/#delegation-signature">signature</a> should be over
 <code>network id</code> + <code>owner address</code> + <code>name_hash</code> + <code>Contract.address</code>
 (concatenated as byte arrays)
 using the private key of the <code>owner</code> account for signing.</p>
@@ -2220,7 +2220,7 @@ this function to verify the input.</p>
     <nav class="md-footer__inner md-grid" aria-label="Footer">
       
         
-        <a href="sophia_features.html" class="md-footer__link md-footer__link--prev" aria-label="Previous: Features" rel="prev">
+        <a href="../sophia_features/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Features" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
           </div>
@@ -2236,7 +2236,7 @@ this function to verify the input.</p>
       
       
         
-        <a href="sophia_examples.html" class="md-footer__link md-footer__link--next" aria-label="Next: Contract examples" rel="next">
+        <a href="../sophia_examples/" class="md-footer__link md-footer__link--next" aria-label="Next: Contract examples" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
@@ -2271,10 +2271,10 @@ this function to verify the input.</p>
     <div class="md-dialog" data-md-component="dialog">
       <div class="md-dialog__inner md-typeset"></div>
     </div>
-    <script id="__config" type="application/json">{"base": ".", "features": ["content.tabs.link", "search.highlight", "search.share", "search.suggest"], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "assets/javascripts/workers/search.477d984a.min.js", "version": {"provider": "mike"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": ["content.tabs.link", "search.highlight", "search.share", "search.suggest"], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "../assets/javascripts/workers/search.477d984a.min.js", "version": {"provider": "mike"}}</script>
     
     
-      <script src="assets/javascripts/bundle.82b56eb2.min.js"></script>
+      <script src="../assets/javascripts/bundle.82b56eb2.min.js"></script>
       
     
   </body>

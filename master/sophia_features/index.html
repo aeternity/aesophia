@@ -9,8 +9,8 @@
       
       
       
-      <link rel="icon" href="favicon.png">
-      <meta name="generator" content="mkdocs-1.2.1, mkdocs-material-7.1.9">
+      <link rel="icon" href="../favicon.png">
+      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-7.1.9">
     
     
       
@@ -18,10 +18,10 @@
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.ca7ac06f.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ca7ac06f.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.f1a3b89f.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.f1a3b89f.min.css">
         
       
     
@@ -55,7 +55,7 @@
     <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="pink" data-md-color-accent="pink">
   
     
-    <script>function __prefix(e){return new URL(".",location).pathname+"."+e}function __get(e,t=localStorage){return JSON.parse(t.getItem(__prefix(e)))}</script>
+    <script>function __prefix(e){return new URL("..",location).pathname+"."+e}function __get(e,t=localStorage){return JSON.parse(t.getItem(__prefix(e)))}</script>
     
       <script>var palette=__get("__palette");if(null!==palette&&"object"==typeof palette.color)for(var key in palette.color)document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
     
@@ -76,7 +76,7 @@
     
       <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="index.html" title="æternity Sophia Language" class="md-header__button md-logo" aria-label="æternity Sophia Language" data-md-component="logo">
+    <a href=".." title="æternity Sophia Language" class="md-header__button md-logo" aria-label="æternity Sophia Language" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54z"/></svg>
@@ -191,7 +191,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="index.html" title="æternity Sophia Language" class="md-nav__button md-logo" aria-label="æternity Sophia Language" data-md-component="logo">
+    <a href=".." title="æternity Sophia Language" class="md-nav__button md-logo" aria-label="æternity Sophia Language" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54z"/></svg>
@@ -223,7 +223,7 @@
   
   
     <li class="md-nav__item">
-      <a href="index.html" class="md-nav__link">
+      <a href=".." class="md-nav__link">
         Introduction
       </a>
     </li>
@@ -238,7 +238,7 @@
   
   
     <li class="md-nav__item">
-      <a href="sophia_syntax.html" class="md-nav__link">
+      <a href="../sophia_syntax/" class="md-nav__link">
         Syntax
       </a>
     </li>
@@ -267,7 +267,7 @@
           <span class="md-nav__icon md-icon"></span>
         </label>
       
-      <a href="sophia_features.html" class="md-nav__link md-nav__link--active">
+      <a href="./" class="md-nav__link md-nav__link--active">
         Features
       </a>
       
@@ -616,7 +616,7 @@
   
   
     <li class="md-nav__item">
-      <a href="sophia_stdlib.html" class="md-nav__link">
+      <a href="../sophia_stdlib/" class="md-nav__link">
         Standard library
       </a>
     </li>
@@ -631,7 +631,7 @@
   
   
     <li class="md-nav__item">
-      <a href="sophia_examples.html" class="md-nav__link">
+      <a href="../sophia_examples/" class="md-nav__link">
         Contract examples
       </a>
     </li>
@@ -646,7 +646,7 @@
   
   
     <li class="md-nav__item">
-      <a href="CHANGELOG.html" class="md-nav__link">
+      <a href="../CHANGELOG/" class="md-nav__link">
         Changelog
       </a>
     </li>
@@ -1021,8 +1021,8 @@
   state is initialized to its return value.</li>
 </ul>
 <p>The language offers some primitive functions to interact with the blockchain and contracts.
-Please refer to the <a href="sophia_stdlib.html#chain">Chain</a>, <a href="sophia_stdlib.html#contract">Contract</a>
-and the <a href="sophia_stdlib.html#call">Call</a> namespaces in the documentation.</p>
+Please refer to the <a href="../sophia_stdlib/#chain">Chain</a>, <a href="../sophia_stdlib/#contract">Contract</a>
+and the <a href="../sophia_stdlib/#call">Call</a> namespaces in the documentation.</p>
 <h3 id="calling-other-contracts">Calling other contracts</h3>
 <p>To call a function in another contract you need the address to an instance of
 the contract. The type of the address must be a contract type, which consists
@@ -1087,8 +1087,8 @@ transaction still only uses up the gas spent running the contract.</p>
 <p>Since the version 6.0.0 Sophia supports deploying contracts by other
 contracts. This can be done in two ways:</p>
 <ul>
-<li>Contract cloning via <a href="sophia_stdlib.html#clone"><code>Chain.clone</code></a></li>
-<li>Direct deploy via <a href="sophia_stdlib.html#create"><code>Chain.create</code></a></li>
+<li>Contract cloning via <a href="../sophia_stdlib/#clone"><code>Chain.clone</code></a></li>
+<li>Direct deploy via <a href="../sophia_stdlib/#create"><code>Chain.create</code></a></li>
 </ul>
 <p>These functions take variable number of arguments that must match the created
 contract's <code>init</code> function. Beside that they take some additional named
@@ -1269,7 +1269,7 @@ the file, except that error messages will refer to the original source
 locations. The language will try to include each file at most one time automatically,
 so even cyclic includes should be working without any special tinkering.</p>
 <h2 id="standard-library">Standard library</h2>
-<p>Sophia offers <a href="sophia_stdlib.html">standard library</a> which exposes some
+<p>Sophia offers <a href="../sophia_stdlib/">standard library</a> which exposes some
 primitive operations and some higher level utilities. The builtin
 namespaces like <code>Chain</code>, <code>Contract</code>, <code>Map</code>
 are included by default and are supported internally by the compiler.
@@ -1500,7 +1500,7 @@ fails rather than wrapping around to -2²⁵⁵.</p>
 second argument is zero.</p>
 <h2 id="bit-fields">Bit fields</h2>
 <p>Sophia integers do not support bit arithmetic. Instead there is a separate
-type <code>bits</code>. See the standard library <a href="sophia_stdlib.html#bits">documentation</a>.</p>
+type <code>bits</code>. See the standard library <a href="../sophia_stdlib/#bits">documentation</a>.</p>
 <p>On the AEVM a bit field is represented by a 256-bit word and reading or writing
 a bit outside the 0..255 range fails with an <code>arithmetic_error</code>. On FATE a bit
 field can be of arbitrary size (but it is still represented by the
@@ -1567,7 +1567,7 @@ Example syntax:
 <div class="highlight"><pre><span></span><code>[1..4] == [1,2,3,4]
 </code></pre></div>
 The ranges are always ascending and have step equal to 1.</p>
-<p>Please refer to the <a href="sophia_stdlib.html#list">standard library</a> for the predefined functionalities.</p>
+<p>Please refer to the <a href="../sophia_stdlib/#list">standard library</a> for the predefined functionalities.</p>
 <h2 id="maps-and-records">Maps and records</h2>
 <p>A Sophia record type is given by a fixed set of fields with associated,
 possibly different, types. For instance
@@ -1579,7 +1579,7 @@ possibly different, types. For instance
 but of a fixed type. The type of maps with keys of type <code>'k</code> and values of type
 <code>'v</code> is written <code>map('k, 'v)</code>. The key type can be any type that does not
 contain a map or a function type.</p>
-<p>Please refer to the <a href="sophia_stdlib.html#map">standard library</a> for the predefined functionalities.</p>
+<p>Please refer to the <a href="../sophia_stdlib/#map">standard library</a> for the predefined functionalities.</p>
 <h3 id="constructing-maps-and-records">Constructing maps and records</h3>
 <p>A value of record type is constructed by giving a value for each of the fields.
 For the example above,
@@ -1631,19 +1631,19 @@ it.</p>
 Strings can be compared for equality (<code>==</code>, <code>!=</code>), used as keys in maps and
 records, and used in builtin functions <code>String.length</code>, <code>String.concat</code> and
 the hash functions described below.</p>
-<p>Please refer to the <code>String</code> <a href="sophia_stdlib.html#string">library documentation</a>.</p>
+<p>Please refer to the <code>String</code> <a href="../sophia_stdlib/#string">library documentation</a>.</p>
 <h2 id="chars">Chars</h2>
 <p>There is a builtin type <code>char</code> (the underlying representation being an integer),
 mainly used to manipulate strings via <code>String.to_list</code>/<code>String.from_list</code>.</p>
 <p>Characters can also be introduced as character literals (`'x', '+', ...).</p>
-<p>Please refer to the <code>Char</code> <a href="sophia_stdlib.html#char">library documentation</a>.</p>
+<p>Please refer to the <code>Char</code> <a href="../sophia_stdlib/#char">library documentation</a>.</p>
 <h2 id="byte-arrays">Byte arrays</h2>
 <p>Byte arrays are fixed size arrays of 8-bit integers. They are described in hexadecimal system,
 for example the literal <code>#cafe</code> creates a two-element array of bytes <code>ca</code> (202) and <code>fe</code> (254)
 and thus is a value of type <code>bytes(2)</code>.</p>
-<p>Please refer to the <code>Bytes</code> <a href="sophia_stdlib.html#bytes">library documentation</a>.</p>
+<p>Please refer to the <code>Bytes</code> <a href="../sophia_stdlib/#bytes">library documentation</a>.</p>
 <h2 id="cryptographic-builtins">Cryptographic builtins</h2>
-<p>Libraries <a href="sophia_stdlib.html#crypto">Crypto</a> and <a href="sophia_stdlib.html#string">String</a> provide functions to
+<p>Libraries <a href="../sophia_stdlib/#crypto">Crypto</a> and <a href="../sophia_stdlib/#string">String</a> provide functions to
 hash objects, verify signatures etc. The <code>hash</code> is a type alias for <code>bytes(32)</code>.</p>
 <h2 id="authorization-interface">Authorization interface</h2>
 <p>When a Generalized account is authorized, the authorization function needs
@@ -1656,7 +1656,7 @@ normal contract call they return <code>None</code>.</p>
 through the Oracle interface.</p>
 <p>For a full description of how Oracle works see
 <a href="https://github.com/aeternity/protocol/blob/master/oracles/oracles.md#oracles">Oracles</a>.
-For a functionality documentation refer to the <a href="sophia_stdlib.html#oracle">standard library</a>.</p>
+For a functionality documentation refer to the <a href="../sophia_stdlib/#oracle">standard library</a>.</p>
 <h3 id="example">Example</h3>
 <p>Example for an oracle answering questions of type <code>string</code> with answers of type <code>int</code>:
 <div class="highlight"><pre><span></span><code>contract Oracles =
@@ -1709,12 +1709,12 @@ For a functionality documentation refer to the <a href="sophia_stdlib.html#oracl
 </code></pre></div></p>
 <h3 id="sanity-checks">Sanity checks</h3>
 <p>When an Oracle literal is passed to a contract, no deep checks are performed.
-For extra safety <a href="sophia_stdlib.html#check">Oracle.check</a> and <a href="sophia_stdlib.html#check_query">Oracle.check_query</a>
+For extra safety <a href="../sophia_stdlib/#check">Oracle.check</a> and <a href="../sophia_stdlib/#check_query">Oracle.check_query</a>
 functions are provided.</p>
 <h2 id="aens-interface">AENS interface</h2>
 <p>Contracts can interact with the
 <a href="https://github.com/aeternity/protocol/blob/master/AENS.md">æternity naming system</a>.
-For this purpose the <a href="sophia_stdlib.html#aens">AENS</a> library was exposed.</p>
+For this purpose the <a href="../sophia_stdlib/#aens">AENS</a> library was exposed.</p>
 <h3 id="example_1">Example</h3>
 <p>In this example we assume that the name <code>name</code> already exists, and is owned by
 an account with address <code>addr</code>. In order to allow a contract <code>ct</code> to handle
@@ -1840,7 +1840,7 @@ the signature data with the <code>network_id</code> (<code>ae_mainnet</code> for
     <nav class="md-footer__inner md-grid" aria-label="Footer">
       
         
-        <a href="sophia_syntax.html" class="md-footer__link md-footer__link--prev" aria-label="Previous: Syntax" rel="prev">
+        <a href="../sophia_syntax/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Syntax" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
           </div>
@@ -1856,7 +1856,7 @@ the signature data with the <code>network_id</code> (<code>ae_mainnet</code> for
       
       
         
-        <a href="sophia_stdlib.html" class="md-footer__link md-footer__link--next" aria-label="Next: Standard library" rel="next">
+        <a href="../sophia_stdlib/" class="md-footer__link md-footer__link--next" aria-label="Next: Standard library" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
@@ -1891,10 +1891,10 @@ the signature data with the <code>network_id</code> (<code>ae_mainnet</code> for
     <div class="md-dialog" data-md-component="dialog">
       <div class="md-dialog__inner md-typeset"></div>
     </div>
-    <script id="__config" type="application/json">{"base": ".", "features": ["content.tabs.link", "search.highlight", "search.share", "search.suggest"], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "assets/javascripts/workers/search.477d984a.min.js", "version": {"provider": "mike"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": ["content.tabs.link", "search.highlight", "search.share", "search.suggest"], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "../assets/javascripts/workers/search.477d984a.min.js", "version": {"provider": "mike"}}</script>
     
     
-      <script src="assets/javascripts/bundle.82b56eb2.min.js"></script>
+      <script src="../assets/javascripts/bundle.82b56eb2.min.js"></script>
       
     
   </body>
