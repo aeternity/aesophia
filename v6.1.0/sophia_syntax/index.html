@@ -1,0 +1,945 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+      <link rel="icon" href="../favicon.png">
+      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-7.1.9">
+    
+    
+      
+        <title>Syntax - æternity Sophia Language</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ca7ac06f.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.f1a3b89f.min.css">
+        
+      
+    
+    
+    
+      
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,400i,700%7CRoboto+Mono&display=fallback">
+        <style>:root{--md-text-font-family:"Roboto";--md-code-font-family:"Roboto Mono"}</style>
+      
+    
+    
+    
+    
+      
+
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="pink" data-md-color-accent="pink">
+  
+    
+    <script>function __prefix(e){return new URL("..",location).pathname+"."+e}function __get(e,t=localStorage){return JSON.parse(t.getItem(__prefix(e)))}</script>
+    
+      <script>var palette=__get("__palette");if(null!==palette&&"object"==typeof palette.color)for(var key in palette.color)document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#syntax" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="æternity Sophia Language" class="md-header__button md-logo" aria-label="æternity Sophia Language" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            æternity Sophia Language
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Syntax
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      <form class="md-header__option" data-md-component="palette">
+        
+          
+          
+          <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="pink" data-md-color-accent="pink"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+          
+            <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3 3.19.09m3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95 2.06.05m-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31z"/></svg>
+            </label>
+          
+        
+          
+          
+          <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="pink" data-md-color-accent="pink"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_2">
+          
+            <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5c-.84 0-1.65.15-2.39.42L12 2M3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29L3.34 7m.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14L3.36 17M20.65 7l-1.77 3.79a7.023 7.023 0 0 0-2.38-4.15l4.15.36m-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29L20.64 17M12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44L12 22z"/></svg>
+            </label>
+          
+        
+      </form>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
+      </label>
+      
+<div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" data-md-state="active" required>
+      <label class="md-search__icon md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
+      </label>
+      <button type="reset" class="md-search__icon md-icon" aria-label="Clear" tabindex="-1">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>
+      </button>
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        
+<a href="https://github.com/aeternity/aesophia" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="æternity Sophia Language" class="md-nav__button md-logo" aria-label="æternity Sophia Language" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54z"/></svg>
+
+    </a>
+    æternity Sophia Language
+  </label>
+  
+    <div class="md-nav__source">
+      
+<a href="https://github.com/aeternity/aesophia" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        Introduction
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Syntax
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        Syntax
+      </a>
+      
+        
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#lexical-syntax" class="md-nav__link">
+    Lexical syntax
+  </a>
+  
+    <nav class="md-nav" aria-label="Lexical syntax">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#comments" class="md-nav__link">
+    Comments
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#keywords" class="md-nav__link">
+    Keywords
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tokens" class="md-nav__link">
+    Tokens
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layout-blocks" class="md-nav__link">
+    Layout blocks
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notation" class="md-nav__link">
+    Notation
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#declarations" class="md-nav__link">
+    Declarations
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#types" class="md-nav__link">
+    Types
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#statements" class="md-nav__link">
+    Statements
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#expressions" class="md-nav__link">
+    Expressions
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operators-types" class="md-nav__link">
+    Operators types
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operator-precendences" class="md-nav__link">
+    Operator precendences
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sophia_features/" class="md-nav__link">
+        Features
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sophia_stdlib/" class="md-nav__link">
+        Standard library
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sophia_examples/" class="md-nav__link">
+        Contract examples
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CHANGELOG/" class="md-nav__link">
+        Changelog
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#lexical-syntax" class="md-nav__link">
+    Lexical syntax
+  </a>
+  
+    <nav class="md-nav" aria-label="Lexical syntax">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#comments" class="md-nav__link">
+    Comments
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#keywords" class="md-nav__link">
+    Keywords
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tokens" class="md-nav__link">
+    Tokens
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layout-blocks" class="md-nav__link">
+    Layout blocks
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notation" class="md-nav__link">
+    Notation
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#declarations" class="md-nav__link">
+    Declarations
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#types" class="md-nav__link">
+    Types
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#statements" class="md-nav__link">
+    Statements
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#expressions" class="md-nav__link">
+    Expressions
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operators-types" class="md-nav__link">
+    Operators types
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operator-precendences" class="md-nav__link">
+    Operator precendences
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          <div class="md-content" data-md-component="content">
+            <article class="md-content__inner md-typeset">
+              
+                
+                
+                <h1 id="syntax">Syntax</h1>
+<h2 id="lexical-syntax">Lexical syntax</h2>
+<h3 id="comments">Comments</h3>
+<p>Single line comments start with <code>//</code> and block comments are enclosed in <code>/*</code>
+and <code>*/</code> and can be nested.</p>
+<h3 id="keywords">Keywords</h3>
+<div class="highlight"><pre><span></span><code>contract elif else entrypoint false function if import include let mod namespace
+private payable stateful switch true type record datatype main interface
+</code></pre></div>
+<h3 id="tokens">Tokens</h3>
+<ul>
+<li><code>Id = [a-z_][A-Za-z0-9_']*</code> identifiers start with a lower case letter.</li>
+<li><code>Con = [A-Z][A-Za-z0-9_']*</code> constructors start with an upper case letter.</li>
+<li><code>QId = (Con\.)+Id</code> qualified identifiers (e.g. <code>Map.member</code>)</li>
+<li><code>QCon = (Con\.)+Con</code> qualified constructor</li>
+<li><code>TVar = 'Id</code> type variable (e.g <code>'a</code>, <code>'b</code>)</li>
+<li><code>Int = [0-9]+(_[0-9]+)*|0x[0-9A-Fa-f]+(_[0-9A-Fa-f]+)*</code> integer literal with optional <code>_</code> separators</li>
+<li><code>Bytes = #[0-9A-Fa-f]+(_[0-9A-Fa-f]+)*</code> byte array literal with optional <code>_</code> separators</li>
+<li><code>String</code> string literal enclosed in <code>"</code> with escape character <code>\</code></li>
+<li><code>Char</code> character literal enclosed in <code>'</code> with escape character <code>\</code></li>
+<li><code>AccountAddress</code> base58-encoded 32 byte account pubkey with <code>ak_</code> prefix</li>
+<li><code>ContractAddress</code> base58-encoded 32 byte contract address with <code>ct_</code> prefix</li>
+<li><code>OracleAddress</code> base58-encoded 32 byte oracle address with <code>ok_</code> prefix</li>
+<li><code>OracleQueryId</code> base58-encoded 32 byte oracle query id with <code>oq_</code> prefix</li>
+</ul>
+<p>Valid string escape codes are</p>
+<table>
+<thead>
+<tr>
+<th>Escape</th>
+<th>ASCII</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>\b</code></td>
+<td>8</td>
+<td></td>
+</tr>
+<tr>
+<td><code>\t</code></td>
+<td>9</td>
+<td></td>
+</tr>
+<tr>
+<td><code>\n</code></td>
+<td>10</td>
+<td></td>
+</tr>
+<tr>
+<td><code>\v</code></td>
+<td>11</td>
+<td></td>
+</tr>
+<tr>
+<td><code>\f</code></td>
+<td>12</td>
+<td></td>
+</tr>
+<tr>
+<td><code>\r</code></td>
+<td>13</td>
+<td></td>
+</tr>
+<tr>
+<td><code>\e</code></td>
+<td>27</td>
+<td></td>
+</tr>
+<tr>
+<td><code>\xHexDigits</code></td>
+<td><em>HexDigits</em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>See the <a href="https://github.com/aeternity/protocol/blob/master/node/api/api_encoding.md">identifier encoding scheme</a> for the
+details on the base58 literals.</p>
+<h2 id="layout-blocks">Layout blocks</h2>
+<p>Sophia uses Python-style layout rules to group declarations and statements. A
+layout block with more than one element must start on a separate line and be
+indented more than the currently enclosing layout block. Blocks with a single
+element can be written on the same line as the previous token.</p>
+<p>Each element of the block must share the same indentation and no part of an
+element may be indented less than the indentation of the block. For instance</p>
+<div class="highlight"><pre><span></span><code>contract Layout =
+  function foo() = 0  // no layout
+  function bar() =    // layout block starts on next line
+    let x = foo()     // indented more than 2 spaces
+    x
+     + 1              // the &#39;+&#39; is indented more than the &#39;x&#39;
+</code></pre></div>
+<h2 id="notation">Notation</h2>
+<p>In describing the syntax below, we use the following conventions:</p>
+<ul>
+<li>Upper-case identifiers denote non-terminals (like <code>Expr</code>) or terminals with
+  some associated value (like <code>Id</code>).</li>
+<li>Keywords and symbols are enclosed in single quotes: <code>'let'</code> or <code>'='</code>.</li>
+<li>Choices are separated by vertical bars: <code>|</code>.</li>
+<li>Optional elements are enclosed in <code>[</code> square brackets <code>]</code>.</li>
+<li><code>(</code> Parentheses <code>)</code> are used for grouping.</li>
+<li>Zero or more repetitions are denoted by a postfix <code>*</code>, and one or more
+  repetitions by a <code>+</code>.</li>
+<li><code>Block(X)</code> denotes a layout block of <code>X</code>s.</li>
+<li><code>Sep(X, S)</code> is short for <code>[X (S X)*]</code>, i.e. a possibly empty sequence of <code>X</code>s
+  separated by <code>S</code>s.</li>
+<li><code>Sep1(X, S)</code> is short for <code>X (S X)*</code>, i.e. same as <code>Sep</code>, but must not be empty.</li>
+</ul>
+<h2 id="declarations">Declarations</h2>
+<p>A Sophia file consists of a sequence of <em>declarations</em> in a layout block.</p>
+<div class="highlight"><pre><span></span><code><span class="n">File</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">TopDecl</span><span class="p">)</span><span class="w"></span>
+
+<span class="n">TopDecl</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="p">[</span><span class="err">&#39;</span><span class="n">payable</span><span class="err">&#39;</span><span class="p">]</span><span class="w"> </span><span class="err">&#39;</span><span class="n">contract</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Con</span><span class="w"> </span><span class="sc">&#39;=&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Decl</span><span class="p">)</span><span class="w"></span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">namespace</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Con</span><span class="w"> </span><span class="sc">&#39;=&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Decl</span><span class="p">)</span><span class="w"></span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;@</span><span class="n">compiler</span><span class="err">&#39;</span><span class="w"> </span><span class="n">PragmaOp</span><span class="w"> </span><span class="n">Version</span><span class="w"></span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">include</span><span class="err">&#39;</span><span class="w"> </span><span class="n">String</span><span class="w"></span>
+
+<span class="n">Decl</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="err">&#39;</span><span class="n">type</span><span class="err">&#39;</span><span class="w">     </span><span class="n">Id</span><span class="w"> </span><span class="p">[</span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">TVar</span><span class="o">*</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="p">]</span><span class="w"> </span><span class="sc">&#39;=&#39;</span><span class="w"> </span><span class="n">TypeAlias</span><span class="w"></span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">record</span><span class="err">&#39;</span><span class="w">   </span><span class="n">Id</span><span class="w"> </span><span class="p">[</span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">TVar</span><span class="o">*</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="p">]</span><span class="w"> </span><span class="sc">&#39;=&#39;</span><span class="w"> </span><span class="n">RecordType</span><span class="w"></span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">datatype</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Id</span><span class="w"> </span><span class="p">[</span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">TVar</span><span class="o">*</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="p">]</span><span class="w"> </span><span class="sc">&#39;=&#39;</span><span class="w"> </span><span class="n">DataType</span><span class="w"></span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="p">(</span><span class="n">EModifier</span><span class="o">*</span><span class="w"> </span><span class="err">&#39;</span><span class="n">entrypoint</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">FModifier</span><span class="o">*</span><span class="w"> </span><span class="err">&#39;</span><span class="n">function</span><span class="err">&#39;</span><span class="p">)</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">FunDecl</span><span class="p">)</span><span class="w"></span>
+
+<span class="n">FunDecl</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Id</span><span class="w"> </span><span class="sc">&#39;:&#39;</span><span class="w"> </span><span class="n">Type</span><span class="w">                             </span><span class="c1">// Type signature</span>
+<span class="w">          </span><span class="o">|</span><span class="w"> </span><span class="n">Id</span><span class="w"> </span><span class="n">Args</span><span class="w"> </span><span class="p">[</span><span class="sc">&#39;:&#39;</span><span class="w"> </span><span class="n">Type</span><span class="p">]</span><span class="w"> </span><span class="sc">&#39;=&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Stmt</span><span class="p">)</span><span class="w">      </span><span class="c1">// Definition</span>
+
+<span class="n">PragmaOp</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="sc">&#39;&lt;&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">=&lt;</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">==</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">&gt;=</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;&gt;&#39;</span><span class="w"></span>
+<span class="n">Version</span><span class="w">  </span><span class="o">::=</span><span class="w"> </span><span class="n">Sep1</span><span class="p">(</span><span class="n">Int</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;.&#39;</span><span class="p">)</span><span class="w"></span>
+
+<span class="n">EModifier</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="err">&#39;</span><span class="n">payable</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">stateful</span><span class="err">&#39;</span><span class="w"></span>
+<span class="n">FModifier</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="err">&#39;</span><span class="n">stateful</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">private</span><span class="err">&#39;</span><span class="w"></span>
+
+<span class="n">Args</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">Pattern</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w"></span>
+</code></pre></div>
+<p>Contract declarations must appear at the top-level.</p>
+<p>For example,
+<div class="highlight"><pre><span></span><code>contract Test =
+  type t = int
+  entrypoint add (x : t, y : t) = x + y
+</code></pre></div></p>
+<p>There are three forms of type declarations: type aliases (declared with the
+<code>type</code> keyword), record type definitions (<code>record</code>) and data type definitions
+(<code>datatype</code>):</p>
+<div class="highlight"><pre><span></span><code><span class="n">TypeAlias</span><span class="w">  </span><span class="o">::=</span><span class="w"> </span><span class="n">Type</span><span class="w"></span>
+<span class="n">RecordType</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="sc">&#39;{&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">FieldType</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;}&#39;</span><span class="w"></span>
+<span class="n">DataType</span><span class="w">   </span><span class="o">::=</span><span class="w"> </span><span class="n">Sep1</span><span class="p">(</span><span class="n">ConDecl</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;|&#39;</span><span class="p">)</span><span class="w"></span>
+
+<span class="n">FieldType</span><span class="w">  </span><span class="o">::=</span><span class="w"> </span><span class="n">Id</span><span class="w"> </span><span class="sc">&#39;:&#39;</span><span class="w"> </span><span class="n">Type</span><span class="w"></span>
+<span class="n">ConDecl</span><span class="w">    </span><span class="o">::=</span><span class="w"> </span><span class="n">Con</span><span class="w"> </span><span class="p">[</span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">Sep1</span><span class="p">(</span><span class="n">Type</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="p">]</span><span class="w"></span>
+</code></pre></div>
+<p>For example,
+<div class="highlight"><pre><span></span><code>record   point(&#39;a) = {x : &#39;a, y : &#39;a}
+datatype shape(&#39;a) = Circle(point(&#39;a), &#39;a) | Rect(point(&#39;a), point(&#39;a))
+type     int_shape = shape(int)
+</code></pre></div></p>
+<h2 id="types">Types</h2>
+<div class="highlight"><pre><span></span><code><span class="n">Type</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Domain</span><span class="w"> </span><span class="err">&#39;</span><span class="o">=&gt;</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Type</span><span class="w">             </span><span class="c1">// Function type</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Type</span><span class="w"> </span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">Type</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w">  </span><span class="c1">// Type application</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">Type</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w">                 </span><span class="c1">// Parens</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">unit</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">Type</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;*&#39;</span><span class="p">)</span><span class="w">      </span><span class="c1">// Tuples</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Id</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">QId</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">TVar</span><span class="w"></span>
+
+<span class="n">Domain</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Type</span><span class="w">                       </span><span class="c1">// Single argument</span>
+<span class="w">         </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">Type</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w">     </span><span class="c1">// Multiple arguments</span>
+</code></pre></div>
+<p>The function type arrow associates to the right.</p>
+<p>Example,
+<div class="highlight"><pre><span></span><code>&#39;a =&gt; list(&#39;a) =&gt; (int * list(&#39;a))
+</code></pre></div></p>
+<h2 id="statements">Statements</h2>
+<p>Function bodies are blocks of <em>statements</em>, where a statement is one of the following</p>
+<div class="highlight"><pre><span></span><code><span class="n">Stmt</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="err">&#39;</span><span class="k">switch</span><span class="sc">&#39; &#39;</span><span class="p">(</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Case</span><span class="p">)</span><span class="w"></span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="k">if</span><span class="sc">&#39; &#39;</span><span class="p">(</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Stmt</span><span class="p">)</span><span class="w"></span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">elif</span><span class="sc">&#39; &#39;</span><span class="p">(</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Stmt</span><span class="p">)</span><span class="w"></span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="k">else</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Stmt</span><span class="p">)</span><span class="w"></span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">let</span><span class="err">&#39;</span><span class="w"> </span><span class="n">LetDef</span><span class="w"></span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Expr</span><span class="w"></span>
+
+<span class="n">LetDef</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Id</span><span class="w"> </span><span class="n">Args</span><span class="w"> </span><span class="p">[</span><span class="sc">&#39;:&#39;</span><span class="w"> </span><span class="n">Type</span><span class="p">]</span><span class="w"> </span><span class="sc">&#39;=&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Stmt</span><span class="p">)</span><span class="w">   </span><span class="c1">// Function definition</span>
+<span class="w">         </span><span class="o">|</span><span class="w"> </span><span class="n">Pattern</span><span class="w"> </span><span class="sc">&#39;=&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Stmt</span><span class="p">)</span><span class="w">              </span><span class="c1">// Value definition</span>
+
+<span class="n">Case</span><span class="w">    </span><span class="o">::=</span><span class="w"> </span><span class="n">Pattern</span><span class="w"> </span><span class="err">&#39;</span><span class="o">=&gt;</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Stmt</span><span class="p">)</span><span class="w"></span>
+<span class="n">Pattern</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Expr</span><span class="w"></span>
+</code></pre></div>
+<p><code>if</code> statements can be followed by zero or more <code>elif</code> statements and an optional final <code>else</code> statement. For example,</p>
+<div class="highlight"><pre><span></span><code>let x : int = 4
+switch(f(x))
+  None =&gt; 0
+  Some(y) =&gt;
+    if(y &gt; 10)
+      &quot;too big&quot;
+    elif(y &lt; 3)
+      &quot;too small&quot;
+    else
+      &quot;just right&quot;
+</code></pre></div>
+<h2 id="expressions">Expressions</h2>
+<div class="highlight"><pre><span></span><code><span class="n">Expr</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">LamArgs</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w"> </span><span class="err">&#39;</span><span class="o">=&gt;</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Stmt</span><span class="p">)</span><span class="w">   </span><span class="c1">// Anonymous function    (x) =&gt; x + 1</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="k">if</span><span class="sc">&#39; &#39;</span><span class="p">(</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="err">&#39;</span><span class="k">else</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="c1">// If expression         if(x &lt; y) y else x</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;:&#39;</span><span class="w"> </span><span class="n">Type</span><span class="w">                      </span><span class="c1">// Type annotation       5 : int</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="n">BinOp</span><span class="w"> </span><span class="n">Expr</span><span class="w">                    </span><span class="c1">// Binary operator       x + y</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">UnOp</span><span class="w"> </span><span class="n">Expr</span><span class="w">                          </span><span class="c1">// Unary operator        ! b</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">Expr</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w">        </span><span class="c1">// Application           f(x, y)</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;.&#39;</span><span class="w"> </span><span class="n">Id</span><span class="w">                        </span><span class="c1">// Projection            state.x</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;[&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;]&#39;</span><span class="w">                  </span><span class="c1">// Map lookup            map[key]</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;{&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">FieldUpdate</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;}&#39;</span><span class="w"> </span><span class="c1">// Record or map update  r{ fld[key].x = y }</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;[&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">Expr</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;]&#39;</span><span class="w">             </span><span class="c1">// List                  [1, 2, 3]</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;[&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;|&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">Generator</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;]&#39;</span><span class="w"></span>
+<span class="w">                                            </span><span class="c1">// List comprehension    [k | x &lt;- [1], if (f(x)), let k = x+1]</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;[&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="err">&#39;</span><span class="p">..</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;]&#39;</span><span class="w">             </span><span class="c1">// List range            [1..n]</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;{&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">FieldUpdate</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;}&#39;</span><span class="w">      </span><span class="c1">// Record or map value   {x = 0, y = 1}, {[key] = val}</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w">                       </span><span class="c1">// Parens                (1 + 2) * 3</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Id</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Con</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">QId</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">QCon</span><span class="w">              </span><span class="c1">// Identifiers           x, None, Map.member, AELib.Token</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Int</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Bytes</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Char</span><span class="w">        </span><span class="c1">// Literals              123, 0xff, #00abc123, &quot;foo&quot;, &#39;%&#39;</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">AccountAddress</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">ContractAddress</span><span class="w">   </span><span class="c1">// Chain identifiers</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">OracleAddress</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">OracleQueryId</span><span class="w">      </span><span class="c1">// Chain identifiers</span>
+
+<span class="n">Generator</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Pattern</span><span class="w"> </span><span class="err">&#39;</span><span class="o">&lt;-</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w">   </span><span class="c1">// Generator</span>
+<span class="w">            </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="k">if</span><span class="sc">&#39; &#39;</span><span class="p">(</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w">   </span><span class="c1">// Guard</span>
+<span class="w">            </span><span class="o">|</span><span class="w"> </span><span class="n">LetDef</span><span class="w">              </span><span class="c1">// Definition</span>
+
+<span class="n">LamArgs</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">LamArg</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w"></span>
+<span class="n">LamArg</span><span class="w">  </span><span class="o">::=</span><span class="w"> </span><span class="n">Id</span><span class="w"> </span><span class="p">[</span><span class="sc">&#39;:&#39;</span><span class="w"> </span><span class="n">Type</span><span class="p">]</span><span class="w"></span>
+
+<span class="n">FieldUpdate</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Path</span><span class="w"> </span><span class="sc">&#39;=&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"></span>
+<span class="n">Path</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Id</span><span class="w">                 </span><span class="c1">// Record field</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;[&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;]&#39;</span><span class="w">       </span><span class="c1">// Map key</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Path</span><span class="w"> </span><span class="sc">&#39;.&#39;</span><span class="w"> </span><span class="n">Id</span><span class="w">        </span><span class="c1">// Nested record field</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Path</span><span class="w"> </span><span class="sc">&#39;[&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;]&#39;</span><span class="w">  </span><span class="c1">// Nested map key</span>
+
+<span class="n">BinOp</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="err">&#39;</span><span class="o">||</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">&amp;&amp;</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;&lt;&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;&gt;&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">=&lt;</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">&gt;=</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">==</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">!=</span><span class="err">&#39;</span><span class="w"></span>
+<span class="w">        </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">::</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">++</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;+&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;-&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;*&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;/&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">mod</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;^&#39;</span><span class="w"></span>
+<span class="n">UnOp</span><span class="w">  </span><span class="o">::=</span><span class="w"> </span><span class="sc">&#39;-&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;!&#39;</span><span class="w"></span>
+</code></pre></div>
+<h2 id="operators-types">Operators types</h2>
+<table>
+<thead>
+<tr>
+<th>Operators</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-</code> <code>+</code> <code>*</code> <code>/</code> <code>mod</code> <code>^</code></td>
+<td>arithmetic operators</td>
+</tr>
+<tr>
+<td><code>!</code> <code>&amp;&amp;</code> <code>\|\|</code></td>
+<td>logical operators</td>
+</tr>
+<tr>
+<td><code>==</code> <code>!=</code> <code>&lt;</code> <code>&gt;</code> <code>=&lt;</code> <code>&gt;=</code></td>
+<td>comparison operators</td>
+</tr>
+<tr>
+<td><code>::</code> <code>++</code></td>
+<td>list operators</td>
+</tr>
+</tbody>
+</table>
+<h2 id="operator-precendences">Operator precendences</h2>
+<p>In order of highest to lowest precedence.</p>
+<table>
+<thead>
+<tr>
+<th>Operators</th>
+<th>Associativity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>!</code></td>
+<td>right</td>
+</tr>
+<tr>
+<td><code>^</code></td>
+<td>left</td>
+</tr>
+<tr>
+<td><code>*</code> <code>/</code> <code>mod</code></td>
+<td>left</td>
+</tr>
+<tr>
+<td><code>-</code> (unary)</td>
+<td>right</td>
+</tr>
+<tr>
+<td><code>+</code> <code>-</code></td>
+<td>left</td>
+</tr>
+<tr>
+<td><code>::</code> <code>++</code></td>
+<td>right</td>
+</tr>
+<tr>
+<td><code>&lt;</code> <code>&gt;</code> <code>=&lt;</code> <code>&gt;=</code> <code>==</code> <code>!=</code></td>
+<td>none</td>
+</tr>
+<tr>
+<td><code>&amp;&amp;</code></td>
+<td>right</td>
+</tr>
+<tr>
+<td><code>\|\|</code></td>
+<td>right</td>
+</tr>
+</tbody>
+</table>
+                
+              
+              
+                
+
+
+              
+            </article>
+          </div>
+        </div>
+        
+      </main>
+      
+        
+<footer class="md-footer">
+  
+    <nav class="md-footer__inner md-grid" aria-label="Footer">
+      
+        
+        <a href=".." class="md-footer__link md-footer__link--prev" aria-label="Previous: Introduction" rel="prev">
+          <div class="md-footer__button md-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
+          </div>
+          <div class="md-footer__title">
+            <div class="md-ellipsis">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              Introduction
+            </div>
+          </div>
+        </a>
+      
+      
+        
+        <a href="../sophia_features/" class="md-footer__link md-footer__link--next" aria-label="Next: Features" rel="next">
+          <div class="md-footer__title">
+            <div class="md-ellipsis">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              Features
+            </div>
+          </div>
+          <div class="md-footer__button md-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4z"/></svg>
+          </div>
+        </a>
+      
+    </nav>
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-footer-copyright">
+        
+        Made with
+        <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+          Material for MkDocs
+        </a>
+        
+      </div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    <script id="__config" type="application/json">{"base": "..", "features": ["content.tabs.link", "search.highlight", "search.share", "search.suggest"], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "../assets/javascripts/workers/search.477d984a.min.js", "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.82b56eb2.min.js"></script>
+      
+    
+  </body>
+</html>
