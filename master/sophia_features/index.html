@@ -1533,6 +1533,7 @@ their respective arguments. For instance,</p>
   get_left(Right(_))   = None
   get_left(Both(x, _)) = Some(x)
 </code></pre></div></p>
+<p><em>NOTE: Data types cannot currently be recursive.</em></p>
 <p>Sophia also supports the assignment of patterns to variables:
 <div class="highlight"><pre><span></span><code>function f(x) = switch(x)
   h1::(t = h2::_) =&gt; (h1 + h2)::t  // same as `h1::h2::k =&gt; (h1 + h2)::h2::k`
@@ -1542,7 +1543,23 @@ function g(p : int * option(int)) : int =
   let (a, (o = Some(b))) = p  // o is equal to Pair.snd(p)
   b
 </code></pre></div></p>
-<p><em>NOTE: Data types cannot currently be recursive.</em></p>
+<p>Guards are boolean expressions that can be used on patterns in both switch
+statements and functions definitions. If a guard expression evaluates to
+<code>true</code>, then the corresponding body will be used. Otherwise, the next pattern
+will be checked:</p>
+<div class="highlight"><pre><span></span><code>function get_left_if_positive(x : one_or_both(int, &#39;b)) : option(int) =
+  switch(x)
+    Left(x)    | x &gt; 0 =&gt; Some(x)
+    Both(x, _) | x &gt; 0 =&gt; Some(x)
+    _                  =&gt; None
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>function
+  get_left_if_positive : one_or_both(int, &#39;b) =&gt; option(int)
+  get_left_if_positive(Left(x))    | x &gt; 0 = Some(x)
+  get_left_if_positive(Both(x, _)) | x &gt; 0 = Some(x)
+  get_left_if_positive(_)                  = None
+</code></pre></div>
+<p>Guards cannot be stateful even when used inside a stateful function.</p>
 <h2 id="lists">Lists</h2>
 <p>A Sophia list is a dynamically sized, homogenous, immutable, singly
 linked list. A list is constructed with the syntax <code>[1, 2, 3]</code>. The

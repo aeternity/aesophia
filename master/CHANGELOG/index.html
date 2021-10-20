@@ -1258,6 +1258,15 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>Assign patterns to variables (e.g. <code>let x::(t = y::_) = [1, 2, 3, 4]</code> where <code>t == [2, 3, 4]</code>)</li>
 <li>Add builtin types (<code>AENS.name, AENS.pointee, Chain.ttl, Chain.base_tx, Chain.ga_meta_tx, Chain.paying_for_tx</code>) to
   the calldata and result decoder</li>
+<li>Patterns guards
+  <div class="highlight"><pre><span></span><code>switch(x)
+  a::[] | a &gt; 10 =&gt; 1
+  _              =&gt; 2
+</code></pre></div>
+  <div class="highlight"><pre><span></span><code>function
+  f(a::[]) | a &gt; 10 = 1
+  f(_)              = 2
+</code></pre></div></li>
 </ul>
 <h3 id="changed">Changed</h3>
 <ul>
