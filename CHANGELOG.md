@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+### Changed
+### Removed
+
+## [6.1.0] - 2021-10-20
+### Added
 - `Bitwise` stdlib
 - `Set` stdlib
 - `Option.force_msg`
@@ -26,7 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ```
 ### Changed
 - Fixed the ACI renderer, it shouldn't drop the `stateful` modifier
-### Removed
 
 ## [6.0.2] 2021-07-05
 ### Changed
@@ -328,7 +332,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v6.0.2...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v6.1.0...HEAD
+[6.1.0]: https://github.com/aeternity/aesophia/compare/v6.0.2...v6.1.0
 [6.0.2]: https://github.com/aeternity/aesophia/compare/v6.0.1...v6.0.2
 [6.0.1]: https://github.com/aeternity/aesophia/compare/v6.0.0...v6.0.1
 [6.0.0]: https://github.com/aeternity/aesophia/compare/v5.0.0...v6.0.0
