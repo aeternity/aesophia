@@ -202,6 +202,7 @@ compilable_contracts() ->
      "child_contract_init_bug",
      "using_namespace",
      "assign_patterns",
+     "patterns_guards",
      "test" % Custom general-purpose test file. Keep it last on the list.
     ].
 
@@ -807,6 +808,14 @@ failing_contracts() ->
     , ?TYPE_ERROR(using_namespace_hidden_parts,
                   [<<?Pos(8,23)
                      "Unbound variable g at line 8, column 23">>
+                  ])
+    , ?TYPE_ERROR(stateful_pattern_guard,
+                  [<<?Pos(8,12)
+                     "Cannot reference stateful function g (at line 8, column 12) in a pattern guard.">>
+                  ])
+    , ?TYPE_ERROR(non_boolean_pattern_guard,
+                  [<<?Pos(4,24)
+                     "Cannot unify string\n         and bool\nwhen checking the type of the expression at line 4, column 24\n  \"y\" : string\nagainst the expected type\n  bool">>
                   ])
     ].
 

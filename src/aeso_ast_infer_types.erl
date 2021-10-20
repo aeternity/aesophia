@@ -132,6 +132,7 @@
     , namespace        = []                 :: qname()
     , used_namespaces  = []                 :: used_namespaces()
     , in_pattern       = false              :: boolean()
+    , in_guard         = false              :: boolean()
     , stateful         = false              :: boolean()
     , current_function = none               :: none | aeso_syntax:id()
     , what             = top                :: top | namespace | contract | contract_interface
@@ -284,7 +285,7 @@ bind_contract({Contract, Ann, Id, Contents}, Env)
            contract_call_type(
              {fun_t, AnnF, [], [ArgT || {typed, _, _, ArgT} <- Args], RetT})
           }
-          || {letfun, AnnF, Entrypoint = {id, _, Name}, Args, _Type, {typed, _, _, RetT}} <- Contents,
+          || {letfun, AnnF, Entrypoint = {id, _, Name}, Args, _Type, [{guarded, _, [], {typed, _, _, RetT}}]} <- Contents,
              Name =/= "init"
         ] ++
         %% Predefined fields
@@ -1356,23 +1357,29 @@ infer_letfun(Env, {fun_clauses, Ann, Fun = {id, _, Name}, Type, Clauses}) ->
 infer_letfun(Env, LetFun = {letfun, Ann, Fun, _, _, _}) ->
     {{Name, Sig}, Clause} = infer_letfun1(Env, LetFun),
     {{Name, Sig}, desugar_clauses(Ann, Fun, Sig, [Clause])}.
-
-infer_letfun1(Env0, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, Body}) ->
+infer_letfun1(Env0, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, GuardedBodies}) ->
     Env = Env0#env{ stateful = aeso_syntax:get_ann(stateful, Attrib, false),
                     current_function = Fun },
     {NewEnv, {typed, _, {tuple, _, TypedArgs}, {tuple_t, _, ArgTypes}}} = infer_pattern(Env, {tuple, [{origin, system} | NameAttrib], Args}),
     ExpectedType = check_type(Env, arg_type(NameAttrib, What)),
-    NewBody={typed, _, _, ResultType} = check_expr(NewEnv, Body, ExpectedType),
+    InferGuardedBodies = fun({guarded, Ann, Guards, Body}) ->
+        NewGuards = lists:map(fun(Guard) ->
+                                  check_expr(NewEnv#env{ in_guard = true }, Guard, {id, Attrib, "bool"})
+                              end, Guards),
+        NewBody = check_expr(NewEnv, Body, ExpectedType),
+        {guarded, Ann, NewGuards, NewBody}
+    end,
+    NewGuardedBodies = [{guarded, _, _, {typed, _, _, ResultType}} | _] = lists:map(InferGuardedBodies, GuardedBodies),
     NamedArgs = [],
     TypeSig = {type_sig, Attrib, none, NamedArgs, ArgTypes, ResultType},
     {{Name, TypeSig},
-     {letfun, Attrib, {id, NameAttrib, Name}, TypedArgs, ResultType, NewBody}}.
+     {letfun, Attrib, {id, NameAttrib, Name}, TypedArgs, ResultType, NewGuardedBodies}}.
 
 desugar_clauses(Ann, Fun, {type_sig, _, _, _, ArgTypes, RetType}, Clauses) ->
     NeedDesugar =
         case Clauses of
-            [{letfun, _, _, As, _, _}] -> lists:any(fun({typed, _, {id, _, _}, _}) -> false; (_) -> true end, As);
-            _                          -> true
+            [{letfun, _, _, As, _, [{guarded, _, [], _}]}] -> lists:any(fun({typed, _, {id, _, _}, _}) -> false; (_) -> true end, As);
+            _                                              -> true
         end,
     case NeedDesugar of
         false -> [Clause] = Clauses, Clause;
@@ -1383,11 +1390,10 @@ desugar_clauses(Ann, Fun, {type_sig, _, _, _, ArgTypes, RetType}, Clauses) ->
             Tuple = fun([X]) -> X;
                        (As) -> {typed, NoAnn, {tuple, NoAnn, As}, {tuple_t, NoAnn, ArgTypes}}
                     end,
-            {letfun, Ann, Fun, Args, RetType,
-             {typed, NoAnn,
-              {switch, NoAnn, Tuple(Args),
-                [ {'case', AnnC, Tuple(ArgsC), Body}
-                || {letfun, AnnC, _, ArgsC, _, Body} <- Clauses ]}, RetType}}
+            {letfun, Ann, Fun, Args, RetType, [{guarded, NoAnn, [], {typed, NoAnn,
+               {switch, NoAnn, Tuple(Args),
+                 [ {'case', AnnC, Tuple(ArgsC), GuardedBodies}
+                 || {letfun, AnnC, _, ArgsC, _, GuardedBodies} <- Clauses ]}, RetType}}]}
     end.
 
 print_typesig({Name, TypeSig}) ->
@@ -1425,6 +1431,12 @@ lookup_name(Env, As, Id, Options) ->
             {set_qname(QId, Id), Ty1}
     end.
 
+check_stateful(#env{ in_guard = true }, Id, Type = {type_sig, _, _, _, _, _}) ->
+    case aeso_syntax:get_ann(stateful, Type, false) of
+        false -> ok;
+        true  ->
+            type_error({stateful_not_allowed_in_guards, Id})
+    end;
 check_stateful(#env{ stateful = false, current_function = Fun }, Id, Type = {type_sig, _, _, _, _, _}) ->
     case aeso_syntax:get_ann(stateful, Type, false) of
         false -> ok;
@@ -1449,7 +1461,7 @@ check_state_dependencies(Env, Defs) ->
     SetState  = Top ++ ["put"],
     Init      = Top ++ ["init"],
     UsedNames = fun(X) -> [{Xs, Ann} || {{term, Xs}, Ann} <- aeso_syntax_utils:used(X)] end,
-    Funs      = [ {Top ++ [Name], Fun} || Fun = {letfun, _, {id, _, Name}, _Args, _Type, _Body} <- Defs ],
+    Funs      = [ {Top ++ [Name], Fun} || Fun = {letfun, _, {id, _, Name}, _Args, _Type, _GuardedBodies} <- Defs ],
     Deps      = maps:from_list([{Name, UsedNames(Def)} || {Name, Def} <- Funs]),
     case maps:get(Init, Deps, false) of
         false -> ok;    %% No init, so nothing to check
@@ -1553,12 +1565,12 @@ infer_expr(Env, {list_comp, AttrsL, Yield, [{comprehension_if, AttrsIF, Cond}|Re
 infer_expr(Env, {list_comp, AsLC, Yield, [{letval, AsLV, Pattern, E}|Rest]}) ->
     NewE = {typed, _, _, PatType} = infer_expr(Env, E),
     BlockType = fresh_uvar(AsLV),
-    {'case', _, NewPattern, NewRest} =
+    {'case', _, NewPattern, [{guarded, _, [], NewRest}]} =
         infer_case( Env
                   , AsLC
                   , Pattern
                   , PatType
-                  , {list_comp, AsLC, Yield, Rest}
+                  , [{guarded, AsLC, [], {list_comp, AsLC, Yield, Rest}}]
                   , BlockType),
     {typed, _, {list_comp, _, TypedYield, TypedRest}, ResType} = NewRest,
     { typed
@@ -1616,8 +1628,8 @@ infer_expr(Env, {'if', Attrs, Cond, Then, Else}) ->
 infer_expr(Env, {switch, Attrs, Expr, Cases}) ->
     NewExpr = {typed, _, _, ExprType} = infer_expr(Env, Expr),
     SwitchType = fresh_uvar(Attrs),
-    NewCases = [infer_case(Env, As, Pattern, ExprType, Branch, SwitchType)
-                || {'case', As, Pattern, Branch} <- Cases],
+    NewCases = [infer_case(Env, As, Pattern, ExprType, GuardedBranches, SwitchType)
+                || {'case', As, Pattern, GuardedBranches} <- Cases],
     {typed, Attrs, {switch, Attrs, NewExpr, NewCases}, SwitchType};
 infer_expr(Env, {record, Attrs, Fields}) ->
     RecordType = fresh_uvar(Attrs),
@@ -1699,8 +1711,8 @@ infer_expr(Env, {lam, Attrs, Args, Body}) ->
     ArgTypes = [fresh_uvar(As) || {arg, As, _, _} <- Args],
     ArgPatterns = [{typed, As, Pat, check_type(Env, T)} || {arg, As, Pat, T} <- Args],
     ResultType = fresh_uvar(Attrs),
-    {'case', _, {typed, _, {tuple, _, NewArgPatterns}, _}, NewBody} =
-        infer_case(Env, Attrs, {tuple, Attrs, ArgPatterns}, {tuple_t, Attrs, ArgTypes}, Body, ResultType),
+    {'case', _, {typed, _, {tuple, _, NewArgPatterns}, _}, [{guarded, _, [], NewBody}]} =
+        infer_case(Env, Attrs, {tuple, Attrs, ArgPatterns}, {tuple_t, Attrs, ArgTypes}, [{guarded, Attrs, [], Body}], ResultType),
     NewArgs = [{arg, As, NewPat, NewT} || {typed, As, NewPat, NewT} <- NewArgPatterns],
     {typed, Attrs, {lam, Attrs, NewArgs, NewBody}, {fun_t, Attrs, [], ArgTypes, ResultType}};
 infer_expr(Env, {letpat, Attrs, Id, Pattern}) ->
@@ -1836,11 +1848,18 @@ infer_pattern(Env, Pattern) ->
     NewPattern = infer_expr(NewEnv, Pattern),
     {NewEnv#env{ in_pattern = Env#env.in_pattern }, NewPattern}.
 
-infer_case(Env, Attrs, Pattern, ExprType, Branch, SwitchType) ->
+infer_case(Env, Attrs, Pattern, ExprType, GuardedBranches, SwitchType) ->
     {NewEnv, NewPattern = {typed, _, _, PatType}} = infer_pattern(Env, Pattern),
-    NewBranch  = check_expr(NewEnv#env{ in_pattern = false }, Branch, SwitchType),
+    InferGuardedBranches = fun({guarded, Ann, Guards, Branch}) ->
+        NewGuards = lists:map(fun(Guard) ->
+                                  check_expr(NewEnv#env{ in_guard = true }, Guard, {id, Attrs, "bool"})
+                              end, Guards),
+        NewBranch = check_expr(NewEnv#env{ in_pattern = false }, Branch, SwitchType),
+        {guarded, Ann, NewGuards, NewBranch}
+    end,
+    NewGuardedBranches = lists:map(InferGuardedBranches, GuardedBranches),
     unify(Env, PatType, ExprType, {case_pat, Pattern, PatType, ExprType}),
-    {'case', Attrs, NewPattern, NewBranch}.
+    {'case', Attrs, NewPattern, NewGuardedBranches}.
 
 %% NewStmts = infer_block(Env, Attrs, Stmts, BlockType)
 infer_block(_Env, Attrs, [], BlockType) ->
@@ -1854,8 +1873,8 @@ infer_block(Env, Attrs, [Def={letfun, Ann, _, _, _, _}|Rest], BlockType) ->
     [LetFun|infer_block(NewE, Attrs, Rest, BlockType)];
 infer_block(Env, _, [{letval, Attrs, Pattern, E}|Rest], BlockType) ->
     NewE = {typed, _, _, PatType} = infer_expr(Env, E),
-    {'case', _, NewPattern, {typed, _, {block, _, NewRest}, _}} =
-        infer_case(Env, Attrs, Pattern, PatType, {block, Attrs, Rest}, BlockType),
+    {'case', _, NewPattern, [{guarded, _, [], {typed, _, {block, _, NewRest}, _}}]} =
+        infer_case(Env, Attrs, Pattern, PatType, [{guarded, Attrs, [], {block, Attrs, Rest}}], BlockType),
     [{letval, Attrs, NewPattern, NewE}|NewRest];
 infer_block(Env, Attrs, [Using = {using, _, _, _, _} | Rest], BlockType) ->
     infer_block(check_usings(Env, Using), Attrs, Rest, BlockType);
@@ -2424,8 +2443,8 @@ unfold_types(Env, {type_def, Ann, Name, Args, Def}, Options) ->
     {type_def, Ann, Name, Args, unfold_types_in_type(Env, Def, Options)};
 unfold_types(Env, {fun_decl, Ann, Name, Type}, Options) ->
     {fun_decl, Ann, Name, unfold_types(Env, Type, Options)};
-unfold_types(Env, {letfun, Ann, Name, Args, Type, Body}, Options) ->
-    {letfun, Ann, Name, unfold_types(Env, Args, Options), unfold_types_in_type(Env, Type, Options), unfold_types(Env, Body, Options)};
+unfold_types(Env, {letfun, Ann, Name, Args, Type, [{guarded, AnnG, [], Body}]}, Options) ->
+    {letfun, Ann, Name, unfold_types(Env, Args, Options), unfold_types_in_type(Env, Type, Options), [{guarded, AnnG, [], unfold_types(Env, Body, Options)}]};
 unfold_types(Env, T, Options) when is_tuple(T) ->
     list_to_tuple(unfold_types(Env, tuple_to_list(T), Options));
 unfold_types(Env, [H|T], Options) ->
@@ -2925,6 +2944,10 @@ mk_error({letval, _Pos, {id, Pos, Name}, _Def}) ->
 mk_error({stateful_not_allowed, Id, Fun}) ->
     Msg = io_lib:format("Cannot reference stateful function ~s (at ~s)\nin the definition of non-stateful function ~s.\n",
                         [pp(Id), pp_loc(Id), pp(Fun)]),
+    mk_t_err(pos(Id), Msg);
+mk_error({stateful_not_allowed_in_guards, Id}) ->
+    Msg = io_lib:format("Cannot reference stateful function ~s (at ~s) in a pattern guard.\n",
+                        [pp(Id), pp_loc(Id)]),
     mk_t_err(pos(Id), Msg);
 mk_error({value_arg_not_allowed, Value, Fun}) ->
     Msg = io_lib:format("Cannot pass non-zero value argument ~s (at ~s)\nin the definition of non-stateful function ~s.\n",

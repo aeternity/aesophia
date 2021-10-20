@@ -121,7 +121,7 @@ contract IntHolder =
   type state = int
   entrypoint init(x) = x
   entrypoint get() = state
-  
+
 main contract IntHolderFactory =
   stateful entrypoint new(x : int) : IntHolder =
     let ih = Chain.create(x) : IntHolder
@@ -471,6 +471,8 @@ function
   get_left(Both(x, _)) = Some(x)
 ```
 
+*NOTE: Data types cannot currently be recursive.*
+
 Sophia also supports the assignment of patterns to variables:
 ```sophia
 function f(x) = switch(x)
@@ -482,7 +484,28 @@ function g(p : int * option(int)) : int =
   b
 ```
 
-*NOTE: Data types cannot currently be recursive.*
+Guards are boolean expressions that can be used on patterns in both switch
+statements and functions definitions. If a guard expression evaluates to
+`true`, then the corresponding body will be used. Otherwise, the next pattern
+will be checked:
+
+```sophia
+function get_left_if_positive(x : one_or_both(int, 'b)) : option(int) =
+  switch(x)
+    Left(x)    | x > 0 => Some(x)
+    Both(x, _) | x > 0 => Some(x)
+    _                  => None
+```
+
+```sophia
+function
+  get_left_if_positive : one_or_both(int, 'b) => option(int)
+  get_left_if_positive(Left(x))    | x > 0 = Some(x)
+  get_left_if_positive(Both(x, _)) | x > 0 = Some(x)
+  get_left_if_positive(_)                  = None
+```
+
+Guards cannot be stateful even when used inside a stateful function.
 
 ## Lists
 

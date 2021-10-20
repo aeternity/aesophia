@@ -41,15 +41,15 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
     Top = Fun(K, X),
     Rec = case X of
             %% lists (bound things in head scope over tail)
-            [A | As]                 -> Scoped(Same(A), Same(As));
+            [A | As]                      -> Scoped(Same(A), Same(As));
             %% decl()
-            {contract, _, _, Ds}     -> Decl(Ds);
-            {namespace, _, _, Ds}    -> Decl(Ds);
-            {type_def, _, I, _, D}   -> Plus(BindType(I), Decl(D));
-            {fun_decl, _, _, T}      -> Type(T);
-            {letval, _, P, E}        -> Scoped(BindExpr(P), Expr(E));
-            {letfun, _, F, Xs, T, E} -> Sum([BindExpr(F), Type(T), Expr(Xs ++ [E])]);
-            {fun_clauses, _, _, T, Cs} -> Sum([Type(T) | [Decl(C) || C <- Cs]]);
+            {contract, _, _, Ds}          -> Decl(Ds);
+            {namespace, _, _, Ds}         -> Decl(Ds);
+            {type_def, _, I, _, D}        -> Plus(BindType(I), Decl(D));
+            {fun_decl, _, _, T}           -> Type(T);
+            {letval, _, P, E}             -> Scoped(BindExpr(P), Expr(E));
+            {letfun, _, F, Xs, T, GEs} -> Sum([BindExpr(F), Type(T), Expr(Xs ++ GEs)]);
+            {fun_clauses, _, _, T, Cs}    -> Sum([Type(T) | [Decl(C) || C <- Cs]]);
             %% typedef()
             {alias_t, T}    -> Type(T);
             {record_t, Fs}  -> Type(Fs);
@@ -89,13 +89,14 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
             {map_get, _, A, B, C}  -> Expr([A, B, C]);
             {block, _, Ss}         -> Expr(Ss);
             {letpat, _, X, P}      -> Plus(BindExpr(X), Expr(P));
+            {guarded, _, Gs, E}    -> Expr([E | Gs]);
             %% field()
             {field, _, LV, E}    -> Expr([LV, E]);
             {field, _, LV, _, E} -> Expr([LV, E]);
             %% arg()
             {arg, _, Y, T} -> Plus(BindExpr(Y), Type(T));
             %% alt()
-            {'case', _, P, E} -> Scoped(BindExpr(P), Expr(E));
+            {'case', _, P, GEs} -> Scoped(BindExpr(P), Expr(GEs));
             %% elim()
             {proj, _, _}    -> Zero;
             {map_get, _, E} -> Expr(E);

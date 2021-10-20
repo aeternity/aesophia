@@ -475,9 +475,9 @@ error_missing_call_function() ->
 get_call_type([{Contract, _, _, Defs}]) when ?IS_CONTRACT_HEAD(Contract) ->
     case [ {lists:last(QFunName), FunType}
           || {letfun, _, {id, _, ?CALL_NAME}, [], _Ret,
-                {typed, _,
-                    {app, _,
-                        {typed, _, {qid, _, QFunName}, FunType}, _}, _}} <- Defs ] of
+                [{guarded, _, [], {typed, _,
+                     {app, _,
+                         {typed, _, {qid, _, QFunName}, FunType}, _}, _}}]} <- Defs ] of
         [Call] -> {ok, Call};
         []     -> error_missing_call_function()
     end;

@@ -385,7 +385,7 @@ decl_to_fcode(Env = #{context := {contract_def, _}}, {fun_decl, _, Id, _}) ->
 decl_to_fcode(Env, {fun_decl, _, _, _})  -> Env;
 decl_to_fcode(Env, {type_def, _Ann, Name, Args, Def}) ->
     typedef_to_fcode(Env, Name, Args, Def);
-decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, Id = {id, _, Name}, Args, Ret, Body}) ->
+decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, Id = {id, _, Name}, Args, Ret, [{guarded, _, [], Body}]}) ->
     Attrs = get_attributes(Ann),
     FName = lookup_fun(Env, qname(Env, Name)),
     FArgs = args_to_fcode(Env, Args),
@@ -662,8 +662,8 @@ expr_to_fcode(Env, _Type, {list_comp, As, Yield, [{comprehension_bind, Pat = {ty
     Arg  = fresh_name(),
     Env1 = bind_var(Env, Arg),
     Bind = {lam, [Arg], expr_to_fcode(Env1, {switch, As, {typed, As, {id, As, Arg}, PatType},
-                                                [{'case', As, Pat, {list_comp, As, Yield, Rest}},
-                                                 {'case', As, {id, As, "_"}, {list, As, []}}]})},
+                                                [{'case', As, Pat, [{guarded, As, [], {list_comp, As, Yield, Rest}}]},
+                                                 {'case', As, {id, As, "_"}, [{guarded, As, [], {list, As, []}}]}]})},
     {def_u, FlatMap, _} = resolve_fun(Env, ["ListInternal", "flat_map"]),
     {def, FlatMap, [Bind, expr_to_fcode(Env, BindExpr)]};
 expr_to_fcode(Env, Type, {list_comp, As, Yield, [{comprehension_if, _, Cond}|Rest]}) ->
@@ -683,9 +683,9 @@ expr_to_fcode(Env, _Type, {'if', _, Cond, Then, Else}) ->
             expr_to_fcode(Env, Else));
 
 %% Switch
-expr_to_fcode(Env, _, {switch, _, Expr = {typed, _, E, Type}, Alts}) ->
+expr_to_fcode(Env, _, S = {switch, _, Expr = {typed, _, E, Type}, Alts}) ->
     Switch = fun(X) ->
-                {switch, alts_to_fcode(Env, type_to_fcode(Env, Type), X, Alts)}
+                {switch, alts_to_fcode(Env, type_to_fcode(Env, Type), X, Alts, S)}
              end,
     case E of
         {id, _, X} -> Switch(X);
@@ -798,6 +798,13 @@ make_if(Cond, Then, Else) ->
     X = fresh_name(),
     {'let', X, Cond, make_if({var, X}, Then, Else)}.
 
+make_if_no_else({var, X}, Then) ->
+    {switch, {split, boolean, X,
+        [{'case', {bool, true},  {nosplit, Then}}]}};
+make_if_no_else(Cond, Then) ->
+    X = fresh_name(),
+    {'let', X, Cond, make_if_no_else({var, X}, Then)}.
+
 -spec make_tuple([fexpr()]) -> fexpr().
 make_tuple([E]) -> E;
 make_tuple(Es) -> {tuple, Es}.
@@ -863,9 +870,9 @@ is_first_order(_)                      -> true.
 
 %% -- Pattern matching --
 
--spec alts_to_fcode(env(), ftype(), var_name(), [aeso_syntax:alt()]) -> fsplit().
-alts_to_fcode(Env, Type, X, Alts) ->
-    FAlts = [alt_to_fcode(Env, Alt) || Alt <- Alts],
+-spec alts_to_fcode(env(), ftype(), var_name(), [aeso_syntax:alt()], aeso_syntax:expr()) -> fsplit().
+alts_to_fcode(Env, Type, X, Alts, Switch) ->
+    FAlts = remove_guards(Env, Alts, Switch),
     split_tree(Env, [{X, Type}], FAlts).
 
 %% Intermediate format before case trees (fcase() and fsplit()).
@@ -878,6 +885,41 @@ alts_to_fcode(Env, Type, X, Alts) ->
               | {tuple, [fpat()]}
               | {con, arities(), tag(), [fpat()]}
               | {assign, fpat(), fpat()}.
+
+remove_guards(_Env, [], _Switch) ->
+    [];
+remove_guards(Env, [Alt = {'case', _, _, [{guarded, _, [], _Expr}]} | Rest], Switch) ->
+    [alt_to_fcode(Env, Alt) | remove_guards(Env, Rest, Switch)];
+remove_guards(Env, [{'case', AnnC, Pat, [{guarded, AnnG, [Guard | Guards], Body} | GuardedBodies]} | Rest], Switch = {switch, Ann, Expr, _}) ->
+    FPat = pat_to_fcode(Env, Pat),
+    FGuard = expr_to_fcode(bind_vars(Env, pat_vars(FPat)), Guard),
+    FBody = expr_to_fcode(bind_vars(Env, pat_vars(FPat)), Body),
+    case Guards of
+        [] ->
+            R = case GuardedBodies of
+                    [] -> Rest;
+                    _  -> [{'case', AnnC, Pat, GuardedBodies} | Rest]
+                end,
+            case R of
+                [] ->
+                    [{'case', [FPat], make_if_no_else(FGuard, FBody)} | remove_guards(Env, Rest, Switch)];
+                _ ->
+                    FSwitch = expr_to_fcode(Env, {switch, Ann, Expr, R}),
+                    [{'case', [FPat], make_if(FGuard, FBody, FSwitch)} | remove_guards(Env, Rest, Switch)]
+            end;
+        _ ->
+            R1 = case GuardedBodies of
+                     [] -> [{'case', AnnC, Pat, [{guarded, AnnG, Guards, Body}]} | Rest];
+                     _  -> [{'case', AnnC, Pat, [{guarded, AnnG, Guards, Body} | GuardedBodies]} | Rest]
+                 end,
+            R2 = case GuardedBodies of
+                     [] -> Rest;
+                     _  -> [{'case', AnnC, Pat, GuardedBodies} | Rest]
+                 end,
+            FSwitch1 = expr_to_fcode(Env, {switch, Ann, Expr, R1}),
+            FSwitch2 = expr_to_fcode(Env, {switch, Ann, Expr, R2}),
+            [{'case', [FPat], make_if(FGuard, FSwitch1, FSwitch2)} | remove_guards(Env, Rest, Switch)]
+    end.
 
 %% %% Invariant: the number of variables matches the number of patterns in each falt.
 -spec split_tree(env(), [{var_name(), ftype()}], [falt()]) -> fsplit().
@@ -1005,7 +1047,7 @@ next_split(Pats) ->
     end.
 
 -spec alt_to_fcode(env(), aeso_syntax:alt()) -> falt().
-alt_to_fcode(Env, {'case', _, Pat, Expr}) ->
+alt_to_fcode(Env, {'case', _, Pat, [{guarded, _, [], Expr}]}) ->
     FPat  = pat_to_fcode(Env, Pat),
     FExpr = expr_to_fcode(bind_vars(Env, pat_vars(FPat)), Expr),
     {'case', [FPat], FExpr}.
@@ -1083,8 +1125,8 @@ decision_tree_to_fcode({'if', A, Then, Else}) ->
 stmts_to_fcode(Env, [{letval, _, {typed, _, {id, _, X}, _}, Expr} | Stmts]) ->
     {'let', X, expr_to_fcode(Env, Expr), stmts_to_fcode(bind_var(Env, X), Stmts)};
 stmts_to_fcode(Env, [{letval, Ann, Pat, Expr} | Stmts]) ->
-    expr_to_fcode(Env, {switch, Ann, Expr, [{'case', Ann, Pat, {block, Ann, Stmts}}]});
-stmts_to_fcode(Env, [{letfun, Ann, {id, _, X}, Args, _Type, Expr} | Stmts]) ->
+    expr_to_fcode(Env, {switch, Ann, Expr, [{'case', Ann, Pat, [{guarded, Ann, [], {block, Ann, Stmts}}]}]});
+stmts_to_fcode(Env, [{letfun, Ann, {id, _, X}, Args, _Type, [{guarded, _, [], Expr}]} | Stmts]) ->
     LamArgs = [ case Arg of
                     {typed, Ann1, Id, T} -> {arg, Ann1, Id, T};
                     _ -> internal_error({bad_arg, Arg})   %% pattern matching has been desugared

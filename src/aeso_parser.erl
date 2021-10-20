@@ -211,10 +211,16 @@ letdef() -> choice(valdef(), fundef()).
 valdef() ->
     ?RULE(pattern(), tok('='), body(), {letval, [], _1, _3}).
 
+guarded_fundefs() ->
+    choice(
+    [ ?RULE(keyword('='), body(), [{guarded, _1, [], _2}])
+    , maybe_block(?RULE(keyword('|'), comma_sep(expr()), tok('='), body(), {guarded, _1, _2, _4}))
+    ]).
+
 fundef() ->
     choice(
-    [ ?RULE(id(), args(),                   tok('='), body(), {letfun, get_ann(_1), _1, _2, type_wildcard(get_ann(_1)), _4})
-    , ?RULE(id(), args(), tok(':'), type(), tok('='), body(), {letfun, get_ann(_1), _1, _2, _4, _6})
+    [ ?RULE(id(), args(),                   guarded_fundefs(), {letfun, get_ann(_1), _1, _2, type_wildcard(get_ann(_1)), _3})
+    , ?RULE(id(), args(), tok(':'), type(), guarded_fundefs(), {letfun, get_ann(_1), _1, _2, _4, _5})
     ]).
 
 args() -> paren_list(pattern()).
@@ -283,7 +289,13 @@ stmt() ->
     ])).
 
 branch() ->
-    ?RULE(pattern(), keyword('=>'), body(), {'case', _2, _1, _3}).
+    ?RULE(pattern(), guarded_branches(), {'case', get_ann(lists:nth(1, _2)), _1, _2}).
+
+guarded_branches() ->
+    choice(
+    [ ?RULE(keyword('=>'), body(), [{guarded, _1, [], _2}])
+    , maybe_block(?RULE(tok('|'), comma_sep(expr()), keyword('=>'), body(), {guarded, _3, _2, _4}))
+    ]).
 
 pattern() ->
     ?LET_P(E, expr(), parse_pattern(E)).
