@@ -457,10 +457,10 @@ Oracle.get_answer(o : oracle('a, 'b), q : oracle_query('a, 'b)) : option('b)
 Checks what is the optional query answer
 
 
-#### expire
+#### expiry
 
 ```
-Oracle.expire(o : oracle('a, 'b)) : int
+Oracle.expiry(o : oracle('a, 'b)) : int
 ```
 
 Ask the oracle when it expires. The result is the block height at which it will happen.
