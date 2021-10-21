@@ -385,8 +385,8 @@ Registers new oracle answering questions of type `'a` with answers of type `'b`.
   private key of the account, proving you have the private key of the oracle to be. If the
   address is the same as the contract `sign` is ignored and can be left out entirely.
 * The `qfee` is the minimum query fee to be paid by a user when asking a question of the oracle.
-* The `ttl` is the Time To Live for the oracle, either relative to the current
-  height (`RelativeTTL(delta)`) or a fixed height (`FixedTTL(height)`).
+* The `ttl` is the Time To Live for the oracle in key blocks, either relative to the current
+  key block height (`RelativeTTL(delta)` where `delta` must be ≤ `64796`) or a fixed key block height (`FixedTTL(height)`).
 * The type `'a` is the type of the question to ask.
 * The type `'b` is the type of the oracle answers.
 
