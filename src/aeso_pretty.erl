@@ -436,15 +436,20 @@ bin_prec('=')    -> {  0,   0,   0};  %% Always printed inside '[ ]'
 bin_prec('@')    -> {  0,   0,   0};  %% Only in error messages
 bin_prec('|>')   -> {150, 150, 200};
 bin_prec('||')   -> {200, 300, 200};
-bin_prec('&&')   -> {300, 400, 300};
+bin_prec('&&')   -> {300, 325, 300};
+bin_prec('bor')  -> {325, 350, 325};
+bin_prec('bxor') -> {350, 375, 350};
+bin_prec('band') -> {375, 400, 375};
 bin_prec('<')    -> {400, 500, 500};
 bin_prec('>')    -> {400, 500, 500};
 bin_prec('=<')   -> {400, 500, 500};
 bin_prec('>=')   -> {400, 500, 500};
 bin_prec('==')   -> {400, 500, 500};
 bin_prec('!=')   -> {400, 500, 500};
-bin_prec('++')   -> {500, 600, 500};
-bin_prec('::')   -> {500, 600, 500};
+bin_prec('++')   -> {500, 550, 500};
+bin_prec('::')   -> {500, 550, 500};
+bin_prec('<<')   -> {550, 600, 550};
+bin_prec('>>')   -> {550, 600, 550};
 bin_prec('+')    -> {600, 600, 650};
 bin_prec('-')    -> {600, 600, 650};
 bin_prec('*')    -> {700, 700, 750};
@@ -454,7 +459,8 @@ bin_prec('^')    -> {750, 750, 800}.
 
 -spec un_prec(aeso_syntax:un_op()) -> {integer(), integer()}.
 un_prec('-')    -> {650, 650};
-un_prec('!')    -> {800, 800}.
+un_prec('!')    -> {800, 800};
+un_prec('bnot') -> {850, 850}.
 
 equals(Ann, A, B) ->
     {app, [{format, infix} | Ann], {'=', Ann}, [A, B]}.
