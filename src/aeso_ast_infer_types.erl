@@ -711,7 +711,8 @@ global_env() ->
                       {"ecrecover_secp256k1",  Fun([Hash, Bytes(65)], Option(Bytes(20)))},
                       {"sha3",     Fun1(A, Hash)},
                       {"sha256",   Fun1(A, Hash)},
-                      {"blake2b",  Fun1(A, Hash)}]) },
+                      {"blake2b",  Fun1(A, Hash)},
+                      {"poseidon", Fun([Int, Int], Int)}]) },
 
     %% Fancy BLS12-381 crypto operations
     MCL_BLS12_381_Scope = #scope
@@ -796,13 +797,15 @@ global_env() ->
                    ]) },
 
     %% Conversion
-    IntScope     = #scope{ funs = MkDefs([{"to_str", Fun1(Int,     String)}]) },
+    IntScope     = #scope{ funs = MkDefs([{"to_str", Fun1(Int, String)},
+                                          {"mulmod", Fun([Int, Int, Int], Int)}]) },
+
     AddressScope = #scope{ funs = MkDefs([{"to_str", Fun1(Address, String)},
+                                          {"to_bytes", Fun1(Address, Bytes(32))},
                                           {"to_contract", FunC(address_to_contract, [Address], A)},
                                           {"is_oracle", Fun1(Address, Bool)},
                                           {"is_contract", Fun1(Address, Bool)},
                                           {"is_payable", Fun1(Address, Bool)}]) },
-
 
     #env{ scopes =
             #{ []           => TopScope
@@ -2167,6 +2170,11 @@ infer_infix({IntOp, As})
        IntOp == '^';    IntOp == 'mod' ->
     Int = {id, As, "int"},
     {fun_t, As, [], [Int, Int], Int};
+infer_infix({BitOp, As})
+  when BitOp == 'band'; BitOp == 'bor'; BitOp == 'bxor';
+       BitOp == '<<';   BitOp == '>>' ->
+    Int = {id, As, "int"},
+    {fun_t, As, [], [Int, Int], Int};
 infer_infix({RelOp, As})
   when RelOp == '=='; RelOp == '!=';
        RelOp == '<';  RelOp == '>';
@@ -2194,6 +2202,9 @@ infer_infix({'|>', As}) ->
 infer_prefix({'!',As}) ->
     Bool = {id, As, "bool"},
     {fun_t, As, [], [Bool], Bool};
+infer_prefix({BitOp,As}) when BitOp =:= 'bnot' ->
+    Int = {id, As, "int"},
+    {fun_t, As, [], [Int], Int};
 infer_prefix({IntOp,As}) when IntOp =:= '-' ->
     Int = {id, As, "int"},
     {fun_t, As, [], [Int], Int}.

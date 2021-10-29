@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [CERES 8.0.0]
+### Added
+- Bitwise operations for integers: `band`, `bor`, `bxor`, `bnot`, `<<` and `>>`.
+- `Int.mulmod` - combined builtin operation for multiplication and modulus.
+- `Crypto.poseidon` - a ZK/SNARK-friendly hash function (over the BLS12-381 scalar field).
+- `Address.to_bytes` - convert an address to its binary representation (for hashing, etc.).
+### Changed
+### Removed
+- `Bitwise.aes` standard library is removed - the builtin operations are superior.
+
 ## [Unreleased]
 ### Added
 - Options to enable/disable certain optimizations.

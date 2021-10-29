@@ -218,6 +218,7 @@ compilable_contracts() ->
      "unapplied_contract_call",
      "unapplied_named_arg_builtin",
      "resolve_field_constraint_by_arity",
+     "ceres",
      "test" % Custom general-purpose test file. Keep it last on the list.
     ].
 

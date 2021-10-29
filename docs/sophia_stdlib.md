@@ -381,6 +381,12 @@ Call.gas_price : int
 
 The gas price of the current call.
 
+#### mulmod
+```
+Int.mulmod : (a : int, b : int, q : int) : int
+```
+
+Combined multiplication and modulus, returns `(a * b) mod q`.
 
 #### fee
 ```
@@ -469,6 +475,13 @@ Chain.block_height : int"
 
 The height of the current block (i.e. the block in which the current call will be included).
 
+#### to_bytes
+```
+Address.to_bytes(a : address) : bytes(32)
+```
+
+The binary representation of the address.
+
 
 ##### coinbase
 ```
@@ -538,6 +551,13 @@ charging the calling contract. Note that this won't be visible in `Call.value`
 in the `init` call of the new contract. It will be included in
 `Contract.balance`, however.
 
+#### poseidon
+```
+Crypto.poseidon(x1 : int, x2 : int) : int
+```
+
+Hash two integers (in the scalar field of BLS12-381) to another integer (in the scalar
+field of BLS12-281). This is a ZK/SNARK-friendly hash function.
 
 The type `'c` must be instantiated with a contract.
 
@@ -912,90 +932,6 @@ It returns `true` iff the oracle query exist and has the expected type.
 ## Includable namespaces
 
 These need to be explicitly included (with `.aes` suffix)
-
-
-### Bitwise
-
-Bitwise operations on arbitrary precision integers.
-
-#### bsr
-```
-Bitwise.bsr(n : int, x : int) : int
-```
-
-Logical bit shift `x` right `n` positions.
-
-
-#### bsl
-```
-Bitwise.bsl(n : int, x : int) : int
-```
-
-Logical bit shift `x` left `n` positions.
-
-
-#### bsli
-```
-Bitwise.bsli(n : int, x : int, lim : int) : int
-```
-
-Logical bit shift `x` left `n` positions, limit to `lim` bits.
-
-
-#### band
-```
-Bitwise.band(x : int, y : int) : int
-```
-
-Bitwise `and` of `x` and `y`.
-
-
-#### bor
-```
-Bitwise.bor(x : int, y : int) : int
-```
-
-Bitwise `or` of `x` and `y`.
-
-
-#### bxor
-```
-Bitwise.bxor(x : int, y : int) : int
-```
-
-Bitwise `xor` of `x` and `y`.
-
-
-#### bnot
-```
-Bitwise.bnot(x : int) : int
-```
-
-Bitwise `not` of `x`. Defined and implemented as `bnot(x) = bxor(x, -1)`.
-
-
-#### uband
-```
-Bitwise.uband(x : int, y : int) : int
-```
-
-Bitwise `and` of _non-negative_ numbers `x` and `y`.
-
-
-#### ubor
-```
-Bitwise.ubor(x : int, y : int) : int
-```
-
-Bitwise `or` of _non-negative_ `x` and `y`.
-
-
-#### ubxor
-```
-Bitwise.ubxor(x : int, y : int) : int
-```
-
-Bitwise `xor` of _non-negative_ `x` and `y`.
 
 
 ### BLS12\_381

@@ -564,6 +564,14 @@ All operations are *safe* with respect to overflow and underflow.
 The division and modulo operations throw an arithmetic error if the
 right-hand operand is zero.
 
+Sophia arbitrary-sized integers (FATE) also supports the following bitwise operations:
+- bitwise and (`x band y`)
+- bitwise or (`x bor y`)
+- bitwise xor (`x bxor y`)
+- bitwise not (`bnot x`)
+- arithmetic bitshift left (`x << n`)
+- arithmetic bitshift right (`x >> n`)
+
 ## Bit fields
 
 Sophia integers do not support bit arithmetic. Instead there is a separate
