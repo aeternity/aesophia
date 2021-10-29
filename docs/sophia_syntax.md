@@ -234,7 +234,8 @@ Path ::= Id                 // Record field
 
 BinOp ::= '||' | '&&' | '<' | '>' | '=<' | '>=' | '==' | '!='
         | '::' | '++' | '+' | '-' | '*' | '/' | 'mod' | '^'
-UnOp  ::= '-' | '!'
+        | 'band' | 'bor' | 'bxor' | '<<' | '>>'
+UnOp  ::= '-' | '!' | 'bnot'
 ```
 
 ## Operators types
@@ -242,6 +243,7 @@ UnOp  ::= '-' | '!'
 | Operators | Type
 | --- | ---
 | `-` `+` `*` `/` `mod` `^` | arithmetic operators
+| `band` `bor` `bxor` `bnot` `<<` `>>` | bitwise operators
 | `!` `&&` `\|\|` | logical operators
 | `==` `!=` `<` `>` `=<` `>=` | comparison operators
 | `::` `++` | list operators
@@ -252,12 +254,16 @@ In order of highest to lowest precedence.
 
 | Operators | Associativity
 | --- | ---
-| `!` | right
+| `!` `bnot`| right
 | `^` | left
 | `*` `/` `mod` | left
 | `-` (unary) | right
 | `+` `-` | left
+| `<<` `>>` | left
 | `::` `++` | right
 | `<` `>` `=<` `>=` `==` `!=` | none
+| `band` | left
+| `bxor` | left
+| `bor` | left
 | `&&` | right
 | `\|\|` | right

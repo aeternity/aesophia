@@ -177,11 +177,17 @@ Opposite of [to_int](#to_int). Returns `None` if the integer doesn't correspond 
 
 #### to_str
 ```
-Int.to_str : int => string
+Int.to_str(i : int) : string
 ```
 
 Casts integer to string using decimal representation
 
+#### mulmod
+```
+Int.mulmod : (a : int, b : int, q : int) : int
+```
+
+Combined multiplication and modulus, returns `(a * b) mod q`.
 
 ### Map
 
@@ -238,6 +244,13 @@ Address.to_str(a : address) : string
 ```
 
 Base58 encoded string
+
+#### to_bytes
+```
+Address.to_bytes(a : address) : bytes(32)
+```
+
+The binary representation of the address.
 
 
 #### is_contract
@@ -297,6 +310,13 @@ Crypto.blake2b(x : 'a) : hash
 
 Hash any object to blake2b
 
+#### poseidon
+```
+Crypto.poseidon(x1 : int, x2 : int) : int
+```
+
+Hash two integers (in the scalar field of BLS12-381) to another integer (in the scalar
+field of BLS12-281). This is a ZK/SNARK-friendly hash function.
 
 #### verify_sig
 ```

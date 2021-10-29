@@ -419,6 +419,14 @@ fails rather than wrapping around to -2²⁵⁵.
 The division and modulo operations also throw an arithmetic error if the
 second argument is zero.
 
+Sophia arbitrary-sized integers (FATE) also supports the following bitwise operations:
+- bitwise and (`x band y`)
+- bitwise or (`x bor y`)
+- bitwise xor (`x bxor y`)
+- bitwise not (`bnot x`)
+- arithmetic bitshift left (`x << n`)
+- arithmetic bitshift right (`x >> n`)
+
 ## Bit fields
 
 Sophia integers do not support bit arithmetic. Instead there is a separate

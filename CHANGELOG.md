@@ -6,8 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Bitwise operations for integers: `band`, `bor`, `bxor`, `bnot`, `<<` and `>>`.
+- `Int.mulmod` - combined builtin operation for multiplication and modulus.
+- `Crypto.poseidon` - a ZK/SNARK-friendly hash function (over the BLS12-381 scalar field).
+- `Address.to_bytes` - convert an address to its binary representation (for hashing, etc.).
 ### Changed
 ### Removed
+- `Bitwise.aes` standard library - it is now obsolete.
 
 ## [6.1.0] - 2021-10-20
 ### Added

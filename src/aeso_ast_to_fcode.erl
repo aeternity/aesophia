@@ -32,12 +32,13 @@
 
 -type op() :: '+' | '-' | '*' | '/' | mod | '^' | '++' | '::' |
               '<' | '>' | '=<' | '>=' | '==' | '!=' | '!' |
+              'band' | 'bor' | 'bxor' | 'bnot' | '<<' | '>>' |
               map_get | map_get_d | map_set | map_from_list | map_to_list |
               map_delete | map_member | map_size | string_length |
               string_concat | bits_set | bits_clear | bits_test | bits_sum |
               bits_intersection | bits_union | bits_difference |
               contract_to_address | address_to_contract | crypto_verify_sig | crypto_verify_sig_secp256k1 |
-              crypto_sha3 | crypto_sha256 | crypto_blake2b |
+              crypto_sha3 | crypto_sha256 | crypto_blake2b | crypto_poseidon |
               crypto_ecverify_secp256k1 | crypto_ecrecover_secp256k1 |
               mcl_bls12_381_g1_neg | mcl_bls12_381_g1_norm | mcl_bls12_381_g1_valid |
               mcl_bls12_381_g1_is_zero | mcl_bls12_381_g1_add | mcl_bls12_381_g1_mul |
@@ -258,7 +259,7 @@ builtins() ->
                               {"lookup_default", 3}, {"delete", 2}, {"member", 2}, {"size", 1}]},
               {["Crypto"],   [{"verify_sig", 3}, {"verify_sig_secp256k1", 3},
                               {"ecverify_secp256k1", 3}, {"ecrecover_secp256k1", 2},
-                              {"sha3", 1}, {"sha256", 1}, {"blake2b", 1}]},
+                              {"sha3", 1}, {"sha256", 1}, {"blake2b", 1}, {"poseidon", 2}]},
               {["MCL_BLS12_381"], [{"g1_neg", 1}, {"g1_norm", 1}, {"g1_valid", 1}, {"g1_is_zero", 1}, {"g1_add", 2}, {"g1_mul", 2},
                                    {"g2_neg", 1}, {"g2_norm", 1}, {"g2_valid", 1}, {"g2_is_zero", 1}, {"g2_add", 2}, {"g2_mul", 2},
                                    {"gt_inv", 1}, {"gt_add", 2}, {"gt_mul", 2}, {"gt_pow", 2}, {"gt_is_one", 1},
@@ -271,8 +272,9 @@ builtins() ->
               {["Bits"],     [{"set", 2}, {"clear", 2}, {"test", 2}, {"sum", 1}, {"intersection", 2},
                               {"union", 2}, {"difference", 2}, {"none", none}, {"all", none}]},
               {["Bytes"],    [{"to_int", 1}, {"to_str", 1}, {"concat", 2}, {"split", 1}]},
-              {["Int"],      [{"to_str", 1}]},
-              {["Address"],  [{"to_str", 1}, {"to_contract", 1}, {"is_oracle", 1}, {"is_contract", 1}, {"is_payable", 1}]}
+              {["Int"],      [{"to_str", 1}, {"mulmod", 2}]},
+              {["Address"],  [{"to_str", 1}, {"to_bytes", 1}, {"to_contract", 1},
+                              {"is_oracle", 1}, {"is_contract", 1}, {"is_payable", 1}]}
              ],
     maps:from_list([ {NS ++ [Fun], {MkName(NS, Fun), Arity}}
                      || {NS, Funs} <- Scopes,
@@ -707,8 +709,9 @@ expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A, B]}) when is_atom(Op) ->
     {op, Op, [expr_to_fcode(Env, A), expr_to_fcode(Env, B)]};
 expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
     case Op of
-        '-' -> {op, '-', [{lit, {int, 0}}, expr_to_fcode(Env, A)]};
-        '!' -> {op, '!', [expr_to_fcode(Env, A)]}
+        '-'    -> {op, '-', [{lit, {int, 0}}, expr_to_fcode(Env, A)]};
+        'bnot' -> {op, 'bnot', [expr_to_fcode(Env, A)]};
+        '!'    -> {op, '!', [expr_to_fcode(Env, A)]}
     end;
 
 %% Function calls
@@ -1146,9 +1149,9 @@ op_builtins() ->
      stringinternal_sha3, stringinternal_sha256, stringinternal_blake2b,
      char_to_int, char_from_int, stringinternal_to_lower, stringinternal_to_upper,
      bits_set, bits_clear, bits_test, bits_sum, bits_intersection, bits_union,
-     bits_difference, int_to_str, address_to_str, crypto_verify_sig,
+     bits_difference, int_to_str, int_mulmod, address_to_str, address_to_bytes, crypto_verify_sig,
      address_to_contract,
-     crypto_verify_sig_secp256k1, crypto_sha3, crypto_sha256, crypto_blake2b,
+     crypto_verify_sig_secp256k1, crypto_sha3, crypto_sha256, crypto_blake2b, crypto_poseidon,
      crypto_ecverify_secp256k1, crypto_ecrecover_secp256k1,
      mcl_bls12_381_g1_neg, mcl_bls12_381_g1_norm, mcl_bls12_381_g1_valid,
      mcl_bls12_381_g1_is_zero, mcl_bls12_381_g1_add, mcl_bls12_381_g1_mul,

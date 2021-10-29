@@ -1,0 +1,14 @@
+contract C =
+  entrypoint test() =
+    let a : int = 23
+    let b : int = 52
+    let c = a bor b
+    let d = c bxor b
+    let e = d band b
+    let f = bnot a
+    let g = f << 2
+    let h = g >> 2
+    let i = Int.mulmod(a, b, h)
+    let j = Crypto.poseidon(i, a)
+    let k : bytes(32) = Address.to_bytes(Call.origin)
+    (a bor b band c bxor a << bnot b >> a, k)

@@ -203,6 +203,7 @@ compilable_contracts() ->
      "using_namespace",
      "assign_patterns",
      "patterns_guards",
+     "ceres",
      "test" % Custom general-purpose test file. Keep it last on the list.
     ].
 

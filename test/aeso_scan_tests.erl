@@ -39,7 +39,8 @@ all_tokens() ->
     %% Symbols
     lists:map(Lit, [',', '.', ';', '|', ':', '(', ')', '[', ']', '{', '}']) ++
     %% Operators
-    lists:map(Lit, ['=', '==', '!=', '>', '<', '>=', '=<', '-', '+', '++', '*', '/', mod, ':', '::', '->', '=>', '||', '&&', '!']) ++
+    lists:map(Lit, ['=', '==', '!=', '>', '<', '>=', '=<', '-', '+', '++', '*', '/', mod,
+                    ':', '::', '->', '=>', '||', '&&', '!', 'band', 'bor', 'bxor', 'bnot' ,'<<', '>>']) ++
     %% Keywords
     lists:map(Lit, [contract, type, 'let', switch]) ++
     %% Comment token (not an actual token), just for tests
