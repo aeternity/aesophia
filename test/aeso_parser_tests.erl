@@ -53,7 +53,7 @@ simple_contracts_test_() ->
             %% associativity
             [ RightAssoc(Op) || Op <- ["||", "&&", "::", "++"] ],
             [ NonAssoc(Op)   || Op <- ["==", "!=", "<", ">", "=<", ">="] ],
-            [ LeftAssoc(Op)  || Op <- ["+", "-", "*", "/", "mod"] ],
+            [ LeftAssoc(Op)  || Op <- ["+", "-", "*", "/", "mod", "band", "bor", "bxor", "<<", ">>"] ],
 
             %% precedence
             [ Stronger(Op2, Op1) || [T1 , T2 | _] <- tails(Tiers), Op1 <- T1, Op2 <- T2 ],
