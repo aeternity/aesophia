@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Compiler warnings for the follwing: shadowing, negative spends, division by zero, unused functions, unused includes, unused stateful annotations, unused variables, unused parameters, unused user-defined type, dead return value.
 ### Changed
 ### Removed
 
