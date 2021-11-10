@@ -1,4 +1,4 @@
-{"1.2.0",
+{"1.1.0",
 [{<<"aebytecode">>,
   {git,"https://github.com/aeternity/aebytecode.git",
        {ref,"0699f35b0398bac6cd4468da654d608375bd853d"}},
