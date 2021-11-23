@@ -280,7 +280,7 @@ contract_call_type({fun_t, Ann, [], Args, Ret}) ->
      Args, {if_t, Ann, Id("protected"), {app_t, Ann, {id, Ann, "option"}, [Ret]}, Ret}}.
 
 -spec bind_contract(aeso_syntax:decl(), env()) -> env().
-bind_contract({Contract, Ann, Id, Contents}, Env)
+bind_contract({Contract, Ann, Id, _Impls, Contents}, Env)
   when ?IS_CONTRACT_HEAD(Contract) ->
     Key    = name(Id),
     Sys    = [{origin, system}],
@@ -832,7 +832,7 @@ infer(Contracts, Options) ->
 -spec infer1(env(), [aeso_syntax:decl()], [aeso_syntax:decl()], list(option())) ->
     {env(), [aeso_syntax:decl()]}.
 infer1(Env, [], Acc, _Options) -> {Env, lists:reverse(Acc)};
-infer1(Env, [{Contract, Ann, ConName, Code} | Rest], Acc, Options)
+infer1(Env, [{Contract, Ann, ConName, Impls, Code} | Rest], Acc, Options)
   when ?IS_CONTRACT_HEAD(Contract) ->
     %% do type inference on each contract independently.
     check_scope_name_clash(Env, contract, ConName),
@@ -846,7 +846,23 @@ infer1(Env, [{Contract, Ann, ConName, Code} | Rest], Acc, Options)
         contract_interface -> ok
     end,
     {Env1, Code1} = infer_contract_top(push_scope(contract, ConName, Env), What, Code, Options),
-    Contract1 = {Contract, Ann, ConName, Code1},
+    Contract1 = {Contract, Ann, ConName, Impls, Code1},
+    AllInterfaces = [{name(IName), I} || I = {contract_interface, _, IName, _, _} <- Acc],
+    ImplsNames = lists:map(fun name/1, Impls),
+    create_type_errors(),
+    lists:foreach(fun(Impl) -> case proplists:get_value(name(Impl), AllInterfaces) of
+                                   undefined -> type_error({referencing_undefined_interface, Impl});
+                                   _         -> ok
+                               end
+                  end, Impls),
+    case What of
+        contract ->
+            ImplementedInterfaces = [proplists:get_value(Name, AllInterfaces) || Name <- ImplsNames],
+            check_implemented_interfaces(ImplementedInterfaces, ConName, [ Fun || Fun = {letfun, _, _, _, _, _} <- Code1 ], [], AllInterfaces);
+        contract_interface ->
+            ok
+    end,
+    destroy_and_report_type_errors(Env),
     Env2 = pop_scope(Env1),
     Env3 = bind_contract(Contract1, Env2),
     infer1(Env3, Rest, [Contract1 | Acc], Options);
@@ -862,17 +878,67 @@ infer1(Env, [{pragma, _, _} | Rest], Acc, Options) ->
     %% Pragmas are checked in check_modifiers
     infer1(Env, Rest, Acc, Options).
 
+check_implemented_interfaces([], _, _, _, _) ->
+    ok;
+check_implemented_interfaces([{contract_interface, _, IName, Extensions, Decls} | Interfaces], ConId, Impls, Acc, AllInterfaces) ->
+    case lists:member(name(IName), Acc) of
+        true ->
+            check_implemented_interfaces(Interfaces, ConId, Impls, Acc, AllInterfaces);
+        false ->
+            Unmatched = match_impls(Decls, ConId, name(IName), Impls),
+            NewInterfaces = [proplists:get_value(name(I), AllInterfaces) || I <- Extensions],
+            check_implemented_interfaces(Interfaces ++ NewInterfaces, ConId, Unmatched, [name(IName) | Acc], AllInterfaces)
+    end.
+
+match_impls([], _, _, Impls) ->
+    Impls;
+match_impls([{fun_decl, _, {id, _, FunName}, {fun_t, _, _, ArgsTypes, RetDecl}} | Decls], ConId, IName, Impls) ->
+    Match = fun({letfun, _, {id, _, FName}, Args, RetFun, _}) when FName == FunName ->
+                    length(ArgsTypes) == length(Args) andalso
+                    compare_types(RetDecl, RetFun) andalso
+                    lists:all(fun({T1, {typed, _, _, T2}}) -> compare_types(T1, T2) end,
+                              lists:zip(ArgsTypes, Args));
+               (_) -> false
+            end,
+    UnmatchedImpls = case lists:search(Match, Impls) of
+                         {value, V} ->
+                             lists:delete(V, Impls);
+                         false ->
+                             type_error({unimplemented_interface_function, ConId, IName, FunName}),
+                             Impls
+                     end,
+    match_impls(Decls, ConId, IName, UnmatchedImpls).
+
+
+-spec compare_types(T, T) -> boolean() when T :: utype() | [utype()].
+compare_types(Types1 = [_ | _], Types2 = [_ | _]) ->
+    length(Types1) == length(Types2) andalso
+    lists:all(fun({T1, T2}) -> compare_types(T1, T2) end, lists:zip(Types1, Types2));
+compare_types({fun_t, _, _, Types1, RetType1}, {fun_t, _, _, Types2, RetType2}) ->
+    % TODO: what about named_args_t and var_args?
+    compare_types(RetType1, RetType2) andalso compare_types(Types1, Types2);
+compare_types({app_t, _, Type1, ArgsTypes1}, {app_t, _, Type2, ArgsTypes2}) ->
+    compare_types(Type1, Type2) andalso compare_types(ArgsTypes1, ArgsTypes2);
+compare_types({tuple_t, _, Types1}, {tuple_t, _, Types2}) ->
+    compare_types(Types1, Types2);
+compare_types(T1 = {Id, _, Type}, {Id, _, Type}) when ?is_type_id(T1) ->
+    true;
+compare_types({if_t, _, {id, _, Id}, Ta1, Tb1}, {if_t, _, {id, _, Id}, Ta2, Tb2}) ->
+    compare_types(Ta1, Ta2) andalso compare_types(Tb1, Tb2);
+compare_types(_, _) ->
+    false.
+
 %% Asserts that the main contract is somehow defined.
 identify_main_contract(Contracts, Options) ->
-    Children   = [C || C = {contract_child, _, _, _} <- Contracts],
-    Mains      = [C || C = {contract_main, _, _, _} <- Contracts],
+    Children   = [C || C = {contract_child, _, _, _, _} <- Contracts],
+    Mains      = [C || C = {contract_main, _, _, _, _} <- Contracts],
     case Mains of
         [] -> case Children of
                   [] -> type_error(
                           {main_contract_undefined,
                            [{file, File} || {src_file, File} <- Options]});
-                  [{contract_child, Ann, Con, Body}] ->
-                      (Contracts -- Children) ++ [{contract_main, Ann, Con, Body}];
+                  [{contract_child, Ann, Con, Impls, Body}] ->
+                      (Contracts -- Children) ++ [{contract_main, Ann, Con, Impls, Body}];
                   [H|_] -> type_error({ambiguous_main_contract,
                                        aeso_syntax:get_ann(H)})
               end;
@@ -1097,7 +1163,7 @@ check_modifiers(Env, Contracts) ->
     check_modifiers_(Env, Contracts),
     destroy_and_report_type_errors(Env).
 
-check_modifiers_(Env, [{Contract, _, Con, Decls} | Rest])
+check_modifiers_(Env, [{Contract, _, Con, _Impls, Decls} | Rest])
   when ?IS_CONTRACT_HEAD(Contract) ->
     IsInterface = Contract =:= contract_interface,
     check_modifiers1(contract, Decls),
@@ -3098,7 +3164,7 @@ mk_error({namespace, _Pos, {con, Pos, Name}, _Def}) ->
     Msg = io_lib:format("Nested namespaces are not allowed. Namespace `~s` is not defined at top level.",
                         [Name]),
     mk_t_err(pos(Pos), Msg);
-mk_error({Contract, _Pos, {con, Pos, Name}, _Def}) when ?IS_CONTRACT_HEAD(Contract) ->
+mk_error({Contract, _Pos, {con, Pos, Name}, _Impls, _Def}) when ?IS_CONTRACT_HEAD(Contract) ->
     Msg = io_lib:format("Nested contracts are not allowed. Contract `~s` is not defined at top level.",
                         [Name]),
     mk_t_err(pos(Pos), Msg);
@@ -3285,6 +3351,12 @@ mk_error({unknown_warning, Warning}) ->
 mk_error({empty_record_definition, Ann, Name}) ->
     Msg = io_lib:format("Empty record definitions are not allowed. Cannot define the record `~s`", [Name]),
     mk_t_err(pos(Ann), Msg);
+mk_error({unimplemented_interface_function, ConId, InterfaceName, FunName}) ->
+    Msg = io_lib:format("Unimplemented function ~s from the interface ~s in the contract ~s", [FunName, InterfaceName, pp(ConId)]),
+    mk_t_err(pos(ConId), Msg);
+mk_error({referencing_undefined_interface, InterfaceId}) ->
+    Msg = io_lib:format("Trying to implement or extend an undefined interface ~s", [pp(InterfaceId)]),
+    mk_t_err(pos(InterfaceId), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),
     mk_t_err(pos(0, 0), Msg).
