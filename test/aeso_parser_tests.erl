@@ -15,7 +15,7 @@ simple_contracts_test_() ->
             Text = "main contract Identity =\n"
                    "  function id(x) = x\n",
             ?assertMatch(
-                [{contract_main, _, {con, _, "Identity"},
+                [{contract_main, _, {con, _, "Identity"}, _,
                     [{letfun, _, {id, _, "id"}, [{id, _, "x"}], {id, _, "_"},
                         [{guarded, _, [], {id, _, "x"}}]}]}], parse_string(Text)),
             ok

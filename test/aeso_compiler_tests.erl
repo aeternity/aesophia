@@ -202,6 +202,8 @@ compilable_contracts() ->
      "assign_patterns",
      "patterns_guards",
      "pipe_operator",
+     "contract_polymorphism",
+     "contract_interface_polymorphism",
      "test" % Custom general-purpose test file. Keep it last on the list.
     ].
 
@@ -824,6 +826,26 @@ failing_contracts() ->
                      "The function `called_unused_function2` is defined but never used.">>,
                    <<?Pos(48, 5)
                      "Unused return value.">>
+                  ])
+    , ?TYPE_ERROR(contract_interface_polymorphism_recursive,
+                  [<<?Pos(1,24)
+                     "Trying to implement or extend an undefined interface Z at line 1, column 24">>
+                  ])
+    , ?TYPE_ERROR(contract_interface_polymorphism_same_decl_multi_interface,
+                  [<<?Pos(7,10)
+                     "Unimplemented function f from the interface I in the contract C">>
+                  ])
+    , ?TYPE_ERROR(contract_polymorphism_missing_implementation,
+                  [<<?Pos(7,10)
+                     "Unimplemented function f from the interface I1 in the contract C">>
+                  ])
+    , ?TYPE_ERROR(contract_polymorphism_same_decl_multi_interface,
+                  [<<?Pos(7,10)
+                     "Unimplemented function f from the interface J in the contract C">>
+                  ])
+    , ?TYPE_ERROR(contract_polymorphism_undefined_interface,
+                  [<<?Pos(1,24)
+                     "Trying to implement or extend an undefined interface H at line 1, column 24">>
                   ])
     ].
 

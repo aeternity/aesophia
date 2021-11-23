@@ -326,7 +326,7 @@ get_option(Opt, Env, Default) ->
 %% -- Compilation ------------------------------------------------------------
 
 -spec to_fcode(env(), aeso_syntax:ast()) -> {env(), fcode()}.
-to_fcode(Env, [{Contract, Attrs, Con = {con, _, Name}, Decls}|Rest])
+to_fcode(Env, [{Contract, Attrs, Con = {con, _, Name}, _Impls, Decls}|Rest])
   when ?IS_CONTRACT_HEAD(Contract) ->
     case Contract =:= contract_interface of
         false ->

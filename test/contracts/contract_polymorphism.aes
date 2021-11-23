@@ -1,0 +1,5 @@
+contract interface Strokable =
+  entrypoint stroke : () => string
+
+contract Cat : Strokable =
+  entrypoint stroke() = "Cat stroke"

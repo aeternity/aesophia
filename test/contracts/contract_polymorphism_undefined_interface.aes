@@ -1,0 +1,5 @@
+contract interface I : H =
+    entrypoint f : () => unit
+
+contract C =
+    entrypoint g() = ()
