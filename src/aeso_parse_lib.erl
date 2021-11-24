@@ -15,7 +15,8 @@
          many/1, many1/1, sep/2, sep1/2,
          infixl/2, infixr/2]).
 
--export([current_file/0, set_current_file/1]).
+-export([current_file/0, set_current_file/1,
+         current_include_type/0, set_current_include_type/1]).
 
 %% -- Types ------------------------------------------------------------------
 
@@ -464,6 +465,13 @@ merge_with(Fun, Map1, Map2) ->
                             maps:update_with(K, fun(R) -> Fun(L, R) end, L, M)
                         end, Map2, maps:to_list(Map1))
     end.
+
+%% Current include type
+current_include_type() ->
+    get('$current_include_type').
+
+set_current_include_type(IncludeType) ->
+    put('$current_include_type', IncludeType).
 
 %% Current source file
 current_file() ->

@@ -18,7 +18,8 @@
          run_parser/3]).
 
 -include("aeso_parse_lib.hrl").
--import(aeso_parse_lib, [current_file/0, set_current_file/1]).
+-import(aeso_parse_lib, [current_file/0, set_current_file/1,
+                         current_include_type/0, set_current_include_type/1]).
 
 -type parse_result() :: aeso_syntax:ast() | {aeso_syntax:ast(), sets:set(include_hash())} | none().
 
@@ -57,6 +58,7 @@ run_parser(P, Inp, Opts) ->
 
 parse_and_scan(P, S, Opts) ->
     set_current_file(proplists:get_value(src_file, Opts, no_file)),
+    set_current_include_type(proplists:get_value(include_type, Opts, none)),
     case aeso_scan:scan(S) of
         {ok, Tokens} -> aeso_parse_lib:parse(P, Tokens);
         {error, {{Input, Pos}, _}} ->
@@ -523,7 +525,11 @@ bracket_list(P) -> brackets(comma_sep(P)).
 -type ann_col()  :: aeso_syntax:ann_col().
 
 -spec pos_ann(ann_line(), ann_col()) -> ann().
-pos_ann(Line, Col) -> [{file, current_file()}, {line, Line}, {col, Col}].
+pos_ann(Line, Col) ->
+    [ {file, current_file()}
+    , {include_type, current_include_type()}
+    , {line, Line}
+    , {col, Col} ].
 
 ann_pos(Ann) ->
     {proplists:get_value(file, Ann),
@@ -665,9 +671,14 @@ expand_includes([{include, Ann, {string, _SAnn, File}} | AST], Included, Acc, Op
             Hashed = hash_include(File, Code),
             case sets:is_element(Hashed, Included) of
                 false ->
+                    IncludeType = case proplists:get_value(file, Ann) of
+                                      no_file -> direct;
+                                      _       -> indirect
+                                  end,
                     Opts1 = lists:keystore(src_file, 1, Opts, {src_file, File}),
+                    Opts2 = lists:keystore(include_type, 1, Opts1, {include_type, IncludeType}),
                     Included1 = sets:add_element(Hashed, Included),
-                    case parse_and_scan(file(), Code, Opts1) of
+                    case parse_and_scan(file(), Code, Opts2) of
                         {ok, AST1} ->
                             expand_includes(AST1 ++ AST, Included1, Acc, Opts);
                         Err = {error, _} ->
