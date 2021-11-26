@@ -921,6 +921,10 @@ compare_types({app_t, _, Type1, ArgsTypes1}, {app_t, _, Type2, ArgsTypes2}) ->
     compare_types(Type1, Type2) andalso compare_types(ArgsTypes1, ArgsTypes2);
 compare_types({tuple_t, _, Types1}, {tuple_t, _, Types2}) ->
     compare_types(Types1, Types2);
+compare_types({tuple_t, _, []}, {id, _, "unit"}) ->
+    true;
+compare_types({id, _, "unit"}, {tuple_t, _, []}) ->
+    true;
 compare_types(T1 = {Id, _, Type}, {Id, _, Type}) when ?is_type_id(T1) ->
     true;
 compare_types({if_t, _, {id, _, Id}, Ta1, Tb1}, {if_t, _, {id, _, Id}, Ta2, Tb2}) ->
@@ -1447,7 +1451,7 @@ infer_letfun(Env = #env{ namespace = Namespace }, LetFun = {letfun, Ann, Fun, _,
     {{Name, Sig}, Clause} = infer_letfun1(Env, LetFun),
     {{Name, Sig}, desugar_clauses(Ann, Fun, Sig, [Clause])}.
 
-infer_letfun1(Env0 = #env{ namespace = NS }, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What,  GuardedBodies}) ->
+infer_letfun1(Env0 = #env{ namespace = NS }, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, GuardedBodies}) ->
     Env = Env0#env{ stateful = aeso_syntax:get_ann(stateful, Attrib, false),
                     current_function = Fun },
     {NewEnv, {typed, _, {tuple, _, TypedArgs}, {tuple_t, _, ArgTypes}}} = infer_pattern(Env, {tuple, [{origin, system} | NameAttrib], Args}),

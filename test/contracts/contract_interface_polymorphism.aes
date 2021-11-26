@@ -1,9 +1,9 @@
 contract interface II =
-    entrypoint f : () => int
+    entrypoint f : () => unit
 
 contract interface I : II =
-    entrypoint g : () => int
+    entrypoint g : () => unit
 
 contract C : I =
-    entrypoint f() = 1
-    entrypoint g() = 2
+    entrypoint f() = ()
+    entrypoint g() = ()
