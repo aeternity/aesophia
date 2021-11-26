@@ -844,6 +844,10 @@ failing_contracts() ->
                      "Unimplemented function f from the interface J in the contract C">>
                   ])
     , ?TYPE_ERROR(contract_polymorphism_undefined_interface,
+                  [<<?Pos(1,14)
+                     "Trying to implement or extend an undefined interface I at line 1, column 14">>
+                  ])
+    , ?TYPE_ERROR(contract_interface_polymorphism_undefined_interface,
                   [<<?Pos(1,24)
                      "Trying to implement or extend an undefined interface H at line 1, column 24">>
                   ])

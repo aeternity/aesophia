@@ -855,6 +855,8 @@ infer1(Env, [{Contract, Ann, ConName, Impls, Code} | Rest], Acc, Options)
                                    _         -> ok
                                end
                   end, Impls),
+    destroy_and_report_type_errors(Env),
+    create_type_errors(),
     case What of
         contract ->
             ImplementedInterfaces = [proplists:get_value(Name, AllInterfaces) || Name <- ImplsNames],
