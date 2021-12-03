@@ -642,12 +642,12 @@ indented more than the currently enclosing layout block. Blocks with a single
 element can be written on the same line as the previous token.</p>
 <p>Each element of the block must share the same indentation and no part of an
 element may be indented less than the indentation of the block. For instance</p>
-<div class="highlight"><pre><span></span><code>contract Layout =
-  function foo() = 0  // no layout
-  function bar() =    // layout block starts on next line
-    let x = foo()     // indented more than 2 spaces
-    x
-     + 1              // the &#39;+&#39; is indented more than the &#39;x&#39;
+<div class="highlight"><pre><span></span><code><span class="k">contract</span><span class="w"> </span><span class="nf">Layout</span><span class="w"> </span><span class="ow">=</span><span class="w"></span>
+<span class="w">  </span><span class="k">function</span><span class="w"> </span><span class="n">foo</span><span class="p">()</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="mi">0</span><span class="w">  </span><span class="c1">// no layout</span>
+<span class="w">  </span><span class="k">function</span><span class="w"> </span><span class="n">bar</span><span class="p">()</span><span class="w"> </span><span class="ow">=</span><span class="w">    </span><span class="c1">// layout block starts on next line</span>
+<span class="w">    </span><span class="k">let</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">foo</span><span class="p">()</span><span class="w">     </span><span class="c1">// indented more than 2 spaces</span>
+<span class="w">    </span><span class="n">x</span><span class="w"></span>
+<span class="w">     </span><span class="ow">+</span><span class="w"> </span><span class="mi">1</span><span class="w">              </span><span class="c1">// the &#39;+&#39; is indented more than the &#39;x&#39;</span>
 </code></pre></div>
 <h2 id="notation">Notation</h2>
 <p>In describing the syntax below, we use the following conventions:</p>
@@ -692,9 +692,9 @@ element may be indented less than the indentation of the block. For instance</p>
 </code></pre></div>
 <p>Contract declarations must appear at the top-level.</p>
 <p>For example,
-<div class="highlight"><pre><span></span><code>contract Test =
-  type t = int
-  entrypoint add (x : t, y : t) = x + y
+<div class="highlight"><pre><span></span><code><span class="k">contract</span><span class="w"> </span><span class="nf">Test</span><span class="w"> </span><span class="ow">=</span><span class="w"></span>
+<span class="w">  </span><span class="k">type</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="kt">int</span><span class="w"></span>
+<span class="w">  </span><span class="k">entrypoint</span><span class="w"> </span><span class="n">add</span><span class="w"> </span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="n">t</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="ow">+</span><span class="w"> </span><span class="n">y</span><span class="w"></span>
 </code></pre></div></p>
 <p>There are three forms of type declarations: type aliases (declared with the
 <code>type</code> keyword), record type definitions (<code>record</code>) and data type definitions
@@ -707,9 +707,9 @@ element may be indented less than the indentation of the block. For instance</p>
 <span class="n">ConDecl</span><span class="w">    </span><span class="o">::=</span><span class="w"> </span><span class="n">Con</span><span class="w"> </span><span class="p">[</span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">Sep1</span><span class="p">(</span><span class="n">Type</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="p">]</span><span class="w"></span>
 </code></pre></div>
 <p>For example,
-<div class="highlight"><pre><span></span><code>record   point(&#39;a) = {x : &#39;a, y : &#39;a}
-datatype shape(&#39;a) = Circle(point(&#39;a), &#39;a) | Rect(point(&#39;a), point(&#39;a))
-type     int_shape = shape(int)
+<div class="highlight"><pre><span></span><code><span class="k">record</span><span class="w">   </span><span class="n">point</span><span class="p">(</span><span class="nv">&#39;a</span><span class="p">)</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="p">{</span><span class="n">x</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="nv">&#39;a</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="nv">&#39;a</span><span class="p">}</span><span class="w"></span>
+<span class="k">datatype</span><span class="w"> </span><span class="n">shape</span><span class="p">(</span><span class="nv">&#39;a</span><span class="p">)</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="nf">Circle</span><span class="p">(</span><span class="n">point</span><span class="p">(</span><span class="nv">&#39;a</span><span class="p">),</span><span class="w"> </span><span class="nv">&#39;a</span><span class="p">)</span><span class="w"> </span><span class="ow">|</span><span class="w"> </span><span class="nf">Rect</span><span class="p">(</span><span class="n">point</span><span class="p">(</span><span class="nv">&#39;a</span><span class="p">),</span><span class="w"> </span><span class="n">point</span><span class="p">(</span><span class="nv">&#39;a</span><span class="p">))</span><span class="w"></span>
+<span class="k">type</span><span class="w">     </span><span class="n">int_shape</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">shape</span><span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="w"></span>
 </code></pre></div></p>
 <h2 id="types">Types</h2>
 <div class="highlight"><pre><span></span><code><span class="n">Type</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Domain</span><span class="w"> </span><span class="err">&#39;</span><span class="o">=&gt;</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Type</span><span class="w">             </span><span class="c1">// Function type</span>
@@ -723,7 +723,7 @@ type     int_shape = shape(int)
 </code></pre></div>
 <p>The function type arrow associates to the right.</p>
 <p>Example,
-<div class="highlight"><pre><span></span><code>&#39;a =&gt; list(&#39;a) =&gt; (int * list(&#39;a))
+<div class="highlight"><pre><span></span><code><span class="nv">&#39;a</span><span class="w"> </span><span class="ow">=&gt;</span><span class="w"> </span><span class="kt">list</span><span class="p">(</span><span class="nv">&#39;a</span><span class="p">)</span><span class="w"> </span><span class="ow">=&gt;</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="ow">*</span><span class="w"> </span><span class="kt">list</span><span class="p">(</span><span class="nv">&#39;a</span><span class="p">))</span><span class="w"></span>
 </code></pre></div></p>
 <h2 id="statements">Statements</h2>
 <p>Function bodies are blocks of <em>statements</em>, where a statement is one of the following</p>
@@ -741,16 +741,16 @@ type     int_shape = shape(int)
 <span class="n">Pattern</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Expr</span><span class="w"></span>
 </code></pre></div>
 <p><code>if</code> statements can be followed by zero or more <code>elif</code> statements and an optional final <code>else</code> statement. For example,</p>
-<div class="highlight"><pre><span></span><code>let x : int = 4
-switch(f(x))
-  None =&gt; 0
-  Some(y) =&gt;
-    if(y &gt; 10)
-      &quot;too big&quot;
-    elif(y &lt; 3)
-      &quot;too small&quot;
-    else
-      &quot;just right&quot;
+<div class="highlight"><pre><span></span><code><span class="k">let</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="mi">4</span><span class="w"></span>
+<span class="k">switch</span><span class="p">(</span><span class="n">f</span><span class="p">(</span><span class="n">x</span><span class="p">))</span><span class="w"></span>
+<span class="w">  </span><span class="nf">None</span><span class="w"> </span><span class="ow">=&gt;</span><span class="w"> </span><span class="mi">0</span><span class="w"></span>
+<span class="w">  </span><span class="nf">Some</span><span class="p">(</span><span class="n">y</span><span class="p">)</span><span class="w"> </span><span class="ow">=&gt;</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">y</span><span class="w"> </span><span class="ow">&gt;</span><span class="w"> </span><span class="mi">10</span><span class="p">)</span><span class="w"></span>
+<span class="w">      </span><span class="s2">&quot;too big&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="k">elif</span><span class="p">(</span><span class="n">y</span><span class="w"> </span><span class="ow">&lt;</span><span class="w"> </span><span class="mi">3</span><span class="p">)</span><span class="w"></span>
+<span class="w">      </span><span class="s2">&quot;too small&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="k">else</span><span class="w"></span>
+<span class="w">      </span><span class="s2">&quot;just right&quot;</span><span class="w"></span>
 </code></pre></div>
 <h2 id="expressions">Expressions</h2>
 <div class="highlight"><pre><span></span><code><span class="n">Expr</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">LamArgs</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w"> </span><span class="err">&#39;</span><span class="o">=&gt;</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Stmt</span><span class="p">)</span><span class="w">   </span><span class="c1">// Anonymous function    (x) =&gt; x + 1</span>

@@ -406,68 +406,68 @@
                 
                 <h1 id="contract-examples">Contract examples</h1>
 <h2 id="crowdfunding">Crowdfunding</h2>
-<div class="highlight"><pre><span></span><code>/*
- * A simple crowd-funding example
- */
-contract FundMe =
+<div class="highlight"><pre><span></span><code><span class="cm">/*</span>
+<span class="cm"> * A simple crowd-funding example</span>
+<span class="cm"> */</span><span class="w"></span>
+<span class="k">contract</span><span class="w"> </span><span class="nf">FundMe</span><span class="w"> </span><span class="ow">=</span><span class="w"></span>
 
-  record spend_args = { recipient : address,
-                        amount    : int }
+<span class="w">  </span><span class="k">record</span><span class="w"> </span><span class="n">spend_args</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">recipient</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="kt">address</span><span class="p">,</span><span class="w"></span>
+<span class="w">                        </span><span class="n">amount</span><span class="w">    </span><span class="ow">:</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
 
-  record state = { contributions : map(address, int),
-                   total         : int,
-                   beneficiary   : address,
-                   deadline      : int,
-                   goal          : int }
+<span class="w">  </span><span class="k">record</span><span class="w"> </span><span class="nb">state</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">contributions</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="kt">map</span><span class="p">(</span><span class="kt">address</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">),</span><span class="w"></span>
+<span class="w">                   </span><span class="n">total</span><span class="w">         </span><span class="ow">:</span><span class="w"> </span><span class="kt">int</span><span class="p">,</span><span class="w"></span>
+<span class="w">                   </span><span class="n">beneficiary</span><span class="w">   </span><span class="ow">:</span><span class="w"> </span><span class="kt">address</span><span class="p">,</span><span class="w"></span>
+<span class="w">                   </span><span class="n">deadline</span><span class="w">      </span><span class="ow">:</span><span class="w"> </span><span class="kt">int</span><span class="p">,</span><span class="w"></span>
+<span class="w">                   </span><span class="n">goal</span><span class="w">          </span><span class="ow">:</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
 
-  stateful function spend(args : spend_args) =
-    Chain.spend(args.recipient, args.amount)
+<span class="w">  </span><span class="k">stateful</span><span class="w"> </span><span class="k">function</span><span class="w"> </span><span class="n">spend</span><span class="p">(</span><span class="n">args</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="n">spend_args</span><span class="p">)</span><span class="w"> </span><span class="ow">=</span><span class="w"></span>
+<span class="w">    </span><span class="nc">Chain</span><span class="p">.</span><span class="n">spend</span><span class="p">(</span><span class="n">args</span><span class="p">.</span><span class="n">recipient</span><span class="p">,</span><span class="w"> </span><span class="n">args</span><span class="p">.</span><span class="n">amount</span><span class="p">)</span><span class="w"></span>
 
-  entrypoint init(beneficiary, deadline, goal) : state =
-    { contributions = {},
-      beneficiary   = beneficiary,
-      deadline      = deadline,
-      total         = 0,
-      goal          = goal }
+<span class="w">  </span><span class="k">entrypoint</span><span class="w"> </span><span class="n">init</span><span class="p">(</span><span class="n">beneficiary</span><span class="p">,</span><span class="w"> </span><span class="n">deadline</span><span class="p">,</span><span class="w"> </span><span class="n">goal</span><span class="p">)</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="nb">state</span><span class="w"> </span><span class="ow">=</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="n">contributions</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="p">{},</span><span class="w"></span>
+<span class="w">      </span><span class="n">beneficiary</span><span class="w">   </span><span class="ow">=</span><span class="w"> </span><span class="n">beneficiary</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="n">deadline</span><span class="w">      </span><span class="ow">=</span><span class="w"> </span><span class="n">deadline</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="n">total</span><span class="w">         </span><span class="ow">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="n">goal</span><span class="w">          </span><span class="ow">=</span><span class="w"> </span><span class="n">goal</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
 
-  function is_contributor(addr) =
-    Map.member(addr, state.contributions)
+<span class="w">  </span><span class="k">function</span><span class="w"> </span><span class="n">is_contributor</span><span class="p">(</span><span class="n">addr</span><span class="p">)</span><span class="w"> </span><span class="ow">=</span><span class="w"></span>
+<span class="w">    </span><span class="nc">Map</span><span class="p">.</span><span class="n">member</span><span class="p">(</span><span class="n">addr</span><span class="p">,</span><span class="w"> </span><span class="nb">state</span><span class="p">.</span><span class="n">contributions</span><span class="p">)</span><span class="w"></span>
 
-  stateful entrypoint contribute() =
-    if(Chain.block_height &gt;= state.deadline)
-      spend({ recipient = Call.caller, amount = Call.value }) // Refund money
-      false
-    else
-      let amount =
-        switch(Map.lookup(Call.caller, state.contributions))
-          None    =&gt; Call.value
-          Some(n) =&gt; n + Call.value
-      put(state{ contributions[Call.caller] = amount,
-                 total @ tot = tot + Call.value })
-      true
+<span class="w">  </span><span class="k">stateful</span><span class="w"> </span><span class="k">entrypoint</span><span class="w"> </span><span class="n">contribute</span><span class="p">()</span><span class="w"> </span><span class="ow">=</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="nc">Chain</span><span class="p">.</span><span class="n">block_height</span><span class="w"> </span><span class="ow">&gt;=</span><span class="w"> </span><span class="nb">state</span><span class="p">.</span><span class="n">deadline</span><span class="p">)</span><span class="w"></span>
+<span class="w">      </span><span class="n">spend</span><span class="p">({</span><span class="w"> </span><span class="n">recipient</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="nc">Call</span><span class="p">.</span><span class="n">caller</span><span class="p">,</span><span class="w"> </span><span class="n">amount</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="nc">Call</span><span class="p">.</span><span class="n">value</span><span class="w"> </span><span class="p">})</span><span class="w"> </span><span class="c1">// Refund money</span>
+<span class="w">      </span><span class="kc">false</span><span class="w"></span>
+<span class="w">    </span><span class="k">else</span><span class="w"></span>
+<span class="w">      </span><span class="k">let</span><span class="w"> </span><span class="n">amount</span><span class="w"> </span><span class="ow">=</span><span class="w"></span>
+<span class="w">        </span><span class="k">switch</span><span class="p">(</span><span class="nc">Map</span><span class="p">.</span><span class="n">lookup</span><span class="p">(</span><span class="nc">Call</span><span class="p">.</span><span class="n">caller</span><span class="p">,</span><span class="w"> </span><span class="nb">state</span><span class="p">.</span><span class="n">contributions</span><span class="p">))</span><span class="w"></span>
+<span class="w">          </span><span class="nf">None</span><span class="w">    </span><span class="ow">=&gt;</span><span class="w"> </span><span class="nc">Call</span><span class="p">.</span><span class="n">value</span><span class="w"></span>
+<span class="w">          </span><span class="nf">Some</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="ow">=&gt;</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="ow">+</span><span class="w"> </span><span class="nc">Call</span><span class="p">.</span><span class="n">value</span><span class="w"></span>
+<span class="w">      </span><span class="nb">put</span><span class="p">(</span><span class="nb">state</span><span class="p">{</span><span class="w"> </span><span class="n">contributions</span><span class="p">[</span><span class="nc">Call</span><span class="p">.</span><span class="n">caller</span><span class="p">]</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">amount</span><span class="p">,</span><span class="w"></span>
+<span class="w">                 </span><span class="n">total</span><span class="w"> </span><span class="ow">@</span><span class="w"> </span><span class="n">tot</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">tot</span><span class="w"> </span><span class="ow">+</span><span class="w"> </span><span class="nc">Call</span><span class="p">.</span><span class="n">value</span><span class="w"> </span><span class="p">})</span><span class="w"></span>
+<span class="w">      </span><span class="kc">true</span><span class="w"></span>
 
-  stateful entrypoint withdraw() =
-    if(Chain.block_height &lt; state.deadline)
-      abort(&quot;Cannot withdraw before deadline&quot;)
-    if(Call.caller == state.beneficiary)
-      withdraw_beneficiary()
-    elif(is_contributor(Call.caller))
-      withdraw_contributor()
-    else
-      abort(&quot;Not a contributor or beneficiary&quot;)
+<span class="w">  </span><span class="k">stateful</span><span class="w"> </span><span class="k">entrypoint</span><span class="w"> </span><span class="n">withdraw</span><span class="p">()</span><span class="w"> </span><span class="ow">=</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="nc">Chain</span><span class="p">.</span><span class="n">block_height</span><span class="w"> </span><span class="ow">&lt;</span><span class="w"> </span><span class="nb">state</span><span class="p">.</span><span class="n">deadline</span><span class="p">)</span><span class="w"></span>
+<span class="w">      </span><span class="nb">abort</span><span class="p">(</span><span class="s2">&quot;Cannot withdraw before deadline&quot;</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="nc">Call</span><span class="p">.</span><span class="n">caller</span><span class="w"> </span><span class="ow">==</span><span class="w"> </span><span class="nb">state</span><span class="p">.</span><span class="n">beneficiary</span><span class="p">)</span><span class="w"></span>
+<span class="w">      </span><span class="n">withdraw_beneficiary</span><span class="p">()</span><span class="w"></span>
+<span class="w">    </span><span class="k">elif</span><span class="p">(</span><span class="n">is_contributor</span><span class="p">(</span><span class="nc">Call</span><span class="p">.</span><span class="n">caller</span><span class="p">))</span><span class="w"></span>
+<span class="w">      </span><span class="n">withdraw_contributor</span><span class="p">()</span><span class="w"></span>
+<span class="w">    </span><span class="k">else</span><span class="w"></span>
+<span class="w">      </span><span class="nb">abort</span><span class="p">(</span><span class="s2">&quot;Not a contributor or beneficiary&quot;</span><span class="p">)</span><span class="w"></span>
 
-  stateful function withdraw_beneficiary() =
-    require(state.total &gt;= state.goal, &quot;Project was not funded&quot;)
-    spend({recipient = state.beneficiary,
-           amount    = Contract.balance })
+<span class="w">  </span><span class="k">stateful</span><span class="w"> </span><span class="k">function</span><span class="w"> </span><span class="n">withdraw_beneficiary</span><span class="p">()</span><span class="w"> </span><span class="ow">=</span><span class="w"></span>
+<span class="w">    </span><span class="nb">require</span><span class="p">(</span><span class="nb">state</span><span class="p">.</span><span class="n">total</span><span class="w"> </span><span class="ow">&gt;=</span><span class="w"> </span><span class="nb">state</span><span class="p">.</span><span class="n">goal</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Project was not funded&quot;</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">spend</span><span class="p">({</span><span class="n">recipient</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="nb">state</span><span class="p">.</span><span class="n">beneficiary</span><span class="p">,</span><span class="w"></span>
+<span class="w">           </span><span class="n">amount</span><span class="w">    </span><span class="ow">=</span><span class="w"> </span><span class="nc">Contract</span><span class="p">.</span><span class="n">balance</span><span class="w"> </span><span class="p">})</span><span class="w"></span>
 
-  stateful function withdraw_contributor() =
-    if(state.total &gt;= state.goal)
-      abort(&quot;Project was funded&quot;)
-    let to = Call.caller
-    spend({recipient = to,
-           amount    = state.contributions[to]})
-    put(state{ contributions @ c = Map.delete(to, c) })
+<span class="w">  </span><span class="k">stateful</span><span class="w"> </span><span class="k">function</span><span class="w"> </span><span class="n">withdraw_contributor</span><span class="p">()</span><span class="w"> </span><span class="ow">=</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="nb">state</span><span class="p">.</span><span class="n">total</span><span class="w"> </span><span class="ow">&gt;=</span><span class="w"> </span><span class="nb">state</span><span class="p">.</span><span class="n">goal</span><span class="p">)</span><span class="w"></span>
+<span class="w">      </span><span class="nb">abort</span><span class="p">(</span><span class="s2">&quot;Project was funded&quot;</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="k">let</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="nc">Call</span><span class="p">.</span><span class="n">caller</span><span class="w"></span>
+<span class="w">    </span><span class="n">spend</span><span class="p">({</span><span class="n">recipient</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">to</span><span class="p">,</span><span class="w"></span>
+<span class="w">           </span><span class="n">amount</span><span class="w">    </span><span class="ow">=</span><span class="w"> </span><span class="nb">state</span><span class="p">.</span><span class="n">contributions</span><span class="p">[</span><span class="n">to</span><span class="p">]})</span><span class="w"></span>
+<span class="w">    </span><span class="nb">put</span><span class="p">(</span><span class="nb">state</span><span class="p">{</span><span class="w"> </span><span class="n">contributions</span><span class="w"> </span><span class="ow">@</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="nc">Map</span><span class="p">.</span><span class="n">delete</span><span class="p">(</span><span class="n">to</span><span class="p">,</span><span class="w"> </span><span class="n">c</span><span class="p">)</span><span class="w"> </span><span class="p">})</span><span class="w"></span>
 </code></pre></div>
 <h2 id="repositories">Repositories</h2>
 <p>This is a list with repositories that include smart contracts written in Sophia:</p>
