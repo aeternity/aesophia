@@ -2322,7 +2322,8 @@ solve_field_constraints(Env, Constraints) ->
 
 -spec solve_ambiguous_field_constraints(env(), [field_constraint()]) -> ok.
 solve_ambiguous_field_constraints(Env, Constraints) ->
-    Unknown = solve_known_record_types(Env, Constraints),
+    NamedArgConstraints = get_named_argument_constraints(),
+    Unknown = solve_known_record_types(Env, Constraints, NamedArgConstraints),
     if Unknown == [] -> ok;
        length(Unknown) < length(Constraints) ->
             %% progress! Keep trying.
@@ -2347,10 +2348,23 @@ solve_unknown_record_types(Env, Unknown) ->
         false -> Solutions
     end.
 
--spec solve_known_record_types(env(), [field_constraint()]) -> [field_constraint()].
-solve_known_record_types(Env, Constraints) ->
+%% Since named argument constraints solving happens after field
+%% constraints solving, try to find if dereferencing a record type
+%% is failing due to unsolved named argument constraint
+dereference_or_solve_named_argument_constraints(Env, RecType, Cs) ->
+    case dereference(RecType) of
+        UVar = {uvar, _, R} ->
+            L = [DT || DT = #dependent_type_constraint{specialized_type = {uvar, _, STR}} <- Cs, STR == R],
+            solve_named_argument_constraints(Env, L),
+            dereference(UVar);
+        Type ->
+            Type
+    end.
+
+-spec solve_known_record_types(env(), [field_constraint()], [named_argument_constraint()]) -> [field_constraint()].
+solve_known_record_types(Env, Constraints, NamedArgConstraints) ->
     DerefConstraints =
-        [ C#field_constraint{record_t = dereference(RecordType)}
+        [ C#field_constraint{record_t = dereference_or_solve_named_argument_constraints(Env, RecordType,  NamedArgConstraints)}
          || C = #field_constraint{record_t = RecordType} <- Constraints ],
     SolvedConstraints =
         [begin
@@ -2398,7 +2412,7 @@ destroy_and_report_unsolved_field_constraints(Env) ->
                         OtherCs),
     {ContractCs, []} =
         lists:partition(fun(#is_contract_constraint{}) -> true; (_) -> false end, OtherCs1),
-    Unknown  = solve_known_record_types(Env, FieldCs),
+    Unknown  = solve_known_record_types(Env, FieldCs, []),
     if Unknown == [] -> ok;
        true ->
             case solve_unknown_record_types(Env, Unknown) of

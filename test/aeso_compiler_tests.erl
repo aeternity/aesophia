@@ -168,6 +168,7 @@ compilable_contracts() ->
      "maps",
      "oracles",
      "remote_call",
+     "remote_call_ambiguous_record",
      "simple",
      "simple_storage",
      "spend_test",
