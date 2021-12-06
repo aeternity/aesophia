@@ -1,0 +1,11 @@
+contract interface Coin =
+    entrypoint mint : () => int
+
+contract interface OtherCoin =
+    entrypoint mint : () => int
+
+main contract Main =
+    function mkCoin() : Coin = ct_11111111111111111111111111111115rHyByZ
+    entrypoint foo() : int =
+        let r = mkCoin()
+        r.mint()
