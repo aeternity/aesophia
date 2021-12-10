@@ -84,6 +84,11 @@
 
 -type field_constraint() :: #field_constraint{} | #record_create_constraint{} | #is_contract_constraint{}.
 
+-type byte_constraint() :: {is_bytes, utype()}
+                         | {add_bytes, aeso_syntax:ann(), concat | split, utype(), utype(), utype()}.
+
+-type constraint() :: named_argument_constraint() | field_constraint() | byte_constraint().
+
 -record(field_info,
     { ann      :: aeso_syntax:ann()
     , field_t  :: utype()
@@ -2074,7 +2079,7 @@ when_option(Opt, Do) ->
 create_constraints() ->
     ets_new(constraints, [ordered_set]).
 
--spec add_constraint(byte_constraint() | named_argument_constraint() | field_constraint()) -> true.
+-spec add_constraint(constraint() | [constraint()]) -> true.
 add_constraint(Constraint) ->
     ets_insert_ordered(constraints, Constraint).
 
@@ -2113,9 +2118,11 @@ solve_constraints(Env) ->
            (_) -> true
         end,
     AmbiguousConstraints = lists:filter(IsAmbiguous, get_constraints()),
+
+    % The two passes on AmbiguousConstraints are needed
     solve_ambiguous_constraints(Env, AmbiguousConstraints ++ AmbiguousConstraints).
 
--spec solve_ambiguous_constraints(env(), [field_constraint() | named_argument_constraint() | byte_constraint()]) -> ok.
+-spec solve_ambiguous_constraints(env(), [constraint()]) -> ok.
 solve_ambiguous_constraints(Env, Constraints) ->
     Unknown = solve_known_record_types(Env, Constraints),
     if Unknown == [] -> ok;
@@ -2227,9 +2234,6 @@ specialize_dependent_type(Env, Type) ->
     end.
 
 %% -- Bytes constraints --
-
--type byte_constraint() :: {is_bytes, utype()}
-                         | {add_bytes, aeso_syntax:ann(), concat | split, utype(), utype(), utype()}.
 
 solve_constraint(_Env, #field_constraint{record_t = {uvar, _, _}}) ->
     not_solved;
@@ -2358,7 +2362,7 @@ solve_unknown_record_types(Env, Unknown) ->
         false -> Solutions
     end.
 
--spec solve_known_record_types(env(), [field_constraint() | named_argument_constraint() | byte_constraint()]) -> [field_constraint()].
+-spec solve_known_record_types(env(), [constraint()]) -> [field_constraint()].
 solve_known_record_types(Env, Constraints) ->
     DerefConstraints = lists:map(fun(C = #field_constraint{record_t = RecordType}) ->
                                         C#field_constraint{record_t = dereference(RecordType)};
