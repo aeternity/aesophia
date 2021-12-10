@@ -2362,6 +2362,8 @@ solve_unknown_record_types(Env, Unknown) ->
         false -> Solutions
     end.
 
+%% This will solve all kinds of constraints but will only return the
+%% unsolved field constraints
 -spec solve_known_record_types(env(), [constraint()]) -> [field_constraint()].
 solve_known_record_types(Env, Constraints) ->
     DerefConstraints = lists:map(fun(C = #field_constraint{record_t = RecordType}) ->
