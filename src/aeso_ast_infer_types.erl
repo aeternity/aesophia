@@ -2215,9 +2215,7 @@ check_named_argument_constraint(Env,
             unify(Env, GenType1, SpecType, {check_expr, App, GenType1, SpecType}),
             true;
         _ -> unify(Env, GenType, SpecType, {check_expr, App, GenType, SpecType}), true
-    end;
-check_named_argument_constraint(_, _) ->
-    true.
+    end.
 
 specialize_dependent_type(Env, Type) ->
     case dereference(Type) of
