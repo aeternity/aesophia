@@ -99,6 +99,9 @@ running out of gas it is necessary to set a gas limit using the `gas` argument.
 However, note that errors that would normally consume all the gas in the
 transaction still only uses up the gas spent running the contract.
 
+Any side effects (state change, token transfers, etc.) made by a failing
+protected call is rolled back, just like they would be in the unprotected case.
+
 
 ### Contract factories and child contracts
 
