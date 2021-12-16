@@ -84,6 +84,11 @@
 
 -type field_constraint() :: #field_constraint{} | #record_create_constraint{} | #is_contract_constraint{}.
 
+-type byte_constraint() :: {is_bytes, utype()}
+                         | {add_bytes, aeso_syntax:ann(), concat | split, utype(), utype(), utype()}.
+
+-type constraint() :: named_argument_constraint() | field_constraint() | byte_constraint().
+
 -record(field_info,
     { ann      :: aeso_syntax:ann()
     , field_t  :: utype()
@@ -1312,7 +1317,7 @@ infer_nonrec(Env, LetFun) ->
     create_constraints(),
     NewLetFun = infer_letfun(Env, LetFun),
     check_special_funs(Env, NewLetFun),
-    destroy_and_report_unsolved_constraints(Env),
+    solve_then_destroy_and_report_unsolved_constraints(Env),
     Result = {TypeSig, _} = instantiate(NewLetFun),
     print_typesig(TypeSig),
     Result.
@@ -1344,12 +1349,12 @@ infer_letrec(Env, Defs) ->
             Got    = proplists:get_value(Name, Funs),
             Expect = typesig_to_fun_t(TypeSig),
             unify(Env, Got, Expect, {check_typesig, Name, Got, Expect}),
-            solve_field_constraints(Env),
+            solve_constraints(Env),
             ?PRINT_TYPES("Checked ~s : ~s\n",
                          [Name, pp(dereference_deep(Got))]),
             Res
           end || LF <- Defs ],
-    destroy_and_report_unsolved_constraints(Env),
+    solve_then_destroy_and_report_unsolved_constraints(Env),
     TypeSigs = instantiate([Sig || {Sig, _} <- Inferred]),
     NewDefs  = instantiate([D || {_, D} <- Inferred]),
     [print_typesig(S) || S <- TypeSigs],
@@ -1539,7 +1544,7 @@ infer_expr(_Env, Body={oracle_query_id, As, _}) ->
     {typed, As, Body, {app_t, As, {id, As, "oracle_query"}, [Q, R]}};
 infer_expr(_Env, Body={contract_pubkey, As, _}) ->
     Con = fresh_uvar(As),
-    constrain([#is_contract_constraint{ contract_t = Con,
+    add_constraint([#is_contract_constraint{ contract_t = Con,
                                         context    = {contract_literal, Body} }]),
     {typed, As, Body, Con};
 infer_expr(_Env, Body={id, As, "_"}) ->
@@ -1636,7 +1641,7 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
                          fun() -> register_function_call(Namespace ++ qname(CurrentFun), Name) end),
             unify(Env, FunType, {fun_t, [], NamedArgsVar, ArgTypes, GeneralResultType}, When),
             when_warning(warn_negative_spend, fun() -> warn_potential_negative_spend(Ann, NewFun1, NewArgs) end),
-            add_named_argument_constraint(
+            add_constraint(
               #dependent_type_constraint{ named_args_t = NamedArgsVar,
                                           named_args   = NamedArgs1,
                                           general_type = GeneralResultType,
@@ -1661,19 +1666,19 @@ infer_expr(Env, {record, Attrs, Fields}) ->
     NewFields = [{field, A, FieldName, infer_expr(Env, Expr)}
                  || {field, A, FieldName, Expr} <- Fields],
     RecordType1 = unfold_types_in_type(Env, RecordType),
-    constrain([ #record_create_constraint{
-                    record_t = RecordType1,
-                    fields   = [ FieldName || {field, _, [{proj, _, FieldName}], _} <- Fields ],
-                    context  = Attrs } || not Env#env.in_pattern ] ++
-              [begin
-                [{proj, _, FieldName}] = LV,
-                #field_constraint{
-                    record_t = RecordType1,
-                    field    = FieldName,
-                    field_t  = T,
-                    kind     = create,
-                    context  = Fld}
-               end || {Fld, {field, _, LV, {typed, _, _, T}}} <- lists:zip(Fields, NewFields)]),
+    add_constraint([ #record_create_constraint{
+                         record_t = RecordType1,
+                         fields   = [ FieldName || {field, _, [{proj, _, FieldName}], _} <- Fields ],
+                         context  = Attrs } || not Env#env.in_pattern ] ++
+                   [begin
+                     [{proj, _, FieldName}] = LV,
+                     #field_constraint{
+                         record_t = RecordType1,
+                         field    = FieldName,
+                         field_t  = T,
+                         kind     = create,
+                         context  = Fld}
+                    end || {Fld, {field, _, LV, {typed, _, _, T}}} <- lists:zip(Fields, NewFields)]),
     {typed, Attrs, {record, Attrs, NewFields}, RecordType};
 infer_expr(Env, {record, Attrs, Record, Update}) ->
     NewRecord = {typed, _, _, RecordType} = infer_expr(Env, Record),
@@ -1682,7 +1687,7 @@ infer_expr(Env, {record, Attrs, Record, Update}) ->
 infer_expr(Env, {proj, Attrs, Record, FieldName}) ->
     NewRecord = {typed, _, _, RecordType} = infer_expr(Env, Record),
     FieldType = fresh_uvar(Attrs),
-    constrain([#field_constraint{
+    add_constraint([#field_constraint{
         record_t = unfold_types_in_type(Env, RecordType),
         field    = FieldName,
         field_t  = FieldType,
@@ -1787,7 +1792,7 @@ check_contract_construction(Env, ForceDef, ContractT, Fun, NamedArgsT, ArgTypes,
     InitT = fresh_uvar(Ann),
     unify(Env, InitT, {fun_t, Ann, NamedArgsT, ArgTypes, fresh_uvar(Ann)}, {checking_init_args, Ann, ContractT, ArgTypes}),
     unify(Env, RetT, ContractT, {return_contract, Fun, ContractT}),
-    constrain(
+    add_constraint(
       [ #field_constraint{
            record_t = unfold_types_in_type(Env, ContractT),
            field    = {id, Ann, ?CONSTRUCTOR_MOCK_NAME},
@@ -1809,7 +1814,7 @@ split_args(Args0) ->
 infer_named_arg(Env, NamedArgs, {named_arg, Ann, Id, E}) ->
     CheckedExpr = {typed, _, _, ArgType} = infer_expr(Env, E),
     check_stateful_named_arg(Env, Id, E),
-    add_named_argument_constraint(
+    add_constraint(
         #named_argument_constraint{
             args = NamedArgs,
             name = Id,
@@ -1847,7 +1852,7 @@ check_record_update(Env, RecordType, Fld) ->
                 FunType = {fun_t, Ann1, [], [FldType], FldType},
                 {field_upd, Ann, LV, check_expr(Env, Fun, FunType)}
         end,
-    constrain([#field_constraint{
+    add_constraint([#field_constraint{
         record_t = unfold_types_in_type(Env, RecordType),
         field    = FieldName,
         field_t  = FldType,
@@ -1987,9 +1992,8 @@ next_count() ->
 %% Clean up all the ets tables (in case of an exception)
 
 ets_tables() ->
-    [options, type_vars, type_defs, record_fields, named_argument_constraints,
-     field_constraints, freshen_tvars, type_errors, defined_contracts,
-     warnings, function_calls, all_functions].
+    [options, type_vars, constraints, freshen_tvars, type_errors,
+     defined_contracts, warnings, function_calls, all_functions].
 
 clean_up_ets() ->
     [ catch ets_delete(Tab) || Tab <- ets_tables() ],
@@ -2073,42 +2077,110 @@ when_option(Opt, Do) ->
 %% -- Constraints --
 
 create_constraints() ->
-    create_named_argument_constraints(),
-    create_bytes_constraints(),
-    create_field_constraints().
+    ets_new(constraints, [ordered_set]).
+
+-spec add_constraint(constraint() | [constraint()]) -> true.
+add_constraint(Constraint) ->
+    ets_insert_ordered(constraints, Constraint).
+
+get_constraints() ->
+    ets_tab2list_ordered(constraints).
+
+destroy_constraints() ->
+    ets_delete(constraints).
+
+-spec solve_constraints(env()) -> ok.
+solve_constraints(Env) ->
+    %% First look for record fields that appear in only one type definition
+    IsAmbiguous =
+        fun(#field_constraint{
+               record_t = RecordType,
+               field    = Field={id, _Attrs, FieldName},
+               field_t  = FieldType,
+               kind     = Kind,
+               context  = When }) ->
+                case lookup_record_field(Env, FieldName, Kind) of
+                    [] ->
+                        type_error({undefined_field, Field}),
+                        false;
+                    [#field_info{field_t = FldType, record_t = RecType}] ->
+                        create_freshen_tvars(),
+                        FreshFldType = freshen(FldType),
+                        FreshRecType = freshen(RecType),
+                        destroy_freshen_tvars(),
+                        unify(Env, FreshFldType, FieldType, {field_constraint, FreshFldType, FieldType, When}),
+                        unify(Env, FreshRecType, RecordType, {record_constraint, FreshRecType, RecordType, When}),
+                        false;
+                    _ ->
+                        %% ambiguity--need cleverer strategy
+                        true
+                end;
+           (_) -> true
+        end,
+    AmbiguousConstraints = lists:filter(IsAmbiguous, get_constraints()),
+
+    % The two passes on AmbiguousConstraints are needed
+    solve_ambiguous_constraints(Env, AmbiguousConstraints ++ AmbiguousConstraints).
+
+-spec solve_ambiguous_constraints(env(), [constraint()]) -> ok.
+solve_ambiguous_constraints(Env, Constraints) ->
+    Unknown = solve_known_record_types(Env, Constraints),
+    if Unknown == [] -> ok;
+       length(Unknown) < length(Constraints) ->
+            %% progress! Keep trying.
+            solve_ambiguous_constraints(Env, Unknown);
+       true ->
+            case solve_unknown_record_types(Env, Unknown) of
+                true -> %% Progress!
+                    solve_ambiguous_constraints(Env, Unknown);
+                _ -> ok %% No progress. Report errors later.
+            end
+    end.
+
+solve_then_destroy_and_report_unsolved_constraints(Env) ->
+    solve_constraints(Env),
+    destroy_and_report_unsolved_constraints(Env).
 
 destroy_and_report_unsolved_constraints(Env) ->
-    solve_field_constraints(Env),
-    solve_named_argument_constraints(Env),
-    solve_bytes_constraints(Env),
-    destroy_and_report_unsolved_bytes_constraints(Env),
-    destroy_and_report_unsolved_named_argument_constraints(Env),
-    destroy_and_report_unsolved_field_constraints(Env).
+    {FieldCs, OtherCs} =
+        lists:partition(fun(#field_constraint{}) -> true; (_) -> false end,
+                        get_constraints()),
+    {CreateCs, OtherCs1} =
+        lists:partition(fun(#record_create_constraint{}) -> true; (_) -> false end,
+                        OtherCs),
+    {ContractCs, OtherCs2} =
+        lists:partition(fun(#is_contract_constraint{}) -> true; (_) -> false end, OtherCs1),
+    {NamedArgCs, OtherCs3} =
+        lists:partition(fun(#dependent_type_constraint{}) -> true;
+                           (#named_argument_constraint{}) -> true;
+                           (_)                            -> false
+                        end, OtherCs2),
+    {BytesCs, []} =
+        lists:partition(fun({is_bytes, _})              -> true;
+                           ({add_bytes, _, _, _, _, _}) -> true;
+                           (_)                          -> false
+                        end, OtherCs3),
+
+    Unsolved = [ S || S <- [ solve_constraint(Env, dereference_deep(C)) || C <- NamedArgCs ],
+                      S == unsolved ],
+    [ type_error({unsolved_named_argument_constraint, C}) || C <- Unsolved ],
+
+    Unknown = solve_known_record_types(Env, FieldCs),
+    if Unknown == [] -> ok;
+       true ->
+            case solve_unknown_record_types(Env, Unknown) of
+                true   -> ok;
+                Errors -> [ type_error(Err) || Err <- Errors ]
+            end
+    end,
+
+    check_record_create_constraints(Env, CreateCs),
+    check_is_contract_constraints(Env, ContractCs),
+    check_bytes_constraints(Env, BytesCs),
+
+    destroy_constraints().
 
 %% -- Named argument constraints --
-
-create_named_argument_constraints() ->
-    ets_new(named_argument_constraints, [ordered_set]).
-
-destroy_named_argument_constraints() ->
-    ets_delete(named_argument_constraints).
-
-get_named_argument_constraints() ->
-    ets_tab2list_ordered(named_argument_constraints).
-
--spec add_named_argument_constraint(named_argument_constraint()) -> ok.
-add_named_argument_constraint(Constraint) ->
-    ets_insert_ordered(named_argument_constraints, Constraint),
-    ok.
-
-solve_named_argument_constraints(Env) ->
-    Unsolved = solve_named_argument_constraints(Env, get_named_argument_constraints()),
-    Unsolved == [].
-
--spec solve_named_argument_constraints(env(), [named_argument_constraint()]) -> [named_argument_constraint()].
-solve_named_argument_constraints(Env, Constraints0) ->
-    [ C || C <- dereference_deep(Constraints0),
-           unsolved == check_named_argument_constraint(Env, C) ].
 
 %% If false, a type error has been emitted, so it's safe to drop the constraint.
 -spec check_named_argument_constraint(env(), named_argument_constraint()) -> true | false | unsolved.
@@ -2159,34 +2231,43 @@ specialize_dependent_type(Env, Type) ->
         _ -> Type   %% Currently no deep dependent types
     end.
 
-
-destroy_and_report_unsolved_named_argument_constraints(Env) ->
-    Unsolved = solve_named_argument_constraints(Env, get_named_argument_constraints()),
-    [ type_error({unsolved_named_argument_constraint, C}) || C <- Unsolved ],
-    destroy_named_argument_constraints(),
-    ok.
-
 %% -- Bytes constraints --
 
--type byte_constraint() :: {is_bytes, utype()}
-                         | {add_bytes, aeso_syntax:ann(), concat | split, utype(), utype(), utype()}.
-
-create_bytes_constraints() ->
-    ets_new(bytes_constraints, [ordered_set]).
-
-get_bytes_constraints() ->
-    ets_tab2list_ordered(bytes_constraints).
-
--spec add_bytes_constraint(byte_constraint()) -> true.
-add_bytes_constraint(Constraint) ->
-    ets_insert_ordered(bytes_constraints, Constraint).
-
-solve_bytes_constraints(Env) ->
-    [ solve_bytes_constraint(Env, C) || C <- get_bytes_constraints() ],
-    ok.
-
-solve_bytes_constraint(_Env, {is_bytes, _}) -> ok;
-solve_bytes_constraint(Env, {add_bytes, Ann, _, A0, B0, C0}) ->
+solve_constraint(_Env, #field_constraint{record_t = {uvar, _, _}}) ->
+    not_solved;
+solve_constraint(Env, C = #field_constraint{record_t = RecType,
+                                            field    = FieldName,
+                                            field_t  = FieldType,
+                                            context  = When}) ->
+    RecId = record_type_name(RecType),
+    Attrs = aeso_syntax:get_ann(RecId),
+    case lookup_type(Env, RecId) of
+        {_, {_Ann, {Formals, {What, Fields}}}} when What =:= record_t; What =:= contract_t ->
+            FieldTypes = [{Name, Type} || {field_t, _, {id, _, Name}, Type} <- Fields],
+            {id, _, FieldString} = FieldName,
+            case proplists:get_value(FieldString, FieldTypes) of
+                undefined ->
+                    type_error({missing_field, FieldName, RecId}),
+                    not_solved;
+                FldType ->
+                    create_freshen_tvars(),
+                    FreshFldType = freshen(FldType),
+                    FreshRecType = freshen(app_t(Attrs, RecId, Formals)),
+                    destroy_freshen_tvars(),
+                    unify(Env, FreshFldType, FieldType, {field_constraint, FreshFldType, FieldType, When}),
+                    unify(Env, FreshRecType, RecType, {record_constraint, FreshRecType, RecType, When}),
+                    C
+            end;
+        _ ->
+            type_error({not_a_record_type, instantiate(RecType), When}),
+            not_solved
+    end;
+solve_constraint(Env, C = #dependent_type_constraint{}) ->
+    check_named_argument_constraint(Env, C);
+solve_constraint(Env, C = #named_argument_constraint{}) ->
+    check_named_argument_constraint(Env, C);
+solve_constraint(_Env, {is_bytes, _}) -> ok;
+solve_constraint(Env, {add_bytes, Ann, _, A0, B0, C0}) ->
     A = unfold_types_in_type(Env, dereference(A0)),
     B = unfold_types_in_type(Env, dereference(B0)),
     C = unfold_types_in_type(Env, dereference(C0)),
@@ -2195,13 +2276,10 @@ solve_bytes_constraint(Env, {add_bytes, Ann, _, A0, B0, C0}) ->
         {{bytes_t, _, M}, _, {bytes_t, _, R}} when R >= M -> unify(Env, {bytes_t, Ann, R - M}, B, {at, Ann});
         {_, {bytes_t, _, N}, {bytes_t, _, R}} when R >= N -> unify(Env, {bytes_t, Ann, R - N}, A, {at, Ann});
         _ -> ok
-    end.
+    end;
+solve_constraint(_, _) -> ok.
 
-destroy_bytes_constraints() ->
-    ets_delete(bytes_constraints).
-
-destroy_and_report_unsolved_bytes_constraints(Env) ->
-    Constraints     = get_bytes_constraints(),
+check_bytes_constraints(Env, Constraints) ->
     InAddConstraint = [ T || {add_bytes, _, _, A, B, C} <- Constraints,
                              T <- [A, B, C],
                              element(1, T) /= bytes_t ],
@@ -2209,8 +2287,7 @@ destroy_and_report_unsolved_bytes_constraints(Env) ->
     %% (no need to generate error messages for both is_bytes and add_bytes).
     Skip = fun({is_bytes, T}) -> lists:member(T, InAddConstraint);
               (_) -> false end,
-    [ check_bytes_constraint(Env, C) || C <- Constraints, not Skip(C) ],
-    destroy_bytes_constraints().
+    [ check_bytes_constraint(Env, C) || C <- Constraints, not Skip(C) ].
 
 check_bytes_constraint(Env, {is_bytes, Type}) ->
     Type1 = unfold_types_in_type(Env, instantiate(Type)),
@@ -2225,32 +2302,11 @@ check_bytes_constraint(Env, {add_bytes, Ann, Fun, A0, B0, C0}) ->
     C = unfold_types_in_type(Env, instantiate(C0)),
     case {A, B, C} of
         {{bytes_t, _, _M}, {bytes_t, _, _N}, {bytes_t, _, _R}} ->
-            ok; %% If all are solved we checked M + N == R in solve_bytes_constraint.
+            ok; %% If all are solved we checked M + N == R in solve_constraint.
         _ -> type_error({unsolved_bytes_constraint, Ann, Fun, A, B, C})
     end.
 
 %% -- Field constraints --
-
-create_field_constraints() ->
-    %% A relation from uvars to constraints
-    ets_new(field_constraints, [ordered_set]).
-
-destroy_field_constraints() ->
-    ets_delete(field_constraints).
-
--spec constrain([field_constraint()]) -> true.
-constrain(FieldConstraints) ->
-    ets_insert_ordered(field_constraints, FieldConstraints).
-
--spec get_field_constraints() -> [field_constraint()].
-get_field_constraints() ->
-    ets_tab2list_ordered(field_constraints).
-
-solve_field_constraints(Env) ->
-    FieldCs =
-        lists:filter(fun(#field_constraint{}) -> true; (_) -> false end,
-                        get_field_constraints()),
-    solve_field_constraints(Env, FieldCs).
 
 check_record_create_constraints(_, []) -> ok;
 check_record_create_constraints(Env, [C | Cs]) ->
@@ -2292,49 +2348,6 @@ check_is_contract_constraints(Env, [C | Cs]) ->
     end,
     check_is_contract_constraints(Env, Cs).
 
--spec solve_field_constraints(env(), [field_constraint()]) -> ok.
-solve_field_constraints(Env, Constraints) ->
-    %% First look for record fields that appear in only one type definition
-    IsAmbiguous = fun(#field_constraint{
-                        record_t = RecordType,
-                        field    = Field={id, _Attrs, FieldName},
-                        field_t  = FieldType,
-                        kind     = Kind,
-                        context  = When }) ->
-        case lookup_record_field(Env, FieldName, Kind) of
-            [] ->
-                type_error({undefined_field, Field}),
-                false;
-            [#field_info{field_t = FldType, record_t = RecType}] ->
-                create_freshen_tvars(),
-                FreshFldType = freshen(FldType),
-                FreshRecType = freshen(RecType),
-                destroy_freshen_tvars(),
-                unify(Env, FreshFldType, FieldType, {field_constraint, FreshFldType, FieldType, When}),
-                unify(Env, FreshRecType, RecordType, {record_constraint, FreshRecType, RecordType, When}),
-                false;
-            _ ->
-                %% ambiguity--need cleverer strategy
-                true
-         end end,
-    AmbiguousConstraints = lists:filter(IsAmbiguous, Constraints),
-    solve_ambiguous_field_constraints(Env, AmbiguousConstraints).
-
--spec solve_ambiguous_field_constraints(env(), [field_constraint()]) -> ok.
-solve_ambiguous_field_constraints(Env, Constraints) ->
-    Unknown = solve_known_record_types(Env, Constraints),
-    if Unknown == [] -> ok;
-       length(Unknown) < length(Constraints) ->
-            %% progress! Keep trying.
-            solve_ambiguous_field_constraints(Env, Unknown);
-       true ->
-            case solve_unknown_record_types(Env, Unknown) of
-                true -> %% Progress!
-                    solve_ambiguous_field_constraints(Env, Unknown);
-                _ -> ok %% No progress. Report errors later.
-            end
-    end.
-
 -spec solve_unknown_record_types(env(), [field_constraint()]) -> true | [tuple()].
 solve_unknown_record_types(Env, Unknown) ->
     UVars = lists:usort([UVar || #field_constraint{record_t = UVar = {uvar, _, _}} <- Unknown]),
@@ -2347,69 +2360,17 @@ solve_unknown_record_types(Env, Unknown) ->
         false -> Solutions
     end.
 
--spec solve_known_record_types(env(), [field_constraint()]) -> [field_constraint()].
+%% This will solve all kinds of constraints but will only return the
+%% unsolved field constraints
+-spec solve_known_record_types(env(), [constraint()]) -> [field_constraint()].
 solve_known_record_types(Env, Constraints) ->
-    DerefConstraints =
-        [ C#field_constraint{record_t = dereference(RecordType)}
-         || C = #field_constraint{record_t = RecordType} <- Constraints ],
-    SolvedConstraints =
-        [begin
-            #field_constraint{record_t = RecType,
-                              field    = FieldName,
-                              field_t  = FieldType,
-                              context  = When} = C,
-            RecId = record_type_name(RecType),
-            Attrs = aeso_syntax:get_ann(RecId),
-            case lookup_type(Env, RecId) of
-                {_, {_Ann, {Formals, {What, Fields}}}} when What =:= record_t; What =:= contract_t ->
-                     FieldTypes = [{Name, Type} || {field_t, _, {id, _, Name}, Type} <- Fields],
-                     {id, _, FieldString} = FieldName,
-                     case proplists:get_value(FieldString, FieldTypes) of
-                         undefined ->
-                             type_error({missing_field, FieldName, RecId}),
-                             not_solved;
-                         FldType ->
-                             create_freshen_tvars(),
-                             FreshFldType = freshen(FldType),
-                             FreshRecType = freshen(app_t(Attrs, RecId, Formals)),
-                             destroy_freshen_tvars(),
-                             unify(Env, FreshFldType, FieldType, {field_constraint, FreshFldType, FieldType, When}),
-                             unify(Env, FreshRecType, RecType, {record_constraint, FreshRecType, RecType, When}),
-                             C
-                     end;
-                _ ->
-                    type_error({not_a_record_type, instantiate(RecType), When}),
-                    not_solved
-             end
-         end
-         || C <- DerefConstraints,
-            case C#field_constraint.record_t of
-                {uvar, _, _} -> false;
-                _          -> true
-            end],
-    DerefConstraints--SolvedConstraints.
-
-destroy_and_report_unsolved_field_constraints(Env) ->
-    {FieldCs, OtherCs} =
-        lists:partition(fun(#field_constraint{}) -> true; (_) -> false end,
-                        get_field_constraints()),
-    {CreateCs, OtherCs1} =
-        lists:partition(fun(#record_create_constraint{}) -> true; (_) -> false end,
-                        OtherCs),
-    {ContractCs, []} =
-        lists:partition(fun(#is_contract_constraint{}) -> true; (_) -> false end, OtherCs1),
-    Unknown  = solve_known_record_types(Env, FieldCs),
-    if Unknown == [] -> ok;
-       true ->
-            case solve_unknown_record_types(Env, Unknown) of
-                true   -> ok;
-                Errors -> [ type_error(Err) || Err <- Errors ]
-            end
-    end,
-    check_record_create_constraints(Env, CreateCs),
-    check_is_contract_constraints(Env, ContractCs),
-    destroy_field_constraints(),
-    ok.
+    DerefConstraints = lists:map(fun(C = #field_constraint{record_t = RecordType}) ->
+                                        C#field_constraint{record_t = dereference(RecordType)};
+                                    (C) -> dereference_deep(C)
+                                 end, Constraints),
+    SolvedConstraints = lists:map(fun(C) -> solve_constraint(Env, dereference_deep(C)) end, DerefConstraints),
+    Unsolved = DerefConstraints--SolvedConstraints,
+    lists:filter(fun(#field_constraint{}) -> true; (_) -> false end, Unsolved).
 
 record_type_name({app_t, _Attrs, RecId, _Args}) when ?is_type_id(RecId) ->
     RecId;
@@ -2717,7 +2678,7 @@ freshen(Ann, {tvar, _, Name}) ->
     NewT;
 freshen(Ann, {bytes_t, _, any}) ->
     X = fresh_uvar(Ann),
-    add_bytes_constraint({is_bytes, X}),
+    add_constraint({is_bytes, X}),
     X;
 freshen(Ann, T) when is_tuple(T) ->
     list_to_tuple(freshen(Ann, tuple_to_list(T)));
@@ -2733,14 +2694,14 @@ freshen_type_sig(Ann, TypeSig = {type_sig, _, Constr, _, _, _}) ->
 
 apply_typesig_constraint(_Ann, none, _FunT) -> ok;
 apply_typesig_constraint(Ann, address_to_contract, {fun_t, _, [], [_], Type}) ->
-    constrain([#is_contract_constraint{ contract_t = Type,
+    add_constraint([#is_contract_constraint{ contract_t = Type,
                                         context    = {address_to_contract, Ann}}]);
 apply_typesig_constraint(Ann, bytes_concat, {fun_t, _, [], [A, B], C}) ->
-    add_bytes_constraint({add_bytes, Ann, concat, A, B, C});
+    add_constraint({add_bytes, Ann, concat, A, B, C});
 apply_typesig_constraint(Ann, bytes_split, {fun_t, _, [], [C], {tuple_t, _, [A, B]}}) ->
-    add_bytes_constraint({add_bytes, Ann, split, A, B, C});
+    add_constraint({add_bytes, Ann, split, A, B, C});
 apply_typesig_constraint(Ann, bytecode_hash, {fun_t, _, _, [Con], _}) ->
-    constrain([#is_contract_constraint{ contract_t = Con,
+    add_constraint([#is_contract_constraint{ contract_t = Con,
                                         context    = {bytecode_hash, Ann} }]).
 
 

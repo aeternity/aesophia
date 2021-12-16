@@ -168,6 +168,7 @@ compilable_contracts() ->
      "maps",
      "oracles",
      "remote_call",
+     "remote_call_ambiguous_record",
      "simple",
      "simple_storage",
      "spend_test",
@@ -676,7 +677,10 @@ failing_contracts() ->
          <<?Pos(15, 5)
            "Cannot unify bytes(26)\n"
            "         and bytes(25)\n"
-           "at line 15, column 5">>,
+           "when checking the type of the expression at line 15, column 5\n"
+           "  Bytes.concat(x, y) : bytes(26)\n"
+           "against the expected type\n"
+           "  bytes(25)">>,
          <<?Pos(17, 5)
            "Failed to resolve byte array lengths in call to Bytes.concat with arguments of type\n"
            "  - bytes(6)  (at line 16, column 24)\n"
