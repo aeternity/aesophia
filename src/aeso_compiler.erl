@@ -325,14 +325,14 @@ to_sophia_value(_, _, revert, Data, Options) ->
                 {ok, Err} ->
                     {ok, {app, [], {id, [], "abort"}, [{string, [], Err}]}};
                 {error, _} ->
-                    Msg = "Could not interpret the revert message\n",
+                    Msg = "Could not interpret the revert message",
                     {error, [aeso_errors:new(data_error, Msg)]}
             end;
         fate ->
             try aeb_fate_encoding:deserialize(Data) of
                 Err -> {ok, {app, [], {id, [], "abort"}, [{string, [], Err}]}}
             catch _:_ ->
-                Msg = "Could not deserialize the revert message\n",
+                Msg = "Could not deserialize the revert message",
                 {error, [aeso_errors:new(data_error, Msg)]}
             end
     end;
@@ -354,12 +354,12 @@ to_sophia_value(ContractString, FunName, ok, Data, Options0) ->
                             {ok, aeso_vm_decode:from_aevm(VmType, Type, VmValue)}
                         catch throw:cannot_translate_to_sophia ->
                             Type0Str = prettypr:format(aeso_pretty:type(Type0)),
-                            Msg = io_lib:format("Cannot translate VM value ~p\n  of type ~p\n  to Sophia type ~s\n",
+                            Msg = io_lib:format("Cannot translate VM value ~p\n  of type ~p\n  to Sophia type ~s",
                                                 [Data, VmType, Type0Str]),
                             {error, [aeso_errors:new(data_error, Msg)]}
                         end;
                     {error, _Err} ->
-                        Msg = io_lib:format("Failed to decode binary as type ~p\n", [VmType]),
+                        Msg = io_lib:format("Failed to decode binary as type ~p", [VmType]),
                         {error, [aeso_errors:new(data_error, Msg)]}
                 end;
             fate ->
@@ -367,12 +367,12 @@ to_sophia_value(ContractString, FunName, ok, Data, Options0) ->
                     {ok, aeso_vm_decode:from_fate(Type, aeb_fate_encoding:deserialize(Data))}
                 catch throw:cannot_translate_to_sophia ->
                         Type1 = prettypr:format(aeso_pretty:type(Type0)),
-                        Msg = io_lib:format("Cannot translate FATE value ~p\n  of Sophia type ~s\n",
+                        Msg = io_lib:format("Cannot translate FATE value ~p\n  of Sophia type ~s",
                                             [aeb_fate_encoding:deserialize(Data), Type1]),
                         {error, [aeso_errors:new(data_error, Msg)]};
                       _:_ ->
                         Type1 = prettypr:format(aeso_pretty:type(Type0)),
-                        Msg = io_lib:format("Failed to decode binary as type ~s\n", [Type1]),
+                        Msg = io_lib:format("Failed to decode binary as type ~s", [Type1]),
                         {error, [aeso_errors:new(data_error, Msg)]}
                end
         end
@@ -436,12 +436,12 @@ decode_calldata(ContractString, FunName, Calldata, Options0) ->
                             {ok, ArgTypes, Values}
                         catch throw:cannot_translate_to_sophia ->
                             Type0Str = prettypr:format(aeso_pretty:type(Type0)),
-                            Msg = io_lib:format("Cannot translate VM value ~p\n  of type ~p\n  to Sophia type ~s\n",
+                            Msg = io_lib:format("Cannot translate VM value ~p\n  of type ~p\n  to Sophia type ~s",
                                                 [VmValue, VmType, Type0Str]),
                             {error, [aeso_errors:new(data_error, Msg)]}
                         end;
                     {error, _Err} ->
-                        Msg = io_lib:format("Failed to decode calldata as type ~p\n", [VmType]),
+                        Msg = io_lib:format("Failed to decode calldata as type ~p", [VmType]),
                         {error, [aeso_errors:new(data_error, Msg)]}
                 end;
             fate ->
@@ -454,12 +454,12 @@ decode_calldata(ContractString, FunName, Calldata, Options0) ->
                             {ok, ArgTypes, AstArgs}
                         catch throw:cannot_translate_to_sophia ->
                                 Type0Str = prettypr:format(aeso_pretty:type(Type0)),
-                                Msg = io_lib:format("Cannot translate FATE value ~p\n  to Sophia type ~s\n",
+                                Msg = io_lib:format("Cannot translate FATE value ~p\n  to Sophia type ~s",
                                                     [FateArgs, Type0Str]),
                                 {error, [aeso_errors:new(data_error, Msg)]}
                         end;
                     {error, _} ->
-                        Msg = io_lib:format("Failed to decode calldata binary\n", []),
+                        Msg = io_lib:format("Failed to decode calldata binary", []),
                         {error, [aeso_errors:new(data_error, Msg)]}
                 end
         end
@@ -502,7 +502,7 @@ get_decode_type(FunName, [{Contract, Ann, _, Defs}]) when ?IS_CONTRACT_HEAD(Cont
             case FunName of
                 "init" -> {ok, [], {tuple_t, [], []}};
                  _ ->
-                    Msg = io_lib:format("Function '~s' is missing in contract\n", [FunName]),
+                    Msg = io_lib:format("Function '~s' is missing in contract", [FunName]),
                     Pos = aeso_code_errors:pos(Ann),
                     aeso_errors:throw(aeso_errors:new(data_error, Pos, Msg))
             end
