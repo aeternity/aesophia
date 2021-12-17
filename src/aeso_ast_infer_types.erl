@@ -2936,35 +2936,38 @@ mk_t_err_from_warn(Warn) ->
 
 mk_error({no_decls, File}) ->
     Pos = aeso_errors:pos(File, 0, 0),
-    mk_t_err(Pos, "Empty contract\n");
+    mk_t_err(Pos, "Empty contract");
 mk_error({mismatched_decl_in_funblock, Name, Decl}) ->
-    Msg = io_lib:format("Mismatch in the function block. Expected implementation/type declaration of ~s function\n", [Name]),
+    Msg = io_lib:format("Mismatch in the function block. Expected implementation/type declaration of ~s function", [Name]),
     mk_t_err(pos(Decl), Msg);
 mk_error({higher_kinded_typevar, T}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("Type ~s is a higher kinded type variable\n"
                         "(takes another type as an argument)\n", [pp(instantiate(T))]
                        ),
     mk_t_err(pos(T), Msg);
 mk_error({wrong_type_arguments, X, ArityGiven, ArityReal}) ->
-    Msg = io_lib:format("Arity for ~s doesn't match. Expected ~p, got ~p\n"
+    Msg = io_lib:format("Arity for ~s doesn't match. Expected ~p, got ~p"
                        , [pp(instantiate(X)), ArityReal, ArityGiven]
                        ),
     mk_t_err(pos(X), Msg);
 mk_error({unnamed_map_update_with_default, Upd}) ->
-    Msg = "Invalid map update with default\n",
+    Msg = "Invalid map update with default",
     mk_t_err(pos(Upd), Msg);
 mk_error({fundecl_must_have_funtype, _Ann, Id, Type}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("~s at ~s was declared with an invalid type ~s.\n"
                        "Entrypoints and functions must have functional types"
                        , [pp(Id), pp_loc(Id), pp(instantiate(Type))]),
     mk_t_err(pos(Id), Msg);
 mk_error({cannot_unify, A, B, When}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("Cannot unify ~s\n         and ~s\n",
                         [pp(instantiate(A)), pp(instantiate(B))]),
     {Pos, Ctxt} = pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
 mk_error({unbound_variable, Id}) ->
-    Msg = io_lib:format("Unbound variable ~s at ~s\n", [pp(Id), pp_loc(Id)]),
+    Msg = io_lib:format("Unbound variable ~s", [pp(Id)]),
     case Id of
         {qid, _, ["Chain", "event"]} ->
             Cxt = "Did you forget to define the event type?",
@@ -2972,13 +2975,15 @@ mk_error({unbound_variable, Id}) ->
         _ -> mk_t_err(pos(Id), Msg)
     end;
 mk_error({undefined_field, Id}) ->
-    Msg = io_lib:format("Unbound field ~s at ~s\n", [pp(Id), pp_loc(Id)]),
+    Msg = io_lib:format("Unbound field ~s", [pp(Id)]),
     mk_t_err(pos(Id), Msg);
 mk_error({not_a_record_type, Type, Why}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("~s\n", [pp_type("Not a record type: ", Type)]),
     {Pos, Ctxt} = pp_why_record(Why),
     mk_t_err(Pos, Msg, Ctxt);
 mk_error({not_a_contract_type, Type, Cxt}) ->
+    % TODO(mk_error)
     Msg =
         case Type of
             {tvar, _, _} ->
@@ -3004,116 +3009,127 @@ mk_error({not_a_contract_type, Type, Cxt}) ->
         end,
     mk_t_err(Pos, Msg, Cxt1);
 mk_error({non_linear_pattern, Pattern, Nonlinear}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("Repeated name~s ~s in pattern\n~s (at ~s)\n",
                         [plural("", "s", Nonlinear), string:join(Nonlinear, ", "),
                          pp_expr("  ", Pattern), pp_loc(Pattern)]),
     mk_t_err(pos(Pattern), Msg);
 mk_error({ambiguous_record, Fields = [{_, First} | _], Candidates}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("Ambiguous record type with field~s ~s (at ~s) could be one of\n~s",
                         [plural("", "s", Fields), string:join([ pp(F) || {_, F} <- Fields ], ", "),
                         pp_loc(First), [ ["  - ", pp(C), " (at ", pp_loc(C), ")\n"] || C <- Candidates ]]),
     mk_t_err(pos(First), Msg);
 mk_error({missing_field, Field, Rec}) ->
-    Msg = io_lib:format("Record type ~s does not have field ~s (at ~s)\n",
-                        [pp(Rec), pp(Field), pp_loc(Field)]),
+    Msg = io_lib:format("Record type ~s does not have field ~s",
+                        [pp(Rec), pp(Field)]),
     mk_t_err(pos(Field), Msg);
 mk_error({missing_fields, Ann, RecType, Fields}) ->
-    Msg = io_lib:format("The field~s ~s ~s missing when constructing an element of type ~s (at ~s)\n",
+    Msg = io_lib:format("The field~s ~s ~s missing when constructing an element of type ~s",
                         [plural("", "s", Fields), string:join(Fields, ", "),
-                         plural("is", "are", Fields), pp(RecType), pp_loc(Ann)]),
+                         plural("is", "are", Fields), pp(RecType)]),
     mk_t_err(pos(Ann), Msg);
 mk_error({no_records_with_all_fields, Fields = [{_, First} | _]}) ->
-    Msg = io_lib:format("No record type with field~s ~s (at ~s)\n",
-                        [plural("", "s", Fields), string:join([ pp(F) || {_, F} <- Fields ], ", "),
-                         pp_loc(First)]),
+    Msg = io_lib:format("No record type with field~s ~s",
+                        [plural("", "s", Fields), string:join([ pp(F) || {_, F} <- Fields ], ", ")]),
     mk_t_err(pos(First), Msg);
 mk_error({recursive_types_not_implemented, Types}) ->
+    % TODO(mk_error)
     S = plural(" is", "s are mutually", Types),
     Msg = io_lib:format("The following type~s recursive, which is not yet supported:\n~s",
                         [S, [io_lib:format("  - ~s (at ~s)\n", [pp(T), pp_loc(T)]) || T <- Types]]),
     mk_t_err(pos(hd(Types)), Msg);
 mk_error({event_must_be_variant_type, Where}) ->
-    Msg = io_lib:format("The event type must be a variant type (at ~s)\n", [pp_loc(Where)]),
+    Msg = io_lib:format("The event type must be a variant type", []),
     mk_t_err(pos(Where), Msg);
 mk_error({indexed_type_must_be_word, Type, Type}) ->
-    Msg = io_lib:format("The indexed type ~s (at ~s) is not a word type\n",
-                        [pp_type("", Type), pp_loc(Type)]),
+    Msg = io_lib:format("The indexed type ~s is not a word type",
+                        [pp_type("", Type)]),
     mk_t_err(pos(Type), Msg);
 mk_error({indexed_type_must_be_word, Type, Type1}) ->
-    Msg = io_lib:format("The indexed type ~s (at ~s) equals ~s which is not a word type\n",
-                        [pp_type("", Type), pp_loc(Type), pp_type("", Type1)]),
+    Msg = io_lib:format("The indexed type ~s equals ~s which is not a word type",
+                        [pp_type("", Type), pp_type("", Type1)]),
     mk_t_err(pos(Type), Msg);
 mk_error({event_0_to_3_indexed_values, Constr}) ->
-    Msg = io_lib:format("The event constructor ~s (at ~s) has too many indexed values (max 3)\n",
-                        [name(Constr), pp_loc(Constr)]),
+    Msg = io_lib:format("The event constructor ~s has too many indexed values (max 3)",
+                        [name(Constr)]),
     mk_t_err(pos(Constr), Msg);
 mk_error({event_0_to_1_string_values, Constr}) ->
-    Msg = io_lib:format("The event constructor ~s (at ~s) has too many non-indexed values (max 1)\n",
-                        [name(Constr), pp_loc(Constr)]),
+    Msg = io_lib:format("The event constructor ~s has too many non-indexed values (max 1)",
+                        [name(Constr)]),
     mk_t_err(pos(Constr), Msg);
 mk_error({repeated_constructor, Cs}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("Variant types must have distinct constructor names\n~s",
                         [[ io_lib:format("~s  (at ~s)\n", [pp_typed("  - ", C, T), pp_loc(C)]) || {C, T} <- Cs ]]),
     mk_t_err(pos(element(1, hd(Cs))), Msg);
 mk_error({bad_named_argument, [], Name}) ->
-    Msg = io_lib:format("Named argument ~s (at ~s) supplied to function expecting no named arguments.\n",
-                        [pp(Name), pp_loc(Name)]),
+    Msg = io_lib:format("Named argument ~s supplied to function expecting no named arguments.",
+                        [pp(Name)]),
     mk_t_err(pos(Name), Msg);
 mk_error({bad_named_argument, Args, Name}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("Named argument ~s (at ~s) is not one of the expected named arguments\n~s",
                         [pp(Name), pp_loc(Name),
                         [ io_lib:format("~s\n", [pp_typed("  - ", Arg, Type)])
                           || {named_arg_t, _, Arg, Type, _} <- Args ]]),
     mk_t_err(pos(Name), Msg);
 mk_error({unsolved_named_argument_constraint, #named_argument_constraint{name = Name, type = Type}}) ->
-    Msg = io_lib:format("Named argument ~s (at ~s) supplied to function with unknown named arguments.\n",
-                        [pp_typed("", Name, Type), pp_loc(Name)]),
+    Msg = io_lib:format("Named argument ~s supplied to function with unknown named arguments.",
+                        [pp_typed("", Name, Type)]),
     mk_t_err(pos(Name), Msg);
 mk_error({reserved_entrypoint, Name, Def}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("The name '~s' is reserved and cannot be used for a\n"
                         "top-level contract function (at ~s).\n", [Name, pp_loc(Def)]),
     mk_t_err(pos(Def), Msg);
 mk_error({duplicate_definition, Name, Locs}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("Duplicate definitions of ~s at\n~s",
                         [Name, [ ["  - ", pp_loc(L), "\n"] || L <- Locs ]]),
     mk_t_err(pos(lists:last(Locs)), Msg);
 mk_error({duplicate_scope, Kind, Name, OtherKind, L}) ->
-    Msg = io_lib:format("The ~p ~s (at ~s) has the same name as a ~p at ~s\n",
-                        [Kind, pp(Name), pp_loc(Name), OtherKind, pp_loc(L)]),
+    Msg = io_lib:format("The ~p ~s has the same name as a ~p at ~s",
+                        [Kind, pp(Name), OtherKind, pp_loc(L)]),
     mk_t_err(pos(Name), Msg);
 mk_error({include, _, {string, Pos, Name}}) ->
-    Msg = io_lib:format("Include of '~s' at ~s\nnot allowed, include only allowed at top level.\n",
-                        [binary_to_list(Name), pp_loc(Pos)]),
+    Msg = io_lib:format("Include of '~s' is not allowed, include only allowed at top level.",
+                        [binary_to_list(Name)]),
     mk_t_err(pos(Pos), Msg);
 mk_error({namespace, _Pos, {con, Pos, Name}, _Def}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("Nested namespaces are not allowed\nNamespace '~s' at ~s not defined at top level.\n",
                         [Name, pp_loc(Pos)]),
     mk_t_err(pos(Pos), Msg);
 mk_error({Contract, _Pos, {con, Pos, Name}, _Def}) when ?IS_CONTRACT_HEAD(Contract) ->
+    % TODO(mk_error)
     Msg = io_lib:format("Nested contracts are not allowed\nContract '~s' at ~s not defined at top level.\n",
                         [Name, pp_loc(Pos)]),
     mk_t_err(pos(Pos), Msg);
 mk_error({type_decl, _, {id, Pos, Name}, _}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("Empty type declarations are not supported\nType ~s at ~s lacks a definition\n",
                         [Name, pp_loc(Pos)]),
     mk_t_err(pos(Pos), Msg);
 mk_error({letval, _Pos, {id, Pos, Name}, _Def}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("Toplevel \"let\" definitions are not supported\nValue ~s at ~s could be replaced by 0-argument function\n",
                         [Name, pp_loc(Pos)]),
     mk_t_err(pos(Pos), Msg);
 mk_error({stateful_not_allowed, Id, Fun}) ->
-    Msg = io_lib:format("Cannot reference stateful function ~s (at ~s)\nin the definition of non-stateful function ~s.\n",
-                        [pp(Id), pp_loc(Id), pp(Fun)]),
+    Msg = io_lib:format("Cannot reference stateful function ~s in the definition of non-stateful function ~s.",
+                        [pp(Id), pp(Fun)]),
     mk_t_err(pos(Id), Msg);
 mk_error({stateful_not_allowed_in_guards, Id}) ->
-    Msg = io_lib:format("Cannot reference stateful function ~s (at ~s) in a pattern guard.\n",
-                        [pp(Id), pp_loc(Id)]),
+    Msg = io_lib:format("Cannot reference stateful function ~s in a pattern guard.",
+                        [pp(Id)]),
     mk_t_err(pos(Id), Msg);
 mk_error({value_arg_not_allowed, Value, Fun}) ->
-    Msg = io_lib:format("Cannot pass non-zero value argument ~s (at ~s)\nin the definition of non-stateful function ~s.\n",
-                        [pp_expr("", Value), pp_loc(Value), pp(Fun)]),
+    Msg = io_lib:format("Cannot pass non-zero value argument ~s in the definition of non-stateful function ~s.",
+                        [pp_expr("", Value), pp(Fun)]),
     mk_t_err(pos(Value), Msg);
 mk_error({init_depends_on_state, Which, [_Init | Chain]}) ->
+    % TODO(mk_error)
     WhichCalls = fun("put") -> ""; ("state") -> ""; (_) -> ", which calls" end,
     Msg = io_lib:format("The init function should return the initial state as its result and cannot ~s the state,\nbut it calls\n~s",
                         [if Which == put -> "write"; true -> "read" end,
@@ -3121,75 +3137,81 @@ mk_error({init_depends_on_state, Which, [_Init | Chain]}) ->
                            || {[_, Fun], Ann} <- Chain]]),
     mk_t_err(pos(element(2, hd(Chain))), Msg);
 mk_error({missing_body_for_let, Ann}) ->
-    Msg = io_lib:format("Let binding at ~s must be followed by an expression\n", [pp_loc(Ann)]),
+    Msg = io_lib:format("Let binding must be followed by an expression.", []),
     mk_t_err(pos(Ann), Msg);
 mk_error({public_modifier_in_contract, Decl}) ->
+    % TODO(mk_error)
     Decl1 = mk_entrypoint(Decl),
     Msg = io_lib:format("Use 'entrypoint' instead of 'function' for public function ~s (at ~s):\n~s\n",
                         [pp_expr("", element(3, Decl)), pp_loc(Decl),
                          prettypr:format(prettypr:nest(2, aeso_pretty:decl(Decl1)))]),
     mk_t_err(pos(Decl), Msg);
 mk_error({init_must_be_an_entrypoint, Decl}) ->
+    % TODO(mk_error)
     Decl1 = mk_entrypoint(Decl),
     Msg = io_lib:format("The init function (at ~s) must be an entrypoint:\n~s\n",
                         [pp_loc(Decl),
                          prettypr:format(prettypr:nest(2, aeso_pretty:decl(Decl1)))]),
     mk_t_err(pos(Decl), Msg);
 mk_error({init_must_not_be_payable, Decl}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("The init function (at ~s) cannot be payable.\n"
                         "You don't need the 'payable' annotation to be able to attach\n"
                         "funds to the create contract transaction.",
                         [pp_loc(Decl)]),
     mk_t_err(pos(Decl), Msg);
 mk_error({proto_must_be_entrypoint, Decl}) ->
+    % TODO(mk_error)
     Decl1 = mk_entrypoint(Decl),
     Msg = io_lib:format("Use 'entrypoint' for declaration of ~s (at ~s):\n~s\n",
                         [pp_expr("", element(3, Decl)), pp_loc(Decl),
                          prettypr:format(prettypr:nest(2, aeso_pretty:decl(Decl1)))]),
     mk_t_err(pos(Decl), Msg);
 mk_error({proto_in_namespace, Decl}) ->
-    Msg = io_lib:format("Namespaces cannot contain function prototypes (at ~s).\n",
-                        [pp_loc(Decl)]),
+    Msg = io_lib:format("Namespaces cannot contain function prototypes.", []),
     mk_t_err(pos(Decl), Msg);
 mk_error({entrypoint_in_namespace, Decl}) ->
-    Msg = io_lib:format("Namespaces cannot contain entrypoints (at ~s). Use 'function' instead.\n",
-                        [pp_loc(Decl)]),
+    Msg = io_lib:format("Namespaces cannot contain entrypoints. Use 'function' instead.", []),
     mk_t_err(pos(Decl), Msg);
 mk_error({private_entrypoint, Decl}) ->
-    Msg = io_lib:format("The entrypoint ~s (at ~s) cannot be private. Use 'function' instead.\n",
-                        [pp_expr("", element(3, Decl)), pp_loc(Decl)]),
+    Msg = io_lib:format("The entrypoint ~s cannot be private. Use 'function' instead.",
+                        [pp_expr("", element(3, Decl))]),
     mk_t_err(pos(Decl), Msg);
 mk_error({private_and_public, Decl}) ->
-    Msg = io_lib:format("The function ~s (at ~s) cannot be both public and private.\n",
-                        [pp_expr("", element(3, Decl)), pp_loc(Decl)]),
+    Msg = io_lib:format("The function ~s cannot be both public and private.",
+                        [pp_expr("", element(3, Decl))]),
     mk_t_err(pos(Decl), Msg);
 mk_error({contract_has_no_entrypoints, Con}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("The contract ~s (at ~s) has no entrypoints. Since Sophia version 3.2, public\n"
                         "contract functions must be declared with the 'entrypoint' keyword instead of\n"
                         "'function'.\n", [pp_expr("", Con), pp_loc(Con)]),
     mk_t_err(pos(Con), Msg);
 mk_error({definition_in_contract_interface, Ann, {id, _, Id}}) ->
-    Msg = "Contract interfaces cannot contain defined functions or entrypoints.\n",
-    Cxt = io_lib:format("Fix: replace the definition of '~s' by a type signature.\n", [Id]),
+    Msg = "Contract interfaces cannot contain defined functions or entrypoints.",
+    Cxt = io_lib:format("Fix: replace the definition of '~s' by a type signature.", [Id]),
     mk_t_err(pos(Ann), Msg, Cxt);
 mk_error({unbound_type, Type}) ->
-    Msg = io_lib:format("Unbound type ~s (at ~s).\n", [pp_type("", Type), pp_loc(Type)]),
+    Msg = io_lib:format("Unbound type ~s.", [pp_type("", Type)]),
     mk_t_err(pos(Type), Msg);
 mk_error({new_tuple_syntax, Ann, Ts}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("Invalid type\n~s  (at ~s)\nThe syntax of tuple types changed in Sophia version 4.0. Did you mean\n~s\n",
                         [pp_type("  ", {args_t, Ann, Ts}), pp_loc(Ann), pp_type("  ", {tuple_t, Ann, Ts})]),
     mk_t_err(pos(Ann), Msg);
 mk_error({map_in_map_key, Ann, KeyType}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("Invalid key type\n~s\n", [pp_type("  ", KeyType)]),
     Cxt = "Map keys cannot contain other maps.\n",
     mk_t_err(pos(Ann), Msg, Cxt);
 mk_error({cannot_call_init_function, Ann}) ->
+    % TODO(mk_error)
     Msg = "The 'init' function is called exclusively by the create contract transaction\n"
           "and cannot be called from the contract code.\n",
     mk_t_err(pos(Ann), Msg);
 mk_error({contract_treated_as_namespace, Ann, [Con, Fun] = QName}) ->
-    Msg = io_lib:format("Invalid call to contract entrypoint '~s'.\n", [string:join(QName, ".")]),
-    Cxt = io_lib:format("It must be called as 'c.~s' for some c : ~s.\n", [Fun, Con]),
+    Msg = io_lib:format("Invalid call to contract entrypoint '~s'.", [string:join(QName, ".")]),
+    Cxt = io_lib:format("It must be called as 'c.~s' for some c : ~s.", [Fun, Con]),
     mk_t_err(pos(Ann), Msg, Cxt);
 mk_error({bad_top_level_decl, Decl}) ->
     What = case element(1, Decl) of
@@ -3197,64 +3219,73 @@ mk_error({bad_top_level_decl, Decl}) ->
                _      -> "contract or namespace"
            end,
     Id = element(3, Decl),
-    Msg = io_lib:format("The definition of '~s' must appear inside a ~s.\n",
+    Msg = io_lib:format("The definition of '~s' must appear inside a ~s.",
                         [pp_expr("", Id), What]),
     mk_t_err(pos(Decl), Msg);
 mk_error({unknown_byte_length, Type}) ->
-    Msg = io_lib:format("Cannot resolve length of byte array.\n", []),
+    Msg = io_lib:format("Cannot resolve length of byte array.", []),
     mk_t_err(pos(Type), Msg);
 mk_error({unsolved_bytes_constraint, Ann, concat, A, B, C}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("Failed to resolve byte array lengths in call to Bytes.concat with arguments of type\n"
                         "~s  (at ~s)\n~s  (at ~s)\nand result type\n~s  (at ~s)\n",
                         [pp_type("  - ", A), pp_loc(A), pp_type("  - ", B),
                          pp_loc(B), pp_type("  - ", C), pp_loc(C)]),
     mk_t_err(pos(Ann), Msg);
 mk_error({unsolved_bytes_constraint, Ann, split, A, B, C}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("Failed to resolve byte array lengths in call to Bytes.split with argument of type\n"
                         "~s  (at ~s)\nand result types\n~s  (at ~s)\n~s  (at ~s)\n",
                         [ pp_type("  - ", C), pp_loc(C), pp_type("  - ", A), pp_loc(A),
                           pp_type("  - ", B), pp_loc(B)]),
     mk_t_err(pos(Ann), Msg);
 mk_error({failed_to_get_compiler_version, Err}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("Failed to get compiler version. Error:\n  ~p\n", [Err]),
     mk_t_err(pos(0, 0), Msg);
 mk_error({compiler_version_mismatch, Ann, Version, Op, Bound}) ->
+    % TODO(mk_error)
     PrintV = fun(V) -> string:join([integer_to_list(N) || N <- V], ".") end,
     Msg = io_lib:format("Cannot compile with this version of the compiler,\n"
                         "because it does not satisfy the constraint"
                         " ~s ~s ~s\n", [PrintV(Version), Op, PrintV(Bound)]),
     mk_t_err(pos(Ann), Msg);
 mk_error({empty_record_or_map_update, Expr}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("Empty record/map update\n~s",
                         [pp_expr("  ", Expr)]),
     mk_t_err(pos(Expr), Msg);
 mk_error({mixed_record_and_map, Expr}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("Mixed record fields and map keys in\n~s",
                         [pp_expr("  ", Expr)]),
     mk_t_err(pos(Expr), Msg);
 mk_error({named_argument_must_be_literal_bool, Name, Arg}) ->
+    % TODO(mk_error)
     Msg = io_lib:format("Invalid '~s' argument\n~s\nIt must be either 'true' or 'false'.", [Name, pp_expr("  ", instantiate(Arg))]),
     mk_t_err(pos(Arg), Msg);
 mk_error({conflicting_updates_for_field, Upd, Key}) ->
-    Msg = io_lib:format("Conflicting updates for field '~s'\n", [Key]),
+    Msg = io_lib:format("Conflicting updates for field '~s'", [Key]),
     mk_t_err(pos(Upd), Msg);
 mk_error({ambiguous_main_contract, Ann}) ->
     Msg = "Could not deduce the main contract. You can point it out manually with the `main` keyword.",
     mk_t_err(pos(Ann), Msg);
 mk_error({main_contract_undefined, Ann}) ->
-    Msg = "No contract defined.\n",
+    Msg = "No contract defined.",
     mk_t_err(pos(Ann), Msg);
 mk_error({multiple_main_contracts, Ann}) ->
-    Msg = "Only one main contract can be defined.\n",
+    Msg = "Only one main contract can be defined.",
     mk_t_err(pos(Ann), Msg);
 mk_error({unify_varargs, When}) ->
+    % TODO(mk_error)
     Msg = "Cannot unify variable argument list.\n",
     {Pos, Ctxt} = pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
 mk_error({clone_no_contract, Ann}) ->
-    Msg = "Chain.clone requires `ref` named argument of contract type.\n",
+    Msg = "Chain.clone requires `ref` named argument of contract type.",
     mk_t_err(pos(Ann), Msg);
 mk_error({contract_lacks_definition, Type, When}) ->
+    % TODO(mk_error)
     Msg = io_lib:format(
             "~s is not implemented.\n",
             [pp_type(Type)]
@@ -3262,6 +3293,7 @@ mk_error({contract_lacks_definition, Type, When}) ->
     {Pos, Ctxt} = pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
 mk_error({ambiguous_name, QIds = [{qid, Ann, _} | _]}) ->
+    % TODO(mk_error)
     Names = lists:map(fun(QId) -> io_lib:format("~s at ~s\n", [pp(QId), pp_loc(QId)]) end, QIds),
     Msg = "Ambiguous name: " ++ lists:concat(Names),
     mk_t_err(pos(Ann), Msg);
@@ -3276,7 +3308,7 @@ mk_error({unknown_warning, Warning}) ->
     Msg = io_lib:format("Trying to report unknown warning: ~p", [Warning]),
     mk_t_err(pos(0, 0), Msg);
 mk_error(Err) ->
-    Msg = io_lib:format("Unknown error: ~p\n", [Err]),
+    Msg = io_lib:format("Unknown error: ~p", [Err]),
     mk_t_err(pos(0, 0), Msg).
 
 mk_warning({unused_include, FileName, SrcFile}) ->
