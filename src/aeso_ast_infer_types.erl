@@ -2074,12 +2074,6 @@ get_option(Key, Default) ->
 when_option(Opt, Do) ->
     get_option(Opt, false) andalso Do().
 
-when_option_else(Opt, Do, Else) ->
-    case get_option(Opt, false) of
-        true -> Do();
-        _    -> Else()
-    end.
-
 %% -- Constraints --
 
 create_constraints() ->
@@ -2957,11 +2951,8 @@ mk_error({wrong_type_arguments, X, ArityGiven, ArityReal}) ->
                        ),
     mk_t_err(pos(X), Msg);
 mk_error({unnamed_map_update_with_default, Upd}) ->
-    MsgRaw = "Invalid map update with default",
-    Msg = MsgRaw ++ "\n",
-    when_option_else(raw_error_messages,
-                     fun() -> mk_t_err(pos(Upd), MsgRaw) end,
-                     fun() -> mk_t_err(pos(Upd), Msg) end);
+    Msg = "Invalid map update with default\n",
+    mk_t_err(pos(Upd), Msg);
 mk_error({fundecl_must_have_funtype, _Ann, Id, Type}) ->
     Msg = io_lib:format("~s at ~s was declared with an invalid type ~s.\n"
                        "Entrypoints and functions must have functional types"
@@ -2973,17 +2964,12 @@ mk_error({cannot_unify, A, B, When}) ->
     {Pos, Ctxt} = pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
 mk_error({unbound_variable, Id}) ->
-    MsgRaw = io_lib:format("Unbound variable ~s", [pp(Id)]),
     Msg = io_lib:format("Unbound variable ~s at ~s\n", [pp(Id), pp_loc(Id)]),
     case Id of
         {qid, _, ["Chain", "event"]} ->
             Cxt = "Did you forget to define the event type?",
-            when_option_else(raw_error_messages,
-                             fun() -> mk_t_err(pos(Id), MsgRaw, Cxt) end,
-                             fun() -> mk_t_err(pos(Id), Msg, Cxt) end);
-        _ -> when_option_else(raw_error_messages,
-                              fun() -> mk_t_err(pos(Id), MsgRaw) end,
-                              fun() -> mk_t_err(pos(Id), Msg) end)
+            mk_t_err(pos(Id), Msg, Cxt);
+        _ -> mk_t_err(pos(Id), Msg)
     end;
 mk_error({undefined_field, Id}) ->
     Msg = io_lib:format("Unbound field ~s at ~s\n", [pp(Id), pp_loc(Id)]),
