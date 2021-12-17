@@ -2976,8 +2976,7 @@ mk_error({undefined_field, Id}) ->
     Msg = io_lib:format("Unbound field ~s", [pp(Id)]),
     mk_t_err(pos(Id), Msg);
 mk_error({not_a_record_type, Type, Why}) ->
-    % TODO(mk_error)
-    Msg = io_lib:format("~s\n", [pp_type("Not a record type: ", Type)]),
+    Msg = io_lib:format("~s", [pp_type("Not a record type: ", Type)]),
     {Pos, Ctxt} = pp_why_record(Why),
     mk_t_err(Pos, Msg, Ctxt);
 mk_error({not_a_contract_type, Type, Cxt}) ->
@@ -3476,20 +3475,20 @@ pp_when(unknown) -> {pos(0,0), ""}.
 -spec pp_why_record(why_record()) -> {pos(), iolist()}.
 pp_why_record({var_args, Ann, Fun}) ->
     {pos(Ann),
-     io_lib:format("arising from resolution of variadic function ~s (at ~s)",
-                   [pp_expr(Fun), pp_loc(Fun)])};
+     io_lib:format("arising from resolution of variadic function ~s",
+                   [pp_expr(Fun)])};
 pp_why_record(Fld = {field, _Ann, LV, _E}) ->
     {pos(Fld),
-     io_lib:format("arising from an assignment of the field ~s (at ~s)",
-                   [pp_expr({lvalue, [], LV}), pp_loc(Fld)])};
+     io_lib:format("arising from an assignment of the field ~s",
+                   [pp_expr({lvalue, [], LV})])};
 pp_why_record(Fld = {field, _Ann, LV, _Alias, _E}) ->
     {pos(Fld),
-     io_lib:format("arising from an assignment of the field ~s (at ~s)",
-                   [pp_expr({lvalue, [], LV}), pp_loc(Fld)])};
+     io_lib:format("arising from an assignment of the field ~s",
+                   [pp_expr({lvalue, [], LV})])};
 pp_why_record({proj, _Ann, Rec, FldName}) ->
     {pos(Rec),
-     io_lib:format("arising from the projection of the field ~s (at ~s)",
-         [pp(FldName), pp_loc(Rec)])}.
+     io_lib:format("arising from the projection of the field ~s",
+         [pp(FldName)])}.
 
 
 if_branches(If = {'if', Ann, _, Then, Else}) ->
