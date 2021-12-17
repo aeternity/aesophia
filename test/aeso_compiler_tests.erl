@@ -330,7 +330,7 @@ failing_contracts() ->
           "  - line 17, column 3">>])
     , ?TYPE_ERROR(type_errors,
        [<<?Pos(17, 23)
-          "Unbound variable zz at line 17, column 23">>,
+          "Unbound variable `zz`">>,
         <<?Pos(26, 9)
           "Cannot unify int\n"
           "         and list(int)\n"
@@ -381,27 +381,25 @@ failing_contracts() ->
           "  - w : int (at line 38, column 13)\n"
           "  - z : string (at line 39, column 10)">>,
         <<?Pos(22, 40)
-          "Not a record type: string\n"
-          "arising from the projection of the field y (at line 22, column 40)">>,
+          "Not a record type: `string`\n"
+          "arising from the projection of the field `y`">>,
         <<?Pos(21, 44)
-          "Not a record type: string\n"
-          "arising from an assignment of the field y (at line 21, column 44)">>,
+          "Not a record type: `string`\n"
+          "arising from an assignment of the field `y`">>,
         <<?Pos(20, 40)
-          "Not a record type: string\n"
-          "arising from an assignment of the field y (at line 20, column 40)">>,
+          "Not a record type: `string`\n"
+          "arising from an assignment of the field `y`">>,
         <<?Pos(19, 37)
-          "Not a record type: string\n"
-          "arising from an assignment of the field y (at line 19, column 37)">>,
+          "Not a record type: `string`\n"
+          "arising from an assignment of the field `y`">>,
         <<?Pos(13, 27)
           "Ambiguous record type with field y (at line 13, column 27) could be one of\n"
           "  - r (at line 4, column 10)\n"
           "  - r' (at line 5, column 10)">>,
         <<?Pos(26, 7)
-          "Repeated name x in pattern\n"
-          "  x :: x (at line 26, column 7)">>,
+          "Repeated name `x` in the pattern `x :: x`">>,
         <<?Pos(44, 14)
-          "Repeated names x, y in pattern\n"
-          "  (x : int, y, x : string, y : bool) (at line 44, column 14)">>,
+          "Repeated names `x`, `y` in the pattern `(x : int, y, x : string, y : bool)`">>,
         <<?Pos(44, 39)
           "Cannot unify int\n"
           "         and string\n"
@@ -417,19 +415,19 @@ failing_contracts() ->
           "against the expected type\n"
           "  string">>,
         <<?Pos(14, 24)
-          "No record type with fields y, z (at line 14, column 24)">>,
+          "No record type with fields `y`, `z`">>,
         <<?Pos(15, 26)
-          "The field z is missing when constructing an element of type r2 (at line 15, column 26)">>,
+          "The field `z` is missing when constructing an element of type `r2`">>,
         <<?Pos(15, 24)
-          "Record type r2 does not have field y (at line 15, column 24)">>,
+          "Record type `r2` does not have field `y`">>,
         <<?Pos(47, 5)
-          "Let binding at line 47, column 5 must be followed by an expression">>,
+          "Let binding must be followed by an expression.">>,
         <<?Pos(50, 5)
-          "Let binding at line 50, column 5 must be followed by an expression">>,
+          "Let binding must be followed by an expression.">>,
         <<?Pos(54, 5)
-          "Let binding at line 54, column 5 must be followed by an expression">>,
+          "Let binding must be followed by an expression.">>,
         <<?Pos(58, 5)
-          "Let binding at line 58, column 5 must be followed by an expression">>,
+          "Let binding must be followed by an expression.">>,
         <<?Pos(63, 5)
           "Cannot unify int\n"
           "         and bool\n"
@@ -449,24 +447,24 @@ failing_contracts() ->
           "when checking that 'init' returns a value of type 'state' at line 5, column 3">>])
     , ?TYPE_ERROR(missing_fields_in_record_expression,
        [<<?Pos(7, 42)
-          "The field x is missing when constructing an element of type r('a) (at line 7, column 42)">>,
+          "The field `x` is missing when constructing an element of type `r('a)`">>,
         <<?Pos(8, 42)
-          "The field y is missing when constructing an element of type r(int) (at line 8, column 42)">>,
+          "The field `y` is missing when constructing an element of type `r(int)`">>,
         <<?Pos(6, 42)
-          "The fields y, z are missing when constructing an element of type r('a) (at line 6, column 42)">>])
+          "The fields `y`, `z` are missing when constructing an element of type `r('a)`">>])
     , ?TYPE_ERROR(namespace_clash,
        [<<?Pos(4, 10)
-          "The contract Call (at line 4, column 10) has the same name as a namespace at (builtin location)">>])
+          "The contract `Call` has the same name as a namespace at (builtin location)">>])
     , ?TYPE_ERROR(bad_events,
         [<<?Pos(9, 25)
-           "The indexed type string (at line 9, column 25) is not a word type">>,
+           "The indexed type `string` is not a word type">>,
          <<?Pos(10, 25)
-           "The indexed type alias_string (at line 10, column 25) equals string which is not a word type">>])
+           "The indexed type `alias_string` equals `string` which is not a word type">>])
     , ?TYPE_ERROR(bad_events2,
         [<<?Pos(9, 7)
-           "The event constructor BadEvent1 (at line 9, column 7) has too many non-indexed values (max 1)">>,
+           "The event constructor `BadEvent1` has too many non-indexed values (max 1)">>,
          <<?Pos(10, 7)
-           "The event constructor BadEvent2 (at line 10, column 7) has too many indexed values (max 3)">>])
+           "The event constructor `BadEvent2` has too many indexed values (max 3)">>])
     , ?TYPE_ERROR(type_clash,
         [<<?Pos(12, 42)
            "Cannot unify int\n"
@@ -477,13 +475,13 @@ failing_contracts() ->
            "  map(string, int)">>])
     , ?TYPE_ERROR(not_toplevel_include,
                   [<<?Pos(2, 11)
-                     "Include of 'included.aes' at line 2, column 11\nnot allowed, include only allowed at top level.">>])
+                     "Include of `included.aes` is not allowed, include only allowed at top level.">>])
     , ?TYPE_ERROR(not_toplevel_namespace,
                   [<<?Pos(2, 13)
-                     "Nested namespaces are not allowed\nNamespace 'Foo' at line 2, column 13 not defined at top level.">>])
+                     "Nested namespaces are not allowed. Namespace `Foo` is not defined at top level.">>])
     , ?TYPE_ERROR(not_toplevel_contract,
         [<<?Pos(2, 12)
-           "Nested contracts are not allowed\nContract 'Con' at line 2, column 12 not defined at top level.">>])
+           "Nested contracts are not allowed. Contract `Con` is not defined at top level.">>])
     , ?TYPE_ERROR(bad_address_literals,
         [<<?Pos(11, 5)
            "Cannot unify address\n"
@@ -580,21 +578,21 @@ failing_contracts() ->
            "  address">>])
     , ?TYPE_ERROR(stateful,
        [<<?Pos(13, 35)
-          "Cannot reference stateful function Chain.spend (at line 13, column 35)\nin the definition of non-stateful function fail1.">>,
+          "Cannot reference stateful function `Chain.spend` in the definition of non-stateful function `fail1`.">>,
         <<?Pos(14, 35)
-          "Cannot reference stateful function local_spend (at line 14, column 35)\nin the definition of non-stateful function fail2.">>,
+          "Cannot reference stateful function `local_spend` in the definition of non-stateful function `fail2`.">>,
         <<?Pos(16, 15)
-          "Cannot reference stateful function Chain.spend (at line 16, column 15)\nin the definition of non-stateful function fail3.">>,
+          "Cannot reference stateful function `Chain.spend` in the definition of non-stateful function `fail3`.">>,
         <<?Pos(20, 31)
-          "Cannot reference stateful function Chain.spend (at line 20, column 31)\nin the definition of non-stateful function fail4.">>,
+          "Cannot reference stateful function `Chain.spend` in the definition of non-stateful function `fail4`.">>,
         <<?Pos(35, 47)
-          "Cannot reference stateful function Chain.spend (at line 35, column 47)\nin the definition of non-stateful function fail5.">>,
+          "Cannot reference stateful function `Chain.spend` in the definition of non-stateful function `fail5`.">>,
         <<?Pos(48, 57)
-          "Cannot pass non-zero value argument 1000 (at line 48, column 57)\nin the definition of non-stateful function fail6.">>,
+          "Cannot pass non-zero value argument `1000` in the definition of non-stateful function `fail6`.">>,
         <<?Pos(49, 56)
-          "Cannot pass non-zero value argument 1000 (at line 49, column 56)\nin the definition of non-stateful function fail7.">>,
+          "Cannot pass non-zero value argument `1000` in the definition of non-stateful function `fail7`.">>,
         <<?Pos(52, 17)
-          "Cannot pass non-zero value argument 1000 (at line 52, column 17)\nin the definition of non-stateful function fail8.">>])
+          "Cannot pass non-zero value argument `1000` in the definition of non-stateful function `fail8`.">>])
     , ?TYPE_ERROR(bad_init_state_access,
        [<<?Pos(11, 5)
           "The init function should return the initial state as its result and cannot write the state,\n"
@@ -613,19 +611,21 @@ failing_contracts() ->
           "  - state (at line 13, column 13)">>])
     , ?TYPE_ERROR(modifier_checks,
        [<<?Pos(11, 3)
-          "The function all_the_things (at line 11, column 3) cannot be both public and private.">>,
+          "The function `all_the_things` cannot be both public and private.">>,
         <<?Pos(3, 3)
-          "Namespaces cannot contain entrypoints (at line 3, column 3). Use 'function' instead.">>,
+          "Namespaces cannot contain entrypoints. Use `function` instead.">>,
         <<?Pos(5, 10)
-          "The contract Remote (at line 5, column 10) has no entrypoints. Since Sophia version 3.2, public\ncontract functions must be declared with the 'entrypoint' keyword instead of\n'function'.">>,
+          "The contract `Remote` has no entrypoints. Since Sophia version 3.2, "
+          "public contract functions must be declared with the `entrypoint` "
+          "keyword instead of `function`.">>,
         <<?Pos(12, 3)
-          "The entrypoint wha (at line 12, column 3) cannot be private. Use 'function' instead.">>,
+          "The entrypoint `wha` cannot be private. Use `function` instead.">>,
         <<?Pos(6, 3)
-          "Use 'entrypoint' for declaration of foo (at line 6, column 3):\n  entrypoint foo : () => unit">>,
+          "Use `entrypoint` for declaration of `foo`: `entrypoint foo : () => unit`">>,
         <<?Pos(10, 3)
-          "Use 'entrypoint' instead of 'function' for public function foo (at line 10, column 3):\n  entrypoint foo() = ()">>,
+          "Use `entrypoint` instead of `function` for public function `foo`: `entrypoint foo() = ()`">>,
         <<?Pos(6, 3)
-          "Use 'entrypoint' instead of 'function' for public function foo (at line 6, column 3):\n  entrypoint foo : () => unit">>])
+          "Use `entrypoint` instead of `function` for public function `foo`: `entrypoint foo : () => unit`">>])
     , ?TYPE_ERROR(list_comp_not_a_list,
       [<<?Pos(2, 36)
          "Cannot unify int\n         and list('a)\nwhen checking rvalue of list comprehension binding at line 2, column 36\n  1 : int\nagainst type \n  list('a)">>
@@ -640,26 +640,23 @@ failing_contracts() ->
       ])
     , ?TYPE_ERROR(map_as_map_key,
        [<<?Pos(5, 47)
-         "Invalid key type\n"
-         "  map(int, int)\n"
+         "Invalid key type `map(int, int)`\n"
          "Map keys cannot contain other maps.">>,
         <<?Pos(6, 31)
-         "Invalid key type\n"
-         "  list(map(int, int))\n"
+         "Invalid key type `list(map(int, int))`\n"
          "Map keys cannot contain other maps.">>,
         <<?Pos(6, 31)
-         "Invalid key type\n"
-         "  lm\n"
+         "Invalid key type `lm`\n"
          "Map keys cannot contain other maps.">>])
     , ?TYPE_ERROR(calling_init_function,
        [<<?Pos(7, 28)
-          "The 'init' function is called exclusively by the create contract transaction\n"
+          "The 'init' function is called exclusively by the create contract transaction "
           "and cannot be called from the contract code.">>])
     , ?TYPE_ERROR(bad_top_level_decl,
         [<<?Pos(1, 1) "The definition of 'square' must appear inside a contract or namespace.">>])
     , ?TYPE_ERROR(missing_event_type,
         [<<?Pos(3, 5)
-           "Unbound variable Chain.event at line 3, column 5\n"
+           "Unbound variable `Chain.event`"
            "Did you forget to define the event type?">>])
     , ?TYPE_ERROR(bad_bytes_concat,
         [<<?Pos(12, 40)
@@ -710,30 +707,30 @@ failing_contracts() ->
             "  - 'a  (at line 18, column 37)">>])
     , ?TYPE_ERROR(wrong_compiler_version,
         [<<?Pos(1, 1)
-           "Cannot compile with this version of the compiler,\n"
+           "Cannot compile with this version of the compiler, "
            "because it does not satisfy the constraint ", Version/binary, " < 1.0">>,
          <<?Pos(2, 1)
-           "Cannot compile with this version of the compiler,\n"
+           "Cannot compile with this version of the compiler, "
            "because it does not satisfy the constraint ", Version/binary, " == 9.9.9">>])
     , ?TYPE_ERROR(interface_with_defs,
          [<<?Pos(2, 3)
             "Contract interfaces cannot contain defined functions or entrypoints.\n"
-            "Fix: replace the definition of 'foo' by a type signature.">>])
+            "Fix: replace the definition of `foo` by a type signature.">>])
     , ?TYPE_ERROR(contract_as_namespace,
          [<<?Pos(5, 28)
-            "Invalid call to contract entrypoint 'Foo.foo'.\n"
-            "It must be called as 'c.foo' for some c : Foo.">>])
+            "Invalid call to contract entrypoint `Foo.foo`.\n"
+            "It must be called as `c.foo` for some `c : Foo`.">>])
     , ?TYPE_ERROR(toplevel_let,
                   [<<?Pos(2, 7)
-                     "Toplevel \"let\" definitions are not supported\n"
-                     "Value this_is_illegal at line 2, column 7 could be replaced by 0-argument function">>])
+                     "Toplevel \"let\" definitions are not supported. "
+                     "Value `this_is_illegal` could be replaced by 0-argument function.">>])
     , ?TYPE_ERROR(empty_typedecl,
                   [<<?Pos(2, 8)
-                     "Empty type declarations are not supported\n"
-                     "Type t at line 2, column 8 lacks a definition">>])
+                     "Empty type declarations are not supported. "
+                     "Type `t` lacks a definition">>])
     , ?TYPE_ERROR(higher_kinded_type,
                   [<<?Pos(2, 35)
-                     "Type 'm is a higher kinded type variable\n"
+                     "Type `'m` is a higher kinded type variable "
                      "(takes another type as an argument)">>])
     , ?TYPE_ERROR(bad_arity,
                   [<<?Pos(3, 20)
@@ -759,24 +756,20 @@ failing_contracts() ->
                      "Invalid map update with default">>])
     , ?TYPE_ERROR(non_functional_entrypoint,
                   [<<?Pos(2, 14)
-                     "f at line 2, column 14 was declared with an invalid type int.\n"
+                     "`f` was declared with an invalid type `int`. "
                      "Entrypoints and functions must have functional types">>])
     , ?TYPE_ERROR(bad_records,
         [<<?Pos(3, 16)
-           "Mixed record fields and map keys in\n"
-           "  {x = 0, [0] = 1}">>,
+           "Mixed record fields and map keys in `{x = 0, [0] = 1}`">>,
          <<?Pos(4, 6)
-           "Mixed record fields and map keys in\n"
-           "  r {x = 0, [0] = 1}">>,
+           "Mixed record fields and map keys in `r {x = 0, [0] = 1}`">>,
          <<?Pos(5, 6)
-           "Empty record/map update\n"
-           "  r {}">>
+           "Empty record/map update `r {}`">>
         ])
     , ?TYPE_ERROR(bad_protected_call,
         [<<?Pos(6, 22)
-           "Invalid 'protected' argument\n"
-           "  (0 : int) == (1 : int) : bool\n"
-           "It must be either 'true' or 'false'.">>
+           "Invalid `protected` argument `(0 : int) == (1 : int) : bool`. "
+           "It must be either `true` or `false`.">>
         ])
     , ?TYPE_ERROR(bad_function_block,
                   [<<?Pos(4, 5)
@@ -850,13 +843,13 @@ failing_contracts() ->
                   [ <<?Pos(2,3)
                       "Ambiguous name: Xa.f at line 2, column 3\nXb.f at line 5, column 3">>
                   , <<?Pos(13,23)
-                      "Unbound variable A.f at line 13, column 23">>
+                      "Unbound variable `A.f`">>
                   ])
     , ?TYPE_ERROR(using_namespace_wrong_scope,
                   [ <<?Pos(19,5)
-                      "Unbound variable f at line 19, column 5">>
+                      "Unbound variable `f`">>
                   , <<?Pos(21,23)
-                      "Unbound variable f at line 21, column 23">>
+                      "Unbound variable `f`">>
                   ])
     , ?TYPE_ERROR(using_namespace_undefined,
                   [<<?Pos(2,3)
@@ -868,11 +861,11 @@ failing_contracts() ->
                   ])
     , ?TYPE_ERROR(using_namespace_hidden_parts,
                   [<<?Pos(8,23)
-                     "Unbound variable g at line 8, column 23">>
+                     "Unbound variable `g`">>
                   ])
     , ?TYPE_ERROR(stateful_pattern_guard,
                   [<<?Pos(8,12)
-                     "Cannot reference stateful function g (at line 8, column 12) in a pattern guard.">>
+                     "Cannot reference stateful function `g` in a pattern guard.">>
                   ])
     , ?TYPE_ERROR(non_boolean_pattern_guard,
                   [<<?Pos(4,24)
