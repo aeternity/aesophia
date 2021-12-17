@@ -3131,18 +3131,15 @@ mk_error({missing_body_for_let, Ann}) ->
     Msg = io_lib:format("Let binding must be followed by an expression.", []),
     mk_t_err(pos(Ann), Msg);
 mk_error({public_modifier_in_contract, Decl}) ->
-    % TODO(mk_error)
     Decl1 = mk_entrypoint(Decl),
-    Msg = io_lib:format("Use 'entrypoint' instead of 'function' for public function ~s (at ~s):\n~s\n",
-                        [pp_expr("", element(3, Decl)), pp_loc(Decl),
+    Msg = io_lib:format("Use 'entrypoint' instead of 'function' for public function `~s`: `~s`",
+                        [pp_expr(element(3, Decl)),
                          prettypr:format(prettypr:nest(2, aeso_pretty:decl(Decl1)))]),
     mk_t_err(pos(Decl), Msg);
 mk_error({init_must_be_an_entrypoint, Decl}) ->
-    % TODO(mk_error)
     Decl1 = mk_entrypoint(Decl),
-    Msg = io_lib:format("The init function (at ~s) must be an entrypoint:\n~s\n",
-                        [pp_loc(Decl),
-                         prettypr:format(prettypr:nest(2, aeso_pretty:decl(Decl1)))]),
+    Msg = io_lib:format("The init function must be an entrypoint: ~s",
+                        [prettypr:format(prettypr:nest(2, aeso_pretty:decl(Decl1)))]),
     mk_t_err(pos(Decl), Msg);
 mk_error({init_must_not_be_payable, Decl}) ->
     Msg = io_lib:format("The init function cannot be payable. "
@@ -3151,10 +3148,9 @@ mk_error({init_must_not_be_payable, Decl}) ->
                         []),
     mk_t_err(pos(Decl), Msg);
 mk_error({proto_must_be_entrypoint, Decl}) ->
-    % TODO(mk_error)
     Decl1 = mk_entrypoint(Decl),
-    Msg = io_lib:format("Use 'entrypoint' for declaration of ~s (at ~s):\n~s\n",
-                        [pp_expr("", element(3, Decl)), pp_loc(Decl),
+    Msg = io_lib:format("Use 'entrypoint' for declaration of `~s`: `~s`",
+                        [pp_expr(element(3, Decl)),
                          prettypr:format(prettypr:nest(2, aeso_pretty:decl(Decl1)))]),
     mk_t_err(pos(Decl), Msg);
 mk_error({proto_in_namespace, Decl}) ->
@@ -3184,14 +3180,12 @@ mk_error({unbound_type, Type}) ->
     Msg = io_lib:format("Unbound type ~s.", [pp_type("", Type)]),
     mk_t_err(pos(Type), Msg);
 mk_error({new_tuple_syntax, Ann, Ts}) ->
-    % TODO(mk_error)
-    Msg = io_lib:format("Invalid type\n~s  (at ~s)\nThe syntax of tuple types changed in Sophia version 4.0. Did you mean\n~s\n",
-                        [pp_type("  ", {args_t, Ann, Ts}), pp_loc(Ann), pp_type("  ", {tuple_t, Ann, Ts})]),
+    Msg = io_lib:format("Invalid type `~s`. The syntax of tuple types changed in Sophia version 4.0. Did you mean `~s`",
+                        [pp_type({args_t, Ann, Ts}), pp_type({tuple_t, Ann, Ts})]),
     mk_t_err(pos(Ann), Msg);
 mk_error({map_in_map_key, Ann, KeyType}) ->
-    % TODO(mk_error)
-    Msg = io_lib:format("Invalid key type\n~s\n", [pp_type("  ", KeyType)]),
-    Cxt = "Map keys cannot contain other maps.\n",
+    Msg = io_lib:format("Invalid key type:~s", [pp_type(" ", KeyType)]),
+    Cxt = "Map keys cannot contain other maps.",
     mk_t_err(pos(Ann), Msg, Cxt);
 mk_error({cannot_call_init_function, Ann}) ->
     Msg = "The 'init' function is called exclusively by the create contract transaction "
@@ -3228,29 +3222,22 @@ mk_error({unsolved_bytes_constraint, Ann, split, A, B, C}) ->
                           pp_type("  - ", B), pp_loc(B)]),
     mk_t_err(pos(Ann), Msg);
 mk_error({failed_to_get_compiler_version, Err}) ->
-    % TODO(mk_error)
-    Msg = io_lib:format("Failed to get compiler version. Error:\n  ~p\n", [Err]),
+    Msg = io_lib:format("Failed to get compiler version. Error: ~p", [Err]),
     mk_t_err(pos(0, 0), Msg);
 mk_error({compiler_version_mismatch, Ann, Version, Op, Bound}) ->
-    % TODO(mk_error)
     PrintV = fun(V) -> string:join([integer_to_list(N) || N <- V], ".") end,
-    Msg = io_lib:format("Cannot compile with this version of the compiler,\n"
+    Msg = io_lib:format("Cannot compile with this version of the compiler, "
                         "because it does not satisfy the constraint"
-                        " ~s ~s ~s\n", [PrintV(Version), Op, PrintV(Bound)]),
+                        " ~s ~s ~s", [PrintV(Version), Op, PrintV(Bound)]),
     mk_t_err(pos(Ann), Msg);
 mk_error({empty_record_or_map_update, Expr}) ->
-    % TODO(mk_error)
-    Msg = io_lib:format("Empty record/map update\n~s",
-                        [pp_expr("  ", Expr)]),
+    Msg = io_lib:format("Empty record/map update `~s`", [pp_expr(Expr)]),
     mk_t_err(pos(Expr), Msg);
 mk_error({mixed_record_and_map, Expr}) ->
-    % TODO(mk_error)
-    Msg = io_lib:format("Mixed record fields and map keys in\n~s",
-                        [pp_expr("  ", Expr)]),
+    Msg = io_lib:format("Mixed record fields and map keys in `~s`", [pp_expr(Expr)]),
     mk_t_err(pos(Expr), Msg);
 mk_error({named_argument_must_be_literal_bool, Name, Arg}) ->
-    % TODO(mk_error)
-    Msg = io_lib:format("Invalid '~s' argument\n~s\nIt must be either 'true' or 'false'.", [Name, pp_expr("  ", instantiate(Arg))]),
+    Msg = io_lib:format("Invalid '~s' argument `~s` It must be either 'true' or 'false'.", [Name, pp_expr(instantiate(Arg))]),
     mk_t_err(pos(Arg), Msg);
 mk_error({conflicting_updates_for_field, Upd, Key}) ->
     Msg = io_lib:format("Conflicting updates for field '~s'", [Key]),
