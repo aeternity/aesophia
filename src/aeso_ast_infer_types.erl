@@ -2941,9 +2941,8 @@ mk_error({mismatched_decl_in_funblock, Name, Decl}) ->
     Msg = io_lib:format("Mismatch in the function block. Expected implementation/type declaration of ~s function", [Name]),
     mk_t_err(pos(Decl), Msg);
 mk_error({higher_kinded_typevar, T}) ->
-    % TODO(mk_error)
-    Msg = io_lib:format("Type ~s is a higher kinded type variable\n"
-                        "(takes another type as an argument)\n", [pp(instantiate(T))]
+    Msg = io_lib:format("Type ~s is a higher kinded type variable "
+                        "(takes another type as an argument)", [pp(instantiate(T))]
                        ),
     mk_t_err(pos(T), Msg);
 mk_error({wrong_type_arguments, X, ArityGiven, ArityReal}) ->
@@ -2955,10 +2954,9 @@ mk_error({unnamed_map_update_with_default, Upd}) ->
     Msg = "Invalid map update with default",
     mk_t_err(pos(Upd), Msg);
 mk_error({fundecl_must_have_funtype, _Ann, Id, Type}) ->
-    % TODO(mk_error)
-    Msg = io_lib:format("~s at ~s was declared with an invalid type ~s.\n"
+    Msg = io_lib:format("~s was declared with an invalid type ~s. "
                        "Entrypoints and functions must have functional types"
-                       , [pp(Id), pp_loc(Id), pp(instantiate(Type))]),
+                       , [pp(Id), pp(instantiate(Type))]),
     mk_t_err(pos(Id), Msg);
 mk_error({cannot_unify, A, B, When}) ->
     % TODO(mk_error)
@@ -3009,10 +3007,9 @@ mk_error({not_a_contract_type, Type, Cxt}) ->
         end,
     mk_t_err(Pos, Msg, Cxt1);
 mk_error({non_linear_pattern, Pattern, Nonlinear}) ->
-    % TODO(mk_error)
-    Msg = io_lib:format("Repeated name~s ~s in pattern\n~s (at ~s)\n",
+    Msg = io_lib:format("Repeated name~s ~s in pattern: ~s",
                         [plural("", "s", Nonlinear), string:join(Nonlinear, ", "),
-                         pp_expr("  ", Pattern), pp_loc(Pattern)]),
+                         pp_expr("  ", Pattern)]),
     mk_t_err(pos(Pattern), Msg);
 mk_error({ambiguous_record, Fields = [{_, First} | _], Candidates}) ->
     % TODO(mk_error)
@@ -3079,9 +3076,8 @@ mk_error({unsolved_named_argument_constraint, #named_argument_constraint{name = 
                         [pp_typed("", Name, Type)]),
     mk_t_err(pos(Name), Msg);
 mk_error({reserved_entrypoint, Name, Def}) ->
-    % TODO(mk_error)
-    Msg = io_lib:format("The name '~s' is reserved and cannot be used for a\n"
-                        "top-level contract function (at ~s).\n", [Name, pp_loc(Def)]),
+    Msg = io_lib:format("The name '~s' is reserved and cannot be used for a "
+                        "top-level contract function.", [Name]),
     mk_t_err(pos(Def), Msg);
 mk_error({duplicate_definition, Name, Locs}) ->
     % TODO(mk_error)
@@ -3097,24 +3093,20 @@ mk_error({include, _, {string, Pos, Name}}) ->
                         [binary_to_list(Name)]),
     mk_t_err(pos(Pos), Msg);
 mk_error({namespace, _Pos, {con, Pos, Name}, _Def}) ->
-    % TODO(mk_error)
-    Msg = io_lib:format("Nested namespaces are not allowed\nNamespace '~s' at ~s not defined at top level.\n",
-                        [Name, pp_loc(Pos)]),
+    Msg = io_lib:format("Nested namespaces are not allowed. Namespace '~s' not defined at top level.",
+                        [Name]),
     mk_t_err(pos(Pos), Msg);
 mk_error({Contract, _Pos, {con, Pos, Name}, _Def}) when ?IS_CONTRACT_HEAD(Contract) ->
-    % TODO(mk_error)
-    Msg = io_lib:format("Nested contracts are not allowed\nContract '~s' at ~s not defined at top level.\n",
-                        [Name, pp_loc(Pos)]),
+    Msg = io_lib:format("Nested contracts are not allowed. Contract '~s' not defined at top level.",
+                        [Name]),
     mk_t_err(pos(Pos), Msg);
 mk_error({type_decl, _, {id, Pos, Name}, _}) ->
-    % TODO(mk_error)
-    Msg = io_lib:format("Empty type declarations are not supported\nType ~s at ~s lacks a definition\n",
-                        [Name, pp_loc(Pos)]),
+    Msg = io_lib:format("Empty type declarations are not supported. Type ~s lacks a definition",
+                        [Name]),
     mk_t_err(pos(Pos), Msg);
 mk_error({letval, _Pos, {id, Pos, Name}, _Def}) ->
-    % TODO(mk_error)
-    Msg = io_lib:format("Toplevel \"let\" definitions are not supported\nValue ~s at ~s could be replaced by 0-argument function\n",
-                        [Name, pp_loc(Pos)]),
+    Msg = io_lib:format("Toplevel \"let\" definitions are not supported. Value ~s could be replaced by 0-argument function.",
+                        [Name]),
     mk_t_err(pos(Pos), Msg);
 mk_error({stateful_not_allowed, Id, Fun}) ->
     Msg = io_lib:format("Cannot reference stateful function ~s in the definition of non-stateful function ~s.",
@@ -3154,11 +3146,10 @@ mk_error({init_must_be_an_entrypoint, Decl}) ->
                          prettypr:format(prettypr:nest(2, aeso_pretty:decl(Decl1)))]),
     mk_t_err(pos(Decl), Msg);
 mk_error({init_must_not_be_payable, Decl}) ->
-    % TODO(mk_error)
-    Msg = io_lib:format("The init function (at ~s) cannot be payable.\n"
-                        "You don't need the 'payable' annotation to be able to attach\n"
+    Msg = io_lib:format("The init function cannot be payable. "
+                        "You don't need the 'payable' annotation to be able to attach "
                         "funds to the create contract transaction.",
-                        [pp_loc(Decl)]),
+                        []),
     mk_t_err(pos(Decl), Msg);
 mk_error({proto_must_be_entrypoint, Decl}) ->
     % TODO(mk_error)
@@ -3182,10 +3173,9 @@ mk_error({private_and_public, Decl}) ->
                         [pp_expr("", element(3, Decl))]),
     mk_t_err(pos(Decl), Msg);
 mk_error({contract_has_no_entrypoints, Con}) ->
-    % TODO(mk_error)
-    Msg = io_lib:format("The contract ~s (at ~s) has no entrypoints. Since Sophia version 3.2, public\n"
-                        "contract functions must be declared with the 'entrypoint' keyword instead of\n"
-                        "'function'.\n", [pp_expr("", Con), pp_loc(Con)]),
+    Msg = io_lib:format("The contract ~s has no entrypoints. Since Sophia version 3.2, public "
+                        "contract functions must be declared with the 'entrypoint' keyword instead of "
+                        "'function'.", [pp_expr("", Con)]),
     mk_t_err(pos(Con), Msg);
 mk_error({definition_in_contract_interface, Ann, {id, _, Id}}) ->
     Msg = "Contract interfaces cannot contain defined functions or entrypoints.",
@@ -3205,9 +3195,8 @@ mk_error({map_in_map_key, Ann, KeyType}) ->
     Cxt = "Map keys cannot contain other maps.\n",
     mk_t_err(pos(Ann), Msg, Cxt);
 mk_error({cannot_call_init_function, Ann}) ->
-    % TODO(mk_error)
-    Msg = "The 'init' function is called exclusively by the create contract transaction\n"
-          "and cannot be called from the contract code.\n",
+    Msg = "The 'init' function is called exclusively by the create contract transaction "
+          "and cannot be called from the contract code.",
     mk_t_err(pos(Ann), Msg);
 mk_error({contract_treated_as_namespace, Ann, [Con, Fun] = QName}) ->
     Msg = io_lib:format("Invalid call to contract entrypoint '~s'.", [string:join(QName, ".")]),
