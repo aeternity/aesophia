@@ -203,6 +203,7 @@ compilable_contracts() ->
      "patterns_guards",
      "pipe_operator",
      "contract_polymorphism",
+     "contract_polymorphism_multi_interface",
      "contract_interface_polymorphism",
      "test" % Custom general-purpose test file. Keep it last on the list.
     ].
