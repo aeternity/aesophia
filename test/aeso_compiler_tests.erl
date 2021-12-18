@@ -836,6 +836,16 @@ failing_contracts() ->
                   [<<?Pos(7,10)
                      "Unimplemented function f from the interface I in the contract C">>
                   ])
+    , ?TYPE_ERROR(contract_interface_polymorphism_same_name_same_type,
+                  [<<?Pos(7,10)
+                     "Unimplemented function f from the interface I1 in the contract C">>
+                  ])
+    , ?TYPE_ERROR(contract_interface_polymorphism_same_name_different_type,
+                  [<<?Pos(9,5)
+                     "Duplicate definitions of f at\n"
+                     "  - line 8, column 5\n"
+                     "  - line 9, column 5">>
+                  ])
     , ?TYPE_ERROR(contract_polymorphism_missing_implementation,
                   [<<?Pos(7,10)
                      "Unimplemented function f from the interface I1 in the contract C">>
