@@ -848,6 +848,12 @@ failing_contracts() ->
                   [<<?Pos(1,14)
                      "Trying to implement or extend an undefined interface I at line 1, column 14">>
                   ])
+    , ?TYPE_ERROR(contract_polymorphism_same_name_different_type_multi_interface,
+                  [<<?Pos(9,5)
+                     "Duplicate definitions of f at\n"
+                     "  - line 8, column 5\n"
+                     "  - line 9, column 5">>
+                  ])
     , ?TYPE_ERROR(contract_interface_polymorphism_undefined_interface,
                   [<<?Pos(1,24)
                      "Trying to implement or extend an undefined interface H at line 1, column 24">>
