@@ -257,33 +257,33 @@ debug_mode_contracts() ->
 warnings() ->
     ?WARNING(warnings,
      [<<?PosW(0, 0)
-        "The file Triple.aes is included but not used">>,
+        "The file `Triple.aes` is included but not used.">>,
       <<?PosW(13, 3)
-        "The function h is defined at line 13, column 3 but never used">>,
+        "The function `h` is defined but never used.">>,
       <<?PosW(19, 3)
-        "The type unused_type is defined at line 19, column 3 but never used">>,
+        "The type `unused_type` is defined but never used.">>,
       <<?PosW(23, 54)
-        "Negative spend at line 23, column 54">>,
+        "Negative spend.">>,
       <<?PosW(27, 9)
-        "The definition of x at line 27, column 9 shadows an older definition at line 26, column 9">>,
+        "The definition of `x` shadows an older definition at line 26, column 9.">>,
       <<?PosW(30, 36)
-        "Division by zero at line 30, column 36">>,
+        "Division by zero.">>,
       <<?PosW(32, 3)
-        "The function unused_stateful is unnecessarily marked as stateful at line 32, column 3">>,
+        "The function `unused_stateful` is unnecessarily marked as stateful.">>,
       <<?PosW(35, 31)
-        "The variable unused_arg is defined at line 35, column 31 but never used">>,
+        "The variable `unused_arg` is defined but never used.">>,
       <<?PosW(36, 9)
-        "The variable unused_var is defined at line 36, column 9 but never used">>,
+        "The variable `unused_var` is defined but never used.">>,
       <<?PosW(41, 3)
-        "The function unused_function is defined at line 41, column 3 but never used">>,
+        "The function `unused_function` is defined but never used.">>,
       <<?PosW(42, 3)
-        "The function recursive_unused_function is defined at line 42, column 3 but never used">>,
+        "The function `recursive_unused_function` is defined but never used.">>,
       <<?PosW(43, 3)
-        "The function called_unused_function1 is defined at line 43, column 3 but never used">>,
+        "The function `called_unused_function1` is defined but never used.">>,
       <<?PosW(44, 3)
-        "The function called_unused_function2 is defined at line 44, column 3 but never used">>,
+        "The function `called_unused_function2` is defined but never used.">>,
       <<?PosW(48, 5)
-        "Unused return value at line 48, column 5">>
+        "Unused return value.">>
      ]).
 
 failing_contracts() ->
@@ -301,82 +301,65 @@ failing_contracts() ->
     %% Type errors
     , ?TYPE_ERROR(name_clash,
        [<<?Pos(14, 3)
-          "Duplicate definitions of abort at\n"
+          "Duplicate definitions of `abort` at\n"
           "  - (builtin location)\n"
           "  - line 14, column 3">>,
         <<?Pos(15, 3)
-          "Duplicate definitions of require at\n"
+          "Duplicate definitions of `require` at\n"
           "  - (builtin location)\n"
           "  - line 15, column 3">>,
         <<?Pos(11, 3)
-          "Duplicate definitions of double_def at\n"
+          "Duplicate definitions of `double_def` at\n"
           "  - line 10, column 3\n"
           "  - line 11, column 3">>,
         <<?Pos(5, 3)
-          "Duplicate definitions of double_proto at\n"
+          "Duplicate definitions of `double_proto` at\n"
           "  - line 4, column 3\n"
           "  - line 5, column 3">>,
         <<?Pos(8, 3)
-          "Duplicate definitions of proto_and_def at\n"
+          "Duplicate definitions of `proto_and_def` at\n"
           "  - line 7, column 3\n"
           "  - line 8, column 3">>,
         <<?Pos(16, 3)
-          "Duplicate definitions of put at\n"
+          "Duplicate definitions of `put` at\n"
           "  - (builtin location)\n"
           "  - line 16, column 3">>,
         <<?Pos(17, 3)
-          "Duplicate definitions of state at\n"
+          "Duplicate definitions of `state` at\n"
           "  - (builtin location)\n"
           "  - line 17, column 3">>])
     , ?TYPE_ERROR(type_errors,
        [<<?Pos(17, 23)
           "Unbound variable `zz`">>,
         <<?Pos(26, 9)
-          "Cannot unify int\n"
-          "         and list(int)\n"
-          "when checking the application at line 26, column 9 of\n"
-          "  (::) : (int, list(int)) => list(int)\n"
+          "Cannot unify `int` and `list(int)`\n"
+          "when checking the application of\n"
+          "  `(::) : (int, list(int)) => list(int)`\n"
           "to arguments\n"
-          "  x : int\n"
-          "  x : int">>,
+          "  `x : int`\n"
+          "  `x : int`">>,
         <<?Pos(9, 48)
-          "Cannot unify string\n"
-          "         and int\n"
-          "when checking the assignment of the field\n"
-          "  x : map(string, string) (at line 9, column 48)\n"
-          "to the old value __x and the new value\n"
-          "  __x {[\"foo\"] @ x = x + 1} : map(string, int)">>,
+          "Cannot unify `string` and `int`\n"
+          "when checking the assignment of the field `x : map(string, string)` "
+          "to the old value `__x` and the new value `__x {[\"foo\"] @ x = x + 1} : map(string, int)`">>,
         <<?Pos(34, 47)
-          "Cannot unify int\n"
-          "         and string\n"
-          "when checking the type of the expression at line 34, column 47\n"
-          "  1 : int\n"
-          "against the expected type\n"
-          "  string">>,
+          "Cannot unify `int` and `string`\n"
+          "when checking the type of the expression `1 : int` "
+          "against the expected type `string`">>,
         <<?Pos(34, 52)
-          "Cannot unify string\n"
-          "         and int\n"
-          "when checking the type of the expression at line 34, column 52\n"
-          "  \"bla\" : string\n"
-          "against the expected type\n"
-          "  int">>,
+          "Cannot unify `string` and `int`\n"
+          "when checking the type of the expression `\"bla\" : string` "
+          "against the expected type `int`">>,
         <<?Pos(32, 18)
-          "Cannot unify string\n"
-          "         and int\n"
-          "when checking the type of the expression at line 32, column 18\n"
-          "  \"x\" : string\n"
-          "against the expected type\n"
-          "  int">>,
+          "Cannot unify `string` and `int`\n"
+          "when checking the type of the expression `\"x\" : string` "
+          "against the expected type `int`">>,
         <<?Pos(11, 58)
-          "Cannot unify string\n"
-          "         and int\n"
-          "when checking the type of the expression at line 11, column 58\n"
-          "  \"foo\" : string\n"
-          "against the expected type\n"
-          "  int">>,
+          "Cannot unify `string` and `int`\n"
+          "when checking the type of the expression `\"foo\" : string` "
+          "against the expected type `int`">>,
         <<?Pos(38, 13)
-          "Cannot unify int\n"
-          "         and string\n"
+          "Cannot unify `int` and `string`\n"
           "when comparing the types of the if-branches\n"
           "  - w : int (at line 38, column 13)\n"
           "  - z : string (at line 39, column 10)">>,
@@ -393,27 +376,21 @@ failing_contracts() ->
           "Not a record type: `string`\n"
           "arising from an assignment of the field `y`">>,
         <<?Pos(13, 27)
-          "Ambiguous record type with field y (at line 13, column 27) could be one of\n"
-          "  - r (at line 4, column 10)\n"
-          "  - r' (at line 5, column 10)">>,
+          "Ambiguous record type with field `y` could be one of\n"
+          "  - `r` (at line 4, column 10)\n"
+          "  - `r'` (at line 5, column 10)">>,
         <<?Pos(26, 7)
           "Repeated name `x` in the pattern `x :: x`">>,
         <<?Pos(44, 14)
           "Repeated names `x`, `y` in the pattern `(x : int, y, x : string, y : bool)`">>,
         <<?Pos(44, 39)
-          "Cannot unify int\n"
-          "         and string\n"
-          "when checking the type of the expression at line 44, column 39\n"
-          "  x : int\n"
-          "against the expected type\n"
-          "  string">>,
+          "Cannot unify `int` and `string`\n"
+          "when checking the type of the expression `x : int` "
+          "against the expected type `string`">>,
         <<?Pos(44, 72)
-          "Cannot unify int\n"
-          "         and string\n"
-          "when checking the type of the expression at line 44, column 72\n"
-          "  x : int\n"
-          "against the expected type\n"
-          "  string">>,
+          "Cannot unify `int` and `string`\n"
+          "when checking the type of the expression `x : int` "
+          "against the expected type `string`">>,
         <<?Pos(14, 24)
           "No record type with fields `y`, `z`">>,
         <<?Pos(15, 26)
@@ -429,22 +406,17 @@ failing_contracts() ->
         <<?Pos(58, 5)
           "Let binding must be followed by an expression.">>,
         <<?Pos(63, 5)
-          "Cannot unify int\n"
-          "         and bool\n"
-          "when checking the type of the expression at line 63, column 5\n"
-          "  id(n) : int\n"
-          "against the expected type\n"
-          "  bool">>])
+          "Cannot unify `int` and `bool`\n"
+          "when checking the type of the expression `id(n) : int` "
+          "against the expected type `bool`">>])
     , ?TYPE_ERROR(init_type_error,
        [<<?Pos(7, 3)
-          "Cannot unify string\n"
-          "         and map(int, int)\n"
-          "when checking that 'init' returns a value of type 'state' at line 7, column 3">>])
+          "Cannot unify `string` and `map(int, int)`\n"
+          "when checking that `init` returns a value of type `state`">>])
     , ?TYPE_ERROR(missing_state_type,
        [<<?Pos(5, 3)
-          "Cannot unify string\n"
-          "         and unit\n"
-          "when checking that 'init' returns a value of type 'state' at line 5, column 3">>])
+          "Cannot unify `string` and `unit`\n"
+          "when checking that `init` returns a value of type `state`">>])
     , ?TYPE_ERROR(missing_fields_in_record_expression,
        [<<?Pos(7, 42)
           "The field `x` is missing when constructing an element of type `r('a)`">>,
@@ -467,12 +439,9 @@ failing_contracts() ->
            "The event constructor `BadEvent2` has too many indexed values (max 3)">>])
     , ?TYPE_ERROR(type_clash,
         [<<?Pos(12, 42)
-           "Cannot unify int\n"
-           "         and string\n"
-           "when checking the type of the expression at line 12, column 42\n"
-           "  r.foo() : map(int, string)\n"
-           "against the expected type\n"
-           "  map(string, int)">>])
+           "Cannot unify `int` and `string`\n"
+           "when checking the type of the expression `r.foo() : map(int, string)` "
+           "against the expected type `map(string, int)`">>])
     , ?TYPE_ERROR(not_toplevel_include,
                   [<<?Pos(2, 11)
                      "Include of `included.aes` is not allowed, include only allowed at top level.">>])
@@ -484,98 +453,66 @@ failing_contracts() ->
            "Nested contracts are not allowed. Contract `Con` is not defined at top level.">>])
     , ?TYPE_ERROR(bad_address_literals,
         [<<?Pos(11, 5)
-           "Cannot unify address\n"
-           "         and oracle(int, bool)\n"
-           "when checking the type of the expression at line 11, column 5\n"
-           "  ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt : address\n"
-           "against the expected type\n"
-           "  oracle(int, bool)">>,
+           "Cannot unify `address` and `oracle(int, bool)`\n"
+           "when checking the type of the expression `ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt : address` "
+           "against the expected type `oracle(int, bool)`">>,
          <<?Pos(9, 5)
-           "Cannot unify address\n"
-           "         and Remote\n"
-           "when checking the type of the expression at line 9, column 5\n"
-           "  ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt : address\n"
-           "against the expected type\n"
-           "  Remote">>,
+           "Cannot unify `address` and `Remote`\n"
+           "when checking the type of the expression `ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt : address` "
+           "against the expected type `Remote`">>,
          <<?Pos(7, 5)
-           "Cannot unify address\n"
-           "         and bytes(32)\n"
-           "when checking the type of the expression at line 7, column 5\n"
-           "  ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt : address\n"
-           "against the expected type\n"
-           "  bytes(32)">>,
+           "Cannot unify `address` and `bytes(32)`\n"
+           "when checking the type of the expression `ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt : address` "
+           "against the expected type `bytes(32)`">>,
          <<?Pos(14, 5)
-           "Cannot unify oracle('a, 'b)\n"
-           "         and oracle_query(int, bool)\n"
-           "when checking the type of the expression at line 14, column 5\n"
-           "  ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5 :\n"
-           "    oracle('a, 'b)\n"
-           "against the expected type\n"
-           "  oracle_query(int, bool)">>,
+           "Cannot unify `oracle('a, 'b)` and `oracle_query(int, bool)`\n"
+           "when checking the type of the expression "
+           "`ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5 : oracle('a, 'b)` "
+           "against the expected type `oracle_query(int, bool)`">>,
          <<?Pos(16, 5)
-           "Cannot unify oracle('c, 'd)\n"
-           "         and bytes(32)\n"
-           "when checking the type of the expression at line 16, column 5\n"
-           "  ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5 :\n"
-           "    oracle('c, 'd)\n"
-           "against the expected type\n"
-           "  bytes(32)">>,
+           "Cannot unify `oracle('c, 'd)` and `bytes(32)`\n"
+           "when checking the type of the expression "
+           "`ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5 : oracle('c, 'd)` "
+           "against the expected type `bytes(32)`">>,
          <<?Pos(18, 5)
-           "Cannot unify oracle('e, 'f)\n"
-           "         and Remote\n"
-           "when checking the type of the expression at line 18, column 5\n"
-           "  ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5 :\n"
-           "    oracle('e, 'f)\n"
-           "against the expected type\n"
-           "  Remote">>,
+           "Cannot unify `oracle('e, 'f)` and `Remote`\n"
+           "when checking the type of the expression "
+           "`ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5 : oracle('e, 'f)` "
+           "against the expected type `Remote`">>,
          <<?Pos(21, 5)
-           "Cannot unify oracle_query('g, 'h)\n"
-           "         and oracle(int, bool)\n"
-           "when checking the type of the expression at line 21, column 5\n"
-           "  oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY :\n"
-           "    oracle_query('g, 'h)\n"
-           "against the expected type\n"
-           "  oracle(int, bool)">>,
+           "Cannot unify `oracle_query('g, 'h)` and `oracle(int, bool)`\n"
+           "when checking the type of the expression "
+           "`oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY : oracle_query('g, 'h)` "
+           "against the expected type `oracle(int, bool)`">>,
          <<?Pos(23, 5)
-           "Cannot unify oracle_query('i, 'j)\n"
-           "         and bytes(32)\n"
-           "when checking the type of the expression at line 23, column 5\n"
-           "  oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY :\n"
-           "    oracle_query('i, 'j)\n"
-           "against the expected type\n"
-           "  bytes(32)">>,
+           "Cannot unify `oracle_query('i, 'j)` and `bytes(32)`\n"
+           "when checking the type of the expression "
+           "`oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY : oracle_query('i, 'j)` "
+           "against the expected type `bytes(32)`">>,
          <<?Pos(25, 5)
-           "Cannot unify oracle_query('k, 'l)\n"
-           "         and Remote\n"
-           "when checking the type of the expression at line 25, column 5\n"
-           "  oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY :\n"
-           "    oracle_query('k, 'l)\n"
-           "against the expected type\n"
-           "  Remote">>,
+           "Cannot unify `oracle_query('k, 'l)` and `Remote`\n"
+           "when checking the type of the expression "
+           "`oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY : oracle_query('k, 'l)` "
+           "against the expected type `Remote`">>,
          <<?Pos(28, 5)
-           "The type address is not a contract type\n"
-           "when checking that the contract literal\n"
-           "  ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ\n"
-           "has the type\n"
-           "  address">>,
+           "The type `address` is not a contract type\n"
+           "when checking that the contract literal "
+           "`ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ` "
+           "has the type `address`">>,
          <<?Pos(30, 5)
-           "The type oracle(int, bool) is not a contract type\n"
-           "when checking that the contract literal\n"
-           "  ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ\n"
-           "has the type\n"
-           "  oracle(int, bool)">>,
+           "The type `oracle(int, bool)` is not a contract type\n"
+           "when checking that the contract literal "
+           "`ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ` "
+           "has the type `oracle(int, bool)`">>,
          <<?Pos(32, 5)
-           "The type bytes(32) is not a contract type\n"
-           "when checking that the contract literal\n"
-           "  ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ\n"
-           "has the type\n"
-           "  bytes(32)">>,
+           "The type `bytes(32)` is not a contract type\n"
+           "when checking that the contract literal "
+           "`ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ` "
+           "has the type `bytes(32)`">>,
          <<?Pos(34, 5),
-           "The type address is not a contract type\n"
-           "when checking that the call to\n"
-           "  Address.to_contract\n"
-           "has the type\n"
-           "  address">>])
+           "The type `address` is not a contract type\n"
+           "when checking that the call to `Address.to_contract` "
+           "has the type `address`">>])
     , ?TYPE_ERROR(stateful,
        [<<?Pos(13, 35)
           "Cannot reference stateful function `Chain.spend` in the definition of non-stateful function `fail1`.">>,
@@ -595,20 +532,20 @@ failing_contracts() ->
           "Cannot pass non-zero value argument `1000` in the definition of non-stateful function `fail8`.">>])
     , ?TYPE_ERROR(bad_init_state_access,
        [<<?Pos(11, 5)
-          "The init function should return the initial state as its result and cannot write the state,\n"
+          "The `init` function should return the initial state as its result and cannot write the state, "
           "but it calls\n"
-          "  - set_state (at line 11, column 5), which calls\n"
-          "  - roundabout (at line 8, column 38), which calls\n"
-          "  - put (at line 7, column 39)">>,
+          "  - `set_state` (at line 11, column 5), which calls\n"
+          "  - `roundabout` (at line 8, column 38), which calls\n"
+          "  - `put` (at line 7, column 39)">>,
         <<?Pos(12, 5)
-          "The init function should return the initial state as its result and cannot read the state,\n"
+          "The `init` function should return the initial state as its result and cannot read the state, "
           "but it calls\n"
-          "  - new_state (at line 12, column 5), which calls\n"
-          "  - state (at line 5, column 29)">>,
+          "  - `new_state` (at line 12, column 5), which calls\n"
+          "  - `state` (at line 5, column 29)">>,
         <<?Pos(13, 13)
-          "The init function should return the initial state as its result and cannot read the state,\n"
+          "The `init` function should return the initial state as its result and cannot read the state, "
           "but it calls\n"
-          "  - state (at line 13, column 13)">>])
+          "  - `state` (at line 13, column 13)">>])
     , ?TYPE_ERROR(modifier_checks,
        [<<?Pos(11, 3)
           "The function `all_the_things` cannot be both public and private.">>,
@@ -628,15 +565,18 @@ failing_contracts() ->
           "Use `entrypoint` instead of `function` for public function `foo`: `entrypoint foo : () => unit`">>])
     , ?TYPE_ERROR(list_comp_not_a_list,
       [<<?Pos(2, 36)
-         "Cannot unify int\n         and list('a)\nwhen checking rvalue of list comprehension binding at line 2, column 36\n  1 : int\nagainst type \n  list('a)">>
+         "Cannot unify `int` and `list('a)`\n"
+         "when checking rvalue of list comprehension binding `1 : int` against type `list('a)`">>
       ])
     , ?TYPE_ERROR(list_comp_if_not_bool,
       [<<?Pos(2, 44)
-         "Cannot unify int\n         and bool\nwhen checking the type of the expression at line 2, column 44\n  3 : int\nagainst the expected type\n  bool">>
+         "Cannot unify `int` and `bool`\n"
+         "when checking the type of the expression `3 : int` against the expected type `bool`">>
       ])
     , ?TYPE_ERROR(list_comp_bad_shadow,
       [<<?Pos(2, 53)
-         "Cannot unify int\n         and string\nwhen checking the type of the pattern at line 2, column 53\n  x : int\nagainst the expected type\n  string">>
+         "Cannot unify `int` and `string`\n"
+         "when checking the type of the pattern `x : int` against the expected type `string`">>
       ])
     , ?TYPE_ERROR(map_as_map_key,
        [<<?Pos(5, 47)
@@ -656,7 +596,7 @@ failing_contracts() ->
         [<<?Pos(1, 1) "The definition of 'square' must appear inside a contract or namespace.">>])
     , ?TYPE_ERROR(missing_event_type,
         [<<?Pos(3, 5)
-           "Unbound variable `Chain.event`"
+           "Unbound variable `Chain.event`\n"
            "Did you forget to define the event type?">>])
     , ?TYPE_ERROR(bad_bytes_concat,
         [<<?Pos(12, 40)
@@ -672,12 +612,9 @@ failing_contracts() ->
            "and result type\n"
            "  - 'f  (at line 13, column 14)">>,
          <<?Pos(15, 5)
-           "Cannot unify bytes(26)\n"
-           "         and bytes(25)\n"
-           "when checking the type of the expression at line 15, column 5\n"
-           "  Bytes.concat(x, y) : bytes(26)\n"
-           "against the expected type\n"
-           "  bytes(25)">>,
+           "Cannot unify `bytes(26)` and `bytes(25)`\n"
+           "when checking the type of the expression `Bytes.concat(x, y) : bytes(26)` "
+           "against the expected type `bytes(25)`">>,
          <<?Pos(17, 5)
            "Failed to resolve byte array lengths in call to Bytes.concat with arguments of type\n"
            "  - bytes(6)  (at line 16, column 24)\n"
@@ -736,21 +673,15 @@ failing_contracts() ->
                   [<<?Pos(3, 20)
                      "Arity for id doesn't match. Expected 1, got 0">>,
                    <<?Pos(3, 25)
-                     "Cannot unify int\n"
-                     "         and id\n"
-                     "when checking the type of the expression at line 3, column 25\n"
-                     "  123 : int\n"
-                     "against the expected type\n"
-                     "  id">>,
+                     "Cannot unify `int` and `id`\n"
+                     "when checking the type of the expression `123 : int` "
+                     "against the expected type `id`">>,
                    <<?Pos(4, 20)
                      "Arity for id doesn't match. Expected 1, got 2">>,
                    <<?Pos(4, 35)
-                     "Cannot unify int\n"
-                     "         and id(int, int)\n"
-                     "when checking the type of the expression at line 4, column 35\n"
-                     "  123 : int\n"
-                     "against the expected type\n"
-                     "  id(int, int)">>])
+                     "Cannot unify `int` and `id(int, int)`\n"
+                     "when checking the type of the expression `123 : int` "
+                     "against the expected type `id(int, int)`">>])
     , ?TYPE_ERROR(bad_unnamed_map_update_default,
                   [<<?Pos(4, 17)
                      "Invalid map update with default">>])
@@ -783,25 +714,23 @@ failing_contracts() ->
                   ])
     , ?TYPE_ERROR(bad_number_of_args,
                   [<<?Pos(3, 39)
-                     "Cannot unify () => unit\n"
-                     "         and (int) => 'a\n",
-                     "when checking the application at line 3, column 39 of\n"
-                     "  f : () => unit\n"
+                     "Cannot unify `() => unit` and `(int) => 'a`\n",
+                     "when checking the application of\n"
+                     "  `f : () => unit`\n"
                      "to arguments\n"
-                     "  1 : int">>,
+                     "  `1 : int`">>,
                    <<?Pos(4, 20)
-                     "Cannot unify (int, string) => 'e\n"
-                     "         and (int) => 'd\n"
-                     "when checking the application at line 4, column 20 of\n"
-                     "  g : (int, string) => 'e\n"
+                     "Cannot unify `(int, string) => 'e` and `(int) => 'd`\n"
+                     "when checking the application of\n"
+                     "  `g : (int, string) => 'e`\n"
                      "to arguments\n"
-                     "  1 : int">>,
+                     "  `1 : int`">>,
                    <<?Pos(5, 20)
-                     "Cannot unify (int, string) => 'c\n"
-                     "         and (string) => 'b\n"
-                     "when checking the application at line 5, column 20 of\n"
-                     "  g : (int, string) => 'c\nto arguments\n"
-                     "  \"Litwo, ojczyzno moja\" : string">>
+                     "Cannot unify `(int, string) => 'c` and `(string) => 'b`\n"
+                     "when checking the application of\n"
+                     "  `g : (int, string) => 'c`\n"
+                     "to arguments\n"
+                     "  `\"Litwo, ojczyzno moja\" : string`">>
                   ])
     , ?TYPE_ERROR(bad_state,
                   [<<?Pos(4, 16)
@@ -810,22 +739,22 @@ failing_contracts() ->
                   [<<?Pos(10,18)
                     "Chain.clone requires `ref` named argument of contract type.">>,
                    <<?Pos(11,18)
-                     "Cannot unify (gas : int, value : int, protected : bool) => if(protected, option(void), void)\n         and (gas : int, value : int, protected : bool, int, bool) => 'b\n"
+                     "Cannot unify `(gas : int, value : int, protected : bool) => if(protected, option(void), void)` and `(gas : int, value : int, protected : bool, int, bool) => 'b`\n"
                      "when checking contract construction of type\n  (gas : int, value : int, protected : bool) =>\n    if(protected, option(void), void) (at line 11, column 18)\nagainst the expected type\n  (gas : int, value : int, protected : bool, int, bool) => 'b">>,
                    <<?Pos(12,37)
-                     "Cannot unify int\n         and bool\n"
-                     "when checking named argument\n  gas : int\nagainst inferred type\n  bool">>,
+                     "Cannot unify `int` and `bool`\n"
+                     "when checking named argument `gas : int` against inferred type `bool`">>,
                    <<?Pos(13,18),
                      "Kaboom is not implemented.\n"
-                     "when resolving arguments of variadic function\n  Chain.create">>,
+                     "when resolving arguments of variadic function `Chain.create`">>,
                    <<?Pos(18,18)
-                     "Cannot unify (gas : int, value : int, protected : bool, int, bool) => if(protected, option(void), void)\n         and (gas : int, value : int, protected : bool) => 'a\n"
+                     "Cannot unify `(gas : int, value : int, protected : bool, int, bool) => if(protected, option(void), void)` and `(gas : int, value : int, protected : bool) => 'a`\n"
                      "when checking contract construction of type\n  (gas : int, value : int, protected : bool, int, bool) =>\n    if(protected, option(void), void) (at line 18, column 18)\nagainst the expected type\n  (gas : int, value : int, protected : bool) => 'a">>,
                    <<?Pos(19,42),
-                     "Named argument protected (at line 19, column 42) is not one of the expected named arguments\n  - value : int">>,
+                     "Named argument `protected` is not one of the expected named arguments\n  - `value : int`">>,
                    <<?Pos(20,42),
-                     "Cannot unify int\n         and bool\n"
-                     "when checking named argument\n  value : int\nagainst inferred type\n  bool">>
+                     "Cannot unify `int` and `bool`\n"
+                     "when checking named argument `value : int` against inferred type `bool`">>
                   ])
     , ?TYPE_ERROR(ambiguous_main,
                   [<<?Pos(1,1)
@@ -840,8 +769,10 @@ failing_contracts() ->
                       "Only one main contract can be defined.">>
                    ])
     , ?TYPE_ERROR(using_namespace_ambiguous_name,
-                  [ <<?Pos(2,3)
-                      "Ambiguous name: Xa.f at line 2, column 3\nXb.f at line 5, column 3">>
+                  [ <<?Pos(13,23)
+                      "Ambiguous name `A.f` could be one of\n"
+                      "  - `Xa.f` (at line 2, column 3)\n"
+                      "  - `Xb.f` (at line 5, column 3)">>
                   , <<?Pos(13,23)
                       "Unbound variable `A.f`">>
                   ])
@@ -869,37 +800,39 @@ failing_contracts() ->
                   ])
     , ?TYPE_ERROR(non_boolean_pattern_guard,
                   [<<?Pos(4,24)
-                     "Cannot unify string\n         and bool\nwhen checking the type of the expression at line 4, column 24\n  \"y\" : string\nagainst the expected type\n  bool">>
+                     "Cannot unify `string` and `bool`\n"
+                     "when checking the type of the expression `\"y\" : string` "
+                     "against the expected type `bool`">>
                   ])
     , ?TYPE_ERROR(warnings,
                   [<<?Pos(0, 0)
-                     "The file Triple.aes is included but not used">>,
+                      "The file `Triple.aes` is included but not used.">>,
                    <<?Pos(13, 3)
-                     "The function h is defined at line 13, column 3 but never used">>,
+                     "The function `h` is defined but never used.">>,
                    <<?Pos(19, 3)
-                     "The type unused_type is defined at line 19, column 3 but never used">>,
+                     "The type `unused_type` is defined but never used.">>,
                    <<?Pos(23, 54)
-                     "Negative spend at line 23, column 54">>,
+                     "Negative spend.">>,
                    <<?Pos(27, 9)
-                     "The definition of x at line 27, column 9 shadows an older definition at line 26, column 9">>,
+                     "The definition of `x` shadows an older definition at line 26, column 9.">>,
                    <<?Pos(30, 36)
-                     "Division by zero at line 30, column 36">>,
+                     "Division by zero.">>,
                    <<?Pos(32, 3)
-                     "The function unused_stateful is unnecessarily marked as stateful at line 32, column 3">>,
+                     "The function `unused_stateful` is unnecessarily marked as stateful.">>,
                    <<?Pos(35, 31)
-                     "The variable unused_arg is defined at line 35, column 31 but never used">>,
+                     "The variable `unused_arg` is defined but never used.">>,
                    <<?Pos(36, 9)
-                     "The variable unused_var is defined at line 36, column 9 but never used">>,
+                     "The variable `unused_var` is defined but never used.">>,
                    <<?Pos(41, 3)
-                     "The function unused_function is defined at line 41, column 3 but never used">>,
+                     "The function `unused_function` is defined but never used.">>,
                    <<?Pos(42, 3)
-                     "The function recursive_unused_function is defined at line 42, column 3 but never used">>,
+                     "The function `recursive_unused_function` is defined but never used.">>,
                    <<?Pos(43, 3)
-                     "The function called_unused_function1 is defined at line 43, column 3 but never used">>,
+                     "The function `called_unused_function1` is defined but never used.">>,
                    <<?Pos(44, 3)
-                     "The function called_unused_function2 is defined at line 44, column 3 but never used">>,
+                     "The function `called_unused_function2` is defined but never used.">>,
                    <<?Pos(48, 5)
-                     "Unused return value at line 48, column 5">>
+                     "Unused return value.">>
                   ])
     ].
 

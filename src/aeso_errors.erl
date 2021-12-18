@@ -66,7 +66,7 @@ throw(#err{} = Err) ->
     erlang:throw({error, [Err]}).
 
 msg(#err{ message = Msg, context = none }) -> Msg;
-msg(#err{ message = Msg, context = Ctxt }) -> Msg ++ Ctxt.
+msg(#err{ message = Msg, context = Ctxt }) -> Msg ++ "\n" ++ Ctxt.
 
 err_msg(#err{ pos = Pos } = Err) ->
     lists:flatten(io_lib:format("~s~s", [str_pos(Pos), msg(Err)])).
