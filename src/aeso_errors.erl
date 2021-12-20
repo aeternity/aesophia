@@ -69,7 +69,7 @@ msg(#err{ message = Msg, context = none }) -> Msg;
 msg(#err{ message = Msg, context = Ctxt }) -> Msg ++ "\n" ++ Ctxt.
 
 err_msg(#err{ pos = Pos } = Err) ->
-    lists:flatten(io_lib:format("~s~s", [str_pos(Pos), msg(Err)])).
+    lists:flatten(io_lib:format("~s~s\n", [str_pos(Pos), msg(Err)])).
 
 str_pos(#pos{file = no_file, line = L, col = C}) ->
     io_lib:format("~p:~p:", [L, C]);
@@ -79,7 +79,7 @@ str_pos(#pos{file = F, line = L, col = C}) ->
 type(#err{ type = Type }) -> Type.
 
 pp(#err{ type = Kind, pos = Pos } = Err) ->
-    lists:flatten(io_lib:format("~s~s:\n~s", [pp_kind(Kind), pp_pos(Pos), msg(Err)])).
+    lists:flatten(io_lib:format("~s~s:\n~s\n", [pp_kind(Kind), pp_pos(Pos), msg(Err)])).
 
 pp_kind(type_error)     -> "Type error";
 pp_kind(parse_error)    -> "Parse error";
