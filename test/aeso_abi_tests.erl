@@ -95,7 +95,7 @@ encode_calldata_neg_test() ->
               "when checking the application of\n"
               "  `x : (int) => string`\n"
               "to arguments\n"
-              "  `true : bool`",
+              "  `true : bool`\n",
     {error, [Err1]} = aeso_compiler:create_calldata(Code, "x", ["true"]),
     ?assertEqual(ExpErr1, aeso_errors:pp(Err1)),
     {error, [Err2]} = aeso_compiler:create_calldata(Code, "x", ["true"], [{backend, fate}]),
