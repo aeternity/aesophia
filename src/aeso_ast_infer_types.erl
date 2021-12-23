@@ -27,6 +27,7 @@
                | aeso_syntax:con() | aeso_syntax:qcon()  %% contracts
                | aeso_syntax:tvar()
                | {if_t, aeso_syntax:ann(), aeso_syntax:id(), utype(), utype()}  %% Can branch on named argument (protected)
+               | {sub_t, aeso_syntax:ann(), utype()}
                | uvar().
 
 -type uvar() :: {uvar, aeso_syntax:ann(), reference()}.
@@ -911,7 +912,6 @@ match_impls([{fun_decl, _, {id, _, FunName}, {fun_t, _, _, ArgsTypes, RetDecl}} 
                      end,
     match_impls(Decls, ConId, IName, UnmatchedImpls).
 
-
 -spec compare_types(T, T) -> boolean() when T :: utype() | [utype()].
 compare_types(Types1 = [_ | _], Types2 = [_ | _]) ->
     length(Types1) == length(Types2) andalso
@@ -1714,7 +1714,7 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
             ResultType = fresh_uvar(Ann),
             when_warning(warn_unused_functions,
                          fun() -> register_function_call(Namespace ++ qname(CurrentFun), Name) end),
-            unify(Env, FunType, {fun_t, [], NamedArgsVar, ArgTypes, GeneralResultType}, When),
+            unify(Env, {sub_t, aeso_syntax:get_ann(FunType), FunType}, {fun_t, [], NamedArgsVar, ArgTypes, GeneralResultType}, When),
             when_warning(warn_negative_spend, fun() -> warn_potential_negative_spend(Ann, NewFun1, NewArgs) end),
             add_constraint(
               #dependent_type_constraint{ named_args_t = NamedArgsVar,
@@ -2452,6 +2452,8 @@ solve_known_record_types(Env, Constraints) ->
     Unsolved = DerefConstraints--SolvedConstraints,
     lists:filter(fun(#field_constraint{}) -> true; (_) -> false end, Unsolved).
 
+record_type_name({sub_t, _, T}) ->
+    record_type_name(T);
 record_type_name({app_t, _Attrs, RecId, _Args}) when ?is_type_id(RecId) ->
     RecId;
 record_type_name(RecId) when ?is_type_id(RecId) ->
@@ -2588,6 +2590,8 @@ unfold_types_in_type(Env, T, Options) when is_tuple(T) ->
     list_to_tuple(unfold_types_in_type(Env, tuple_to_list(T), Options));
 unfold_types_in_type(Env, [H|T], Options) ->
     [unfold_types_in_type(Env, H, Options)|unfold_types_in_type(Env, T, Options)];
+unfold_types_in_type(Env, {sub_t, Ann, T}, Options) ->
+    {sub_t, Ann, unfold_types_in_type(Env, T, Options)};
 unfold_types_in_type(_Env, X, _Options) ->
     X.
 
@@ -2639,6 +2643,20 @@ unify1(_Env, {uvar, A, R}, T, When) ->
 unify1(Env, T, {uvar, A, R}, When) ->
     unify1(Env, {uvar, A, R}, T, When);
 unify1(_Env, {tvar, _, X}, {tvar, _, X}, _When) -> true; %% Rigid type variables
+unify1(Env, {sub_t, _, T1}, {sub_t, _, T2}, When) ->
+    % TODO: should be an error
+    unify(Env, T1, T2, When);
+unify1(Env, {sub_t, _, T1}, T2, When) ->
+    case {T1, T2} of
+        {{con, _, "Cat"}, {con, _, "Animal"}} -> true;
+        {{fun_t, A1, NAs1, As1, Tf1}, {fun_t, A2, NAs2, As2, Tf2}} ->
+            T1Sub = {fun_t, A1, NAs1, As1, {sub_t, aeso_syntax:get_ann(Tf1), Tf1}},
+            T2Sub = {fun_t, A2, NAs2, [{sub_t, aeso_syntax:get_ann(Arg), Arg} || Arg <- As2], Tf2},
+            unify(Env, T1Sub, T2Sub, When);
+        _  -> unify(Env, T1, T2, When)
+    end;
+unify1(Env, T1, T2 = {sub_t, _, _}, When) ->
+    unify1(Env, T2, T1, When);
 unify1(Env, [A|B], [C|D], When) ->
     unify(Env, A, C, When) andalso unify(Env, B, D, When);
 unify1(_Env, X, X, _When) ->
@@ -2685,6 +2703,8 @@ unify1(_Env, A, B, When) ->
     cannot_unify(A, B, When),
     false.
 
+dereference({sub_t, Ann, T}) ->
+    {sub_t, Ann, dereference(T)};
 dereference(T = {uvar, _, R}) ->
     case ets_lookup(type_vars, R) of
         [] ->
@@ -2707,6 +2727,7 @@ occurs_check(R, T) ->
     occurs_check1(R, dereference(T)).
 
 occurs_check1(R, {uvar, _, R1}) -> R == R1;
+occurs_check1(R, {sub_t, _, T}) -> occurs_check1(R, T);
 occurs_check1(_, {id, _, _}) -> false;
 occurs_check1(_, {con, _, _}) -> false;
 occurs_check1(_, {qid, _, _}) -> false;
