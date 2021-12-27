@@ -278,8 +278,6 @@ type({bytes_t, _, Len}) ->
     text(lists:concat(["bytes(", Len, ")"]));
 type({if_t, _, Id, Then, Else}) ->
     beside(text("if"), args_type([Id, Then, Else]));
-type({sub_t, _, T}) ->
-    text("sub_t");
 type({named_arg_t, _, Name, Type, _Default}) ->
     %% Drop the default value
     %% follow(hsep(typed(name(Name), Type), text("=")), expr(Default));
