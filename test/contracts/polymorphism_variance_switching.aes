@@ -1,0 +1,50 @@
+contract interface Creature =
+    entrypoint is_alive : () => bool
+
+contract interface Animal : Creature =
+    entrypoint sound : () => string
+
+contract Cat : Animal =
+    entrypoint sound() = "meow"
+    entrypoint is_alive() = true
+
+main contract Main =
+    entrypoint init() = ()
+
+    stateful function g0(x : Creature) : Cat = Chain.create()
+    stateful function f0(x : Cat) : Creature = g1(x)
+    stateful function h0() =
+        let a : Animal = (Chain.create() : Cat)
+        let c : Creature = (Chain.create() : Cat)
+        let c1 : Creature = a
+        ()
+
+    stateful function g1(x : Animal) : Cat = Chain.create()
+    stateful function f1(x : Cat) : Animal = g1(x)
+    stateful function h1() =
+        let x : Animal = (Chain.create() : Cat)
+        ()
+
+    stateful function g11(x : list(Animal)) : list(Cat) = [Chain.create()]
+    stateful function f11(x : list(Cat)) : list(Animal) = g11(x)
+
+    stateful function g12(x : Animal * Animal) : Cat * Cat = (Chain.create(), Chain.create())
+    stateful function f12(x : Cat * Cat) : Animal * Animal = g12(x)
+
+    stateful function g13() : map(Cat, Cat) = { [Chain.create()] = Chain.create() }
+    stateful function f13() : map(Animal, Animal) = g13()
+
+    stateful function g2(x : Cat) : Cat = Chain.create()
+    stateful function f2(x : Animal) : Animal = g2(x)
+
+    stateful function g3(x : Cat) : Animal = f1(x)
+    stateful function f3(x : Cat) : Cat = g3(x)
+
+    stateful function g4(x : (Cat => Animal)) : Cat = Chain.create()
+    stateful function f4(x : (Animal => Cat)) : Animal = g4(x)
+
+    stateful function g44(x : list(list(Cat) => list(Animal))) : Cat = Chain.create()
+    stateful function f44(x : list(list(Animal) => list(Cat))) : Animal = g44(x)
+
+    stateful function g5(x : (Animal => Animal)) : Cat = Chain.create()
+    stateful function f5(x : (Cat => Cat)) : Animal = g5(x)

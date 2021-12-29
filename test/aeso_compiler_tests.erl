@@ -868,6 +868,20 @@ failing_contracts() ->
                   [<<?Pos(1,24)
                      "Trying to implement or extend an undefined interface H at line 1, column 24">>
                   ])
+    , ?TYPE_ERROR(polymorphism_variance_switching,
+                  [<<?Pos(38,49)
+                     "Cannot unify Animal\n"
+                     "         and Cat\n"
+                     "when checking the application at line 38, column 49 of\n  g2 : (Cat) => Cat\nto arguments\n  x : Animal">>,
+                   <<?Pos(41,43)
+                     "Cannot unify Animal\n"
+                     "         and Cat\n"
+                     "when checking the type of the expression at line 41, column 43\n  g3(x) : Animal\nagainst the expected type\n  Cat">>,
+                   <<?Pos(50,55)
+                     "Cannot unify Animal\n"
+                     "         and Cat\n"
+                     "when checking the application at line 50, column 55 of\n  g5 : ((Animal) => Animal) => Cat\nto arguments\n  x : (Cat) => Cat">>
+                  ])
     ].
 
 -define(Path(File), "code_errors/" ??File).
