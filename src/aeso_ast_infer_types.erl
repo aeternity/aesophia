@@ -134,6 +134,7 @@
     , vars             = []                 :: [{name(), var_info()}]
     , typevars         = unrestricted       :: unrestricted | [name()]
     , fields           = #{}                :: #{ name() => [field_info()] }    %% fields are global
+    , contract_parents = #{}                :: #{ name() => [name()] }
     , namespace        = []                 :: qname()
     , used_namespaces  = []                 :: used_namespaces()
     , in_pattern       = false              :: boolean()
@@ -832,9 +833,12 @@ infer(Contracts, Options) ->
 -spec infer1(env(), [aeso_syntax:decl()], [aeso_syntax:decl()], list(option())) ->
     {env(), [aeso_syntax:decl()]}.
 infer1(Env, [], Acc, _Options) -> {Env, lists:reverse(Acc)};
-infer1(Env, [{Contract, Ann, ConName, Impls, Code} | Rest], Acc, Options)
+infer1(Env0, [{Contract, Ann, ConName, Impls, Code} | Rest], Acc, Options)
   when ?IS_CONTRACT_HEAD(Contract) ->
     %% do type inference on each contract independently.
+    Env = Env0#env{ contract_parents = maps:put(name(ConName),
+                                                [name(Impl) || Impl <- Impls],
+                                                Env0#env.contract_parents) },
     check_scope_name_clash(Env, contract, ConName),
     What = case Contract of
                contract_main -> contract;
@@ -1965,7 +1969,7 @@ infer_case(Env = #env{ namespace = NS, current_function = {id, _, Fun} }, Attrs,
         {guarded, Ann, NewGuards, NewBranch}
     end,
     NewGuardedBranches = lists:map(InferGuardedBranches, GuardedBranches),
-    unify(Env, PatType, ExprType, {case_pat, Pattern, PatType, ExprType}),
+    unify(Env, ExprType, PatType, {case_pat, Pattern, PatType, ExprType}),
     {'case', Attrs, NewPattern, NewGuardedBranches}.
 
 %% NewStmts = infer_block(Env, Attrs, Stmts, BlockType)
@@ -2647,6 +2651,13 @@ unify1(_Env, {id, _, Name}, {id, _, Name}, _When) ->
     true;
 unify1(_Env, {con, _, Name}, {con, _, Name}, _When) ->
     true;
+unify1(Env, A = {con, _, Child}, B = {con, _, Base}, When) ->
+    case is_subtype(Env, Child, Base) of
+        true -> true;
+        false ->
+            cannot_unify(A, B, When),
+            false
+    end;
 unify1(_Env, {qid, _, Name}, {qid, _, Name}, _When) ->
     true;
 unify1(_Env, {qcon, _, Name}, {qcon, _, Name}, _When) ->
@@ -2663,8 +2674,8 @@ unify1(_Env, {fun_t, _, _, var_args, _}, {fun_t, _, _, _, _}, When) ->
     type_error({unify_varargs, When});
 unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, When)
   when length(Args1) == length(Args2) ->
-    unify(Env, Named1, Named2, When) andalso
-    unify(Env, Args1, Args2, When) andalso unify(Env, Result1, Result2, When);
+    unify(Env, Named2, Named1, When) andalso
+    unify(Env, Args2, Args1, When) andalso unify(Env, Result1, Result2, When);
 unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, When)
   when length(Args1) == length(Args2), Tag == id orelse Tag == qid ->
     unify(Env, Args1, Args2, When);
@@ -2684,6 +2695,18 @@ unify1(Env, A, {app_t, _, T, []}, When) ->
 unify1(_Env, A, B, When) ->
     cannot_unify(A, B, When),
     false.
+
+is_subtype(Env, Child, Base) ->
+    Parents = maps:get(Child, Env#env.contract_parents, []),
+    if
+        Parents == [] ->
+            false;
+        true ->
+            case lists:member(Base, Parents) of
+                true -> true;
+                false -> lists:any(fun(Parent) -> is_subtype(Env, Parent, Base) end, Parents)
+            end
+    end.
 
 dereference(T = {uvar, _, R}) ->
     case ets_lookup(type_vars, R) of
