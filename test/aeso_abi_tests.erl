@@ -91,9 +91,11 @@ encode_calldata_neg_test() ->
     Code = [ "contract Foo =\n"
              "  entrypoint x(y : int) : string = \"hello\"\n" ],
 
-    ExpErr1 = "Type error at line 5, col 34:\nCannot unify int\n         and bool\n"
-              "when checking the application at line 5, column 34 of\n"
-              "  x : (int) => string\nto arguments\n  true : bool\n",
+    ExpErr1 = "Type error at line 5, col 34:\nCannot unify `int` and `bool`\n"
+              "when checking the application of\n"
+              "  `x : (int) => string`\n"
+              "to arguments\n"
+              "  `true : bool`\n",
     {error, [Err1]} = aeso_compiler:create_calldata(Code, "x", ["true"]),
     ?assertEqual(ExpErr1, aeso_errors:pp(Err1)),
     {error, [Err2]} = aeso_compiler:create_calldata(Code, "x", ["true"], [{backend, fate}]),
