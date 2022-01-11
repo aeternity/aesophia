@@ -30,12 +30,14 @@
 
 -export([ err_msg/1
         , msg/1
+        , msg_oneline/1
         , new/2
         , new/3
         , new/4
         , pos/2
         , pos/3
         , pp/1
+        , pp_oneline/1
         , pp_pos/1
         , to_json/1
         , throw/1
@@ -68,6 +70,9 @@ throw(#err{} = Err) ->
 msg(#err{ message = Msg, context = none }) -> Msg;
 msg(#err{ message = Msg, context = Ctxt }) -> Msg ++ "\n" ++ Ctxt.
 
+msg_oneline(#err{ message = Msg, context = none }) -> Msg;
+msg_oneline(#err{ message = Msg, context = Ctxt }) -> Msg ++ " - " ++ Ctxt.
+
 err_msg(#err{ pos = Pos } = Err) ->
     lists:flatten(io_lib:format("~s~s\n", [str_pos(Pos), msg(Err)])).
 
@@ -80,6 +85,11 @@ type(#err{ type = Type }) -> Type.
 
 pp(#err{ type = Kind, pos = Pos } = Err) ->
     lists:flatten(io_lib:format("~s~s:\n~s\n", [pp_kind(Kind), pp_pos(Pos), msg(Err)])).
+
+pp_oneline(#err{ type = Kind, pos = Pos } = Err) ->
+    Msg = msg_oneline(Err),
+    OneLineMsg = re:replace(Msg, "[\s\\n]+", " ", [global]),
+    lists:flatten(io_lib:format("~s~s: ~s", [pp_kind(Kind), pp_pos(Pos), OneLineMsg])).
 
 pp_kind(type_error)     -> "Type error";
 pp_kind(parse_error)    -> "Parse error";
