@@ -176,18 +176,14 @@ lookup_var(#env{vars = Vars}, X) ->
 
 %% -- The compiler --
 
-lit_to_fate(Env, L) ->
-    case L of
-        {int, N}             -> aeb_fate_data:make_integer(N);
-        {string, S}          -> aeb_fate_data:make_string(S);
-        {bytes, B}           -> aeb_fate_data:make_bytes(B);
-        {bool, B}            -> aeb_fate_data:make_boolean(B);
-        {account_pubkey, K}  -> aeb_fate_data:make_address(K);
-        {contract_pubkey, K} -> aeb_fate_data:make_contract(K);
-        {oracle_pubkey, K}   -> aeb_fate_data:make_oracle(K);
-        {oracle_query_id, H} -> aeb_fate_data:make_oracle_query(H);
-        {contract_code, C}   ->
-            Options = Env#env.options,
+serialize_contract_code(Env, C) ->
+    Cache = case get(contract_code_cache) of
+                undefined -> put(contract_code_cache, #{}), #{};
+                Res       -> Res
+            end,
+    case maps:get(C, Cache, none) of
+        none ->
+            Options  = Env#env.options,
             FCode    = maps:get(C, Env#env.child_contracts),
             FateCode = compile(Env#env.child_contracts, FCode, Options),
             ByteCode = aeb_fate_code:serialize(FateCode, []),
@@ -201,7 +197,22 @@ lit_to_fate(Env, L) ->
                      payable => maps:get(payable, FCode)
                    },
             Serialized = aeser_contract_code:serialize(Code),
-            aeb_fate_data:make_contract_bytearray(Serialized);
+            put(contract_code_cache, maps:put(C, Serialized, Cache)),
+            Serialized;
+        Serialized -> Serialized
+    end.
+
+lit_to_fate(Env, L) ->
+    case L of
+        {int, N}             -> aeb_fate_data:make_integer(N);
+        {string, S}          -> aeb_fate_data:make_string(S);
+        {bytes, B}           -> aeb_fate_data:make_bytes(B);
+        {bool, B}            -> aeb_fate_data:make_boolean(B);
+        {account_pubkey, K}  -> aeb_fate_data:make_address(K);
+        {contract_pubkey, K} -> aeb_fate_data:make_contract(K);
+        {oracle_pubkey, K}   -> aeb_fate_data:make_oracle(K);
+        {oracle_query_id, H} -> aeb_fate_data:make_oracle_query(H);
+        {contract_code, C}   -> aeb_fate_data:make_contract_bytearray(serialize_contract_code(Env, C));
         {typerep, T}         -> aeb_fate_data:make_typerep(type_to_scode(T))
      end.
 
