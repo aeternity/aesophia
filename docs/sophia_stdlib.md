@@ -311,7 +311,9 @@ the `pubkey`
 Crypto.ecverify_secp256k1(msg : hash, addr : bytes(20), sig : bytes(65)) : bool
 ```
 
-Verifies a signature for a msg against an Ethereum style address
+Verifies a signature for a msg against an Ethereum style address. Note that the
+signature should be 65 bytes and include the recovery identifier byte `V`. The
+expected organization of the signature is (`V || R || S`).
 
 
 #### ecrecover_secp256k1
@@ -319,14 +321,18 @@ Verifies a signature for a msg against an Ethereum style address
 Crypto.ecrecover_secp256k1(msg : hash, sig : bytes(65)) : option(bytes(20))
 ```
 
-Recovers the Ethereum style address from a msg hash and respective signature
+Recovers the Ethereum style address from a msg hash and respective
+ECDSA-signature. Note that the signature should be 65 bytes and include the
+recovery identifier byte `V`. The expected organization of the signature is (`V
+|| R || S`).
 
 
 #### verify_sig_secp256k1
 ```
 Crypto.verify_sig_secp256k1(msg : hash, pubkey : bytes(64), sig : bytes(64)) : bool
 ```
-<!-- TODO -->
+
+Verifies a standard 64-byte ECDSA signature (`R || S`).
 
 
 ### Auth
