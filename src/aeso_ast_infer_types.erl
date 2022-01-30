@@ -377,9 +377,15 @@ lookup_env(Env, Kind, Ann, Name) ->
                 [Res = {_, {AnnR, _}}] ->
                     when_warning(warn_unused_includes,
                                  fun() ->
-                                         case proplists:get_value(include_type, Ann, none) of
-                                             none -> used_include(AnnR);
-                                             _    -> ok
+                                         %% If a file is used from a different file, we
+                                         %% can then mark it as used
+                                         F1 = proplists:get_value(file, Ann, no_file),
+                                         F2 = proplists:get_value(file, AnnR, no_file),
+                                         if
+                                             F1 /= F2 ->
+                                                 used_include(AnnR);
+                                             true ->
+                                                 ok
                                          end
                                  end),
                     Res;
@@ -859,13 +865,8 @@ infer1(Env, [{Contract, Ann, ConName, Code} | Rest], Acc, Options)
 infer1(Env, [{namespace, Ann, Name, Code} | Rest], Acc, Options) ->
     when_warning(warn_unused_includes,
                  fun() ->
-                         case proplists:get_value(include_type, Ann, none) of
-                             direct ->
-                                 SrcFile = proplists:get_value(src_file, Options, no_file),
-                                 potential_unused_include(Ann, SrcFile);
-                             _ ->
-                                 ok
-                         end
+                     SrcFile = proplists:get_value(src_file, Options, no_file),
+                     potential_unused_include(Ann, SrcFile)
                  end),
     check_scope_name_clash(Env, namespace, Name),
     {Env1, Code1} = infer_contract_top(push_scope(namespace, Name, Env), namespace, Code, Options),
