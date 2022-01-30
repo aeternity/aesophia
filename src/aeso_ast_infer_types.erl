@@ -857,7 +857,16 @@ infer1(Env, [{Contract, Ann, ConName, Code} | Rest], Acc, Options)
     Env3 = bind_contract(Contract1, Env2),
     infer1(Env3, Rest, [Contract1 | Acc], Options);
 infer1(Env, [{namespace, Ann, Name, Code} | Rest], Acc, Options) ->
-    when_warning(warn_unused_includes, fun() -> potential_unused_include(Ann, proplists:get_value(src_file, Options, no_file)) end),
+    when_warning(warn_unused_includes,
+                 fun() ->
+                         case proplists:get_value(include_type, Ann, none) of
+                             direct ->
+                                 SrcFile = proplists:get_value(src_file, Options, no_file),
+                                 potential_unused_include(Ann, SrcFile);
+                             _ ->
+                                 ok
+                         end
+                 end),
     check_scope_name_clash(Env, namespace, Name),
     {Env1, Code1} = infer_contract_top(push_scope(namespace, Name, Env), namespace, Code, Options),
     Namespace1 = {namespace, Ann, Name, Code1},

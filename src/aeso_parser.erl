@@ -685,8 +685,9 @@ expand_includes([{include, Ann, {string, _SAnn, File}} | AST], Included, Acc, Op
             Hashed = hash_include(File, Code),
             case sets:is_element(Hashed, Included) of
                 false ->
+                    SrcFile = proplists:get_value(src_file, Opts, no_file),
                     IncludeType = case proplists:get_value(file, Ann) of
-                                      no_file -> direct;
+                                      SrcFile -> direct;
                                       _       -> indirect
                                   end,
                     Opts1 = lists:keystore(src_file, 1, Opts, {src_file, File}),
