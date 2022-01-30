@@ -375,7 +375,13 @@ lookup_env(Env, Kind, Ann, Name) ->
             case [ Res || QName <- Names, Res <- [lookup_env1(Env, Kind, Ann, QName)], Res /= false] of
                 []    -> false;
                 [Res = {_, {AnnR, _}}] ->
-                    when_warning(warn_unused_includes, fun() -> used_include(AnnR) end),
+                    when_warning(warn_unused_includes,
+                                 fun() ->
+                                         case proplists:get_value(include_type, Ann, none) of
+                                             none -> used_include(AnnR);
+                                             _    -> ok
+                                         end
+                                 end),
                     Res;
                 Many  ->
                     type_error({ambiguous_name, qid(Ann, Name), [{qid, A, Q} || {Q, {A, _}} <- Many]}),
