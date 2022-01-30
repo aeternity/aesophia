@@ -53,21 +53,21 @@ namespace String =
 
   // Converts a decimal ("123", "-253") or a hexadecimal ("0xa2f", "-0xBBB") string
   // into an integer. If the string doesn't contain a valid number `None` is returned.
-  function to_int(s : string) : option(int) =
-    let s = StringInternal.to_list(s)
-    switch(is_prefix(['-'], s))
-      None    => to_int_pos(s)
+  function to_int(str : string) : option(int) =
+    let lst = StringInternal.to_list(str)
+    switch(is_prefix(['-'], lst))
+      None    => to_int_pos(lst)
       Some(s) => switch(to_int_pos(s))
                    None => None
                    Some(x) => Some(-x)
 
   // Private helper functions below
-  private function to_int_pos(s : list(char)) =
-    switch(is_prefix(['0', 'x'], s))
+  private function to_int_pos(chs : list(char)) =
+    switch(is_prefix(['0', 'x'], chs))
       None =>
-        to_int_(s, ch_to_int_10, 0, 10)
-      Some(s) =>
-        to_int_(s, ch_to_int_16, 0, 16)
+        to_int_(chs, ch_to_int_10, 0, 10)
+      Some(str) =>
+        to_int_(str, ch_to_int_16, 0, 16)
 
   private function
     tokens_(_, [], acc) = [StringInternal.from_list(List.reverse(acc))]
@@ -84,8 +84,8 @@ namespace String =
     contains_(ix, str, substr) =
       switch(is_prefix(substr, str))
         None =>
-          let _ :: str = str
-          contains_(ix + 1, str, substr)
+          let _ :: tailstr = str
+          contains_(ix + 1, tailstr, substr)
         Some(_) =>
           Some(ix)
 
@@ -101,15 +101,15 @@ namespace String =
     to_int_(i :: is, value, x, b) =
       switch(value(i))
         None => None
-        Some(i) => to_int_(is, value, x * b + i, b)
+        Some(n) => to_int_(is, value, x * b + n, b)
 
-  private function ch_to_int_10(c) =
-    let c = Char.to_int(c)
+  private function ch_to_int_10(ch) =
+    let c = Char.to_int(ch)
     if(c >= 48 && c =< 57) Some(c - 48)
     else None
 
-  private function ch_to_int_16(c) =
-    let c = Char.to_int(c)
+  private function ch_to_int_16(ch) =
+    let c = Char.to_int(ch)
     if(c >= 48 && c =< 57)    Some(c - 48)
     elif(c >= 65 && c =< 70)  Some(c - 55)
     elif(c >= 97 && c =< 102) Some(c - 87)

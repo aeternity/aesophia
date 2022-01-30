@@ -116,16 +116,6 @@ namespace Bitwise =
         1 => ubxor__(a / 2, b / 2, val * 2, acc + val)
         _ => ubxor__(a / 2, b / 2, val * 2, acc)
 
-  // Bitwise combined 'and' and 'not' of second argument for positive integers
-  // x 'bnand' y = x 'band' ('bnot' y)
-  // The tricky bit is that after negation the second argument has an infinite number of 1's
-  // use as many as needed!
-  //
-  // NOTE: this function is not symmetric!
-  private function ubnand(a, b) =
-    require(a >= 0 && b >= 0, "ubxor is only defined for non-negative integers")
-    ubnand__(a, b, 1, 0)
-
   private function ubnand_(a, b) = ubnand__(a, b, 1, 0)
 
   private function
