@@ -2850,7 +2850,6 @@ create_unused_functions() ->
     ets_new(function_calls, [bag]),
     ets_new(all_functions, [set]).
 
-register_function_call(_Caller, {proj, _, _, _}) -> ok;
 register_function_call(Caller, Callee) ->
     ets_insert(function_calls, {Caller, Callee}).
 
