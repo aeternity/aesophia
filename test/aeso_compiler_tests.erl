@@ -834,7 +834,7 @@ failing_contracts() ->
                      "The function `called_unused_function2` is defined but never used.">>,
                    <<?Pos(48, 5)
                      "Unused return value.">>,
-                   <<?PosW(60, 5)
+                   <<?Pos(60, 5)
                      "The function `dec` is defined but never used.">>
                   ])
     ].

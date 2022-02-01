@@ -1,4 +1,4 @@
-// This should include Lists.aes implicitly, since Option.aes does.
+include "List.aes"
 include "Option.aes"
 
 contract Test =
