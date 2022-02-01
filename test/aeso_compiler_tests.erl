@@ -264,7 +264,9 @@ warnings() ->
       <<?PosW(44, 3)
         "The function `called_unused_function2` is defined but never used.">>,
       <<?PosW(48, 5)
-        "Unused return value.">>
+        "Unused return value.">>,
+      <<?PosW(60, 5)
+        "The function `dec` is defined but never used.">>
      ]).
 
 failing_contracts() ->
@@ -831,7 +833,9 @@ failing_contracts() ->
                    <<?Pos(44, 3)
                      "The function `called_unused_function2` is defined but never used.">>,
                    <<?Pos(48, 5)
-                     "Unused return value.">>
+                     "Unused return value.">>,
+                   <<?PosW(60, 5)
+                     "The function `dec` is defined but never used.">>
                   ])
     ].
 

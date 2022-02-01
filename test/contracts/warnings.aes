@@ -47,3 +47,14 @@ contract Warnings =
   entrypoint unused_return_value() =
     rv()
     2
+
+namespace FunctionsAsArgs =
+    function f() = g()
+
+    private function g() = h(inc)
+    private function h(fn : (int => int)) = fn(1)
+
+    // Passed as arg to h in g
+    private function inc(n : int) : int = n + 1
+    // Never used
+    private function dec(n : int) : int = n - 1

@@ -1456,13 +1456,15 @@ app_t(Ann, Name, Args) -> {app_t, Ann, Name, Args}.
 lookup_name(Env, As, Name) ->
     lookup_name(Env, As, Name, []).
 
-lookup_name(Env = #env{ namespace = NS, current_function = {id, _, Fun} }, As, Id, Options) ->
+lookup_name(Env = #env{ namespace = NS, current_function = {id, _, Fun} = CurFn }, As, Id, Options) ->
     case lookup_env(Env, term, As, qname(Id)) of
         false ->
             type_error({unbound_variable, Id}),
             {Id, fresh_uvar(As)};
         {QId, {_, Ty}} ->
             when_warning(warn_unused_variables, fun() -> used_variable(NS, Fun, QId) end),
+            when_warning(warn_unused_functions,
+                         fun() -> register_function_call(NS ++ qname(CurFn), QId) end),
             Freshen = proplists:get_value(freshen, Options, false),
             check_stateful(Env, Id, Ty),
             Ty1 = case Ty of
@@ -1645,22 +1647,15 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
         prefix ->
             infer_op(Env, Ann, Fun, Args, fun infer_prefix/1);
         _ ->
-            CurrentFun = Env#env.current_function,
-            Namespace = Env#env.namespace,
             NamedArgsVar = fresh_uvar(Ann),
             NamedArgs1 = [ infer_named_arg(Env, NamedArgsVar, Arg) || Arg <- NamedArgs ],
             NewFun0 = infer_expr(Env, Fun),
             NewArgs = [infer_expr(Env, A) || A <- Args],
             ArgTypes = [T || {typed, _, _, T} <- NewArgs],
-            NewFun1 = {typed, _, Name, FunType} = infer_var_args_fun(Env, NewFun0, NamedArgs1, ArgTypes),
+            NewFun1 = {typed, _, _, FunType} = infer_var_args_fun(Env, NewFun0, NamedArgs1, ArgTypes),
             When = {infer_app, Fun, NamedArgs1, Args, FunType, ArgTypes},
             GeneralResultType = fresh_uvar(Ann),
             ResultType = fresh_uvar(Ann),
-            when_warning(warn_unused_functions,
-                         fun() -> if element(1, Name) == lam -> ok;
-                                     true -> register_function_call(Namespace ++ qname(CurrentFun), Name)
-                                  end
-                         end),
             unify(Env, FunType, {fun_t, [], NamedArgsVar, ArgTypes, GeneralResultType}, When),
             when_warning(warn_negative_spend, fun() -> warn_potential_negative_spend(Ann, NewFun1, NewArgs) end),
             add_constraint(
@@ -2856,7 +2851,7 @@ create_unused_functions() ->
 
 register_function_call(_Caller, {proj, _, _, _}) -> ok;
 register_function_call(Caller, Callee) ->
-    ets_insert(function_calls, {Caller, qname(Callee)}).
+    ets_insert(function_calls, {Caller, Callee}).
 
 potential_unused_function(#env{ what = namespace }, Ann, FunQName, FunId) ->
     ets_insert(all_functions, {Ann, FunQName, FunId, not aeso_syntax:get_ann(private, Ann, false)});
