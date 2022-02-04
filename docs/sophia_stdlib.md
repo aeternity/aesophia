@@ -12,223 +12,39 @@ in the scope and do not need any actions to be used, while the others require so
 
 The out-of-the-box namespaces are:
 
+- [Address](#address)
+- [AENS](#aens)
+- [Auth](#auth)
 - [Bits](#bits)
 - [Bytes](#bytes)
-- [Char](#char)
-- [Int](#int)
-- [Map](#map)
-- [Address](#address)
-- [Crypto](#crypto)
-- [Auth](#auth)
-- [Oracle](#oracle)
-- [AENS](#aens)
-- [Contract](#contract)
 - [Call](#call)
 - [Chain](#chain)
+- [Char](#char)
+- [Contract](#contract)
+- [Crypto](#crypto)
+- [Int](#int)
+- [Map](#map)
+- [Oracle](#oracle)
 
 The following ones need to be included as regular files with `.aes` suffix, for example
 ```
 include "List.aes"
 ```
 
-- [List](#list)
-- [Option](#option)
-- [String](#string)
-- [Func](#func)
-- [Pair](#pair)
-- [Triple](#triple)
 - [Bitwise](#bitwise)
 - [BLS12_381](bls12_381)
+- [Func](#func)
 - [Frac](#frac)
+- [List](#list)
+- [Option](#option)
+- [Pair](#pair)
 - [Set](#set-stdlib)
+- [String](#string)
+- [Triple](#triple)
 
 ## Builtin namespaces
 
 They are available without any explicit includes.
-
-### Bits
-
-#### none
-```
-Bits.none : bits
-```
-
-A bit field with all bits cleared
-
-
-#### all
-```
-Bits.all : bits
-```
-
-A bit field with all bits set
-
-
-#### set
-```
-Bits.set(b : bits, i : int) : bits
-```
-
-Set bit i
-
-
-#### clear
-```
-Bits.clear(b : bits, i : int) : bits
-```
-
-Clear bit i
-
-
-#### test
-```
-Bits.test(b : bits, i : int) : bool
-```
-
-Check if bit i is set
-
-
-#### sum
-```
-Bits.sum(b : bits) : int
-```
-
-Count the number of set bits
-
-
-#### union
-```
-Bits.union(a : bits, b : bits) : bits
-```
-
-Bitwise disjunction
-
-
-#### intersection
-```
-Bits.intersection(a : bits, b : bits) : bits
-```
-
-Bitwise conjunction
-
-
-#### difference
-```
-Bits.difference(a : bits, b : bits) : bits
-```
-
-Each bit is true if and only if it was 1 in `a` and 0 in `b`
-
-
-### Bytes
-
-#### to_int
-```
-Bytes.to_int(b : bytes(n)) : int
-```
-
-Interprets the byte array as a big endian integer
-
-
-#### to_str
-```
-Bytes.to_str(b : bytes(n)) : string
-```
-
-Returns the hexadecimal representation of the byte array
-
-
-#### concat
-```
-Bytes.concat : (a : bytes(m), b : bytes(n)) => bytes(m + n)
-```
-
-Concatenates two byte arrays
-
-
-#### split
-```
-Bytes.split(a : bytes(m + n)) : bytes(m) * bytes(n)
-```
-
-Splits a byte array at given index
-
-
-### Char
-
-#### to_int
- ```
-Char.to_int(c : char) : int
-```
-
-Returns the UTF-8 codepoint of a character
-
-
-#### from_int
-
-```
-Char.from_int(i : int) : option(char)
- ```
-
-Opposite of [to_int](#to_int). Returns `None` if the integer doesn't correspond to a single (normalized) codepoint.
-
-
-### Int
-
-#### to_str
-```
-Int.to_str : int => string
-```
-
-Casts integer to string using decimal representation
-
-
-### Map
-
-#### lookup
-`Map.lookup(k : 'k, m : map('k, 'v)) : option('v)`
-
-Returns the value under a key in given map as `Some` or `None`
-if the key is not present
-
-
-#### lookup_default
-`Map.lookup_default(k : 'k, m : map('k, 'v), v : 'v) : 'v`
-
-Returns the value under a key in given map or the
-default value `v` if the key is not present
-
-
-#### member
-`Map.member(k : 'k, m : map('k, 'v)) : bool`
-
-Checks if the key is present in the map
-
-
-#### delete
-`Map.delete(k : 'k, m : map('k, 'v)) : map('k, 'v)`
-
-Removes the key from the map
-
-
-#### size
-`Map.size(m : map('k, 'v)) : int`
-
-Returns the number of elements in the map
-
-
-#### to_list
-`Map.to_list(m : map('k, 'v)) : list('k * 'v)`
-
-Returns a list containing pairs of keys and their respective elements.
-
-
-#### from_list
-`Map.from_list(m : list('k * 'v)) : map('k, 'v)`
-
-Turns a list of pairs of form `(key, value)` into a map
-
-
 
 ### Address
 
@@ -270,222 +86,6 @@ Address.to_contract(a : address) : C
 ```
 
 Cast address to contract type C (where `C` is a contract)
-
-
-### Crypto
-
-#### sha3
-```
-Crypto.sha3(x : 'a) : hash
-```
-
-Hash any object to SHA3
-
-
-#### sha256
-```
-Crypto.sha256(x : 'a) : hash
-```
-
-Hash any object to SHA256
-
-
-#### blake2b
-```
-Crypto.blake2b(x : 'a) : hash
-```
-
-Hash any object to blake2b
-
-
-#### verify_sig
-```
-Crypto.verify_sig(msg : hash, pubkey : address, sig : signature) : bool
-```
-
-Checks if the signature of `msg` was made using private key corresponding to
-the `pubkey`
-
-#### ecverify_secp256k1
-```
-Crypto.ecverify_secp256k1(msg : hash, addr : bytes(20), sig : bytes(65)) : bool
-```
-
-Verifies a signature for a msg against an Ethereum style address. Note that the
-signature should be 65 bytes and include the recovery identifier byte `V`. The
-expected organization of the signature is (`V || R || S`).
-
-
-#### ecrecover_secp256k1
-```
-Crypto.ecrecover_secp256k1(msg : hash, sig : bytes(65)) : option(bytes(20))
-```
-
-Recovers the Ethereum style address from a msg hash and respective
-ECDSA-signature. Note that the signature should be 65 bytes and include the
-recovery identifier byte `V`. The expected organization of the signature is (`V
-|| R || S`).
-
-
-#### verify_sig_secp256k1
-```
-Crypto.verify_sig_secp256k1(msg : hash, pubkey : bytes(64), sig : bytes(64)) : bool
-```
-
-Verifies a standard 64-byte ECDSA signature (`R || S`).
-
-
-### Auth
-
-
-#### tx
-
-```
-Auth.tx : option(Chain.tx)
-```
-
-Where `Chain.tx` is (built-in) defined like:
-```
-namespace Chain =
-  record tx = { paying_for : option(Chain.paying_for_tx)
-              , ga_metas : list(Chain.ga_meta_tx)
-              , actor : address
-              , fee   : int
-              , ttl   : int
-              , tx    : Chain.base_tx }
-
-  datatype ga_meta_tx    = GAMetaTx(address, int)
-  datatype paying_for_tx = PayingForTx(address, int)
-  datatype base_tx = SpendTx(address, int, string)
-                   | OracleRegisterTx | OracleQueryTx | OracleResponseTx | OracleExtendTx
-                   | NamePreclaimTx | NameClaimTx(hash) | NameUpdateTx(string)
-                   | NameRevokeTx(hash) | NameTransferTx(address, string)
-                   | ChannelCreateTx(address) | ChannelDepositTx(address, int) | ChannelWithdrawTx(address, int) |
-                   | ChannelForceProgressTx(address) | ChannelCloseMutualTx(address) | ChannelCloseSoloTx(address)
-                   | ChannelSlashTx(address) | ChannelSettleTx(address) | ChannelSnapshotSoloTx(address)
-                   | ContractCreateTx(int) | ContractCallTx(address, int)
-                   | GAAttachTx
-```
-
-
-#### tx_hash
-```
-Auth.tx_hash : option(hash)
-```
-
-Gets the transaction hash during authentication.
-
-### Oracle
-
-#### register
-```
-Oracle.register(<signature : bytes(64)>, acct : address, qfee : int, ttl : Chain.ttl) : oracle('a, 'b)
-```
-
-Registers new oracle answering questions of type `'a` with answers of type `'b`.
-
-* The `acct` is the address of the oracle to register (can be the same as the contract).
-* `signature` is a signature proving that the contract is allowed to register the account -
-  the `network id` + `account address` + `contract address` (concatenated as byte arrays) is
-  [signed](./sophia_features.md#delegation-signature) with the
-  private key of the account, proving you have the private key of the oracle to be. If the
-  address is the same as the contract `sign` is ignored and can be left out entirely.
-* The `qfee` is the minimum query fee to be paid by a user when asking a question of the oracle.
-* The `ttl` is the Time To Live for the oracle, either relative to the current
-  height (`RelativeTTL(delta)`) or a fixed height (`FixedTTL(height)`).
-* The type `'a` is the type of the question to ask.
-* The type `'b` is the type of the oracle answers.
-
-Examples:
-```
-  Oracle.register(addr0, 25, RelativeTTL(400))
-  Oracle.register(addr1, 25, RelativeTTL(500), signature = sign1)
-```
-
-
-#### get_question
-```
-Oracle.get_question(o : oracle('a, 'b), q : oracle_query('a, 'b)) : 'a
-```
-
-Checks what was the question of query `q` on oracle `o`
-
-
-#### respond
-```
-Oracle.respond(<signature : bytes(64)>, o : oracle('a, 'b), q : oracle_query('a, 'b), 'b) : unit
-```
-
-Responds to the question `q` on `o`.
-Unless the contract address is the same as the oracle address the `signature`
-(which is an optional, named argument)
-needs to be provided. Proving that we have the private key of the oracle by
-[signing](./sophia_features.md#delegation-signature)
-the `network id` + `oracle query id` + `contract address`
-
-
-#### extend
-```
-Oracle.extend(<signature : bytes(64)>, o : oracle('a, 'b), ttl : Chain.ttl) : unit
-```
-
-Extends TTL of an oracle.
-* `singature` is a named argument and thus optional. Must be the same as for `Oracle.register`
-* `o` is the oracle being extended
-* `ttl` must be `RelativeTTL`. The time to live of `o` will be extended by this value.
-
-#### query_fee
-```
-Oracle.query_fee(o : oracle('a, 'b)) : int
-```
-
-Returns the query fee of the oracle
-
-
-#### query
-```
-Oracle.query(o : oracle('a, 'b), q : 'a, qfee : int, qttl : Chain.ttl, rttl : Chain.ttl) : oracle_query('a, 'b)
-```
-
-Asks the oracle a question.
-* The `qfee` is the query fee debited to the contract account (`Contract.address`).
-* The `qttl` controls the last height at which the oracle can submit a response
-  and can be either fixed or relative.
-* The `rttl` must be relative and controls how long an answer is kept on the chain.
-The call fails if the oracle could expire before an answer.
-
-
-#### get_answer
-```
-Oracle.get_answer(o : oracle('a, 'b), q : oracle_query('a, 'b)) : option('b)
-```
-
-Checks what is the optional query answer
-
-
-#### expiry
-
-```
-Oracle.expiry(o : oracle('a, 'b)) : int
-```
-
-Ask the oracle when it expires. The result is the block height at which it will happen.
-
-
-#### check
-```
-Oracle.check(o : oracle('a, 'b)) : bool
-```
-
-Returns `true` iff the oracle `o` exists and has correct type
-
-
-#### check_query
-```
-Oracle.check_query(o : oracle('a, 'b), q : oracle_query('a, 'b)) : bool
-```
-
-It returns `true` iff the oracle query exist and has the expected type.
 
 
 ### AENS
@@ -598,32 +198,153 @@ will not be updated, for example if `None` is passed as `expiry` the expiry
 block of the name is not changed.
 
 
-### Contract
+### Auth
 
-Values related to the current contract
 
-#### creator
+#### tx
+
 ```
-Contract.creator : address
-```
-
-Address of the entity that signed the contract creation transaction
-
-
-#### address
-```
-Contract.address : address
+Auth.tx : option(Chain.tx)
 ```
 
-Address of the contract account
-
-
-#### balance
+Where `Chain.tx` is (built-in) defined like:
 ```
-Contract.balance : int
+namespace Chain =
+  record tx = { paying_for : option(Chain.paying_for_tx)
+              , ga_metas : list(Chain.ga_meta_tx)
+              , actor : address
+              , fee   : int
+              , ttl   : int
+              , tx    : Chain.base_tx }
+
+  datatype ga_meta_tx    = GAMetaTx(address, int)
+  datatype paying_for_tx = PayingForTx(address, int)
+  datatype base_tx = SpendTx(address, int, string)
+                   | OracleRegisterTx | OracleQueryTx | OracleResponseTx | OracleExtendTx
+                   | NamePreclaimTx | NameClaimTx(hash) | NameUpdateTx(string)
+                   | NameRevokeTx(hash) | NameTransferTx(address, string)
+                   | ChannelCreateTx(address) | ChannelDepositTx(address, int) | ChannelWithdrawTx(address, int) |
+                   | ChannelForceProgressTx(address) | ChannelCloseMutualTx(address) | ChannelCloseSoloTx(address)
+                   | ChannelSlashTx(address) | ChannelSettleTx(address) | ChannelSnapshotSoloTx(address)
+                   | ContractCreateTx(int) | ContractCallTx(address, int)
+                   | GAAttachTx
 ```
 
-Amount of coins in the contract account
+
+#### tx_hash
+```
+Auth.tx_hash : option(hash)
+```
+
+Gets the transaction hash during authentication.
+
+
+### Bits
+
+#### none
+```
+Bits.none : bits
+```
+
+A bit field with all bits cleared
+
+
+#### all
+```
+Bits.all : bits
+```
+
+A bit field with all bits set
+
+
+#### set
+```
+Bits.set(b : bits, i : int) : bits
+```
+
+Set bit i
+
+
+#### clear
+```
+Bits.clear(b : bits, i : int) : bits
+```
+
+Clear bit i
+
+
+#### test
+```
+Bits.test(b : bits, i : int) : bool
+```
+
+Check if bit i is set
+
+
+#### sum
+```
+Bits.sum(b : bits) : int
+```
+
+Count the number of set bits
+
+
+#### union
+```
+Bits.union(a : bits, b : bits) : bits
+```
+
+Bitwise disjunction
+
+
+#### intersection
+```
+Bits.intersection(a : bits, b : bits) : bits
+```
+
+Bitwise conjunction
+
+
+#### difference
+```
+Bits.difference(a : bits, b : bits) : bits
+```
+
+Each bit is true if and only if it was 1 in `a` and 0 in `b`
+
+
+### Bytes
+
+#### to_int
+```
+Bytes.to_int(b : bytes(n)) : int
+```
+
+Interprets the byte array as a big endian integer
+
+
+#### to_str
+```
+Bytes.to_str(b : bytes(n)) : string
+```
+
+Returns the hexadecimal representation of the byte array
+
+
+#### concat
+```
+Bytes.concat : (a : bytes(m), b : bytes(n)) => bytes(m + n)
+```
+
+Concatenates two byte arrays
+
+
+#### split
+```
+Bytes.split(a : bytes(m + n)) : bytes(m) * bytes(n)
+```
+
+Splits a byte array at given index
 
 
 ### Call
@@ -909,9 +630,964 @@ Chain.event(e : event) : unit
 Emits the event. To use this function one needs to define the `event` type as a `datatype` in the contract.
 
 
+### Char
+
+#### to_int
+ ```
+Char.to_int(c : char) : int
+```
+
+Returns the UTF-8 codepoint of a character
+
+
+#### from_int
+
+```
+Char.from_int(i : int) : option(char)
+ ```
+
+Opposite of [to_int](#to_int). Returns `None` if the integer doesn't correspond to a single (normalized) codepoint.
+
+
+### Contract
+
+Values related to the current contract
+
+#### creator
+```
+Contract.creator : address
+```
+
+Address of the entity that signed the contract creation transaction
+
+
+#### address
+```
+Contract.address : address
+```
+
+Address of the contract account
+
+
+#### balance
+```
+Contract.balance : int
+```
+
+Amount of coins in the contract account
+
+
+### Crypto
+
+#### sha3
+```
+Crypto.sha3(x : 'a) : hash
+```
+
+Hash any object to SHA3
+
+
+#### sha256
+```
+Crypto.sha256(x : 'a) : hash
+```
+
+Hash any object to SHA256
+
+
+#### blake2b
+```
+Crypto.blake2b(x : 'a) : hash
+```
+
+Hash any object to blake2b
+
+
+#### verify_sig
+```
+Crypto.verify_sig(msg : hash, pubkey : address, sig : signature) : bool
+```
+
+Checks if the signature of `msg` was made using private key corresponding to
+the `pubkey`
+
+#### ecverify_secp256k1
+```
+Crypto.ecverify_secp256k1(msg : hash, addr : bytes(20), sig : bytes(65)) : bool
+```
+
+Verifies a signature for a msg against an Ethereum style address. Note that the
+signature should be 65 bytes and include the recovery identifier byte `V`. The
+expected organization of the signature is (`V || R || S`).
+
+
+#### ecrecover_secp256k1
+```
+Crypto.ecrecover_secp256k1(msg : hash, sig : bytes(65)) : option(bytes(20))
+```
+
+Recovers the Ethereum style address from a msg hash and respective
+ECDSA-signature. Note that the signature should be 65 bytes and include the
+recovery identifier byte `V`. The expected organization of the signature is (`V
+|| R || S`).
+
+
+#### verify_sig_secp256k1
+```
+Crypto.verify_sig_secp256k1(msg : hash, pubkey : bytes(64), sig : bytes(64)) : bool
+```
+
+Verifies a standard 64-byte ECDSA signature (`R || S`).
+
+
+### Int
+
+#### to_str
+```
+Int.to_str : int => string
+```
+
+Casts integer to string using decimal representation
+
+
+### Map
+
+#### lookup
+`Map.lookup(k : 'k, m : map('k, 'v)) : option('v)`
+
+Returns the value under a key in given map as `Some` or `None`
+if the key is not present
+
+
+#### lookup_default
+`Map.lookup_default(k : 'k, m : map('k, 'v), v : 'v) : 'v`
+
+Returns the value under a key in given map or the
+default value `v` if the key is not present
+
+
+#### member
+`Map.member(k : 'k, m : map('k, 'v)) : bool`
+
+Checks if the key is present in the map
+
+
+#### delete
+`Map.delete(k : 'k, m : map('k, 'v)) : map('k, 'v)`
+
+Removes the key from the map
+
+
+#### size
+`Map.size(m : map('k, 'v)) : int`
+
+Returns the number of elements in the map
+
+
+#### to_list
+`Map.to_list(m : map('k, 'v)) : list('k * 'v)`
+
+Returns a list containing pairs of keys and their respective elements.
+
+
+#### from_list
+`Map.from_list(m : list('k * 'v)) : map('k, 'v)`
+
+Turns a list of pairs of form `(key, value)` into a map
+
+
+### Oracle
+
+#### register
+```
+Oracle.register(<signature : bytes(64)>, acct : address, qfee : int, ttl : Chain.ttl) : oracle('a, 'b)
+```
+
+Registers new oracle answering questions of type `'a` with answers of type `'b`.
+
+* The `acct` is the address of the oracle to register (can be the same as the contract).
+* `signature` is a signature proving that the contract is allowed to register the account -
+  the `network id` + `account address` + `contract address` (concatenated as byte arrays) is
+  [signed](./sophia_features.md#delegation-signature) with the
+  private key of the account, proving you have the private key of the oracle to be. If the
+  address is the same as the contract `sign` is ignored and can be left out entirely.
+* The `qfee` is the minimum query fee to be paid by a user when asking a question of the oracle.
+* The `ttl` is the Time To Live for the oracle, either relative to the current
+  height (`RelativeTTL(delta)`) or a fixed height (`FixedTTL(height)`).
+* The type `'a` is the type of the question to ask.
+* The type `'b` is the type of the oracle answers.
+
+Examples:
+```
+  Oracle.register(addr0, 25, RelativeTTL(400))
+  Oracle.register(addr1, 25, RelativeTTL(500), signature = sign1)
+```
+
+
+#### get_question
+```
+Oracle.get_question(o : oracle('a, 'b), q : oracle_query('a, 'b)) : 'a
+```
+
+Checks what was the question of query `q` on oracle `o`
+
+
+#### respond
+```
+Oracle.respond(<signature : bytes(64)>, o : oracle('a, 'b), q : oracle_query('a, 'b), 'b) : unit
+```
+
+Responds to the question `q` on `o`.
+Unless the contract address is the same as the oracle address the `signature`
+(which is an optional, named argument)
+needs to be provided. Proving that we have the private key of the oracle by
+[signing](./sophia_features.md#delegation-signature)
+the `network id` + `oracle query id` + `contract address`
+
+
+#### extend
+```
+Oracle.extend(<signature : bytes(64)>, o : oracle('a, 'b), ttl : Chain.ttl) : unit
+```
+
+Extends TTL of an oracle.
+* `singature` is a named argument and thus optional. Must be the same as for `Oracle.register`
+* `o` is the oracle being extended
+* `ttl` must be `RelativeTTL`. The time to live of `o` will be extended by this value.
+
+#### query_fee
+```
+Oracle.query_fee(o : oracle('a, 'b)) : int
+```
+
+Returns the query fee of the oracle
+
+
+#### query
+```
+Oracle.query(o : oracle('a, 'b), q : 'a, qfee : int, qttl : Chain.ttl, rttl : Chain.ttl) : oracle_query('a, 'b)
+```
+
+Asks the oracle a question.
+* The `qfee` is the query fee debited to the contract account (`Contract.address`).
+* The `qttl` controls the last height at which the oracle can submit a response
+  and can be either fixed or relative.
+* The `rttl` must be relative and controls how long an answer is kept on the chain.
+The call fails if the oracle could expire before an answer.
+
+
+#### get_answer
+```
+Oracle.get_answer(o : oracle('a, 'b), q : oracle_query('a, 'b)) : option('b)
+```
+
+Checks what is the optional query answer
+
+
+#### expiry
+
+```
+Oracle.expiry(o : oracle('a, 'b)) : int
+```
+
+Ask the oracle when it expires. The result is the block height at which it will happen.
+
+
+#### check
+```
+Oracle.check(o : oracle('a, 'b)) : bool
+```
+
+Returns `true` iff the oracle `o` exists and has correct type
+
+
+#### check_query
+```
+Oracle.check_query(o : oracle('a, 'b), q : oracle_query('a, 'b)) : bool
+```
+
+It returns `true` iff the oracle query exist and has the expected type.
+
+
 ## Includable namespaces
 
 These need to be explicitly included (with `.aes` suffix)
+
+
+### Bitwise
+
+Bitwise operations on arbitrary precision integers.
+
+#### bsr
+```
+Bitwise.bsr(n : int, x : int) : int
+```
+
+Logical bit shift `x` right `n` positions.
+
+
+#### bsl
+```
+Bitwise.bsl(n : int, x : int) : int
+```
+
+Logical bit shift `x` left `n` positions.
+
+
+#### bsli
+```
+Bitwise.bsli(n : int, x : int, lim : int) : int
+```
+
+Logical bit shift `x` left `n` positions, limit to `lim` bits.
+
+
+#### band
+```
+Bitwise.band(x : int, y : int) : int
+```
+
+Bitwise `and` of `x` and `y`.
+
+
+#### bor
+```
+Bitwise.bor(x : int, y : int) : int
+```
+
+Bitwise `or` of `x` and `y`.
+
+
+#### bxor
+```
+Bitwise.bxor(x : int, y : int) : int
+```
+
+Bitwise `xor` of `x` and `y`.
+
+
+#### bnot
+```
+Bitwise.bnot(x : int) : int
+```
+
+Bitwise `not` of `x`. Defined and implemented as `bnot(x) = bxor(x, -1)`.
+
+
+#### uband
+```
+Bitwise.uband(x : int, y : int) : int
+```
+
+Bitwise `and` of _non-negative_ numbers `x` and `y`.
+
+
+#### ubor
+```
+Bitwise.ubor(x : int, y : int) : int
+```
+
+Bitwise `or` of _non-negative_ `x` and `y`.
+
+
+#### ubxor
+```
+Bitwise.ubxor(x : int, y : int) : int
+```
+
+Bitwise `xor` of _non-negative_ `x` and `y`.
+
+
+### BLS12\_381
+
+#### Types
+
+##### fp
+
+Built-in (Montgomery) integer representation 32 bytes
+
+
+##### fr
+
+Built-in (Montgomery) integer representation 48 bytes
+
+
+##### fp2
+```
+record fp2 = { x1 : fp, x2 : fp }`
+```
+
+##### g1
+```
+record g1  = { x : fp, y : fp, z : fp }
+```
+
+
+##### g2
+```
+record g2  = { x : fp2, y : fp2, z : fp2 }
+```
+
+
+##### gt
+```
+record gt  = { x1 : fp, x2 : fp, x3 : fp, x4 : fp, x5 : fp, x6 : fp, x7 : fp, x8 : fp, x9 : fp, x10 : fp, x11 : fp, x12 : fp }
+```
+
+#### Functions
+
+##### pairing\_check
+```
+BLS12_381.pairing_check(xs : list(g1), ys : list(g2)) : bool
+```
+
+Pairing check of a list of points, `xs` and `ys` should be of equal length.
+
+##### int_to_fr
+```
+BLS12_381.int_to_fr(x : int) : fr
+```
+
+Convert an integer to an `fr` - a 32 bytes internal (Montgomery) integer representation.
+
+##### int_to_fp
+```
+BLS12_381.int_to_fp(x : int) : fp
+```
+
+Convert an integer to an `fp` - a 48 bytes internal (Montgomery) integer representation.
+
+##### fr_to_int
+```
+BLS12_381.fr_to_int(x : fr)  : int
+```
+
+Convert a `fr` value into an integer.
+
+##### fp_to_int
+```
+BLS12_381.fp_to_int(x : fp)  : int
+```
+
+Convert a `fp` value into an integer.
+
+##### mk_g1
+```
+BLS12_381.mk_g1(x : int, y : int, z : int) : g1
+```
+
+Construct a `g1` point from three integers.
+
+##### mk_g2
+```
+BLS12_381.mk_g2(x1 : int, x2 : int, y1 : int, y2 : int, z1 : int, z2 : int) : g2
+```
+
+Construct a `g2` point from six integers.
+
+##### g1_neg
+```
+BLS12_381.g1_neg(p : g1) : g1
+```
+
+Negate a `g1` value.
+
+##### g1_norm
+```
+BLS12_381.g1_norm(p : g1) : g1
+```
+
+Normalize a `g1` value.
+
+##### g1_valid
+```
+BLS12_381.g1_valid(p : g1) : bool
+```
+
+Check that a `g1` value is a group member.
+
+##### g1_is_zero
+```
+BLS12_381.g1_is_zero(p : g1) : bool
+```
+
+Check if a `g1` value corresponds to the zero value of the group.
+
+##### g1_add
+```
+BLS12_381.g1_add(p : g1, q : g1) : g1
+```
+
+Add two `g1` values.
+
+##### g1_mul
+```
+BLS12_381.g1_mul(k : fr, p : g1) : g1
+```
+
+Scalar multiplication for `g1`.
+
+##### g2_neg
+```
+BLS12_381.g2_neg(p : g2) : g2
+```
+
+Negate a `g2` value.
+
+##### g2_norm
+```
+BLS12_381.g2_norm(p : g2) : g2
+```
+
+Normalize a `g2` value.
+
+##### g2_valid
+```
+BLS12_381.g2_valid(p : g2) : bool
+```
+
+Check that a `g2` value is a group member.
+
+##### g2_is_zero
+```
+BLS12_381.g2_is_zero(p : g2) : bool
+```
+
+Check if a `g2` value corresponds to the zero value of the group.
+
+##### g2_add
+```
+BLS12_381.g2_add(p : g2, q : g2) : g2
+```
+
+Add two `g2` values.
+
+##### g2_mul
+```
+BLS12_381.g2_mul(k : fr, p : g2) : g2
+```
+
+Scalar multiplication for `g2`.
+
+##### gt_inv
+```
+BLS12_381.gt_inv(p : gt) : gt
+```
+
+Invert a `gt` value.
+
+##### gt_add
+```
+BLS12_381.gt_add(p : gt, q : gt) : gt
+```
+
+Add two `gt` values.
+
+##### gt_mul
+```
+BLS12_381.gt_mul(p : gt, q : gt) : gt
+```
+
+Multiply two `gt` values.
+
+##### gt_pow
+```
+BLS12_381.gt_pow(p : gt, k : fr) : gt
+```
+
+Calculate exponentiation `p ^ k`.
+
+##### gt_is_one
+```
+BLS12_381.gt_is_one(p : gt) : bool
+```
+
+Compare a `gt` value to the unit value of the Gt group.
+
+##### pairing
+```
+BLS12_381.pairing(p : g1, q : g2) : gt
+```
+
+Compute the pairing of a `g1` value and a `g2` value.
+
+##### miller_loop
+```
+BLS12_381.miller_loop(p : g1, q : g2) : gt
+```
+
+Do the Miller loop stage of pairing for `g1` and `g2`.
+
+##### final_exp
+```
+BLS12_381.final_exp(p : gt) : gt
+```
+
+Perform the final exponentiation step of pairing for a `gt` value.
+
+
+### Func
+
+Functional combinators.
+
+#### id
+```
+Func.id(x : 'a) : 'a
+```
+
+Identity function. Returns its argument.
+
+
+#### const
+```
+Func.const(x : 'a) : 'b => 'a = (y) => x
+```
+
+Constant function constructor. Given `x` returns a function that returns `x` regardless of its argument.
+
+
+#### flip
+```
+Func.flip(f : ('a, 'b) => 'c) : ('b, 'a) => 'c
+```
+
+Switches order of arguments of arity 2 function.
+
+
+#### comp
+```
+Func.comp(f : 'b => 'c, g : 'a => 'b) : 'a => 'c
+```
+
+Function composition. `comp(f, g)(x) == f(g(x))`.
+
+
+#### pipe
+```
+Func.pipe(f : 'a => 'b, g : 'b => 'c) : 'a => 'c
+```
+
+Flipped function composition. `pipe(f, g)(x) == g(f(x))`.
+
+
+#### rapply
+```
+Func.rapply(x : 'a, f : 'a => 'b) : 'b
+```
+
+Reverse application. `rapply(x, f) == f(x)`.
+
+
+#### recur
+```
+Func.recur(f : ('arg => 'res, 'arg) => 'res) : 'arg => 'res
+```
+
+The Z combinator. Allows performing local recursion and having anonymous recursive lambdas. To make function `A => B` recursive the user needs to transform it to take two arguments instead – one of type `A => B` which is going to work as a self-reference, and the other one of type `A`  which is the original argument. Therefore, transformed function should have `(A => B, A) => B` signature.
+
+Example usage:
+```
+let factorial = recur((fac, n) => if(n < 2) 1 else n * fac(n - 1))
+```
+
+If the function is going to take more than one argument it will need to be either tuplified or have curried out latter arguments.
+
+Example (factorial with custom step):
+
+```
+// tuplified version
+let factorial_t(n, step) =
+  let fac(rec, args) =
+    let (n, step) = args
+    if(n < 2) 1 else n * rec((n - step, step))
+  recur(fac)((n, step))
+
+// curried version
+let factorial_c(n, step) =
+  let fac(rec, n) = (step) =>
+    if(n < 2) 1 else n * rec(n - 1)(step)
+  recur(fac)(n)(step)
+```
+
+
+#### iter
+```
+Func.iter(n : int, f : 'a => 'a) : 'a => 'a
+```
+
+`n`th composition of f with itself, for instance `iter(3, f)` is equivalent to `(x) => f(f(f(x)))`.
+
+
+#### curry
+```
+Func.curry2(f : ('a, 'b) => 'c) : 'a => ('b => 'c)
+Func.curry3(f : ('a, 'b, 'c) => 'd) : 'a => ('b => ('c => 'd))
+```
+
+Turns a function that takes n arguments into a curried function that takes
+one argument and returns a function that waits for the rest in the same
+manner. For instance `curry2((a, b) => a + b)(1)(2) == 3`.
+
+
+#### uncurry
+```
+Func.uncurry2(f : 'a => ('b => 'c)) : ('a, 'b) => 'c
+Func.uncurry3(f : 'a => ('b => ('c => 'd))) : ('a, 'b, 'c) => 'd
+```
+
+Opposite to [curry](#curry).
+
+
+#### tuplify
+```
+Func.tuplify2(f : ('a, 'b) => 'c) : (('a * 'b)) => 'c
+Func.tuplify3(f : ('a, 'b, 'c) => 'd) : 'a * 'b * 'c => 'd
+```
+
+Turns a function that takes n arguments into a function that takes an n-tuple.
+
+
+#### untuplify
+```
+Func.untuplify2(f : 'a * 'b => 'c) : ('a, 'b) => 'c
+Func.untuplify3(f : 'a * 'b * 'c => 'd) : ('a, 'b, 'c) => 'd
+```
+
+Opposite to [tuplify](#tuplify).
+
+
+### Frac
+
+This namespace provides operations on rational numbers. A rational number is represented
+as a fraction of two integers which are stored internally in the `frac` datatype.
+
+The datatype consists of three constructors `Neg/2`, `Zero/0` and `Pos/2` which determine the
+sign of the number. Both values stored in `Neg` and `Pos` need to be strictly positive
+integers. However, when creating a `frac` you should never use the constructors explicitly.
+Instead of that, always use provided functions like `make_frac` or `from_int`. This helps
+keeping the internal representation well defined.
+
+The described below functions take care of the normalization of the fractions –
+they won't grow if it is unnecessary. Please note that the size of `frac` can be still
+very big while the value is actually very close to a natural number – the division of
+two extremely big prime numbers *will* be as big as both of them. To face this issue
+the [optimize](#optimize) function is provided. It will approximate the value of the
+fraction to fit in the given error margin and to shrink its size as much as possible.
+
+**Important note:** `frac` must *not* be compared using standard `<`-like operators.
+The operator comparison is not possible to overload at this moment, nor the
+language provides checkers to prevent unintended usage of them. Therefore the typechecker
+**will** allow that and the results of such comparison will be unspecified.
+You should use [lt](#lt), [geq](#geq), [eq](#eq) etc instead.
+
+#### Types
+
+##### frac
+```
+datatype frac = Pos(int, int) | Zero | Neg(int, int)
+```
+
+Internal representation of fractional numbers. First integer encodes the numerator and the second the denominator –
+both must be always positive, as the sign is being handled by the choice of the constructor.
+
+
+#### Functions
+
+##### make_frac
+`Frac.make_frac(n : int, d : int) : frac`
+
+Creates a fraction out of numerator and denominator. Automatically normalizes, so
+`make_frac(2, 4)` and `make_frac(1, 2)` will yield same results.
+
+
+##### num
+`Frac.num(f : frac) : int`
+
+Returns the numerator of a fraction.
+
+
+##### den
+`Frac.den(f : frac) : int`
+
+Returns the denominator of a fraction.
+
+
+##### to_pair
+`Frac.to_pair(f : frac) : int * int`
+
+Turns a fraction into a pair of numerator and denominator.
+
+
+##### sign
+`Frac.sign(f : frac) : int`
+
+Returns the signum of a fraction, -1, 0, 1 if negative, zero, positive respectively.
+
+
+##### to_str
+`Frac.to_str(f : frac) : string`
+
+Conversion to string. Does not display division by 1 or denominator if equals zero.
+
+
+##### simplify
+`Frac.simplify(f : frac) : frac`
+
+Reduces fraction to normal form if for some reason it is not in it.
+
+
+##### eq
+`Frac.eq(a : frac, b : frac) : bool`
+
+Checks if `a` is equal to `b`.
+
+
+##### neq
+`Frac.neq(a : frac, b : frac) : bool`
+
+Checks if `a` is not equal to `b`.
+
+
+##### geq
+`Frac.geq(a : frac, b : frac) : bool`
+
+Checks if `a` is greater or equal to `b`.
+
+
+##### leq
+`Frac.leq(a : frac, b : frac) : bool`
+
+Checks if `a` is lesser or equal to `b`.
+
+
+##### gt
+`Frac.gt(a : frac, b : frac) : bool`
+
+Checks if `a` is greater than `b`.
+
+
+##### lt
+`Frac.lt(a : frac, b : frac) : bool`
+
+Checks if `a` is lesser than `b`.
+
+
+##### min
+`Frac.min(a : frac, b : frac) : frac`
+
+Chooses lesser of the two fractions.
+
+
+##### max
+`Frac.max(a : frac, b : frac) : frac`
+
+Chooses greater of the two fractions.
+
+
+##### abs
+`Frac.abs(f : frac) : frac`
+
+Absolute value.
+
+
+##### from_int
+`Frac.from_int(n : int) : frac`
+
+From integer conversion. Effectively `make_frac(n, 1)`.
+
+
+##### floor
+`Frac.floor(f : frac) : int`
+
+Rounds a fraction to the nearest lesser or equal integer.
+
+
+##### ceil
+`Frac.ceil(f : frac) : int`
+
+Rounds a fraction to the nearest greater or equal integer.
+
+
+##### round_to_zero
+`Frac.round_to_zero(f : frac) : int`
+
+Rounds a fraction towards zero.
+Effectively `ceil` if lesser than zero and `floor` if greater.
+
+
+##### round_from_zero
+`Frac.round_from_zero(f : frac) : int`
+
+Rounds a fraction from zero.
+Effectively `ceil` if greater than zero and `floor` if lesser.
+
+
+##### round
+`Frac.round(f : frac) : int`
+
+Rounds a fraction to a nearest integer. If two integers are in the same distance it
+will choose the even one.
+
+
+##### add
+`Frac.add(a : frac, b : frac) : frac`
+
+Sum of the fractions.
+
+
+##### neg
+`Frac.neg(a : frac) : frac`
+
+Negation of the fraction.
+
+
+##### sub
+`Frac.sub(a : frac, b : frac) : frac`
+
+Subtraction of two fractions.
+
+
+##### inv
+`Frac.inv(a : frac) : frac`
+
+Inverts a fraction. Throws error if `a` is zero.
+
+
+##### mul
+`Frac.mul(a : frac, b : frac) : frac`
+
+Multiplication of two fractions.
+
+
+##### div
+`Frac.div(a : frac, b : frac) : frac`
+
+Division of two fractions.
+
+
+##### int_exp
+`Frac.int_exp(b : frac, e : int) : frac`
+
+Takes `b` to the power of `e`. The exponent can be a negative value.
+
+
+##### optimize
+`Frac.optimize(f : frac, loss : frac) : frac`
+
+Shrink the internal size of a fraction as much as possible by approximating it to the
+point where the error would exceed the `loss` value.
+
+
+##### is_sane
+`Frac.is_sane(f : frac) : bool`
+
+For debugging. If it ever returns false in a code that doesn't call `frac` constructors or
+accept arbitrary `frac`s from the surface you should report it as a
+[bug](https://github.com/aeternity/aesophia/issues/new)
+
+If you expect getting calls with malformed `frac`s in your contract, you should use
+this function to verify the input.
+
 
 ### List
 
@@ -1445,6 +2121,181 @@ Option.choose_first(l : list(option('a))) : option('a)
 Same as [choose](#choose), but chooses from a list insted of two arguments.
 
 
+### Pair
+
+Common operations on 2-tuples.
+
+#### fst
+```
+Pair.fst(t : ('a * 'b)) : 'a
+```
+
+First element projection.
+
+
+#### snd
+```
+Pair.snd(t : ('a * 'b)) : 'b
+```
+
+Second element projection.
+
+
+#### map1
+```
+Pair.map1(f : 'a => 'c, t : ('a * 'b)) : ('c * 'b)
+```
+
+Applies function over first element.
+
+
+#### map2
+```
+Pair.map2(f : 'b => 'c, t : ('a * 'b)) : ('a * 'c)
+```
+
+Applies function over second element.
+
+
+#### bimap
+```
+Pair.bimap(f : 'a => 'c, g : 'b => 'd, t : ('a * 'b)) : ('c * 'd)
+```
+
+Applies functions over respective elements.
+
+
+#### swap
+```
+Pair.swap(t : ('a * 'b)) : ('b * 'a)
+```
+
+Swaps elements.
+
+
+### <a name='set-stdlib'>Set</a>
+
+#### Types
+
+```
+record set('a) = { to_map : map('a, unit) }
+```
+
+#### Functions
+
+##### new
+
+```
+Set.new() : set('a)
+```
+
+Returns an empty set
+
+##### member
+
+```
+member(e : 'a, s : set('a)) : bool
+```
+
+Checks if the element `e` is present in the set `s`
+
+##### insert
+
+```
+insert(e : 'a, s : set('a)) : set('a)
+```
+
+Inserts the element `e` in the set `s`
+
+##### delete
+
+```
+Set.delete(e : 'a, s : set('a)) : set('a)
+```
+
+Removes the element `e` from the set `s`
+
+##### size
+
+```
+size(s : set('a)) : int
+```
+
+Returns the number of elements in the set `s`
+
+##### to_list
+
+```
+Set.to_list(s : set('a)) : list('a)
+```
+
+Returns a list containing the elements of the set `s`
+
+##### from_list
+
+```
+Set.from_list(l : list('a)) : set('a)
+```
+
+Turns the list `l` into a set
+
+##### filter
+
+```
+Set.filter(p : 'a => bool, s : set('a)) : set('a)
+```
+
+Filters out elements of `s` that fulfill predicate `p`
+
+##### fold
+
+```
+Set.fold(f : ('a, 'b) => 'b, acc : 'b, s : set('a)) : 'b
+```
+
+Folds the function `f` over every element in the set `s` and returns the final value of the accumulator `acc`.
+
+##### subtract
+
+```
+Set.subtract(s1 : set('a), s2 : set('a)) : set('a)
+```
+
+Returns the elements of `s1` that are not members of `s2`
+
+##### intersection
+
+```
+Set.intersection(s1 : set('a), s2 : set('a)) : set('a)
+```
+
+Returns the intersection of the two sets `s1` and `s2`
+
+##### intersection_list
+
+```
+Set.intersection_list(sets : list(set('a))) : set('a)
+```
+
+Returns the intersection of all the sets in the given list
+
+##### union
+
+```
+Set.union(s1 : set('a), s2 : set('a)) : set('a)
+```
+
+Returns the union of the two sets `s1` and `s2`
+
+##### union_list
+
+```
+Set.union_list(sets : list(set('a))) : set('a)
+```
+
+Returns the union of all the sets in the given list
+
+
 ### String
 
 Operations on the `string` type. A `string` is a UTF-8 encoded byte array.
@@ -1561,188 +2412,6 @@ blake2b(s : string) : hash
 Computes the Blake2B hash of the string.
 
 
-### Func
-
-Functional combinators.
-
-#### id
-```
-Func.id(x : 'a) : 'a
-```
-
-Identity function. Returns its argument.
-
-
-#### const
-```
-Func.const(x : 'a) : 'b => 'a = (y) => x
-```
-
-Constant function constructor. Given `x` returns a function that returns `x` regardless of its argument.
-
-
-#### flip
-```
-Func.flip(f : ('a, 'b) => 'c) : ('b, 'a) => 'c
-```
-
-Switches order of arguments of arity 2 function.
-
-
-#### comp
-```
-Func.comp(f : 'b => 'c, g : 'a => 'b) : 'a => 'c
-```
-
-Function composition. `comp(f, g)(x) == f(g(x))`.
-
-
-#### pipe
-```
-Func.pipe(f : 'a => 'b, g : 'b => 'c) : 'a => 'c
-```
-
-Flipped function composition. `pipe(f, g)(x) == g(f(x))`.
-
-
-#### rapply
-```
-Func.rapply(x : 'a, f : 'a => 'b) : 'b
-```
-
-Reverse application. `rapply(x, f) == f(x)`.
-
-
-#### recur
-```
-Func.recur(f : ('arg => 'res, 'arg) => 'res) : 'arg => 'res
-```
-
-The Z combinator. Allows performing local recursion and having anonymous recursive lambdas. To make function `A => B` recursive the user needs to transform it to take two arguments instead – one of type `A => B` which is going to work as a self-reference, and the other one of type `A`  which is the original argument. Therefore, transformed function should have `(A => B, A) => B` signature.
-
-Example usage:
-```
-let factorial = recur((fac, n) => if(n < 2) 1 else n * fac(n - 1))
-```
-
-If the function is going to take more than one argument it will need to be either tuplified or have curried out latter arguments.
-
-Example (factorial with custom step):
-
-```
-// tuplified version
-let factorial_t(n, step) =
-  let fac(rec, args) =
-    let (n, step) = args
-    if(n < 2) 1 else n * rec((n - step, step))
-  recur(fac)((n, step))
-
-// curried version
-let factorial_c(n, step) =
-  let fac(rec, n) = (step) =>
-    if(n < 2) 1 else n * rec(n - 1)(step)
-  recur(fac)(n)(step)
-```
-
-
-#### iter
-```
-Func.iter(n : int, f : 'a => 'a) : 'a => 'a
-```
-
-`n`th composition of f with itself, for instance `iter(3, f)` is equivalent to `(x) => f(f(f(x)))`.
-
-
-#### curry
-```
-Func.curry2(f : ('a, 'b) => 'c) : 'a => ('b => 'c)
-Func.curry3(f : ('a, 'b, 'c) => 'd) : 'a => ('b => ('c => 'd))
-```
-
-Turns a function that takes n arguments into a curried function that takes
-one argument and returns a function that waits for the rest in the same
-manner. For instance `curry2((a, b) => a + b)(1)(2) == 3`.
-
-
-#### uncurry
-```
-Func.uncurry2(f : 'a => ('b => 'c)) : ('a, 'b) => 'c
-Func.uncurry3(f : 'a => ('b => ('c => 'd))) : ('a, 'b, 'c) => 'd
-```
-
-Opposite to [curry](#curry).
-
-
-#### tuplify
-```
-Func.tuplify2(f : ('a, 'b) => 'c) : (('a * 'b)) => 'c
-Func.tuplify3(f : ('a, 'b, 'c) => 'd) : 'a * 'b * 'c => 'd
-```
-
-Turns a function that takes n arguments into a function that takes an n-tuple.
-
-
-#### untuplify
-```
-Func.untuplify2(f : 'a * 'b => 'c) : ('a, 'b) => 'c
-Func.untuplify3(f : 'a * 'b * 'c => 'd) : ('a, 'b, 'c) => 'd
-```
-
-Opposite to [tuplify](#tuplify).
-
-
-### Pair
-
-Common operations on 2-tuples.
-
-#### fst
-```
-Pair.fst(t : ('a * 'b)) : 'a
-```
-
-First element projection.
-
-
-#### snd
-```
-Pair.snd(t : ('a * 'b)) : 'b
-```
-
-Second element projection.
-
-
-#### map1
-```
-Pair.map1(f : 'a => 'c, t : ('a * 'b)) : ('c * 'b)
-```
-
-Applies function over first element.
-
-
-#### map2
-```
-Pair.map2(f : 'b => 'c, t : ('a * 'b)) : ('a * 'c)
-```
-
-Applies function over second element.
-
-
-#### bimap
-```
-Pair.bimap(f : 'a => 'c, g : 'b => 'd, t : ('a * 'b)) : ('c * 'd)
-```
-
-Applies functions over respective elements.
-
-
-#### swap
-```
-Pair.swap(t : ('a * 'b)) : ('b * 'a)
-```
-
-Swaps elements.
-
-
 ### Triple
 
 #### fst
@@ -1823,668 +2492,3 @@ Triple.rotl(t : ('a * 'b * 'c)) : ('b * 'c * 'a)
 ```
 
 Cyclic rotation of the elements to the left.
-
-### Bitwise
-
-Bitwise operations on arbitrary precision integers.
-
-#### bsr
-```
-Bitwise.bsr(n : int, x : int) : int
-```
-
-Logical bit shift `x` right `n` positions.
-
-
-#### bsl
-```
-Bitwise.bsl(n : int, x : int) : int
-```
-
-Logical bit shift `x` left `n` positions.
-
-
-#### bsli
-```
-Bitwise.bsli(n : int, x : int, lim : int) : int
-```
-
-Logical bit shift `x` left `n` positions, limit to `lim` bits.
-
-
-#### band
-```
-Bitwise.band(x : int, y : int) : int
-```
-
-Bitwise `and` of `x` and `y`.
-
-
-#### bor
-```
-Bitwise.bor(x : int, y : int) : int
-```
-
-Bitwise `or` of `x` and `y`.
-
-
-#### bxor
-```
-Bitwise.bxor(x : int, y : int) : int
-```
-
-Bitwise `xor` of `x` and `y`.
-
-
-#### bnot
-```
-Bitwise.bnot(x : int) : int
-```
-
-Bitwise `not` of `x`. Defined and implemented as `bnot(x) = bxor(x, -1)`.
-
-
-#### uband
-```
-Bitwise.uband(x : int, y : int) : int
-```
-
-Bitwise `and` of _non-negative_ numbers `x` and `y`.
-
-
-#### ubor
-```
-Bitwise.ubor(x : int, y : int) : int
-```
-
-Bitwise `or` of _non-negative_ `x` and `y`.
-
-
-#### ubxor
-```
-Bitwise.ubxor(x : int, y : int) : int
-```
-
-Bitwise `xor` of _non-negative_ `x` and `y`.
-
-
-### BLS12\_381
-
-#### Types
-
-##### fp
-
-Built-in (Montgomery) integer representation 32 bytes
-
-
-##### fr
-
-Built-in (Montgomery) integer representation 48 bytes
-
-
-##### fp2
-```
-record fp2 = { x1 : fp, x2 : fp }`
-```
-
-##### g1
-```
-record g1  = { x : fp, y : fp, z : fp }
-```
-
-
-##### g2
-```
-record g2  = { x : fp2, y : fp2, z : fp2 }
-```
-
-
-##### gt
-```
-record gt  = { x1 : fp, x2 : fp, x3 : fp, x4 : fp, x5 : fp, x6 : fp, x7 : fp, x8 : fp, x9 : fp, x10 : fp, x11 : fp, x12 : fp }
-```
-
-#### Functions
-
-##### pairing\_check
-```
-BLS12_381.pairing_check(xs : list(g1), ys : list(g2)) : bool
-```
-
-Pairing check of a list of points, `xs` and `ys` should be of equal length.
-
-##### int_to_fr
-```
-BLS12_381.int_to_fr(x : int) : fr
-```
-
-Convert an integer to an `fr` - a 32 bytes internal (Montgomery) integer representation.
-
-##### int_to_fp
-```
-BLS12_381.int_to_fp(x : int) : fp
-```
-
-Convert an integer to an `fp` - a 48 bytes internal (Montgomery) integer representation.
-
-##### fr_to_int
-```
-BLS12_381.fr_to_int(x : fr)  : int
-```
-
-Convert a `fr` value into an integer.
-
-##### fp_to_int
-```
-BLS12_381.fp_to_int(x : fp)  : int
-```
-
-Convert a `fp` value into an integer.
-
-##### mk_g1
-```
-BLS12_381.mk_g1(x : int, y : int, z : int) : g1
-```
-
-Construct a `g1` point from three integers.
-
-##### mk_g2
-```
-BLS12_381.mk_g2(x1 : int, x2 : int, y1 : int, y2 : int, z1 : int, z2 : int) : g2
-```
-
-Construct a `g2` point from six integers.
-
-##### g1_neg
-```
-BLS12_381.g1_neg(p : g1) : g1
-```
-
-Negate a `g1` value.
-
-##### g1_norm
-```
-BLS12_381.g1_norm(p : g1) : g1
-```
-
-Normalize a `g1` value.
-
-##### g1_valid
-```
-BLS12_381.g1_valid(p : g1) : bool
-```
-
-Check that a `g1` value is a group member.
-
-##### g1_is_zero
-```
-BLS12_381.g1_is_zero(p : g1) : bool
-```
-
-Check if a `g1` value corresponds to the zero value of the group.
-
-##### g1_add
-```
-BLS12_381.g1_add(p : g1, q : g1) : g1
-```
-
-Add two `g1` values.
-
-##### g1_mul
-```
-BLS12_381.g1_mul(k : fr, p : g1) : g1
-```
-
-Scalar multiplication for `g1`.
-
-##### g2_neg
-```
-BLS12_381.g2_neg(p : g2) : g2
-```
-
-Negate a `g2` value.
-
-##### g2_norm
-```
-BLS12_381.g2_norm(p : g2) : g2
-```
-
-Normalize a `g2` value.
-
-##### g2_valid
-```
-BLS12_381.g2_valid(p : g2) : bool
-```
-
-Check that a `g2` value is a group member.
-
-##### g2_is_zero
-```
-BLS12_381.g2_is_zero(p : g2) : bool
-```
-
-Check if a `g2` value corresponds to the zero value of the group.
-
-##### g2_add
-```
-BLS12_381.g2_add(p : g2, q : g2) : g2
-```
-
-Add two `g2` values.
-
-##### g2_mul
-```
-BLS12_381.g2_mul(k : fr, p : g2) : g2
-```
-
-Scalar multiplication for `g2`.
-
-##### gt_inv
-```
-BLS12_381.gt_inv(p : gt) : gt
-```
-
-Invert a `gt` value.
-
-##### gt_add
-```
-BLS12_381.gt_add(p : gt, q : gt) : gt
-```
-
-Add two `gt` values.
-
-##### gt_mul
-```
-BLS12_381.gt_mul(p : gt, q : gt) : gt
-```
-
-Multiply two `gt` values.
-
-##### gt_pow
-```
-BLS12_381.gt_pow(p : gt, k : fr) : gt
-```
-
-Calculate exponentiation `p ^ k`.
-
-##### gt_is_one
-```
-BLS12_381.gt_is_one(p : gt) : bool
-```
-
-Compare a `gt` value to the unit value of the Gt group.
-
-##### pairing
-```
-BLS12_381.pairing(p : g1, q : g2) : gt
-```
-
-Compute the pairing of a `g1` value and a `g2` value.
-
-##### miller_loop
-```
-BLS12_381.miller_loop(p : g1, q : g2) : gt
-```
-
-Do the Miller loop stage of pairing for `g1` and `g2`.
-
-##### final_exp
-```
-BLS12_381.final_exp(p : gt) : gt
-```
-
-Perform the final exponentiation step of pairing for a `gt` value.
-
-### Frac
-
-This namespace provides operations on rational numbers. A rational number is represented
-as a fraction of two integers which are stored internally in the `frac` datatype.
-
-The datatype consists of three constructors `Neg/2`, `Zero/0` and `Pos/2` which determine the
-sign of the number. Both values stored in `Neg` and `Pos` need to be strictly positive
-integers. However, when creating a `frac` you should never use the constructors explicitly.
-Instead of that, always use provided functions like `make_frac` or `from_int`. This helps
-keeping the internal representation well defined.
-
-The described below functions take care of the normalization of the fractions –
-they won't grow if it is unnecessary. Please note that the size of `frac` can be still
-very big while the value is actually very close to a natural number – the division of
-two extremely big prime numbers *will* be as big as both of them. To face this issue
-the [optimize](#optimize) function is provided. It will approximate the value of the
-fraction to fit in the given error margin and to shrink its size as much as possible.
-
-**Important note:** `frac` must *not* be compared using standard `<`-like operators.
-The operator comparison is not possible to overload at this moment, nor the
-language provides checkers to prevent unintended usage of them. Therefore the typechecker
-**will** allow that and the results of such comparison will be unspecified.
-You should use [lt](#lt), [geq](#geq), [eq](#eq) etc instead.
-
-#### Types
-
-##### frac
-```
-datatype frac = Pos(int, int) | Zero | Neg(int, int)
-```
-
-Internal representation of fractional numbers. First integer encodes the numerator and the second the denominator –
-both must be always positive, as the sign is being handled by the choice of the constructor.
-
-
-#### Functions
-
-##### make_frac
-`Frac.make_frac(n : int, d : int) : frac`
-
-Creates a fraction out of numerator and denominator. Automatically normalizes, so
-`make_frac(2, 4)` and `make_frac(1, 2)` will yield same results.
-
-
-##### num
-`Frac.num(f : frac) : int`
-
-Returns the numerator of a fraction.
-
-
-##### den
-`Frac.den(f : frac) : int`
-
-Returns the denominator of a fraction.
-
-
-##### to_pair
-`Frac.to_pair(f : frac) : int * int`
-
-Turns a fraction into a pair of numerator and denominator.
-
-
-##### sign
-`Frac.sign(f : frac) : int`
-
-Returns the signum of a fraction, -1, 0, 1 if negative, zero, positive respectively.
-
-
-##### to_str
-`Frac.to_str(f : frac) : string`
-
-Conversion to string. Does not display division by 1 or denominator if equals zero.
-
-
-##### simplify
-`Frac.simplify(f : frac) : frac`
-
-Reduces fraction to normal form if for some reason it is not in it.
-
-
-##### eq
-`Frac.eq(a : frac, b : frac) : bool`
-
-Checks if `a` is equal to `b`.
-
-
-##### neq
-`Frac.neq(a : frac, b : frac) : bool`
-
-Checks if `a` is not equal to `b`.
-
-
-##### geq
-`Frac.geq(a : frac, b : frac) : bool`
-
-Checks if `a` is greater or equal to `b`.
-
-
-##### leq
-`Frac.leq(a : frac, b : frac) : bool`
-
-Checks if `a` is lesser or equal to `b`.
-
-
-##### gt
-`Frac.gt(a : frac, b : frac) : bool`
-
-Checks if `a` is greater than `b`.
-
-
-##### lt
-`Frac.lt(a : frac, b : frac) : bool`
-
-Checks if `a` is lesser than `b`.
-
-
-##### min
-`Frac.min(a : frac, b : frac) : frac`
-
-Chooses lesser of the two fractions.
-
-
-##### max
-`Frac.max(a : frac, b : frac) : frac`
-
-Chooses greater of the two fractions.
-
-
-##### abs
-`Frac.abs(f : frac) : frac`
-
-Absolute value.
-
-
-##### from_int
-`Frac.from_int(n : int) : frac`
-
-From integer conversion. Effectively `make_frac(n, 1)`.
-
-
-##### floor
-`Frac.floor(f : frac) : int`
-
-Rounds a fraction to the nearest lesser or equal integer.
-
-
-##### ceil
-`Frac.ceil(f : frac) : int`
-
-Rounds a fraction to the nearest greater or equal integer.
-
-
-##### round_to_zero
-`Frac.round_to_zero(f : frac) : int`
-
-Rounds a fraction towards zero.
-Effectively `ceil` if lesser than zero and `floor` if greater.
-
-
-##### round_from_zero
-`Frac.round_from_zero(f : frac) : int`
-
-Rounds a fraction from zero.
-Effectively `ceil` if greater than zero and `floor` if lesser.
-
-
-##### round
-`Frac.round(f : frac) : int`
-
-Rounds a fraction to a nearest integer. If two integers are in the same distance it
-will choose the even one.
-
-
-##### add
-`Frac.add(a : frac, b : frac) : frac`
-
-Sum of the fractions.
-
-
-##### neg
-`Frac.neg(a : frac) : frac`
-
-Negation of the fraction.
-
-
-##### sub
-`Frac.sub(a : frac, b : frac) : frac`
-
-Subtraction of two fractions.
-
-
-##### inv
-`Frac.inv(a : frac) : frac`
-
-Inverts a fraction. Throws error if `a` is zero.
-
-
-##### mul
-`Frac.mul(a : frac, b : frac) : frac`
-
-Multiplication of two fractions.
-
-
-##### div
-`Frac.div(a : frac, b : frac) : frac`
-
-Division of two fractions.
-
-
-##### int_exp
-`Frac.int_exp(b : frac, e : int) : frac`
-
-Takes `b` to the power of `e`. The exponent can be a negative value.
-
-
-##### optimize
-`Frac.optimize(f : frac, loss : frac) : frac`
-
-Shrink the internal size of a fraction as much as possible by approximating it to the
-point where the error would exceed the `loss` value.
-
-
-##### is_sane
-`Frac.is_sane(f : frac) : bool`
-
-For debugging. If it ever returns false in a code that doesn't call `frac` constructors or
-accept arbitrary `frac`s from the surface you should report it as a
-[bug](https://github.com/aeternity/aesophia/issues/new)
-
-If you expect getting calls with malformed `frac`s in your contract, you should use
-this function to verify the input.
-
-## <a name='set-stdlib'>Set</a>
-
-### Types
-
-```
-record set('a) = { to_map : map('a, unit) }
-```
-
-### Functions
-
-#### new
-
-```
-Set.new() : set('a)
-```
-
-Returns an empty set
-
-#### member
-
-```
-member(e : 'a, s : set('a)) : bool
-```
-
-Checks if the element `e` is present in the set `s`
-
-#### insert
-
-```
-insert(e : 'a, s : set('a)) : set('a)
-```
-
-Inserts the element `e` in the set `s`
-
-#### delete
-
-```
-Set.delete(e : 'a, s : set('a)) : set('a)
-```
-
-Removes the element `e` from the set `s`
-
-#### size
-
-```
-size(s : set('a)) : int
-```
-
-Returns the number of elements in the set `s`
-
-#### to_list
-
-```
-Set.to_list(s : set('a)) : list('a)
-```
-
-Returns a list containing the elements of the set `s`
-
-#### from_list
-
-```
-Set.from_list(l : list('a)) : set('a)
-```
-
-Turns the list `l` into a set
-
-#### filter
-
-```
-Set.filter(p : 'a => bool, s : set('a)) : set('a)
-```
-
-Filters out elements of `s` that fulfill predicate `p`
-
-#### fold
-
-```
-Set.fold(f : ('a, 'b) => 'b, acc : 'b, s : set('a)) : 'b
-```
-
-Folds the function `f` over every element in the set `s` and returns the final value of the accumulator `acc`.
-
-#### subtract
-
-```
-Set.subtract(s1 : set('a), s2 : set('a)) : set('a)
-```
-
-Returns the elements of `s1` that are not members of `s2`
-
-#### intersection
-
-```
-Set.intersection(s1 : set('a), s2 : set('a)) : set('a)
-```
-
-Returns the intersection of the two sets `s1` and `s2`
-
-#### intersection_list
-
-```
-Set.intersection_list(sets : list(set('a))) : set('a)
-```
-
-Returns the intersection of all the sets in the given list
-
-#### union
-
-```
-Set.union(s1 : set('a), s2 : set('a)) : set('a)
-```
-
-Returns the union of the two sets `s1` and `s2`
-
-#### union_list
-
-```
-Set.union_list(sets : list(set('a))) : set('a)
-```
-
-Returns the union of all the sets in the given list
