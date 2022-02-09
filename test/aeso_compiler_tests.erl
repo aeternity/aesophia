@@ -565,7 +565,7 @@ failing_contracts() ->
       ])
     , ?TYPE_ERROR(list_comp_bad_shadow,
       [<<?Pos(2, 53)
-         "Cannot unify `int` and `string`\n"
+         "Cannot unify `string` and `int`\n"
          "when checking the type of the pattern `x : int` against the expected type `string`">>
       ])
     , ?TYPE_ERROR(map_as_map_key,
@@ -830,57 +830,60 @@ failing_contracts() ->
                   ])
     , ?TYPE_ERROR(contract_interface_polymorphism_recursive,
                   [<<?Pos(1,24)
-                     "Trying to implement or extend an undefined interface Z at line 1, column 24">>
+                     "Trying to implement or extend an undefined interface `Z`">>
                   ])
     , ?TYPE_ERROR(contract_interface_polymorphism_same_decl_multi_interface,
                   [<<?Pos(7,10)
-                     "Unimplemented function f from the interface I in the contract C">>
+                     "Unimplemented function `f` from the interface `I` in the contract `C`">>
                   ])
     , ?TYPE_ERROR(contract_interface_polymorphism_same_name_same_type,
                   [<<?Pos(7,10)
-                     "Unimplemented function f from the interface I1 in the contract C">>
+                     "Unimplemented function `f` from the interface `I1` in the contract `C`">>
                   ])
     , ?TYPE_ERROR(contract_interface_polymorphism_same_name_different_type,
                   [<<?Pos(9,5)
-                     "Duplicate definitions of f at\n"
+                     "Duplicate definitions of `f` at\n"
                      "  - line 8, column 5\n"
                      "  - line 9, column 5">>
                   ])
     , ?TYPE_ERROR(contract_polymorphism_missing_implementation,
                   [<<?Pos(7,10)
-                     "Unimplemented function f from the interface I1 in the contract C">>
+                     "Unimplemented function `f` from the interface `I1` in the contract `C`">>
                   ])
     , ?TYPE_ERROR(contract_polymorphism_same_decl_multi_interface,
                   [<<?Pos(7,10)
-                     "Unimplemented function f from the interface J in the contract C">>
+                     "Unimplemented function `f` from the interface `J` in the contract `C`">>
                   ])
     , ?TYPE_ERROR(contract_polymorphism_undefined_interface,
                   [<<?Pos(1,14)
-                     "Trying to implement or extend an undefined interface I at line 1, column 14">>
+                     "Trying to implement or extend an undefined interface `I`">>
                   ])
     , ?TYPE_ERROR(contract_polymorphism_same_name_different_type_multi_interface,
                   [<<?Pos(9,5)
-                     "Duplicate definitions of f at\n"
+                     "Duplicate definitions of `f` at\n"
                      "  - line 8, column 5\n"
                      "  - line 9, column 5">>
                   ])
     , ?TYPE_ERROR(contract_interface_polymorphism_undefined_interface,
                   [<<?Pos(1,24)
-                     "Trying to implement or extend an undefined interface H at line 1, column 24">>
+                     "Trying to implement or extend an undefined interface `H`">>
                   ])
     , ?TYPE_ERROR(polymorphism_variance_switching,
                   [<<?Pos(38,49)
-                     "Cannot unify Animal\n"
-                     "         and Cat\n"
-                     "when checking the application at line 38, column 49 of\n  g2 : (Cat) => Cat\nto arguments\n  x : Animal">>,
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the application of\n"
+                     "  `g2 : (Cat) => Cat`\n"
+                     "to arguments\n"
+                     "  `x : Animal`">>,
                    <<?Pos(41,43)
-                     "Cannot unify Animal\n"
-                     "         and Cat\n"
-                     "when checking the type of the expression at line 41, column 43\n  g3(x) : Animal\nagainst the expected type\n  Cat">>,
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the expression `g3(x) : Animal` against the expected type `Cat`">>,
                    <<?Pos(50,55)
-                     "Cannot unify Animal\n"
-                     "         and Cat\n"
-                     "when checking the application at line 50, column 55 of\n  g5 : ((Animal) => Animal) => Cat\nto arguments\n  x : (Cat) => Cat">>
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the application of\n"
+                     "  `g5 : ((Animal) => Animal) => Cat`\n"
+                     "to arguments\n"
+                     "  `x : (Cat) => Cat`">>
                   ])
     ].
 

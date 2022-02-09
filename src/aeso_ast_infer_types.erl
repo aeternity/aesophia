@@ -3381,10 +3381,10 @@ mk_error({empty_record_definition, Ann, Name}) ->
     Msg = io_lib:format("Empty record definitions are not allowed. Cannot define the record `~s`", [Name]),
     mk_t_err(pos(Ann), Msg);
 mk_error({unimplemented_interface_function, ConId, InterfaceName, FunName}) ->
-    Msg = io_lib:format("Unimplemented function ~s from the interface ~s in the contract ~s", [FunName, InterfaceName, pp(ConId)]),
+    Msg = io_lib:format("Unimplemented function `~s` from the interface `~s` in the contract `~s`", [FunName, InterfaceName, pp(ConId)]),
     mk_t_err(pos(ConId), Msg);
 mk_error({referencing_undefined_interface, InterfaceId}) ->
-    Msg = io_lib:format("Trying to implement or extend an undefined interface ~s", [pp(InterfaceId)]),
+    Msg = io_lib:format("Trying to implement or extend an undefined interface `~s`", [pp(InterfaceId)]),
     mk_t_err(pos(InterfaceId), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),
