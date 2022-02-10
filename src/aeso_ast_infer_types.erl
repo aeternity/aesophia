@@ -113,6 +113,8 @@
 
 -type type_constraints() :: none | bytes_concat | bytes_split | address_to_contract | bytecode_hash.
 
+-type variance() :: invariant | covariant | contravariant | bivariant.
+
 -type fun_info()  :: {aeso_syntax:ann(), typesig() | type()}.
 -type type_info() :: {aeso_syntax:ann(), typedef()}.
 -type var_info()  :: {aeso_syntax:ann(), utype()}.
@@ -806,6 +808,7 @@ infer(Contracts, Options) ->
         create_options(Options),
         ets_new(defined_contracts, [bag]),
         ets_new(type_vars, [set]),
+        ets_new(type_vars_variance, [set]),
         ets_new(warnings, [bag]),
         when_warning(warn_unused_functions, fun() -> create_unused_functions() end),
         check_modifiers(Env, Contracts),
@@ -1103,6 +1106,8 @@ check_typedef_sccs(Env, TypeMap, [{acyclic, Name} | SCCs], Acc) ->
                     Env2 = check_fields(Env1, TypeMap, RecTy, Fields),
                     check_typedef_sccs(Env2, TypeMap, SCCs, Acc1);
                 {variant_t, Cons} ->
+                    ets_insert(type_vars_variance, {Env#env.namespace ++ qname(D),
+                                                    infer_type_vars_variance(Xs, Cons)}),
                     Target   = check_type(Env1, app_t(Ann, D, Xs)),
                     ConType  = fun([]) -> Target; (Args) -> {type_sig, Ann, none, [], Args, Target} end,
                     ConTypes = [ begin
@@ -1127,6 +1132,61 @@ check_typedef(Env, {record_t, Fields}) ->
 check_typedef(Env, {variant_t, Cons}) ->
     {variant_t, [ {constr_t, Ann, Con, [ check_type(Env, Arg) || Arg <- Args ]}
                 || {constr_t, Ann, Con, Args} <- Cons ]}.
+
+-spec infer_type_vars_variance(aeso_syntax:tvar(), [{constr_t, _, _, _}]) -> [variance()].
+infer_type_vars_variance(TypeParams, Cons) ->
+    % args from all type constructors
+    FlatArgs = lists:flatten([Args || {constr_t, _, _, Args} <- Cons]),
+
+    Vs = lists:flatten([infer_type_vars_variance(Arg) || Arg <- FlatArgs]),
+    lists:map(fun({tvar, _, TVar}) ->
+                      S = sets:from_list([Variance || {TV, Variance} <- Vs, TV == TVar]),
+                      IsInvariant     = sets:is_element(invariant, S),
+                      IsCovariant     = sets:is_element(covariant, S),
+                      IsContravariant = sets:is_element(contravariant, S),
+                      IsBivariant     = sets:is_element(bivariant, S),
+                      case {IsInvariant, IsCovariant, IsContravariant, IsBivariant} of
+                          {true,      _,     _,    _} -> invariant;
+                          {false,  true,  true,    _} -> invariant;
+                          {false,     _,     _, true} -> bivariant;
+                          {false,  true, false,    _} -> covariant;
+                          {false, false,  true,    _} -> contravariant;
+                          _ -> invariant
+                      end
+              end, TypeParams).
+
+-spec infer_type_vars_variance(utype()) -> [{name(), variance()}].
+infer_type_vars_variance(FT = {fun_t, _, [], [{app_t, _, Type, Args}], Res}) ->
+    Variances = case ets_lookup(type_vars_variance, qname(Type)) of
+                    [{_, Vs}] -> Vs;
+                    _ -> lists:duplicate(length(Args), covariant)
+                end,
+    TypeVarsVariance = [{TVar, Variance}
+                        || {{tvar, _, TVar}, Variance} <- lists:zip(Args, Variances)],
+    FlipVariance = fun({TVar, covariant}) -> {TVar, contravariant};
+                      ({TVar, contravariant}) -> {TVar, covariant}
+                   end,
+    Cur = case arrows_in_type(FT) rem 2 of
+              0 -> TypeVarsVariance;
+              1 -> lists:map(FlipVariance, TypeVarsVariance)
+          end,
+    Cur ++ infer_type_vars_variance(Res);
+infer_type_vars_variance(FT = {fun_t, _, [], [{tvar, _, TVar}], Res}) ->
+    Cur = case arrows_in_type(FT) rem 2 of
+              0 -> {TVar, covariant};
+              1 -> {TVar, contravariant}
+          end,
+    [Cur | infer_type_vars_variance(Res)];
+infer_type_vars_variance({fun_t, _, [], [_Arg], Res}) ->
+    infer_type_vars_variance(Res);
+infer_type_vars_variance({tvar, _, TVar}) ->
+    [{TVar, covariant}];
+infer_type_vars_variance(_) -> [].
+
+arrows_in_type({fun_t, _, [], [_Arg], FRes}) ->
+    1 + arrows_in_type(FRes);
+arrows_in_type(_) ->
+    0.
 
 check_usings(Env, []) ->
     Env;
@@ -2077,7 +2137,8 @@ next_count() ->
 
 ets_tables() ->
     [options, type_vars, constraints, freshen_tvars, type_errors,
-     defined_contracts, warnings, function_calls, all_functions].
+     defined_contracts, warnings, function_calls, all_functions,
+     type_vars_variance].
 
 clean_up_ets() ->
     [ catch ets_delete(Tab) || Tab <- ets_tables() ],
@@ -2617,9 +2678,11 @@ subst_tvars1(_Env, X) ->
 
 %% Unification
 
-unify(_, {id, _, "_"}, _, _When) -> true;
-unify(_, _, {id, _, "_"}, _When) -> true;
-unify(Env, A, B, When) ->
+unify(Env, A, B, When) -> unify0(Env, A, B, covariant, When).
+
+unify0(_, {id, _, "_"}, _, _Variance, _When) -> true;
+unify0(_, _, {id, _, "_"}, _Variance, _When) -> true;
+unify0(Env, A, B, Variance, When) ->
     Options =
         case When of    %% Improve source location for map_in_map_key errors
             {check_expr, E, _, _} -> [{ann, aeso_syntax:get_ann(E)}];
@@ -2627,11 +2690,11 @@ unify(Env, A, B, When) ->
         end,
     A1 = dereference(unfold_types_in_type(Env, A, Options)),
     B1 = dereference(unfold_types_in_type(Env, B, Options)),
-    unify1(Env, A1, B1, When).
+    unify1(Env, A1, B1, Variance, When).
 
-unify1(_Env, {uvar, _, R}, {uvar, _, R}, _When) ->
+unify1(_Env, {uvar, _, R}, {uvar, _, R}, _Variance, _When) ->
     true;
-unify1(_Env, {uvar, A, R}, T, When) ->
+unify1(_Env, {uvar, A, R}, T, _Variance, When) ->
     case occurs_check(R, T) of
         true ->
             cannot_unify({uvar, A, R}, T, When),
@@ -2640,65 +2703,85 @@ unify1(_Env, {uvar, A, R}, T, When) ->
             ets_insert(type_vars, {R, T}),
             true
     end;
-unify1(Env, T, {uvar, A, R}, When) ->
-    unify1(Env, {uvar, A, R}, T, When);
-unify1(_Env, {tvar, _, X}, {tvar, _, X}, _When) -> true; %% Rigid type variables
-unify1(Env, [A|B], [C|D], When) ->
-    unify(Env, A, C, When) andalso unify(Env, B, D, When);
-unify1(_Env, X, X, _When) ->
+unify1(Env, T, {uvar, A, R}, Variance, When) ->
+    unify1(Env, {uvar, A, R}, T, Variance, When);
+unify1(_Env, {tvar, _, X}, {tvar, _, X}, _Variance, _When) -> true; %% Rigid type variables
+unify1(Env, [A|B], [C|D], [V|Variances], When) ->
+    unify0(Env, A, C, V, When) andalso unify0(Env, B, D, Variances, When);
+unify1(Env, [A|B], [C|D], Variance, When) ->
+    unify0(Env, A, C, Variance, When) andalso unify0(Env, B, D, Variance, When);
+unify1(_Env, X, X, _Variance, _When) ->
     true;
-unify1(_Env, {id, _, Name}, {id, _, Name}, _When) ->
+unify1(_Env, {id, _, Name}, {id, _, Name}, _Variance, _When) ->
     true;
-unify1(_Env, {con, _, Name}, {con, _, Name}, _When) ->
-    true;
-unify1(Env, A = {con, _, Child}, B = {con, _, Base}, When) ->
-    case is_subtype(Env, Child, Base) of
-        true -> true;
-        false ->
+unify1(Env, A = {con, _, NameA}, B = {con, _, NameB}, Variance, When) ->
+    IsSubtype = case Variance of
+                    invariant     -> NameA == NameB;
+                    covariant     -> is_subtype(Env, NameA, NameB);
+                    contravariant -> is_subtype(Env, NameB, NameA);
+                    bivariant     -> is_subtype(Env, NameA, NameB)
+                end,
+    if
+        IsSubtype ->
+            true;
+        true ->
             cannot_unify(A, B, When),
             false
     end;
-unify1(_Env, {qid, _, Name}, {qid, _, Name}, _When) ->
+unify1(_Env, {qid, _, Name}, {qid, _, Name}, _Variance, _When) ->
     true;
-unify1(_Env, {qcon, _, Name}, {qcon, _, Name}, _When) ->
+unify1(_Env, {qcon, _, Name}, {qcon, _, Name}, _Variance, _When) ->
     true;
-unify1(_Env, {bytes_t, _, Len}, {bytes_t, _, Len}, _When) ->
+unify1(_Env, {bytes_t, _, Len}, {bytes_t, _, Len}, _Variance, _When) ->
     true;
-unify1(Env, {if_t, _, {id, _, Id}, Then1, Else1}, {if_t, _, {id, _, Id}, Then2, Else2}, When) ->
-    unify(Env, Then1, Then2, When) andalso
-    unify(Env, Else1, Else2, When);
+unify1(Env, {if_t, _, {id, _, Id}, Then1, Else1}, {if_t, _, {id, _, Id}, Then2, Else2}, Variance, When) ->
+    unify0(Env, Then1, Then2, Variance, When) andalso
+    unify0(Env, Else1, Else2, Variance, When);
 
-unify1(_Env, {fun_t, _, _, _, _}, {fun_t, _, _, var_args, _}, When) ->
+unify1(_Env, {fun_t, _, _, _, _}, {fun_t, _, _, var_args, _}, _Variance, When) ->
     type_error({unify_varargs, When});
-unify1(_Env, {fun_t, _, _, var_args, _}, {fun_t, _, _, _, _}, When) ->
+unify1(_Env, {fun_t, _, _, var_args, _}, {fun_t, _, _, _, _}, _Variance, When) ->
     type_error({unify_varargs, When});
-unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, When)
+unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, Variance, When)
   when length(Args1) == length(Args2) ->
-    unify(Env, Named2, Named1, When) andalso
-    unify(Env, Args2, Args1, When) andalso unify(Env, Result1, Result2, When);
-unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, When)
+    OppositeVariance = case Variance of
+                           invariant     -> invariant;
+                           covariant     -> contravariant;
+                           contravariant -> covariant;
+                           bivariant     -> bivariant
+                       end,
+    unify0(Env, Named1, Named2, OppositeVariance, When) andalso
+    unify0(Env, Args1, Args2, OppositeVariance, When) andalso
+    unify0(Env, Result1, Result2, Variance, When);
+unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, Variance, When)
   when length(Args1) == length(Args2), Tag == id orelse Tag == qid ->
-    unify(Env, Args1, Args2, When);
-unify1(Env, {tuple_t, _, As}, {tuple_t, _, Bs}, When)
+    Variances = case ets_lookup(type_vars_variance, F) of
+                    [{_, Vs}] -> Vs;
+                    _ -> Variance
+                end,
+    unify1(Env, Args1, Args2, Variances, When);
+unify1(Env, {tuple_t, _, As}, {tuple_t, _, Bs}, Variance, When)
   when length(As) == length(Bs) ->
-    unify(Env, As, Bs, When);
-unify1(Env, {named_arg_t, _, Id1, Type1, _}, {named_arg_t, _, Id2, Type2, _}, When) ->
-    unify1(Env, Id1, Id2, {arg_name, Id1, Id2, When}),
-    unify1(Env, Type1, Type2, When);
+    unify0(Env, As, Bs, Variance, When);
+unify1(Env, {named_arg_t, _, Id1, Type1, _}, {named_arg_t, _, Id2, Type2, _}, Variance, When) ->
+    unify1(Env, Id1, Id2, Variance, {arg_name, Id1, Id2, When}),
+    unify1(Env, Type1, Type2, Variance, When);
 %% The grammar is a bit inconsistent about whether types without
 %% arguments are represented as applications to an empty list of
 %% parameters or not. We therefore allow them to unify.
-unify1(Env, {app_t, _, T, []}, B, When) ->
-    unify(Env, T, B, When);
-unify1(Env, A, {app_t, _, T, []}, When) ->
-    unify(Env, A, T, When);
-unify1(_Env, A, B, When) ->
+unify1(Env, {app_t, _, T, []}, B, Variance, When) ->
+    unify0(Env, T, B, Variance, When);
+unify1(Env, A, {app_t, _, T, []}, Variance, When) ->
+    unify0(Env, A, T, Variance, When);
+unify1(_Env, A, B, _Variance, When) ->
     cannot_unify(A, B, When),
     false.
 
 is_subtype(Env, Child, Base) ->
     Parents = maps:get(Child, Env#env.contract_parents, []),
     if
+        Child == Base ->
+            true;
         Parents == [] ->
             false;
         true ->

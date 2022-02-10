@@ -92,7 +92,7 @@ encode_calldata_neg_test() ->
     Code = [ "contract Foo =\n"
              "  entrypoint f(x : int) : string = \"hello\"\n" ],
 
-    ExpErr1 = "Type error at line 5, col 34:\nCannot unify `bool` and `int`\n"
+    ExpErr1 = "Type error at line 5, col 34:\nCannot unify `int` and `bool`\n"
               "when checking the application of\n"
               "  `f : (int) => string`\n"
               "to arguments\n"

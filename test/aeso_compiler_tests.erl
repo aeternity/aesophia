@@ -591,14 +591,14 @@ failing_contracts() ->
     , ?TYPE_ERROR(bad_bytes_concat,
         [<<?Pos(12, 40)
            "Failed to resolve byte array lengths in call to Bytes.concat with arguments of type\n"
-           "  - 'g  (at line 12, column 40)\n"
-           "  - 'h  (at line 12, column 40)\n"
+           "  - 'g  (at line 12, column 20)\n"
+           "  - 'h  (at line 12, column 23)\n"
            "and result type\n"
            "  - bytes(10)  (at line 12, column 28)">>,
          <<?Pos(13, 28)
            "Failed to resolve byte array lengths in call to Bytes.concat with arguments of type\n"
-           "  - 'd  (at line 13, column 28)\n"
-           "  - 'e  (at line 13, column 28)\n"
+           "  - 'd  (at line 13, column 20)\n"
+           "  - 'e  (at line 13, column 23)\n"
            "and result type\n"
            "  - 'f  (at line 13, column 14)">>,
          <<?Pos(15, 5)
@@ -608,7 +608,7 @@ failing_contracts() ->
          <<?Pos(17, 5)
            "Failed to resolve byte array lengths in call to Bytes.concat with arguments of type\n"
            "  - bytes(6)  (at line 16, column 24)\n"
-           "  - 'b  (at line 17, column 5)\n"
+           "  - 'b  (at line 16, column 34)\n"
            "and result type\n"
            "  - 'c  (at line 16, column 39)">>,
          <<?Pos(19, 25)
@@ -616,7 +616,7 @@ failing_contracts() ->
     , ?TYPE_ERROR(bad_bytes_split,
          [<<?Pos(13, 5)
             "Failed to resolve byte array lengths in call to Bytes.split with argument of type\n"
-            "  - 'f  (at line 13, column 5)\n"
+            "  - 'f  (at line 12, column 20)\n"
             "and result types\n"
             "  - 'e  (at line 12, column 25)\n"
             "  - bytes(20)  (at line 12, column 29)">>,
@@ -628,7 +628,7 @@ failing_contracts() ->
             "  - 'd  (at line 16, column 5)">>,
           <<?Pos(19, 5)
             "Failed to resolve byte array lengths in call to Bytes.split with argument of type\n"
-            "  - 'b  (at line 19, column 5)\n"
+            "  - 'b  (at line 18, column 20)\n"
             "and result types\n"
             "  - bytes(20)  (at line 18, column 25)\n"
             "  - 'a  (at line 18, column 37)">>])
@@ -870,7 +870,7 @@ failing_contracts() ->
                   ])
     , ?TYPE_ERROR(polymorphism_variance_switching,
                   [<<?Pos(38,49)
-                     "Cannot unify `Animal` and `Cat`\n"
+                     "Cannot unify `Cat` and `Animal`\n"
                      "when checking the application of\n"
                      "  `g2 : (Cat) => Cat`\n"
                      "to arguments\n"
