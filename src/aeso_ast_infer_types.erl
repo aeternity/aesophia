@@ -1133,7 +1133,6 @@ check_typedef(Env, {variant_t, Cons}) ->
     {variant_t, [ {constr_t, Ann, Con, [ check_type(Env, Arg) || Arg <- Args ]}
                 || {constr_t, Ann, Con, Args} <- Cons ]}.
 
--spec infer_type_vars_variance(aeso_syntax:tvar(), [{constr_t, _, _, _}]) -> [variance()].
 infer_type_vars_variance(TypeParams, Cons) ->
     % args from all type constructors
     FlatArgs = lists:flatten([Args || {constr_t, _, _, Args} <- Cons]),
