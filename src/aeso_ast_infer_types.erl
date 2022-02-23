@@ -809,6 +809,7 @@ infer(Contracts, Options) ->
         ets_new(defined_contracts, [bag]),
         ets_new(type_vars, [set]),
         ets_new(type_vars_variance, [set]),
+        ets_new(uvars_variance, [set]),
         ets_new(warnings, [bag]),
         when_warning(warn_unused_functions, fun() -> create_unused_functions() end),
         check_modifiers(Env, Contracts),
@@ -1155,6 +1156,14 @@ infer_type_vars_variance(TypeParams, Cons) ->
               end, TypeParams).
 
 -spec infer_type_vars_variance(utype()) -> [{name(), variance()}].
+infer_type_vars_variance({app_t, _, Type, Args}) ->
+    Variances = case ets_lookup(type_vars_variance, qname(Type)) of
+                    [{_, Vs}] -> Vs;
+                    _ -> lists:duplicate(length(Args), covariant)
+                end,
+    TypeVarsVariance = [{TVar, Variance}
+                        || {{tvar, _, TVar}, Variance} <- lists:zip(Args, Variances)],
+    TypeVarsVariance;
 infer_type_vars_variance(FT = {fun_t, _, [], [{app_t, _, Type, Args}], Res}) ->
     Variances = case ets_lookup(type_vars_variance, qname(Type)) of
                     [{_, Vs}] -> Vs;
@@ -1777,6 +1786,17 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
             ResultType = fresh_uvar(Ann),
             when_warning(warn_unused_functions,
                          fun() -> register_function_call(Namespace ++ qname(CurrentFun), Name) end),
+            case FunType of
+                {fun_t, _, _, _, {app_t, _, QType, TArgs}} ->
+                    case ets_lookup(type_vars_variance, qname(QType)) of
+                        [{_, Vs}] ->
+                            lists:foreach(fun({{uvar, _, URef}, Variance}) ->
+                                              ets_insert(uvars_variance, {URef, invariant})
+                                          end, lists:zip(TArgs, Vs));
+                        _ -> ok
+                    end;
+                _ -> ok
+            end,
             unify(Env, FunType, {fun_t, [], NamedArgsVar, ArgTypes, GeneralResultType}, When),
             when_warning(warn_negative_spend, fun() -> warn_potential_negative_spend(Ann, NewFun1, NewArgs) end),
             add_constraint(
@@ -2681,7 +2701,7 @@ unify(Env, A, B, When) -> unify0(Env, A, B, covariant, When).
 
 unify0(_, {id, _, "_"}, _, _Variance, _When) -> true;
 unify0(_, _, {id, _, "_"}, _Variance, _When) -> true;
-unify0(Env, A, B, Variance, When) ->
+unify0(Env, A, B, Variance0, When) ->
     Options =
         case When of    %% Improve source location for map_in_map_key errors
             {check_expr, E, _, _} -> [{ann, aeso_syntax:get_ann(E)}];
@@ -2689,6 +2709,14 @@ unify0(Env, A, B, Variance, When) ->
         end,
     A1 = dereference(unfold_types_in_type(Env, A, Options)),
     B1 = dereference(unfold_types_in_type(Env, B, Options)),
+    Variance = case A of
+                   {uvar, _,URef} ->
+                       case ets_lookup(uvars_variance, URef) of
+                           [{_, V}] -> V;
+                           _        -> Variance0
+                       end;
+                   _ -> Variance0
+               end,
     unify1(Env, A1, B1, Variance, When).
 
 unify1(_Env, {uvar, _, R}, {uvar, _, R}, _Variance, _When) ->

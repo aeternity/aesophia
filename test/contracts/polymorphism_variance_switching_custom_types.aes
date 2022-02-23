@@ -1,0 +1,132 @@
+contract interface Animal =
+    entrypoint sound : () => string
+
+contract Cat : Animal =
+    entrypoint sound() = "meow"
+
+main contract Main =
+    datatype ta('a) = TA('a => unit)
+    datatype tb('a) = TB(unit => 'a)
+    datatype tc('a) = TC('a => 'a)
+    datatype td('a) = TD(unit => unit)
+    datatype te('a) = TE1('a => unit) | TE2(unit => 'a)
+    datatype tf('a) = TF(ta('a) => unit)
+    datatype tg('a) = TG(tb('a) => unit)
+    datatype th('a) = TH(unit => ta('a))
+    datatype ti('a) = TI(unit => tb('a))
+    datatype tj('a) = TJ('a => unit => 'a)
+    datatype tk('a, 'b) = TK('a => 'b => unit)
+
+    function f_a_to_a_to_u(_ : Animal) : (Animal => unit) = f_a_to_u
+    function f_a_to_c_to_u(_ : Animal) : (Cat => unit) = f_c_to_u
+    function f_c_to_a_to_u(_ : Cat) : (Animal => unit) = f_a_to_u
+    function f_c_to_c_to_u(_ : Cat) : (Cat => unit) = f_c_to_u
+
+    function f_u_to_u(_ : unit) : unit = ()
+    function f_a_to_u(_ : Animal) : unit = ()
+    function f_c_to_u(_ : Cat) : unit = ()
+
+    function f_ta_a_to_u(_ : ta(Animal)) : unit = ()
+    function f_ta_c_to_u(_ : ta(Cat)) : unit = ()
+    function f_tb_a_to_u(_ : tb(Animal)) : unit = ()
+    function f_tb_c_to_u(_ : tb(Cat)) : unit = ()
+    function f_u_to_ta_a(_ : unit) : ta(Animal) = TA(f_a_to_u)
+    function f_u_to_ta_c(_ : unit) : ta(Cat) = TA(f_c_to_u)
+
+    stateful function f_c() : Cat = Chain.create()
+    stateful function f_a() : Animal = f_c()
+
+    stateful function f_u_to_a(_ : unit) : Animal = f_a()
+    stateful function f_u_to_c(_ : unit) : Cat = f_c()
+    stateful function f_a_to_a(_ : Animal) : Animal = f_a()
+    stateful function f_a_to_c(_ : Animal) : Cat = f_c()
+    stateful function f_c_to_a(_ : Cat) : Animal = f_a()
+    stateful function f_c_to_c(_ : Cat) : Cat = f_c()
+
+    stateful function f_a_to_u_to_a(_ : Animal) : (unit => Animal) = f_u_to_a
+    stateful function f_a_to_u_to_c(_ : Animal) : (unit => Cat) = f_u_to_c
+    stateful function f_c_to_u_to_a(_ : Cat) : (unit => Animal) = f_u_to_a
+    stateful function f_c_to_u_to_c(_ : Cat) : (unit => Cat) = f_u_to_c
+
+    stateful function f_u_to_tb_a(_ : unit) : tb(Animal) = TB(f_u_to_a)
+    stateful function f_u_to_tb_c(_ : unit) : tb(Cat) = TB(f_u_to_c)
+
+    stateful entrypoint init() =
+        let va1 : ta(Animal) = TA(f_a_to_u)  // success
+        let va2 : ta(Animal) = TA(f_c_to_u)  // fail
+        let va3 : ta(Cat)    = TA(f_a_to_u)  // success
+        let va4 : ta(Cat)    = TA(f_c_to_u)  // success
+
+        let vb1 : tb(Animal) = TB(f_u_to_a)  // success
+        let vb2 : tb(Animal) = TB(f_u_to_c)  // success
+        let vb3 : tb(Cat)    = TB(f_u_to_a)  // fail
+        let vb4 : tb(Cat)    = TB(f_u_to_c)  // success
+
+        let vc1 : tc(Animal) = TC(f_a_to_a)  // success
+        let vc2 : tc(Animal) = TC(f_a_to_c)  // fail
+        let vc3 : tc(Animal) = TC(f_c_to_a)  // fail
+        let vc4 : tc(Animal) = TC(f_c_to_c)  // fail
+        let vc5 : tc(Cat)    = TC(f_a_to_a)  // fail
+        let vc6 : tc(Cat)    = TC(f_a_to_c)  // fail
+        let vc7 : tc(Cat)    = TC(f_c_to_a)  // fail
+        let vc8 : tc(Cat)    = TC(f_c_to_c)  // success
+
+        let vd1 : td(Animal) = TD(f_u_to_u)  // success
+        let vd2 : td(Cat)    = TD(f_u_to_u)  // success
+
+        let ve1 : te(Animal) = TE1(f_a_to_u)  // success
+        let ve2 : te(Animal) = TE1(f_c_to_u)  // fail
+        let ve3 : te(Animal) = TE2(f_u_to_a)  // success
+        let ve4 : te(Animal) = TE2(f_u_to_c)  // fail
+        let ve5 : te(Cat)    = TE1(f_a_to_u)  // fail
+        let ve6 : te(Cat)    = TE1(f_c_to_u)  // success
+        let ve7 : te(Cat)    = TE2(f_u_to_a)  // fail
+        let ve8 : te(Cat)    = TE2(f_u_to_c)  // success
+
+        let vf1 : tf(Animal) = TF(f_ta_a_to_u)  // success
+        let vf2 : tf(Animal) = TF(f_ta_c_to_u)  // success
+        let vf3 : tf(Cat)    = TF(f_ta_a_to_u)  // fail
+        let vf4 : tf(Cat)    = TF(f_ta_c_to_u)  // success
+
+        let vg1 : tg(Animal) = TG(f_tb_a_to_u)  // success
+        let vg2 : tg(Animal) = TG(f_tb_c_to_u)  // fail
+        let vg3 : tg(Cat)    = TG(f_tb_a_to_u)  // success
+        let vg4 : tg(Cat)    = TG(f_tb_c_to_u)  // success
+
+        let vh1 : th(Animal) = TH(f_u_to_ta_a)  // success
+        let vh2 : th(Animal) = TH(f_u_to_ta_c)  // fail
+        let vh3 : th(Cat)    = TH(f_u_to_ta_a)  // success
+        let vh4 : th(Cat)    = TH(f_u_to_ta_c)  // success
+
+        let vi1 : ti(Animal) = TI(f_u_to_tb_a)  // success
+        let vi2 : ti(Animal) = TI(f_u_to_tb_c)  // success
+        let vi3 : ti(Cat)    = TI(f_u_to_tb_a)  // fail
+        let vi4 : ti(Cat)    = TI(f_u_to_tb_c)  // success
+
+        let vj1 : tj(Animal) = TJ(f_a_to_u_to_a)  // success
+        let vj2 : tj(Animal) = TJ(f_a_to_u_to_c)  // fail
+        let vj3 : tj(Animal) = TJ(f_c_to_u_to_a)  // fail (TODO)
+        let vj4 : tj(Animal) = TJ(f_c_to_u_to_c)  // success
+        let vj5 : tj(Cat)    = TJ(f_a_to_u_to_a)  // fail
+        let vj6 : tj(Cat)    = TJ(f_a_to_u_to_c)  // fail
+        let vj7 : tj(Cat)    = TJ(f_c_to_u_to_a)  // fail (TODO)
+        let vj8 : tj(Cat)    = TJ(f_c_to_u_to_c)  // success
+
+        let vk01 : tk(Animal, Animal) = TK(f_a_to_a_to_u)  // success
+        let vk02 : tk(Animal, Animal) = TK(f_a_to_c_to_u)  // fail
+        let vk03 : tk(Animal, Animal) = TK(f_c_to_a_to_u)  // success
+        let vk04 : tk(Animal, Animal) = TK(f_c_to_c_to_u)  // fail
+        let vk05 : tk(Animal, Cat)    = TK(f_a_to_a_to_u)  // success
+        let vk06 : tk(Animal, Cat)    = TK(f_a_to_c_to_u)  // success
+        let vk07 : tk(Animal, Cat)    = TK(f_c_to_a_to_u)  // success
+        let vk08 : tk(Animal, Cat)    = TK(f_c_to_c_to_u)  // success
+        let vk09 : tk(Cat, Animal)    = TK(f_a_to_a_to_u)  // fail
+        let vk10 : tk(Cat, Animal)    = TK(f_a_to_c_to_u)  // fail
+        let vk11 : tk(Cat, Animal)    = TK(f_c_to_a_to_u)  // success
+        let vk12 : tk(Cat, Animal)    = TK(f_c_to_c_to_u)  // fail
+        let vk13 : tk(Cat, Cat)       = TK(f_a_to_a_to_u)  // fail
+        let vk14 : tk(Cat, Cat)       = TK(f_a_to_c_to_u)  // fail
+        let vk15 : tk(Cat, Cat)       = TK(f_c_to_a_to_u)  // success
+        let vk16 : tk(Cat, Cat)       = TK(f_c_to_c_to_u)  // success
+
+        ()

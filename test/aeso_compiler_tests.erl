@@ -885,6 +885,116 @@ failing_contracts() ->
                      "to arguments\n"
                      "  `x : (Cat) => Cat`">>
                   ])
+    , ?TYPE_ERROR(polymorphism_variance_switching_custom_types,
+                  [<<?Pos(56,32)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the type of the expression `TA(f_c_to_u) : ta(Cat)` against the expected type `ta(Animal)`">>,
+                   <<?Pos(62,32)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the expression `TB(f_u_to_a) : tb(Animal)` against the expected type `tb(Cat)`">>,
+                   <<?Pos(66,32)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the application of\n"
+                     "  `TC : ((Animal) => Animal) => tc(Animal)`\n"
+                     "to arguments\n"
+                     "  `f_a_to_c : (Animal) => Cat`">>,
+                   <<?Pos(67,32)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the application of\n"
+                     "  `TC : ((Cat) => Cat) => tc(Cat)`\n"
+                     "to arguments\n"
+                     "  `f_c_to_a : (Cat) => Animal`">>,
+                   <<?Pos(68,32)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the type of the expression `TC(f_c_to_c) : tc(Cat)` against the expected type `tc(Animal)`">>,
+                   <<?Pos(69,32)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the expression `TC(f_a_to_a) : tc(Animal)` against the expected type `tc(Cat)`">>,
+                   <<?Pos(70,32)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the application of\n"
+                     "  `TC : ((Animal) => Animal) => tc(Animal)`\n"
+                     "to arguments\n"
+                     "  `f_a_to_c : (Animal) => Cat`">>,
+                   <<?Pos(71,32)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the application of\n"
+                     "  `TC : ((Cat) => Cat) => tc(Cat)`\n"
+                     "to arguments\n"
+                     "  `f_c_to_a : (Cat) => Animal`">>,
+                   <<?Pos(78,32)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the type of the expression `TE1(f_c_to_u) : te(Cat)` against the expected type `te(Animal)`">>,
+                   <<?Pos(80,32)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the type of the expression `TE2(f_u_to_c) : te(Cat)` against the expected type `te(Animal)`">>,
+                   <<?Pos(81,32)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the expression `TE1(f_a_to_u) : te(Animal)` against the expected type `te(Cat)`">>,
+                   <<?Pos(83,32)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the expression `TE2(f_u_to_a) : te(Animal)` against the expected type `te(Cat)`">>,
+                   <<?Pos(88,32)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the expression `TF(f_ta_a_to_u) : tf(Animal)` against the expected type `tf(Cat)`">>,
+                   <<?Pos(92,32)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the type of the expression `TG(f_tb_c_to_u) : tg(Cat)` against the expected type `tg(Animal)`">>,
+                   <<?Pos(97,32)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the type of the expression `TH(f_u_to_ta_c) : th(Cat)` against the expected type `th(Animal)`">>,
+                   <<?Pos(103,32)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the expression `TI(f_u_to_tb_a) : ti(Animal)` against the expected type `ti(Cat)`">>,
+                   <<?Pos(107,32)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the application of\n"
+                     "  `TJ : ((Animal) => (unit) => Animal) => tj(Animal)`\n"
+                     "to arguments\n"
+                     "  `f_a_to_u_to_c : (Animal) => (unit) => Cat`">>,
+                   <<?Pos(108,32)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the application of\n"
+                     "  `TJ : ((Cat) => (unit) => Cat) => tj(Cat)`\n"
+                     "to arguments\n"
+                     "  `f_c_to_u_to_a : (Cat) => (unit) => Animal`">>,
+                   <<?Pos(110,32)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the expression `TJ(f_a_to_u_to_a) : tj(Animal)` against the expected type `tj(Cat)`">>,
+                   <<?Pos(111,32)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the application of\n"
+                     "  `TJ : ((Animal) => (unit) => Animal) => tj(Animal)`\n"
+                     "to arguments\n"
+                     "  `f_a_to_u_to_c : (Animal) => (unit) => Cat`">>,
+                   <<?Pos(112,32)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the application of\n"
+                     "  `TJ : ((Cat) => (unit) => Cat) => tj(Cat)`\n"
+                     "to arguments\n"
+                     "  `f_c_to_u_to_a : (Cat) => (unit) => Animal`">>,
+                   <<?Pos(116,41)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the type of the expression `TK(f_a_to_c_to_u) : tk(Animal, Cat)` against the expected type `tk(Animal, Animal)`">>,
+                   <<?Pos(118,41)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the type of the expression `TK(f_c_to_c_to_u) : tk(Cat, Cat)` against the expected type `tk(Animal, Animal)`">>,
+                   <<?Pos(123,41)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the expression `TK(f_a_to_a_to_u) : tk(Animal, Animal)` against the expected type `tk(Cat, Animal)`">>,
+                   <<?Pos(124,41)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the expression `TK(f_a_to_c_to_u) : tk(Animal, Cat)` against the expected type `tk(Cat, Animal)`">>,
+                   <<?Pos(126,41)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the type of the expression `TK(f_c_to_c_to_u) : tk(Cat, Cat)` against the expected type `tk(Cat, Animal)`">>,
+                   <<?Pos(127,41)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the expression `TK(f_a_to_a_to_u) : tk(Animal, Animal)` against the expected type `tk(Cat, Cat)`">>,
+                   <<?Pos(128,41)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the expression `TK(f_a_to_c_to_u) : tk(Animal, Cat)` against the expected type `tk(Cat, Cat)`">>
+                  ])
     ].
 
 -define(Path(File), "code_errors/" ??File).
