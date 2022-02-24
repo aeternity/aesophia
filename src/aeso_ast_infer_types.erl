@@ -1196,6 +1196,11 @@ arrows_in_type({fun_t, _, [], [_Arg], FRes}) ->
 arrows_in_type(_) ->
     0.
 
+opposite_variance(invariant) -> invariant;
+opposite_variance(covariant) -> contravariant;
+opposite_variance(contravariant) -> covariant;
+opposite_variance(bivariant) -> bivariant.
+
 check_usings(Env, []) ->
     Env;
 check_usings(Env = #env{ used_namespaces = UsedNamespaces }, [{using, Ann, Con, Alias, Parts} | Rest]) ->
@@ -2771,14 +2776,8 @@ unify1(_Env, {fun_t, _, _, var_args, _}, {fun_t, _, _, _, _}, _Variance, When) -
     type_error({unify_varargs, When});
 unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, Variance, When)
   when length(Args1) == length(Args2) ->
-    OppositeVariance = case Variance of
-                           invariant     -> invariant;
-                           covariant     -> contravariant;
-                           contravariant -> covariant;
-                           bivariant     -> bivariant
-                       end,
-    unify0(Env, Named1, Named2, OppositeVariance, When) andalso
-    unify0(Env, Args1, Args2, OppositeVariance, When) andalso
+    unify0(Env, Named1, Named2, opposite_variance(Variance), When) andalso
+    unify0(Env, Args1, Args2, opposite_variance(Variance), When) andalso
     unify0(Env, Result1, Result2, Variance, When);
 unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, Variance, When)
   when length(Args1) == length(Args2), Tag == id orelse Tag == qid ->
