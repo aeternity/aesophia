@@ -809,7 +809,7 @@ infer(Contracts, Options) ->
         ets_new(defined_contracts, [bag]),
         ets_new(type_vars, [set]),
         ets_new(type_vars_variance, [set]),
-        ets_new(uvars_variance, [set]),
+        ets_new(type_vars_uvar, [set]),
         ets_new(warnings, [bag]),
         when_warning(warn_unused_functions, fun() -> create_unused_functions() end),
         check_modifiers(Env, Contracts),
@@ -1791,15 +1791,14 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
             ResultType = fresh_uvar(Ann),
             when_warning(warn_unused_functions,
                          fun() -> register_function_call(Namespace ++ qname(CurrentFun), Name) end),
+            % the uvars of tvars are stored so that no variance switching happens
+            % in between them (e.g. in TC('a => 'a), 'a should be a single type)
             case FunType of
-                {fun_t, _, _, _, {app_t, _, QType, TArgs}} ->
-                    case ets_lookup(type_vars_variance, qname(QType)) of
-                        [{_, Vs}] ->
-                            lists:foreach(fun({{uvar, _, URef}, Variance}) ->
-                                              ets_insert(uvars_variance, {URef, invariant})
-                                          end, lists:zip(TArgs, Vs));
-                        _ -> ok
-                    end;
+                {fun_t, _, _, _, {app_t, _, _, TArgs}} ->
+                    lists:foreach(fun({uvar, _, URef}) ->
+                                          ets_insert(type_vars_uvar, {URef});
+                                     (_) -> ok
+                                  end, TArgs);
                 _ -> ok
             end,
             unify(Env, FunType, {fun_t, [], NamedArgsVar, ArgTypes, GeneralResultType}, When),
@@ -2716,9 +2715,9 @@ unify0(Env, A, B, Variance0, When) ->
     B1 = dereference(unfold_types_in_type(Env, B, Options)),
     Variance = case A of
                    {uvar, _,URef} ->
-                       case ets_lookup(uvars_variance, URef) of
-                           [{_, V}] -> V;
-                           _        -> Variance0
+                       case ets_lookup(type_vars_uvar, URef) of
+                           [_] -> invariant;
+                           _   -> Variance0
                        end;
                    _ -> Variance0
                end,

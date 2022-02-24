@@ -105,11 +105,11 @@ main contract Main =
 
         let vj1 : tj(Animal) = TJ(f_a_to_u_to_a)  // success
         let vj2 : tj(Animal) = TJ(f_a_to_u_to_c)  // fail
-        let vj3 : tj(Animal) = TJ(f_c_to_u_to_a)  // fail (TODO)
+        let vj3 : tj(Animal) = TJ(f_c_to_u_to_a)  // fail
         let vj4 : tj(Animal) = TJ(f_c_to_u_to_c)  // success
         let vj5 : tj(Cat)    = TJ(f_a_to_u_to_a)  // fail
         let vj6 : tj(Cat)    = TJ(f_a_to_u_to_c)  // fail
-        let vj7 : tj(Cat)    = TJ(f_c_to_u_to_a)  // fail (TODO)
+        let vj7 : tj(Cat)    = TJ(f_c_to_u_to_a)  // fail
         let vj8 : tj(Cat)    = TJ(f_c_to_u_to_c)  // success
 
         let vk01 : tk(Animal, Animal) = TK(f_a_to_a_to_u)  // success
