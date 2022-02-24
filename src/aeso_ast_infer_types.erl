@@ -2747,16 +2747,9 @@ unify1(_Env, X, X, _Variance, _When) ->
 unify1(_Env, {id, _, Name}, {id, _, Name}, _Variance, _When) ->
     true;
 unify1(Env, A = {con, _, NameA}, B = {con, _, NameB}, Variance, When) ->
-    IsSubtype = case Variance of
-                    invariant     -> NameA == NameB;
-                    covariant     -> is_subtype(Env, NameA, NameB);
-                    contravariant -> is_subtype(Env, NameB, NameA);
-                    bivariant     -> is_subtype(Env, NameA, NameB)
-                end,
-    if
-        IsSubtype ->
-            true;
-        true ->
+    case is_subtype(Env, NameA, NameB, Variance) of
+        true -> true;
+        false ->
             cannot_unify(A, B, When),
             false
     end;
@@ -2802,6 +2795,15 @@ unify1(Env, A, {app_t, _, T, []}, Variance, When) ->
 unify1(_Env, A, B, _Variance, When) ->
     cannot_unify(A, B, When),
     false.
+
+is_subtype(Env, NameA, NameB, invariant) ->
+    NameA == NameB;
+is_subtype(Env, NameA, NameB, covariant) ->
+    is_subtype(Env, NameA, NameB);
+is_subtype(Env, NameA, NameB, contravariant) ->
+    is_subtype(Env, NameB, NameA);
+is_subtype(Env, NameA, NameB, bivariant) ->
+    is_subtype(Env, NameA, NameB) orelse is_subtype(Env, NameB, NameA).
 
 is_subtype(Env, Child, Base) ->
     Parents = maps:get(Child, Env#env.contract_parents, []),
