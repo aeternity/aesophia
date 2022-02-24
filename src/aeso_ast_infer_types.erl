@@ -2796,7 +2796,7 @@ unify1(_Env, A, B, _Variance, When) ->
     cannot_unify(A, B, When),
     false.
 
-is_subtype(Env, NameA, NameB, invariant) ->
+is_subtype(_Env, NameA, NameB, invariant) ->
     NameA == NameB;
 is_subtype(Env, NameA, NameB, covariant) ->
     is_subtype(Env, NameA, NameB);
