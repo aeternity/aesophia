@@ -2161,7 +2161,7 @@ next_count() ->
 ets_tables() ->
     [options, type_vars, constraints, freshen_tvars, type_errors,
      defined_contracts, warnings, function_calls, all_functions,
-     type_vars_variance].
+     type_vars_variance, type_vars_uvar].
 
 clean_up_ets() ->
     [ catch ets_delete(Tab) || Tab <- ets_tables() ],
