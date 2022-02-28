@@ -1,0 +1,18 @@
+contract Main =
+    function is_negative(x : int) =
+        if (x < 0)
+            true
+        else
+            false
+
+    function inc_by_one(x : int) = x + 1
+    function inc_by_two(x : int) = x + 2
+
+    type state = bool
+
+    entrypoint init(x : int) = x
+        |> inc_by_one
+        |> inc_by_one
+        |> inc_by_two
+        |> ((x) => x * 5)
+        |> is_negative
