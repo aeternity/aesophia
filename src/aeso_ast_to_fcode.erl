@@ -703,8 +703,11 @@ expr_to_fcode(Env, _Type, {block, _, Stmts}) ->
 expr_to_fcode(Env, _Type, Expr = {app, _, {Op, _}, [_, _]}) when Op == '&&'; Op == '||' ->
     Tree = expr_to_decision_tree(Env, Expr),
     decision_tree_to_fcode(Tree);
-expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A, B]}) when is_atom(Op) ->
-    {op, Op, [expr_to_fcode(Env, A), expr_to_fcode(Env, B)]};
+expr_to_fcode(Env, Type, {app, Ann, {Op, _}, [A, B]}) when is_atom(Op) ->
+    case Op of
+        '|>' -> expr_to_fcode(Env, Type, {app, Ann, B, [A]});
+        _    -> {op, Op, [expr_to_fcode(Env, A), expr_to_fcode(Env, B)]}
+    end;
 expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
     case Op of
         '-' -> {op, '-', [{lit, {int, 0}}, expr_to_fcode(Env, A)]};

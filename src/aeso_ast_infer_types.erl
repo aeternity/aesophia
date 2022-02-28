@@ -1941,7 +1941,12 @@ infer_infix({'::', As}) ->
 infer_infix({'++', As}) ->
     ElemType = fresh_uvar(As),
     ListType = {app_t, As, {id, As, "list"}, [ElemType]},
-    {fun_t, As, [], [ListType, ListType], ListType}.
+    {fun_t, As, [], [ListType, ListType], ListType};
+infer_infix({'|>', As}) ->
+    ArgType = fresh_uvar(As),
+    ResType = fresh_uvar(As),
+    FunType = {fun_t, As, [], [ArgType], ResType},
+    {fun_t, As, [], [ArgType, FunType], ResType}.
 
 infer_prefix({'!',As}) ->
     Bool = {id, As, "bool"},
