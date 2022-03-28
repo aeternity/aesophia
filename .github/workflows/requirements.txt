@@ -1,5 +1,5 @@
-mkdocs==1.2.3
+mkdocs==1.2.4
 mkdocs-simple-hooks==0.1.3
 mkdocs-material==7.1.9
 mike==1.0.1
-git+git://github.com/pygments/pygments@38cd147859fdaeb73a0a2018601f4ec5277798bc#egg=pygments
+pygments==2.11.2
