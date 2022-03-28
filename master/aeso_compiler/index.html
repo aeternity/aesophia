@@ -10,7 +10,7 @@
       
       
       <link rel="icon" href="../favicon.png">
-      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-7.1.9">
+      <meta name="generator" content="mkdocs-1.2.4, mkdocs-material-7.1.9">
     
     
       
@@ -386,24 +386,24 @@
 <p>This module provides the interface to the standard Sophia compiler. It
 returns the compiled module in a map which can then be loaded.</p>
 <h3 id="types">Types</h3>
-<div class="highlight"><pre><span></span><code><span class="nf">contract_string</span><span class="p">()</span> <span class="o">=</span> <span class="n">string</span><span class="p">()</span> <span class="p">|</span> <span class="n">binary</span><span class="p">()</span>
-<span class="nf">contract_map</span><span class="p">()</span> <span class="o">=</span> <span class="p">#{</span><span class="n">bytecode</span> <span class="o">=&gt;</span> <span class="n">binary</span><span class="p">(),</span>
-                   <span class="n">compiler_version</span> <span class="o">=&gt;</span> <span class="n">binary</span><span class="p">(),</span>
-                   <span class="n">contract_souce</span> <span class="o">=&gt;</span> <span class="n">string</span><span class="p">(),</span>
-                   <span class="n">type_info</span> <span class="o">=&gt;</span> <span class="n">type_info</span><span class="p">()}</span>
-<span class="nf">type_info</span><span class="p">()</span>
-<span class="nf">errorstring</span><span class="p">()</span> <span class="o">=</span> <span class="n">binary</span><span class="p">()</span>
+<div class="highlight"><pre><span></span><code><span class="nf">contract_string</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">string</span><span class="p">()</span><span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="n">binary</span><span class="p">()</span><span class="w"></span>
+<span class="nf">contract_map</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">#{</span><span class="n">bytecode</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">binary</span><span class="p">(),</span><span class="w"></span>
+<span class="w">                   </span><span class="n">compiler_version</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">binary</span><span class="p">(),</span><span class="w"></span>
+<span class="w">                   </span><span class="n">contract_souce</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">string</span><span class="p">(),</span><span class="w"></span>
+<span class="w">                   </span><span class="n">type_info</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">type_info</span><span class="p">()}</span><span class="w"></span>
+<span class="nf">type_info</span><span class="p">()</span><span class="w"></span>
+<span class="nf">errorstring</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">binary</span><span class="p">()</span><span class="w"></span>
 </code></pre></div>
 <h3 id="exports">Exports</h3>
 <h4 id="filefile">file(File)</h4>
 <h4 id="filefile-options-compret">file(File, Options) -&gt; CompRet</h4>
 <h4 id="from_stringcontractstring-options-compret">from_string(ContractString, Options) -&gt; CompRet</h4>
 <p>Types</p>
-<div class="highlight"><pre><span></span><code><span class="nv">ContractString</span> <span class="o">=</span> <span class="n">contract_string</span><span class="p">()</span>
-<span class="nv">Options</span> <span class="o">=</span> <span class="p">[</span><span class="nv">Option</span><span class="p">]</span>
-<span class="nv">CompRet</span> <span class="o">=</span> <span class="p">{</span><span class="n">ok</span><span class="p">,</span><span class="nv">ContractMap</span><span class="p">}</span> <span class="p">|</span> <span class="p">{</span><span class="n">error</span><span class="p">,</span><span class="nv">ErrorString</span><span class="p">}</span>
-<span class="nv">ContractMap</span> <span class="o">=</span> <span class="n">contract_map</span><span class="p">()</span>
-<span class="nv">ErrorString</span> <span class="o">=</span> <span class="n">errorstring</span><span class="p">()</span>
+<div class="highlight"><pre><span></span><code><span class="nv">ContractString</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">contract_string</span><span class="p">()</span><span class="w"></span>
+<span class="nv">Options</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">Option</span><span class="p">]</span><span class="w"></span>
+<span class="nv">CompRet</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">ok</span><span class="p">,</span><span class="nv">ContractMap</span><span class="p">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="p">{</span><span class="n">error</span><span class="p">,</span><span class="nv">ErrorString</span><span class="p">}</span><span class="w"></span>
+<span class="nv">ContractMap</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">contract_map</span><span class="p">()</span><span class="w"></span>
+<span class="nv">ErrorString</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">errorstring</span><span class="p">()</span><span class="w"></span>
 </code></pre></div>
 <p>Compile a contract defined in a file or in a string.</p>
 <p>The <strong>pp_</strong> options all print to standard output the following:</p>
@@ -424,12 +424,12 @@ Type = term()
 Check a call in contract through the <code>__call</code> function.</p>
 <h4 id="sophia_type_to_typerepstring-typerep">sophia_type_to_typerep(String) -&gt; TypeRep</h4>
 <p>Types
-<div class="highlight"><pre><span></span><code> <span class="p">{</span><span class="n">ok</span><span class="p">,</span><span class="nv">TypeRep</span><span class="p">}</span> <span class="p">|</span> <span class="p">{</span><span class="n">error</span><span class="p">,</span> <span class="n">badtype</span><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><span class="w"> </span><span class="p">{</span><span class="n">ok</span><span class="p">,</span><span class="nv">TypeRep</span><span class="p">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="p">{</span><span class="n">error</span><span class="p">,</span><span class="w"> </span><span class="n">badtype</span><span class="p">}</span><span class="w"></span>
 </code></pre></div></p>
 <p>Get the type representation of a type declaration.</p>
 <h4 id="version-ok-version-error-term">version() -&gt; {ok, Version} | {error, term()}</h4>
 <p>Types</p>
-<div class="highlight"><pre><span></span><code><span class="nv">Version</span> <span class="o">=</span> <span class="n">binary</span><span class="p">()</span>
+<div class="highlight"><pre><span></span><code><span class="nv">Version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">binary</span><span class="p">()</span><span class="w"></span>
 </code></pre></div>
 <p>Get the current version of the Sophia compiler.</p>
                 

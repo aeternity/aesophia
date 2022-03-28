@@ -10,7 +10,7 @@
       
       
       <link rel="icon" href="../favicon.png">
-      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-7.1.9">
+      <meta name="generator" content="mkdocs-1.2.4, mkdocs-material-7.1.9">
     
     
       
@@ -968,16 +968,20 @@ the <code>pubkey</code></p>
 <h4 id="ecverify_secp256k1">ecverify_secp256k1</h4>
 <div class="highlight"><pre><span></span><code>Crypto.ecverify_secp256k1(msg : hash, addr : bytes(20), sig : bytes(65)) : bool
 </code></pre></div>
-<p>Verifies a signature for a msg against an Ethereum style address</p>
+<p>Verifies a signature for a msg against an Ethereum style address. Note that the
+signature should be 65 bytes and include the recovery identifier byte <code>V</code>. The
+expected organization of the signature is (<code>V || R || S</code>).</p>
 <h4 id="ecrecover_secp256k1">ecrecover_secp256k1</h4>
 <div class="highlight"><pre><span></span><code>Crypto.ecrecover_secp256k1(msg : hash, sig : bytes(65)) : option(bytes(20))
 </code></pre></div>
-<p>Recovers the Ethereum style address from a msg hash and respective signature</p>
+<p>Recovers the Ethereum style address from a msg hash and respective
+ECDSA-signature. Note that the signature should be 65 bytes and include the
+recovery identifier byte <code>V</code>. The expected organization of the signature is (<code>V
+|| R || S</code>).</p>
 <h4 id="verify_sig_secp256k1">verify_sig_secp256k1</h4>
 <div class="highlight"><pre><span></span><code>Crypto.verify_sig_secp256k1(msg : hash, pubkey : bytes(64), sig : bytes(64)) : bool
 </code></pre></div>
-<!-- TODO -->
-
+<p>Verifies a standard 64-byte ECDSA signature (<code>R || S</code>).</p>
 <h3 id="auth">Auth</h3>
 <h4 id="tx">tx</h4>
 <div class="highlight"><pre><span></span><code>Auth.tx : option(Chain.tx)
