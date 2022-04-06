@@ -1,0 +1,9 @@
+contract First =
+    entrypoint print_num(x) = 1 + x
+
+contract Second =
+    entrypoint print_num() = 1
+
+main contract Test =
+    entrypoint f(c) = c.print_num(1)
+    entrypoint g(c) = c.print_num()

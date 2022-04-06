@@ -217,6 +217,7 @@ compilable_contracts() ->
      "polymorphic_map_keys",
      "unapplied_contract_call",
      "unapplied_named_arg_builtin",
+     "resolve_field_constraint_by_arity",
      "test" % Custom general-purpose test file. Keep it last on the list.
     ].
 
@@ -733,10 +734,22 @@ failing_contracts() ->
                      "Conflicting updates for field 'foo'">>])
     , ?TYPE_ERROR(factories_type_errors,
                   [<<?Pos(10,18)
-                    "Chain.clone requires `ref` named argument of contract type.">>,
+                     "Chain.clone requires `ref` named argument of contract type.">>,
                    <<?Pos(11,18)
-                     "Cannot unify `(gas : int, value : int, protected : bool) => if(protected, option(void), void)` and `(gas : int, value : int, protected : bool, int, bool) => 'b`\n"
-                     "when checking contract construction of type\n  (gas : int, value : int, protected : bool) =>\n    if(protected, option(void), void) (at line 11, column 18)\nagainst the expected type\n  (gas : int, value : int, protected : bool, int, bool) => 'b">>,
+                     "Cannot unify `(gas : int, value : int, protected : bool) => if(protected, option(void), void)` and `(gas : int, value : int, protected : bool, int, bool) => if(protected, option(void), void)`\n"
+                     "when checking contract construction of type\n"
+                     "  (gas : int, value : int, protected : bool) =>\n"
+                     "    if(protected, option(void), void) (at line 11, column 18)\n"
+                     "against the expected type\n"
+                     "  (gas : int, value : int, protected : bool, int, bool) =>\n"
+                     "    if(protected, option(void), void)">>,
+                   <<?Pos(11,18)
+                     "Cannot unify `Bakoom` and `Kaboom`\n"
+                     "when checking that contract construction of type\n"
+                     "  Bakoom\n"
+                     "arising from resolution of variadic function `Chain.clone`\n"
+                     "matches the expected type\n"
+                     "  Kaboom">>,
                    <<?Pos(12,37)
                      "Cannot unify `int` and `bool`\n"
                      "when checking named argument `gas : int` against inferred type `bool`">>,
