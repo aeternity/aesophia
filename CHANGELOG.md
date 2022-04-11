@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Compiler warnings for the follwing: shadowing, negative spends, division by zero, unused functions, unused includes, unused stateful annotations, unused variables, unused parameters, unused user-defined type, dead return value.
+- The pipe operator |>
+  ```
+  [1, 2, 3] |> List.first |> Option.is_some  // Option.is_some(List.first([1, 2, 3]))
+  ```
 ### Changed
 - Error messages have been restructured (less newlines) to provide more unified errors. Also `pp_oneline/1` has been added.
 ### Removed
