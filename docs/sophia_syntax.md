@@ -234,6 +234,7 @@ Path ::= Id                 // Record field
 
 BinOp ::= '||' | '&&' | '<' | '>' | '=<' | '>=' | '==' | '!='
         | '::' | '++' | '+' | '-' | '*' | '/' | 'mod' | '^'
+        | '|>'
 UnOp  ::= '-' | '!'
 ```
 
@@ -245,6 +246,7 @@ UnOp  ::= '-' | '!'
 | `!` `&&` `\|\|` | logical operators
 | `==` `!=` `<` `>` `=<` `>=` | comparison operators
 | `::` `++` | list operators
+| `\|>` | functional operators
 
 ## Operator precendences
 
@@ -261,3 +263,4 @@ In order of highest to lowest precedence.
 | `<` `>` `=<` `>=` `==` `!=` | none
 | `&&` | right
 | `\|\|` | right
+| `\|>` | left

@@ -308,17 +308,18 @@ expr() -> expr100().
 
 expr100() ->
     Expr100 = ?LAZY_P(expr100()),
-    Expr200 = ?LAZY_P(expr200()),
+    Expr150 = ?LAZY_P(expr150()),
     choice(
     [ ?RULE(lam_args(), keyword('=>'), body(), {lam, _2, _1, _3})   %% TODO: better location
-    , {'if', keyword('if'), parens(Expr100), Expr200, right(tok(else), Expr100)}
-    , ?RULE(Expr200, optional(right(tok(':'), type())),
+    , {'if', keyword('if'), parens(Expr100), Expr150, right(tok(else), Expr100)}
+    , ?RULE(Expr150, optional(right(tok(':'), type())),
             case _2 of
                 none       -> _1;
                 {ok, Type} -> {typed, get_ann(_1), _1, Type}
             end)
     ]).
 
+expr150() -> infixl(expr200(), binop('|>')).
 expr200() -> infixr(expr300(), binop('||')).
 expr300() -> infixr(expr400(), binop('&&')).
 expr400() -> infix(expr500(),  binop(['<', '>', '=<', '>=', '==', '!='])).
