@@ -108,7 +108,7 @@ aci_test_contract(Name) ->
                {error, ErrorStringJ} when is_binary(ErrorStringJ) -> error(ErrorStringJ);
                {error, ErrorJ} -> aeso_compiler_tests:print_and_throw(ErrorJ)
            end,
-    case aeso_compiler:from_string(String, [{aci, json}, {backend, fate} | Opts]) of
+    case aeso_compiler:from_string(String, [{aci, json} | Opts]) of
         {ok, #{aci := JSON1}} ->
             ?assertEqual(JSON, JSON1),
             io:format("JSON:\n~p\n", [JSON]),

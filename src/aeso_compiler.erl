@@ -252,8 +252,9 @@ to_sophia_value(ContractString, Fun, ResType, Data) ->
 to_sophia_value(_, _, error, Err, _Options) ->
     {ok, {app, [], {id, [], "error"}, [{string, [], Err}]}};
 to_sophia_value(_, _, revert, Data, _Options) ->
-    try aeb_fate_encoding:deserialize(Data) of
-        Err -> {ok, {app, [], {id, [], "abort"}, [{string, [], Err}]}}
+    try aeso_vm_decode:from_fate({id, [], "string"}, aeb_fate_encoding:deserialize(Data)) of
+        Err ->
+            {ok, {app, [], {id, [], "abort"}, [Err]}}
     catch _:_ ->
             Msg = "Could not deserialize the revert message",
             {error, [aeso_errors:new(data_error, Msg)]}

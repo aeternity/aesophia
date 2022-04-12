@@ -41,7 +41,6 @@ format({invalid_entrypoint, Why, Ann, {id, _, Name}, Thing}) ->
     Msg = io_lib:format("The ~sof entrypoint '~s' ~s.",
                         [ThingS, Name, Bad]),
     case Why of
-        polymorphic  -> mk_err(pos(Ann), Msg, "Use the FATE backend if you want polymorphic entrypoints.\n");
         higher_order -> mk_err(pos(Ann), Msg)
     end;
 format({invalid_aens_resolve_type, Ann, T}) ->
