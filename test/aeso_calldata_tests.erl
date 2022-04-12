@@ -19,19 +19,9 @@ calldata_test_() ->
      [ {"Testing " ++ ContractName ++ " contract calling " ++ Fun,
         fun() ->
            ContractString = aeso_test_utils:read_contract(ContractName),
-           AevmExprs =
-              case not lists:member(ContractName, not_yet_compilable(aevm)) of
-                  true -> ast_exprs(ContractString, Fun, Args, [{backend, aevm}]);
-                  false -> undefined
-              end,
-           FateExprs =
-              case not lists:member(ContractName, not_yet_compilable(fate)) of
-                  true -> ast_exprs(ContractString, Fun, Args, [{backend, fate}]);
-                  false -> undefined
-              end,
+           FateExprs = ast_exprs(ContractString, Fun, Args),
            ParsedExprs = parse_args(Fun, Args),
-           [ ?assertEqual(ParsedExprs, AevmExprs) || AevmExprs /= undefined ],
-           [ ?assertEqual(ParsedExprs, FateExprs) || FateExprs /= undefined ],
+           ?assertEqual(ParsedExprs, FateExprs),
            ok
         end} || {ContractName, Fun, Args} <- compilable_contracts()].
 
@@ -42,19 +32,9 @@ calldata_aci_test_() ->
            {ok, ContractACIBin} = aeso_aci:contract_interface(string, ContractString),
            ContractACI = binary_to_list(ContractACIBin),
            io:format("ACI:\n~s\n", [ContractACIBin]),
-           AevmExprs =
-              case not lists:member(ContractName, not_yet_compilable(aevm)) of
-                  true -> ast_exprs(ContractACI, Fun, Args, [{backend, aevm}]);
-                  false -> undefined
-              end,
-           FateExprs =
-              case not lists:member(ContractName, not_yet_compilable(fate)) of
-                  true -> ast_exprs(ContractACI, Fun, Args, [{backend, fate}]);
-                  false -> undefined
-              end,
+           FateExprs = ast_exprs(ContractACI, Fun, Args),
            ParsedExprs = parse_args(Fun, Args),
-           [ ?assertEqual(ParsedExprs, AevmExprs) || AevmExprs /= undefined ],
-           [ ?assertEqual(ParsedExprs, FateExprs) || FateExprs /= undefined ],
+           ?assertEqual(ParsedExprs, FateExprs),
            ok
         end} || {ContractName, Fun, Args} <- compilable_contracts()].
 
@@ -75,6 +55,8 @@ strip_ann1(L) when is_list(L) ->
     lists:map(fun strip_ann/1, L);
 strip_ann1(X) -> X.
 
+ast_exprs(ContractString, Fun, Args) ->
+    ast_exprs(ContractString, Fun, Args, []).
 ast_exprs(ContractString, Fun, Args, Opts) ->
     {ok, Data} = (catch aeso_compiler:create_calldata(ContractString, Fun, Args, Opts)),
     {ok, _Types, Exprs} = (catch aeso_compiler:decode_calldata(ContractString, Fun, Data, Opts)),
@@ -159,8 +141,3 @@ compilable_contracts() ->
      {"stub", "foo", ["-42"]},
      {"payable", "foo", ["42"]}
     ].
-
-not_yet_compilable(fate) ->
-    [];
-not_yet_compilable(aevm) ->
-    ["funargs", "strings"].

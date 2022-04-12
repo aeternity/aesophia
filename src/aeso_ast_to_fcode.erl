@@ -9,7 +9,7 @@
 %%%-------------------------------------------------------------------
 -module(aeso_ast_to_fcode).
 
--export([ast_to_fcode/2, format_fexpr/1]).
+-export([ast_to_fcode/2, format_fexpr/1, type_to_fcode/2]).
 -export_type([fcode/0, fexpr/0, fun_def/0]).
 
 -include("aeso_utils.hrl").

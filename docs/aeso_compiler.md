@@ -49,8 +49,6 @@ The **pp_** options all print to standard output the following:
 
 `pp_typed_ast` - print the AST with type information at each node
 
-`pp_icode` - print the internal code structure
-
 `pp_assembler` - print the generated assembler code
 
 `pp_bytecode` - print the bytecode instructions

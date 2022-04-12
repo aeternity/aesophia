@@ -1928,7 +1928,7 @@ infer_infix({RelOp, As})
   when RelOp == '=='; RelOp == '!=';
        RelOp == '<';  RelOp == '>';
        RelOp == '<='; RelOp == '=<'; RelOp == '>=' ->
-    T = fresh_uvar(As),     %% allow any type here, check in ast_to_icode that we have comparison for it
+    T = fresh_uvar(As),     %% allow any type here, check in the backend that we have comparison for it
     Bool = {id, As, "bool"},
     {fun_t, As, [], [T, T], Bool};
 infer_infix({'..', As}) ->

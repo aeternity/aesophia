@@ -9,7 +9,7 @@
 %%%-------------------------------------------------------------------
 -module(aeso_fcode_to_fate).
 
--export([compile/2, compile/3, term_to_fate/1, term_to_fate/2]).
+-export([compile/2, compile/3, term_to_fate/1, term_to_fate/2, type_to_scode/1]).
 
 -ifdef(TEST).
 -export([optimize_fun/4, to_basic_blocks/1]).
