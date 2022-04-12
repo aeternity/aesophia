@@ -1306,6 +1306,9 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h3 id="added">Added</h3>
 <ul>
 <li>Compiler warnings for the follwing: shadowing, negative spends, division by zero, unused functions, unused includes, unused stateful annotations, unused variables, unused parameters, unused user-defined type, dead return value.</li>
+<li>The pipe operator |&gt;
+  <div class="highlight"><pre><span></span><code>[1, 2, 3] |&gt; List.first |&gt; Option.is_some  // Option.is_some(List.first([1, 2, 3]))
+</code></pre></div></li>
 </ul>
 <h3 id="changed">Changed</h3>
 <ul>
