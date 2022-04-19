@@ -863,11 +863,9 @@ infer1(Env0, [{Contract, Ann, ConName, Impls, Code} | Rest], Acc, Options)
                                    _         -> ok
                                end
                   end, Impls),
-    destroy_and_report_type_errors(Env),
-    create_type_errors(),
     case What of
         contract ->
-            ImplementedInterfaces = [proplists:get_value(Name, AllInterfaces) || Name <- ImplsNames],
+            ImplementedInterfaces = [I || I <- [proplists:get_value(Name, AllInterfaces) || Name <- ImplsNames], I /= undefined],
             check_implemented_interfaces(ImplementedInterfaces, ConName, [ Fun || Fun = {letfun, _, _, _, _, _} <- Code1 ], [], AllInterfaces);
         contract_interface ->
             ok
