@@ -62,15 +62,6 @@ Type = term()
 ```
 Check a call in contract through the `__call` function.
 
-#### sophia_type_to_typerep(String) -> TypeRep
-
-Types
-``` erlang
- {ok,TypeRep} | {error, badtype}
-```
-
-Get the type representation of a type declaration.
-
 #### version() -> {ok, Version} | {error, term()}
 
 Types

@@ -225,9 +225,6 @@ payable stateful entrypoint buy(to : address) =
     abort("Value too low")
 ```
 
-Note: In the æternity VM (AEVM) contracts and entrypoints were by default
-payable until the Lima release.
-
 ## Namespaces
 
 Code can be split into libraries using the `namespace` construct. Namespaces
@@ -405,7 +402,7 @@ Sophia has the following types:
 
 ## Arithmetic
 
-Sophia integers (`int`) are represented by 256-bit (AEVM) or arbitrary-sized (FATE) signed words and supports the following
+Sophia integers (`int`) are represented by arbitrary-sized signed words and support the following
 arithmetic operations:
 - addition (`x + y`)
 - subtraction (`x - y`)
@@ -414,22 +411,16 @@ arithmetic operations:
 - remainder (`x mod y`), satisfying `y * (x / y) + x mod y == x` for non-zero `y`
 - exponentiation (`x ^ y`)
 
-All operations are *safe* with respect to overflow and underflow. On AEVM they behave as the corresponding
-operations on arbitrary-size integers and fail with `arithmetic_error` if the
-result cannot be represented by a 256-bit signed word. For example, `2 ^ 255`
-fails rather than wrapping around to -2²⁵⁵.
-
-The division and modulo operations also throw an arithmetic error if the
-second argument is zero.
+All operations are *safe* with respect to overflow and underflow. 
+The division and modulo operations throw an arithmetic error if the
+right-hand operand is zero.
 
 ## Bit fields
 
 Sophia integers do not support bit arithmetic. Instead there is a separate
 type `bits`. See the standard library [documentation](sophia_stdlib.md#bits).
 
-On the AEVM a bit field is represented by a 256-bit word and reading or writing
-a bit outside the 0..255 range fails with an `arithmetic_error`. On FATE a bit
-field can be of arbitrary size (but it is still represented by the
+A bit field can be of arbitrary size (but it is still represented by the
 corresponding integer, so setting very high bits can be expensive).
 
 ## Type aliases
