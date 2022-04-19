@@ -49,12 +49,6 @@ format({invalid_aens_resolve_type, Ann, T}) ->
                         "It must be a string or a pubkey type (address, oracle, etc).",
                         [pp_type(2, T)]),
     mk_err(pos(Ann), Msg);
-format({invalid_map_key_type, Why, Ann, Type}) ->
-    Msg = io_lib:format("Invalid map key type\n~s", [pp_type(2, Type)]),
-    Cxt = case Why of
-             function    -> "Map keys cannot be higher-order."
-          end,
-    mk_err(pos(Ann), Msg, Cxt);
 format({invalid_oracle_type, Why, What, Ann, Type}) ->
     WhyS = case Why of higher_order -> "higher-order (contain function types)";
                        polymorphic  -> "polymorphic (contain type variables)" end,

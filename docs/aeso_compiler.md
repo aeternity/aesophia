@@ -51,8 +51,6 @@ The **pp_** options all print to standard output the following:
 
 `pp_assembler` - print the generated assembler code
 
-`pp_bytecode` - print the bytecode instructions
-
 #### check_call(ContractString, Options) -> CheckRet
 
 Types

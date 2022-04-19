@@ -34,7 +34,6 @@
                 | pp_types
                 | pp_typed_ast
                 | pp_assembler
-                | pp_bytecode
                 | no_code
                 | keep_included
                 | debug_mode
