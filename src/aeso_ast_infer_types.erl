@@ -855,22 +855,7 @@ infer1(Env0, [{Contract, Ann, ConName, Impls, Code} | Rest], Acc, Options)
     end,
     {Env1, Code1} = infer_contract_top(push_scope(contract, ConName, Env), What, Code, Options),
     Contract1 = {Contract, Ann, ConName, Impls, Code1},
-    AllInterfaces = [{name(IName), I} || I = {contract_interface, _, IName, _, _} <- Acc],
-    ImplsNames = lists:map(fun name/1, Impls),
-    create_type_errors(),
-    lists:foreach(fun(Impl) -> case proplists:get_value(name(Impl), AllInterfaces) of
-                                   undefined -> type_error({referencing_undefined_interface, Impl});
-                                   _         -> ok
-                               end
-                  end, Impls),
-    case What of
-        contract ->
-            ImplementedInterfaces = [I || I <- [proplists:get_value(Name, AllInterfaces) || Name <- ImplsNames], I /= undefined],
-            check_implemented_interfaces(ImplementedInterfaces, ConName, [ Fun || Fun = {letfun, _, _, _, _, _} <- Code1 ], [], AllInterfaces);
-        contract_interface ->
-            ok
-    end,
-    destroy_and_report_type_errors(Env),
+    check_implemented_interfaces(Env1, Contract1, What, Acc),
     Env2 = pop_scope(Env1),
     Env3 = bind_contract(Contract1, Env2),
     infer1(Env3, Rest, [Contract1 | Acc], Options);
@@ -886,18 +871,47 @@ infer1(Env, [{pragma, _, _} | Rest], Acc, Options) ->
     %% Pragmas are checked in check_modifiers
     infer1(Env, Rest, Acc, Options).
 
-check_implemented_interfaces([], _, _, _, _) ->
+check_implemented_interfaces(Env, {_Contract, _Ann, ConName, Impls, Code}, What, DefinedContracts) ->
+    create_type_errors(),
+    AllInterfaces = [{name(IName), I} || I = {contract_interface, _, IName, _, _} <- DefinedContracts],
+    ImplsNames = lists:map(fun name/1, Impls),
+
+    %% All implemented intrefaces should already be defined
+    lists:foreach(fun(Impl) -> case proplists:get_value(name(Impl), AllInterfaces) of
+                                   undefined -> type_error({referencing_undefined_interface, Impl});
+                                   _         -> ok
+                               end
+                  end, Impls),
+
+    case What of
+        contract ->
+            ImplementedInterfaces = [I || I <- [proplists:get_value(Name, AllInterfaces) || Name <- ImplsNames],
+                                          I /= undefined],
+            Letfuns = [ Fun || Fun = {letfun, _, _, _, _, _} <- Code ],
+            check_implemented_interfaces_recursive(ImplementedInterfaces, ConName, Letfuns, AllInterfaces);
+        contract_interface ->
+            ok
+    end,
+    destroy_and_report_type_errors(Env).
+
+check_implemented_interfaces_recursive(ImplementedInterfaces, ConId, Letfuns, AllInterfaces) ->
+    check_implemented_interfaces_recursive(ImplementedInterfaces, ConId, Letfuns, [], AllInterfaces).
+
+%% Recursively check that all directly and indirectly referenced interfaces are implemented
+check_implemented_interfaces_recursive([], _, _, _, _) ->
     ok;
-check_implemented_interfaces([{contract_interface, _, IName, Extensions, Decls} | Interfaces], ConId, Impls, Acc, AllInterfaces) ->
+check_implemented_interfaces_recursive([{contract_interface, _, IName, Extensions, Decls} | Interfaces],
+                                       ConId, Impls, Acc, AllInterfaces) ->
     case lists:member(name(IName), Acc) of
         true ->
-            check_implemented_interfaces(Interfaces, ConId, Impls, Acc, AllInterfaces);
+            check_implemented_interfaces_recursive(Interfaces, ConId, Impls, Acc, AllInterfaces);
         false ->
             Unmatched = match_impls(Decls, ConId, name(IName), Impls),
-            NewInterfaces = [proplists:get_value(name(I), AllInterfaces) || I <- Extensions],
-            check_implemented_interfaces(Interfaces ++ NewInterfaces, ConId, Unmatched, [name(IName) | Acc], AllInterfaces)
+            NewInterfaces = Interfaces ++ [proplists:get_value(name(I), AllInterfaces) || I <- Extensions],
+            check_implemented_interfaces_recursive(NewInterfaces, ConId, Unmatched, [name(IName) | Acc], AllInterfaces)
     end.
 
+%% Match the functions of the contract with the interfaces functions, and return unmatched functions
 match_impls([], _, _, Impls) ->
     Impls;
 match_impls([{fun_decl, _, {id, _, FunName}, {fun_t, _, _, ArgsTypes, RetDecl}} | Decls], ConId, IName, Impls) ->
