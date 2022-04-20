@@ -933,7 +933,8 @@ match_impls([{fun_decl, _, {id, _, FunName}, {fun_t, _, _, ArgsTypes, RetDecl}} 
 
 
 -spec compare_types(T, T) -> boolean() when T :: utype() | [utype()].
-compare_types(Types1 = [_ | _], Types2 = [_ | _]) ->
+compare_types(Types1, Types2)
+  when is_list(Types1) andalso is_list(Types2) ->
     length(Types1) == length(Types2) andalso
     lists:all(fun({T1, T2}) -> compare_types(T1, T2) end, lists:zip(Types1, Types2));
 compare_types({fun_t, _, _, Types1, RetType1}, {fun_t, _, _, Types2, RetType2}) ->
