@@ -1157,17 +1157,13 @@ infer_type_vars_variance(TypeParams, Cons) ->
     Vs = lists:flatten([infer_type_vars_variance(Arg) || Arg <- FlatArgs]),
     lists:map(fun({tvar, _, TVar}) ->
                       S = sets:from_list([Variance || {TV, Variance} <- Vs, TV == TVar]),
-                      IsInvariant     = sets:is_element(invariant, S),
                       IsCovariant     = sets:is_element(covariant, S),
                       IsContravariant = sets:is_element(contravariant, S),
-                      IsBivariant     = sets:is_element(bivariant, S),
-                      case {IsInvariant, IsCovariant, IsContravariant, IsBivariant} of
-                          {true,      _,     _,    _} -> invariant;
-                          {false,  true,  true,    _} -> invariant;
-                          {false,     _,     _, true} -> bivariant;
-                          {false,  true, false,    _} -> covariant;
-                          {false, false,  true,    _} -> contravariant;
-                          _ -> invariant
+                      case {IsCovariant, IsContravariant} of
+                          {true,   true} -> invariant;
+                          {true,  false} -> covariant;
+                          {false,  true} -> contravariant;
+                          {false, false} -> bivariant
                       end
               end, TypeParams).
 
