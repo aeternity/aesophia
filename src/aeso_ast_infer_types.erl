@@ -937,9 +937,10 @@ compare_types(Types1, Types2)
   when is_list(Types1) andalso is_list(Types2) ->
     length(Types1) == length(Types2) andalso
     lists:all(fun({T1, T2}) -> compare_types(T1, T2) end, lists:zip(Types1, Types2));
-compare_types({fun_t, _, _, Types1, RetType1}, {fun_t, _, _, Types2, RetType2}) ->
-    % TODO: what about named_args_t and var_args?
-    compare_types(RetType1, RetType2) andalso compare_types(Types1, Types2);
+compare_types({fun_t, _, NamedArgs1, Types1, RetType1}, {fun_t, _, NamedArgs2, Types2, RetType2}) ->
+    compare_types(NamedArgs1, NamedArgs2) andalso
+    compare_types(RetType1, RetType2) andalso
+    compare_types(Types1, Types2);
 compare_types({app_t, _, Type1, ArgsTypes1}, {app_t, _, Type2, ArgsTypes2}) ->
     compare_types(Type1, Type2) andalso compare_types(ArgsTypes1, ArgsTypes2);
 compare_types({tuple_t, _, Types1}, {tuple_t, _, Types2}) ->
@@ -952,6 +953,8 @@ compare_types(T1 = {Id, _, Type}, {Id, _, Type}) when ?is_type_id(T1) ->
     true;
 compare_types({if_t, _, {id, _, Id}, Ta1, Tb1}, {if_t, _, {id, _, Id}, Ta2, Tb2}) ->
     compare_types(Ta1, Ta2) andalso compare_types(Tb1, Tb2);
+compare_types({named_arg_t, _, {id, _, Name}, T1, _}, {named_arg_t, _, {id, _, Name}, T2, _}) ->
+    compare_types(T1, T2);
 compare_types(_, _) ->
     false.
 
