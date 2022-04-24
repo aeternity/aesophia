@@ -1154,7 +1154,7 @@ infer_type_vars_variance(TypeParams, Cons) ->
     % args from all type constructors
     FlatArgs = lists:flatten([Args || {constr_t, _, _, Args} <- Cons]),
 
-    Vs = lists:flatten([infer_type_vars_variance(Arg) || Arg <- FlatArgs]),
+    Vs = lists:flatten([element(1, infer_type_vars_variance(Arg)) || Arg <- FlatArgs]),
     lists:map(fun({tvar, _, TVar}) ->
                       S = sets:from_list([Variance || {TV, Variance} <- Vs, TV == TVar]),
                       IsCovariant     = sets:is_element(covariant, S),
@@ -1167,7 +1167,7 @@ infer_type_vars_variance(TypeParams, Cons) ->
                       end
               end, TypeParams).
 
--spec infer_type_vars_variance(utype()) -> [{name(), variance()}].
+-spec infer_type_vars_variance(utype()) -> {[{name(), variance()}], integer()}.
 infer_type_vars_variance({app_t, _, Type, Args}) ->
     Variances = case ets_lookup(type_vars_variance, qname(Type)) of
                     [{_, Vs}] -> Vs;
@@ -1175,8 +1175,8 @@ infer_type_vars_variance({app_t, _, Type, Args}) ->
                 end,
     TypeVarsVariance = [{TVar, Variance}
                         || {{tvar, _, TVar}, Variance} <- lists:zip(Args, Variances)],
-    TypeVarsVariance;
-infer_type_vars_variance(FT = {fun_t, _, [], [{app_t, _, Type, Args}], Res}) ->
+    {TypeVarsVariance, 0};
+infer_type_vars_variance({fun_t, _, [], [{app_t, _, Type, Args}], Res}) ->
     Variances = case ets_lookup(type_vars_variance, qname(Type)) of
                     [{_, Vs}] -> Vs;
                     _ -> lists:duplicate(length(Args), covariant)
@@ -1186,27 +1186,25 @@ infer_type_vars_variance(FT = {fun_t, _, [], [{app_t, _, Type, Args}], Res}) ->
     FlipVariance = fun({TVar, covariant}) -> {TVar, contravariant};
                       ({TVar, contravariant}) -> {TVar, covariant}
                    end,
-    Cur = case arrows_in_type(FT) rem 2 of
+    {TVVs, Depth} = infer_type_vars_variance(Res),
+    Cur = case (Depth + 1) rem 2 of
               0 -> TypeVarsVariance;
               1 -> lists:map(FlipVariance, TypeVarsVariance)
           end,
-    Cur ++ infer_type_vars_variance(Res);
-infer_type_vars_variance(FT = {fun_t, _, [], [{tvar, _, TVar}], Res}) ->
-    Cur = case arrows_in_type(FT) rem 2 of
+    {Cur ++ TVVs, Depth + 1};
+infer_type_vars_variance({fun_t, _, [], [{tvar, _, TVar}], Res}) ->
+    {TVVs, Depth} = infer_type_vars_variance(Res),
+    Cur = case (Depth + 1) rem 2 of
               0 -> {TVar, covariant};
               1 -> {TVar, contravariant}
           end,
-    [Cur | infer_type_vars_variance(Res)];
+    {[Cur | TVVs], Depth + 1};
 infer_type_vars_variance({fun_t, _, [], [_Arg], Res}) ->
-    infer_type_vars_variance(Res);
+    {X, Depth} = infer_type_vars_variance(Res),
+    {X, Depth + 1};
 infer_type_vars_variance({tvar, _, TVar}) ->
-    [{TVar, covariant}];
-infer_type_vars_variance(_) -> [].
-
-arrows_in_type({fun_t, _, [], [_Arg], FRes}) ->
-    1 + arrows_in_type(FRes);
-arrows_in_type(_) ->
-    0.
+    {[{TVar, covariant}], 0};
+infer_type_vars_variance(_) -> {[], 0}.
 
 opposite_variance(invariant) -> invariant;
 opposite_variance(covariant) -> contravariant;
