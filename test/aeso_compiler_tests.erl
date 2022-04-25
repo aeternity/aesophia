@@ -883,7 +883,10 @@ failing_contracts() ->
                      "when checking the application of\n"
                      "  `g5 : ((Animal) => Animal) => Cat`\n"
                      "to arguments\n"
-                     "  `x : (Cat) => Cat`">>
+                     "  `x : (Cat) => Cat`">>,
+                   <<?Pos(54, 44)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the expression `f6() : option(Animal)` against the expected type `option(Cat)`">>
                   ])
     , ?TYPE_ERROR(polymorphism_variance_switching_custom_types,
                   [<<?Pos(56,32)
