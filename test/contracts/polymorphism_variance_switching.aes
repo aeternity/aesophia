@@ -48,3 +48,18 @@ main contract Main =
 
     stateful function g5(x : (Animal => Animal)) : Cat = Chain.create()
     stateful function f5(x : (Cat => Cat)) : Animal = g5(x)
+
+    stateful function g6() : option(Cat) = Some(Chain.create())
+    stateful function f6() : option(Animal) = g6()
+    stateful function h6() : option(Cat) = f6()
+
+    type cat_type = Cat
+    type animal_type = Animal
+    type cat_cat_map = map(cat_type, cat_type)
+    type animal_animal_map = map(animal_type, animal_type)
+
+    stateful function g71(x : animal_type) : cat_type = Chain.create()
+    stateful function f71(x : cat_type) : animal_type = g1(x)
+
+    stateful function g72() : cat_cat_map = { [Chain.create()] = Chain.create() }
+    stateful function f72() : animal_animal_map = g13()
