@@ -1307,8 +1307,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <ul>
 <li>Compiler warnings for the follwing: shadowing, negative spends, division by zero, unused functions, unused includes, unused stateful annotations, unused variables, unused parameters, unused user-defined type, dead return value.</li>
 <li>The pipe operator |&gt;
-  <div class="highlight"><pre><span></span><code>[1, 2, 3] |&gt; List.first |&gt; Option.is_some  // Option.is_some(List.first([1, 2, 3]))
-</code></pre></div></li>
+  <code>[1, 2, 3] |&gt; List.first |&gt; Option.is_some  // Option.is_some(List.first([1, 2, 3]))</code></li>
 </ul>
 <h3 id="changed">Changed</h3>
 <ul>
@@ -1326,14 +1325,12 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>Add builtin types (<code>AENS.name, AENS.pointee, Chain.ttl, Chain.base_tx, Chain.ga_meta_tx, Chain.paying_for_tx</code>) to
   the calldata and result decoder</li>
 <li>Patterns guards
-  <div class="highlight"><pre><span></span><code>switch(x)
-  a::[] | a &gt; 10 =&gt; 1
-  _              =&gt; 2
-</code></pre></div>
-  <div class="highlight"><pre><span></span><code>function
-  f(a::[]) | a &gt; 10 = 1
-  f(_)              = 2
-</code></pre></div></li>
+  <code>switch(x)
+    a::[] | a &gt; 10 =&gt; 1
+    _              =&gt; 2</code>
+  <code>function
+    f(a::[]) | a &gt; 10 = 1
+    f(_)              = 2</code></li>
 </ul>
 <h3 id="changed_1">Changed</h3>
 <ul>
@@ -1377,11 +1374,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   has been added. Use it by <code>include "String.aes"</code>. It includes functions for
   turning strings into lists of characters for detailed manipulation. For
   example:
-  <div class="highlight"><pre><span></span><code>include &quot;String.aes&quot;
-contract C =
-  entrypoint filter_all_a(s: string) : string =
-    String.from_list(List.filter((c : char) =&gt; c != &#39;a&#39;, String.to_list(s)))
-</code></pre></div>
+  <code>include "String.aes"
+  contract C =
+    entrypoint filter_all_a(s: string) : string =
+      String.from_list(List.filter((c : char) =&gt; c != 'a', String.to_list(s)))</code>
   will return a list with all <code>a</code>'s removed.</li>
 </ul>
 <p>There are also convenience functions <code>split</code>, <code>concat</code>, <code>to_upper</code>,
@@ -1413,14 +1409,13 @@ contract C =
   transaction and the transaction hash is available <code>Auth.tx</code>, it is only
   available during authentication if invoked by a normal contract call
   it returns <code>None</code>. Example:
-  <div class="highlight"><pre><span></span><code>switch(Auth.tx)
-  None      =&gt; abort(&quot;Not in Auth context&quot;)
-  Some(tx0) =&gt;
-    switch(tx0.tx)
-      Chain.SpendTx(_, amount, _)  =&gt; amount &gt; 400
-      Chain.ContractCallTx(_, _)   =&gt; true
-      _                            =&gt; false
-</code></pre></div>
+  <code>switch(Auth.tx)
+    None      =&gt; abort("Not in Auth context")
+    Some(tx0) =&gt;
+      switch(tx0.tx)
+        Chain.SpendTx(_, amount, _)  =&gt; amount &gt; 400
+        Chain.ContractCallTx(_, _)   =&gt; true
+        _                            =&gt; false</code>
 - A debug mode is a added to the compiler. Right now its only use is to
   turn off hermetization.</p>
 <h3 id="changed_5">Changed</h3>
@@ -1469,21 +1464,18 @@ contract C =
 <ul>
 <li>Allow separate entrypoint/function type signature and definition, and pattern
   matching in left-hand sides:
-  <div class="highlight"><pre><span></span><code>  function
-    length : list(&#39;a) =&gt; int
-    length([])      = 0
-    length(x :: xs) = 1 + length(xs)
-</code></pre></div></li>
+  <code>function
+      length : list('a) =&gt; int
+      length([])      = 0
+      length(x :: xs) = 1 + length(xs)</code></li>
 <li>Allow pattern matching in list comprehension generators (filtering out match
   failures):
-  <div class="highlight"><pre><span></span><code>  function somes(xs : list(option(&#39;a))) : list(&#39;a) =
-    [ x | Some(x) &lt;- xs ]
-</code></pre></div></li>
+  <code>function somes(xs : list(option('a))) : list('a) =
+      [ x | Some(x) &lt;- xs ]</code></li>
 <li>Allow pattern matching in let-bindings (aborting on match failures):
-  <div class="highlight"><pre><span></span><code>  function test(m : map(int, int)) =
-      let Some(x) = Map.lookup(m, 0)
-      x
-</code></pre></div></li>
+  <code>function test(m : map(int, int)) =
+        let Some(x) = Map.lookup(m, 0)
+        x</code></li>
 </ul>
 <h3 id="changed_7">Changed</h3>
 <ul>
@@ -1522,9 +1514,8 @@ contract C =
   and verifying an Ethereum address for a message hash and a signature.</li>
 <li>Sophia supports list comprehensions known from languages like Python, Haskell or Erlang.
   Example syntax:
-<div class="highlight"><pre><span></span><code>[x + y | x &lt;- [1,2,3,4,5], let k = x*x, if (k &gt; 5), y &lt;- [k, k+1, k+2]]
-// yields [12,13,14,20,21,22,30,31,32]
-</code></pre></div></li>
+<code>[x + y | x &lt;- [1,2,3,4,5], let k = x*x, if (k &gt; 5), y &lt;- [k, k+1, k+2]]
+// yields [12,13,14,20,21,22,30,31,32]</code></li>
 <li>A new contract, and endpoint, modifier <code>payable</code> is introduced. Contracts, and enpoints,
   that shall be able to receive funds should be marked as payable. <code>Address.is_payable(a)</code>
   can be used to check if an (contract) address is payable or not.</li>
@@ -1562,24 +1553,21 @@ contract C =
 <h3 id="added_8">Added</h3>
 <ul>
 <li>New builtin function <code>require : (bool, string) =&gt; ()</code>. Defined as
-    <div class="highlight"><pre><span></span><code>function require(b, err) = if(!b) abort(err)
-</code></pre></div></li>
+    <code>function require(b, err) = if(!b) abort(err)</code></li>
 <li>New builtin functions
-    <div class="highlight"><pre><span></span><code>Bytes.to_str : bytes(_) =&gt; string
-Bytes.to_int : bytes(_) =&gt; int
-</code></pre></div>
+    <code>Bytes.to_str : bytes(_) =&gt; string
+    Bytes.to_int : bytes(_) =&gt; int</code>
   for converting a byte array to a hex string and interpreting it as a
   big-endian encoded integer respectively.</li>
 </ul>
 <h3 id="changed_10">Changed</h3>
 <ul>
 <li>Public contract functions must now be declared as <em>entrypoints</em>:
-  <div class="highlight"><pre><span></span><code>contract Example =
-  // Exported
-  entrypoint exported_fun(x) = local_fun(x)
-  // Not exported
-  function local_fun(x) = x
-</code></pre></div>
+  <code>contract Example =
+    // Exported
+    entrypoint exported_fun(x) = local_fun(x)
+    // Not exported
+    function local_fun(x) = x</code>
   Functions in namespaces still use <code>function</code> (and <code>private function</code> for
   private functions).</li>
 <li>The return type of <code>Chain.block_hash(height)</code> has changed, it used to

@@ -386,25 +386,25 @@
 <p>This module provides the interface to the standard Sophia compiler. It
 returns the compiled module in a map which can then be loaded.</p>
 <h3 id="types">Types</h3>
-<div class="highlight"><pre><span></span><code><span class="nf">contract_string</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">string</span><span class="p">()</span><span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="n">binary</span><span class="p">()</span><span class="w"></span>
-<span class="nf">contract_map</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">#{</span><span class="n">bytecode</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">binary</span><span class="p">(),</span><span class="w"></span>
-<span class="w">                   </span><span class="n">compiler_version</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">binary</span><span class="p">(),</span><span class="w"></span>
-<span class="w">                   </span><span class="n">contract_souce</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">string</span><span class="p">(),</span><span class="w"></span>
-<span class="w">                   </span><span class="n">type_info</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">type_info</span><span class="p">()}</span><span class="w"></span>
-<span class="nf">type_info</span><span class="p">()</span><span class="w"></span>
-<span class="nf">errorstring</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">binary</span><span class="p">()</span><span class="w"></span>
-</code></pre></div>
+<p><code>erlang
+contract_string() = string() | binary()
+contract_map() = #{bytecode =&gt; binary(),
+                   compiler_version =&gt; binary(),
+                   contract_souce =&gt; string(),
+                   type_info =&gt; type_info()}
+type_info()
+errorstring() = binary()</code></p>
 <h3 id="exports">Exports</h3>
 <h4 id="filefile">file(File)</h4>
 <h4 id="filefile-options-compret">file(File, Options) -&gt; CompRet</h4>
 <h4 id="from_stringcontractstring-options-compret">from_string(ContractString, Options) -&gt; CompRet</h4>
 <p>Types</p>
-<div class="highlight"><pre><span></span><code><span class="nv">ContractString</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">contract_string</span><span class="p">()</span><span class="w"></span>
-<span class="nv">Options</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">Option</span><span class="p">]</span><span class="w"></span>
-<span class="nv">CompRet</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">ok</span><span class="p">,</span><span class="nv">ContractMap</span><span class="p">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="p">{</span><span class="n">error</span><span class="p">,</span><span class="nv">ErrorString</span><span class="p">}</span><span class="w"></span>
-<span class="nv">ContractMap</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">contract_map</span><span class="p">()</span><span class="w"></span>
-<span class="nv">ErrorString</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">errorstring</span><span class="p">()</span><span class="w"></span>
-</code></pre></div>
+<p><code>erlang
+ContractString = contract_string()
+Options = [Option]
+CompRet = {ok,ContractMap} | {error,ErrorString}
+ContractMap = contract_map()
+ErrorString = errorstring()</code></p>
 <p>Compile a contract defined in a file or in a string.</p>
 <p>The <strong>pp_</strong> options all print to standard output the following:</p>
 <p><code>pp_sophia_code</code> - print the input Sophia code.</p>
@@ -416,21 +416,20 @@ returns the compiled module in a map which can then be loaded.</p>
 <p><code>pp_bytecode</code> - print the bytecode instructions</p>
 <h4 id="check_callcontractstring-options-checkret">check_call(ContractString, Options) -&gt; CheckRet</h4>
 <p>Types
-<div class="highlight"><pre><span></span><code>ContractString = string() | binary()
+<code>ContractString = string() | binary()
 CheckRet = {ok,string(),{Types,Type | any()},Terms} | {error,Term}
 Types = [Type]
-Type = term()
-</code></pre></div>
+Type = term()</code>
 Check a call in contract through the <code>__call</code> function.</p>
 <h4 id="sophia_type_to_typerepstring-typerep">sophia_type_to_typerep(String) -&gt; TypeRep</h4>
 <p>Types
-<div class="highlight"><pre><span></span><code><span class="w"> </span><span class="p">{</span><span class="n">ok</span><span class="p">,</span><span class="nv">TypeRep</span><span class="p">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="p">{</span><span class="n">error</span><span class="p">,</span><span class="w"> </span><span class="n">badtype</span><span class="p">}</span><span class="w"></span>
-</code></pre></div></p>
+<code>erlang
+ {ok,TypeRep} | {error, badtype}</code></p>
 <p>Get the type representation of a type declaration.</p>
 <h4 id="version-ok-version-error-term">version() -&gt; {ok, Version} | {error, term()}</h4>
 <p>Types</p>
-<div class="highlight"><pre><span></span><code><span class="nv">Version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">binary</span><span class="p">()</span><span class="w"></span>
-</code></pre></div>
+<p><code>erlang
+Version = binary()</code></p>
 <p>Get the current version of the Sophia compiler.</p>
                 
               

@@ -777,11 +777,10 @@ in the scope and do not need any actions to be used, while the others require so
 <li><a href="#oracle">Oracle</a></li>
 </ul>
 <p>The following ones need to be included as regular files with <code>.aes</code> suffix, for example
-<div class="highlight"><pre><span></span><code>include &quot;List.aes&quot;
-</code></pre></div></p>
+<code>include "List.aes"</code></p>
 <ul>
 <li><a href="#bitwise">Bitwise</a></li>
-<li><a href="bls12_381">BLS12_381</a></li>
+<li><a href="#bls12_381">BLS12_381</a></li>
 <li><a href="#func">Func</a></li>
 <li><a href="#frac">Frac</a></li>
 <li><a href="#list">List</a></li>
@@ -795,24 +794,19 @@ in the scope and do not need any actions to be used, while the others require so
 <p>They are available without any explicit includes.</p>
 <h3 id="address">Address</h3>
 <h4 id="to_str">to_str</h4>
-<div class="highlight"><pre><span></span><code>Address.to_str(a : address) : string
-</code></pre></div>
+<p><code>Address.to_str(a : address) : string</code></p>
 <p>Base58 encoded string</p>
 <h4 id="is_contract">is_contract</h4>
-<div class="highlight"><pre><span></span><code>Address.is_contract(a : address) : bool
-</code></pre></div>
+<p><code>Address.is_contract(a : address) : bool</code></p>
 <p>Is the address a contract</p>
 <h4 id="is_oracle">is_oracle</h4>
-<div class="highlight"><pre><span></span><code>Address.is_oracle(a : address) : bool
-</code></pre></div>
+<p><code>Address.is_oracle(a : address) : bool</code></p>
 <p>Is the address a registered oracle</p>
 <h4 id="is_payable">is_payable</h4>
-<div class="highlight"><pre><span></span><code>Address.is_payable(a : address) : bool
-</code></pre></div>
+<p><code>Address.is_payable(a : address) : bool</code></p>
 <p>Can the address be spent to</p>
 <h4 id="to_contract">to_contract</h4>
-<div class="highlight"><pre><span></span><code>Address.to_contract(a : address) : C
-</code></pre></div>
+<p><code>Address.to_contract(a : address) : C</code></p>
 <p>Cast address to contract type C (where <code>C</code> is a contract)</p>
 <h3 id="aens">AENS</h3>
 <p>The following functionality is available for interacting with the æternity
@@ -824,78 +818,67 @@ a signature to prove that we are allowed to do AENS operations on behalf of
 i.e. the signature material should be prefixed by the network id.</p>
 <h4 id="types">Types</h4>
 <h5 id="name">name</h5>
-<div class="highlight"><pre><span></span><code>datatype name = Name(address, Chain.ttl, map(string, AENS.pointee))
-</code></pre></div>
+<p><code>datatype name = Name(address, Chain.ttl, map(string, AENS.pointee))</code></p>
 <h5 id="pointee">pointee</h5>
-<div class="highlight"><pre><span></span><code>datatype pointee = AccountPt(address) | OraclePt(address)
-                 | ContractPt(address) | ChannelPt(address)
-</code></pre></div>
+<p><code>datatype pointee = AccountPt(address) | OraclePt(address)
+                 | ContractPt(address) | ChannelPt(address)</code></p>
 <h4 id="functions">Functions</h4>
 <h5 id="resolve">resolve</h5>
-<div class="highlight"><pre><span></span><code>AENS.resolve(name : string, key : string) : option(&#39;a)
-</code></pre></div>
+<p><code>AENS.resolve(name : string, key : string) : option('a)</code></p>
 <p>Name resolution. Here <code>name</code> should be a registered name and <code>key</code> one of the attributes
 associated with this name (for instance <code>"account_pubkey"</code>). The return type
 (<code>'a</code>) must be resolved at compile time to an atomic type and the value is
 type checked against this type at run time.</p>
 <h5 id="lookup">lookup</h5>
-<div class="highlight"><pre><span></span><code>AENS.lookup(name : string) : option(AENS.name)
-</code></pre></div>
+<p><code>AENS.lookup(name : string) : option(AENS.name)</code></p>
 <p>If <code>name</code> is an active name <code>AENS.lookup</code> returns a name object.
 The three arguments to <code>Name</code> are <code>owner</code>, <code>expiry</code> and a map of the
 <code>pointees</code> for the name. Note: the expiry of the name is always a fixed TTL.
 For example:
-<div class="highlight"><pre><span></span><code>let Some(Name(owner, FixedTTL(expiry), ptrs)) = AENS.lookup(&quot;example.chain&quot;)
-</code></pre></div></p>
+<code>let Some(Name(owner, FixedTTL(expiry), ptrs)) = AENS.lookup("example.chain")</code></p>
 <h5 id="preclaim">preclaim</h5>
-<div class="highlight"><pre><span></span><code>AENS.preclaim(owner : address, commitment_hash : hash, &lt;signature : signature&gt;) : unit
-</code></pre></div>
+<p><code>AENS.preclaim(owner : address, commitment_hash : hash, &lt;signature : signature&gt;) : unit</code></p>
 <p>The <a href="../sophia_features/#delegation-signature">signature</a> should be over
 <code>network id</code> + <code>owner address</code> + <code>Contract.address</code> (concatenated as byte arrays).</p>
 <h5 id="claim">claim</h5>
-<div class="highlight"><pre><span></span><code>AENS.claim(owner : address, name : string, salt : int, name_fee : int, &lt;signature : signature&gt;) : unit
-</code></pre></div>
+<p><code>AENS.claim(owner : address, name : string, salt : int, name_fee : int, &lt;signature : signature&gt;) : unit</code></p>
 <p>The <a href="../sophia_features/#delegation-signature">signature</a> should be over
 <code>network id</code> + <code>owner address</code> + <code>name_hash</code> + <code>Contract.address</code>
 (concatenated as byte arrays)
 using the private key of the <code>owner</code> account for signing.</p>
 <h5 id="transfer">transfer</h5>
-<div class="highlight"><pre><span></span><code>AENS.transfer(owner : address, new_owner : address, name : string, &lt;signature : signature&gt;) : unit
-</code></pre></div>
+<p><code>AENS.transfer(owner : address, new_owner : address, name : string, &lt;signature : signature&gt;) : unit</code></p>
 <p>Transfers name to the new owner.</p>
 <p>The <a href="../sophia_features/#delegation-signature">signature</a> should be over
 <code>network id</code> + <code>owner address</code> + <code>name_hash</code> + <code>Contract.address</code>
 (concatenated as byte arrays)
 using the private key of the <code>owner</code> account for signing.</p>
 <h5 id="revoke">revoke</h5>
-<div class="highlight"><pre><span></span><code>AENS.revoke(owner : address, name : string, &lt;signature : signature&gt;) : unit
-</code></pre></div>
+<p><code>AENS.revoke(owner : address, name : string, &lt;signature : signature&gt;) : unit</code></p>
 <p>Revokes the name to extend the ownership time.</p>
 <p>The <a href="../sophia_features/#delegation-signature">signature</a> should be over
 <code>network id</code> + <code>owner address</code> + <code>name_hash</code> + <code>Contract.address</code>
 (concatenated as byte arrays)
 using the private key of the <code>owner</code> account for signing.</p>
 <h5 id="update">update</h5>
-<div class="highlight"><pre><span></span><code>AENS.update(owner : address, name : string, expiry : option(Chain.ttl), client_ttl : option(int),
-            new_ptrs : map(string, AENS.pointee), &lt;signature : signature&gt;) : unit
-</code></pre></div>
+<p><code>AENS.update(owner : address, name : string, expiry : option(Chain.ttl), client_ttl : option(int),
+            new_ptrs : map(string, AENS.pointee), &lt;signature : signature&gt;) : unit</code></p>
 <p>Updates the name. If the optional parameters are set to <code>None</code> that parameter
 will not be updated, for example if <code>None</code> is passed as <code>expiry</code> the expiry
 block of the name is not changed.</p>
 <h3 id="auth">Auth</h3>
 <h4 id="tx">tx</h4>
-<div class="highlight"><pre><span></span><code>Auth.tx : option(Chain.tx)
-</code></pre></div>
+<p><code>Auth.tx : option(Chain.tx)</code></p>
 <p>Where <code>Chain.tx</code> is (built-in) defined like:
-<div class="highlight"><pre><span></span><code>namespace Chain =
+```
+namespace Chain =
   record tx = { paying_for : option(Chain.paying_for_tx)
               , ga_metas : list(Chain.ga_meta_tx)
               , actor : address
               , fee   : int
               , ttl   : int
-              , tx    : Chain.base_tx }
-
-  datatype ga_meta_tx    = GAMetaTx(address, int)
+              , tx    : Chain.base_tx }</p>
+<p>datatype ga_meta_tx    = GAMetaTx(address, int)
   datatype paying_for_tx = PayingForTx(address, int)
   datatype base_tx = SpendTx(address, int, string)
                    | OracleRegisterTx | OracleQueryTx | OracleResponseTx | OracleExtendTx
@@ -906,110 +889,87 @@ block of the name is not changed.</p>
                    | ChannelSlashTx(address) | ChannelSettleTx(address) | ChannelSnapshotSoloTx(address)
                    | ContractCreateTx(int) | ContractCallTx(address, int)
                    | GAAttachTx
-</code></pre></div></p>
+```</p>
 <h4 id="tx_hash">tx_hash</h4>
-<div class="highlight"><pre><span></span><code>Auth.tx_hash : option(hash)
-</code></pre></div>
+<p><code>Auth.tx_hash : option(hash)</code></p>
 <p>Gets the transaction hash during authentication.</p>
 <h3 id="bits">Bits</h3>
 <h4 id="none">none</h4>
-<div class="highlight"><pre><span></span><code>Bits.none : bits
-</code></pre></div>
+<p><code>Bits.none : bits</code></p>
 <p>A bit field with all bits cleared</p>
 <h4 id="all">all</h4>
-<div class="highlight"><pre><span></span><code>Bits.all : bits
-</code></pre></div>
+<p><code>Bits.all : bits</code></p>
 <p>A bit field with all bits set</p>
 <h4 id="set">set</h4>
-<div class="highlight"><pre><span></span><code>Bits.set(b : bits, i : int) : bits
-</code></pre></div>
+<p><code>Bits.set(b : bits, i : int) : bits</code></p>
 <p>Set bit i</p>
 <h4 id="clear">clear</h4>
-<div class="highlight"><pre><span></span><code>Bits.clear(b : bits, i : int) : bits
-</code></pre></div>
+<p><code>Bits.clear(b : bits, i : int) : bits</code></p>
 <p>Clear bit i</p>
 <h4 id="test">test</h4>
-<div class="highlight"><pre><span></span><code>Bits.test(b : bits, i : int) : bool
-</code></pre></div>
+<p><code>Bits.test(b : bits, i : int) : bool</code></p>
 <p>Check if bit i is set</p>
 <h4 id="sum">sum</h4>
-<div class="highlight"><pre><span></span><code>Bits.sum(b : bits) : int
-</code></pre></div>
+<p><code>Bits.sum(b : bits) : int</code></p>
 <p>Count the number of set bits</p>
 <h4 id="union">union</h4>
-<div class="highlight"><pre><span></span><code>Bits.union(a : bits, b : bits) : bits
-</code></pre></div>
+<p><code>Bits.union(a : bits, b : bits) : bits</code></p>
 <p>Bitwise disjunction</p>
 <h4 id="intersection">intersection</h4>
-<div class="highlight"><pre><span></span><code>Bits.intersection(a : bits, b : bits) : bits
-</code></pre></div>
+<p><code>Bits.intersection(a : bits, b : bits) : bits</code></p>
 <p>Bitwise conjunction</p>
 <h4 id="difference">difference</h4>
-<div class="highlight"><pre><span></span><code>Bits.difference(a : bits, b : bits) : bits
-</code></pre></div>
+<p><code>Bits.difference(a : bits, b : bits) : bits</code></p>
 <p>Each bit is true if and only if it was 1 in <code>a</code> and 0 in <code>b</code></p>
 <h3 id="bytes">Bytes</h3>
 <h4 id="to_int">to_int</h4>
-<div class="highlight"><pre><span></span><code>Bytes.to_int(b : bytes(n)) : int
-</code></pre></div>
+<p><code>Bytes.to_int(b : bytes(n)) : int</code></p>
 <p>Interprets the byte array as a big endian integer</p>
 <h4 id="to_str_1">to_str</h4>
-<div class="highlight"><pre><span></span><code>Bytes.to_str(b : bytes(n)) : string
-</code></pre></div>
+<p><code>Bytes.to_str(b : bytes(n)) : string</code></p>
 <p>Returns the hexadecimal representation of the byte array</p>
 <h4 id="concat">concat</h4>
-<div class="highlight"><pre><span></span><code>Bytes.concat : (a : bytes(m), b : bytes(n)) =&gt; bytes(m + n)
-</code></pre></div>
+<p><code>Bytes.concat : (a : bytes(m), b : bytes(n)) =&gt; bytes(m + n)</code></p>
 <p>Concatenates two byte arrays</p>
 <h4 id="split">split</h4>
-<div class="highlight"><pre><span></span><code>Bytes.split(a : bytes(m + n)) : bytes(m) * bytes(n)
-</code></pre></div>
+<p><code>Bytes.split(a : bytes(m + n)) : bytes(m) * bytes(n)</code></p>
 <p>Splits a byte array at given index</p>
 <h3 id="call">Call</h3>
 <p>Values related to the call to the current contract</p>
 <h4 id="origin">origin</h4>
-<div class="highlight"><pre><span></span><code>Call.origin : address
-</code></pre></div>
+<p><code>Call.origin : address</code></p>
 <p>The address of the account that signed the call transaction that led to this call.</p>
 <h4 id="caller">caller</h4>
-<div class="highlight"><pre><span></span><code>Call.caller : address
-</code></pre></div>
+<p><code>Call.caller : address</code></p>
 <p>The address of the entity (possibly another contract) calling the contract.</p>
 <h4 id="value">value</h4>
-<div class="highlight"><pre><span></span><code>Call.value : int
-</code></pre></div>
+<p><code>Call.value : int</code></p>
 <p>The amount of coins transferred to the contract in the call.</p>
 <h4 id="gas_price">gas_price</h4>
-<div class="highlight"><pre><span></span><code>Call.gas_price : int
-</code></pre></div>
+<p><code>Call.gas_price : int</code></p>
 <p>The gas price of the current call.</p>
 <h4 id="fee">fee</h4>
-<div class="highlight"><pre><span></span><code>Call.fee : int
-</code></pre></div>
+<p><code>Call.fee : int</code></p>
 <p>The fee of the current call.</p>
 <h4 id="gas_left">gas_left</h4>
-<div class="highlight"><pre><span></span><code>Call.gas_left() : int
-</code></pre></div>
+<p><code>Call.gas_left() : int</code></p>
 <p>The amount of gas left for the current call.</p>
 <h3 id="chain">Chain</h3>
 <p>Values and functions related to the chain itself and other entities that live on it.</p>
 <h4 id="types_1">Types</h4>
 <h5 id="tx_1">tx</h5>
-<div class="highlight"><pre><span></span><code>record tx = { paying_for : option(Chain.paying_for_tx)
+<p><code>record tx = { paying_for : option(Chain.paying_for_tx)
             , ga_metas : list(Chain.ga_meta_tx)
             , actor : address
             , fee   : int
             , ttl   : int
-            , tx    : Chain.base_tx }
-</code></pre></div>
+            , tx    : Chain.base_tx }</code></p>
 <h5 id="ga_meta_tx">ga_meta_tx</h5>
-<div class="highlight"><pre><span></span><code>datatype ga_meta_tx    = GAMetaTx(address, int)
-</code></pre></div>
+<p><code>datatype ga_meta_tx    = GAMetaTx(address, int)</code></p>
 <h5 id="paying_for_tx">paying_for_tx</h5>
-<div class="highlight"><pre><span></span><code>datatype paying_for_tx = PayingForTx(address, int)
-</code></pre></div>
+<p><code>datatype paying_for_tx = PayingForTx(address, int)</code></p>
 <h5 id="base_tx">base_tx</h5>
-<div class="highlight"><pre><span></span><code>datatype base_tx = SpendTx(address, int, string)
+<p><code>datatype base_tx = SpendTx(address, int, string)
                  | OracleRegisterTx | OracleQueryTx | OracleResponseTx | OracleExtendTx
                  | NamePreclaimTx | NameClaimTx(hash) | NameUpdateTx(string)
                  | NameRevokeTx(hash) | NameTransferTx(address, string)
@@ -1017,51 +977,41 @@ block of the name is not changed.</p>
                  | ChannelForceProgressTx(address) | ChannelCloseMutualTx(address) | ChannelCloseSoloTx(address)
                  | ChannelSlashTx(address) | ChannelSettleTx(address) | ChannelSnapshotSoloTx(address)
                  | ContractCreateTx(int) | ContractCallTx(address, int)
-                 | GAAttachTx
-</code></pre></div>
+                 | GAAttachTx</code></p>
 <h4 id="functions_1">Functions</h4>
 <h5 id="balance">balance</h5>
-<div class="highlight"><pre><span></span><code>Chain.balance(a : address) : int
-</code></pre></div>
+<p><code>Chain.balance(a : address) : int</code></p>
 <p>The balance of account <code>a</code>.</p>
 <h5 id="block_hash">block_hash</h5>
-<div class="highlight"><pre><span></span><code>Chain.block_hash(h : int) : option(bytes(32))
-</code></pre></div>
+<p><code>Chain.block_hash(h : int) : option(bytes(32))</code></p>
 <p>The hash of the block at height <code>h</code>. <code>h</code> has to be within 256 blocks from the
 current height of the chain or else the function will return <code>None</code>.</p>
 <p>NOTE: In AEVM and FATE VM version 1 <code>Chain.block_height</code> was not considered an
 allowed height. From FATE VM version 2 (IRIS) it will return the block hash of
 the current generation.</p>
 <h5 id="block_height">block_height</h5>
-<div class="highlight"><pre><span></span><code>Chain.block_height : int&quot;
-</code></pre></div>
+<p><code>Chain.block_height : int"</code></p>
 <p>The height of the current block (i.e. the block in which the current call will be included).</p>
 <h5 id="coinbase">coinbase</h5>
-<div class="highlight"><pre><span></span><code>Chain.coinbase : address
-</code></pre></div>
+<p><code>Chain.coinbase : address</code></p>
 <p>The address of the account that mined the current block.</p>
 <h5 id="timestamp">timestamp</h5>
-<div class="highlight"><pre><span></span><code>Chain.timestamp : int
-</code></pre></div>
+<p><code>Chain.timestamp : int</code></p>
 <p>The timestamp of the current block.</p>
 <h5 id="difficulty">difficulty</h5>
-<div class="highlight"><pre><span></span><code>Chain.difficulty : int
-</code></pre></div>
+<p><code>Chain.difficulty : int</code></p>
 <p>The difficulty of the current block.</p>
 <h5 id="gas">gas</h5>
-<div class="highlight"><pre><span></span><code>Chain.gas_limit : int
-</code></pre></div>
+<p><code>Chain.gas_limit : int</code></p>
 <p>The gas limit of the current block.</p>
 <h5 id="bytecode_hash">bytecode_hash</h5>
-<div class="highlight"><pre><span></span><code>Chain.bytecode_hash : &#39;c =&gt; option(hash)
-</code></pre></div>
+<p><code>Chain.bytecode_hash : 'c =&gt; option(hash)</code></p>
 <p>Returns the hash of the contract's bytecode (or <code>None</code> if it is
 nonexistent or deployed before FATE2). The type <code>'c</code> must be
 instantiated with a contract. The charged gas increases linearly to
 the size of the serialized bytecode of the deployed contract.</p>
 <h5 id="create">create</h5>
-<div class="highlight"><pre><span></span><code>Chain.create(value : int, ...) =&gt; &#39;c
-</code></pre></div>
+<p><code>Chain.create(value : int, ...) =&gt; 'c</code></p>
 <p>Creates and deploys a new instance of a contract <code>'c</code>. All of the
 unnamed arguments will be passed to the <code>init</code> function. The charged
 gas increases linearly with the size of the compiled child contract's
@@ -1082,29 +1032,28 @@ in the <code>init</code> call of the new contract. It will be included in
 <code>Contract.balance</code>, however.</p>
 <p>The type <code>'c</code> must be instantiated with a contract.</p>
 <p>Example usage:
-<div class="highlight"><pre><span></span><code>payable contract Auction =
+```
+payable contract Auction =
   record state = {supply: int, name: string}
   entrypoint init(supply, name) = {supply: supply, name: name}
   stateful payable entrypoint buy(amount) =
-    require(Call.value == amount, &quot;amount_value_mismatch&quot;)
+    require(Call.value == amount, "amount_value_mismatch")
     ...
   stateful entrypoint sell(amount) =
-    require(amount &gt;= 0, &quot;negative_amount&quot;)
-    ...
-
-main contract Market =
+    require(amount &gt;= 0, "negative_amount")
+    ...</p>
+<p>main contract Market =
   type state = list(Auction)
   entrypoint init() = []
   stateful entrypoint new(name : string) =
     let new_auction = Chain.create(0, name) : Auction
     put(new_auction::state)
-</code></pre></div></p>
+```</p>
 <p>The typechecker must be certain about the created contract's type, so it is
 worth writing it explicitly as shown in the example.</p>
 <h5 id="clone">clone</h5>
-<div class="highlight"><pre><span></span><code>Chain.clone : ( ref : &#39;c, gas : int, value : int, protected : bool, ...
-              ) =&gt; if(protected) option(&#39;c) else &#39;c
-</code></pre></div>
+<p><code>Chain.clone : ( ref : 'c, gas : int, value : int, protected : bool, ...
+              ) =&gt; if(protected) option('c) else 'c</code></p>
 <p>Clones the contract under the mandatory named argument <code>ref</code>. That means a new
 contract of the same bytecode and the same <code>payable</code> parameter shall be created.
 <strong>NOTE:</strong> the <code>state</code> won't be copied and the contract will be initialized with
@@ -1127,92 +1076,77 @@ only take a boolean <em>literal</em>, so other expressions such as variables wil
 rejected by the compiler.</p>
 <p>The type <code>'c</code> must be instantiated with a contract.</p>
 <p>Example usage:</p>
-<div class="highlight"><pre><span></span><code>payable contract interface Auction =
+<p>```
+payable contract interface Auction =
   entrypoint init : (int, string) =&gt; void
   stateful payable entrypoint buy : (int) =&gt; ()
-  stateful entrypoint sell : (int) =&gt; ()
-
-main contract Market =
+  stateful entrypoint sell : (int) =&gt; ()</p>
+<p>main contract Market =
   type state = list(Auction)
   entrypoint init() = []
   stateful entrypoint new_of(template : Auction, name : string) =
     switch(Chain.clone(ref=template, protected=true, 0, name))
-      None =&gt; abort(&quot;Bad auction!&quot;)
+      None =&gt; abort("Bad auction!")
       Some(new_auction) =&gt;
         put(new_auction::state)
-</code></pre></div>
+```</p>
 <p>When cloning by an interface, <code>init</code> entrypoint declaration is required. It is a
 good practice to set its return type to <code>void</code> in order to indicate that this
 function is not supposed to be called and is state agnostic. Trivia: internal
 implementation of the <code>init</code> function does not actually return <code>state</code>, but
 calls <code>put</code> instead. Moreover, FATE prevents even handcrafted calls to <code>init</code>.</p>
 <h5 id="event">event</h5>
-<p><div class="highlight"><pre><span></span><code>Chain.event(e : event) : unit
-</code></pre></div>
+<p><code>Chain.event(e : event) : unit</code>
 Emits the event. To use this function one needs to define the <code>event</code> type as a <code>datatype</code> in the contract.</p>
 <h3 id="char">Char</h3>
 <h4 id="to_int_1">to_int</h4>
-<p><code>Char.to_int(c : char) : int
-<div class="highlight"><pre><span></span><code>Returns the UTF-8 codepoint of a character
-
-
-#### from_int
-</code></pre></div>
-Char.from_int(i : int) : option(char)</code></p>
+<p><code>Char.to_int(c : char) : int</code></p>
+<p>Returns the UTF-8 codepoint of a character</p>
+<h4 id="from_int">from_int</h4>
+<p><code>Char.from_int(i : int) : option(char)</code></p>
 <p>Opposite of <a href="#to_int">to_int</a>. Returns <code>None</code> if the integer doesn't correspond to a single (normalized) codepoint.</p>
 <h3 id="contract">Contract</h3>
 <p>Values related to the current contract</p>
 <h4 id="creator">creator</h4>
-<div class="highlight"><pre><span></span><code>Contract.creator : address
-</code></pre></div>
+<p><code>Contract.creator : address</code></p>
 <p>Address of the entity that signed the contract creation transaction</p>
 <h4 id="address_1">address</h4>
-<div class="highlight"><pre><span></span><code>Contract.address : address
-</code></pre></div>
+<p><code>Contract.address : address</code></p>
 <p>Address of the contract account</p>
 <h4 id="balance_1">balance</h4>
-<div class="highlight"><pre><span></span><code>Contract.balance : int
-</code></pre></div>
+<p><code>Contract.balance : int</code></p>
 <p>Amount of coins in the contract account</p>
 <h3 id="crypto">Crypto</h3>
 <h4 id="sha3">sha3</h4>
-<div class="highlight"><pre><span></span><code>Crypto.sha3(x : &#39;a) : hash
-</code></pre></div>
+<p><code>Crypto.sha3(x : 'a) : hash</code></p>
 <p>Hash any object to SHA3</p>
 <h4 id="sha256">sha256</h4>
-<div class="highlight"><pre><span></span><code>Crypto.sha256(x : &#39;a) : hash
-</code></pre></div>
+<p><code>Crypto.sha256(x : 'a) : hash</code></p>
 <p>Hash any object to SHA256</p>
 <h4 id="blake2b">blake2b</h4>
-<div class="highlight"><pre><span></span><code>Crypto.blake2b(x : &#39;a) : hash
-</code></pre></div>
+<p><code>Crypto.blake2b(x : 'a) : hash</code></p>
 <p>Hash any object to blake2b</p>
 <h4 id="verify_sig">verify_sig</h4>
-<div class="highlight"><pre><span></span><code>Crypto.verify_sig(msg : hash, pubkey : address, sig : signature) : bool
-</code></pre></div>
+<p><code>Crypto.verify_sig(msg : hash, pubkey : address, sig : signature) : bool</code></p>
 <p>Checks if the signature of <code>msg</code> was made using private key corresponding to
 the <code>pubkey</code></p>
 <h4 id="ecverify_secp256k1">ecverify_secp256k1</h4>
-<div class="highlight"><pre><span></span><code>Crypto.ecverify_secp256k1(msg : hash, addr : bytes(20), sig : bytes(65)) : bool
-</code></pre></div>
+<p><code>Crypto.ecverify_secp256k1(msg : hash, addr : bytes(20), sig : bytes(65)) : bool</code></p>
 <p>Verifies a signature for a msg against an Ethereum style address. Note that the
 signature should be 65 bytes and include the recovery identifier byte <code>V</code>. The
 expected organization of the signature is (<code>V || R || S</code>).</p>
 <h4 id="ecrecover_secp256k1">ecrecover_secp256k1</h4>
-<div class="highlight"><pre><span></span><code>Crypto.ecrecover_secp256k1(msg : hash, sig : bytes(65)) : option(bytes(20))
-</code></pre></div>
+<p><code>Crypto.ecrecover_secp256k1(msg : hash, sig : bytes(65)) : option(bytes(20))</code></p>
 <p>Recovers the Ethereum style address from a msg hash and respective
 ECDSA-signature. Note that the signature should be 65 bytes and include the
 recovery identifier byte <code>V</code>. The expected organization of the signature is (<code>V
 || R || S</code>).</p>
 <h4 id="verify_sig_secp256k1">verify_sig_secp256k1</h4>
-<div class="highlight"><pre><span></span><code>Crypto.verify_sig_secp256k1(msg : hash, pubkey : bytes(64), sig : bytes(64)) : bool
-</code></pre></div>
+<p><code>Crypto.verify_sig_secp256k1(msg : hash, pubkey : bytes(64), sig : bytes(64)) : bool</code></p>
 <p>Verifies a standard 64-byte ECDSA signature (<code>R || S</code>).</p>
 <h3 id="int">Int</h3>
 <h4 id="to_str_2">to_str</h4>
-<div class="highlight"><pre><span></span><code>Int.to_str : int =&gt; string
-</code></pre></div>
+<p><code>Int.to_str : int =&gt; string</code></p>
 <p>Casts integer to string using decimal representation</p>
 <h3 id="map">Map</h3>
 <h4 id="lookup_1">lookup</h4>
@@ -1240,8 +1174,7 @@ default value <code>v</code> if the key is not present</p>
 <p>Turns a list of pairs of form <code>(key, value)</code> into a map</p>
 <h3 id="oracle">Oracle</h3>
 <h4 id="register">register</h4>
-<div class="highlight"><pre><span></span><code>Oracle.register(&lt;signature : bytes(64)&gt;, acct : address, qfee : int, ttl : Chain.ttl) : oracle(&#39;a, &#39;b)
-</code></pre></div>
+<p><code>Oracle.register(&lt;signature : bytes(64)&gt;, acct : address, qfee : int, ttl : Chain.ttl) : oracle('a, 'b)</code></p>
 <p>Registers new oracle answering questions of type <code>'a</code> with answers of type <code>'b</code>.</p>
 <ul>
 <li>The <code>acct</code> is the address of the oracle to register (can be the same as the contract).</li>
@@ -1257,16 +1190,13 @@ default value <code>v</code> if the key is not present</p>
 <li>The type <code>'b</code> is the type of the oracle answers.</li>
 </ul>
 <p>Examples:
-<div class="highlight"><pre><span></span><code>  Oracle.register(addr0, 25, RelativeTTL(400))
-  Oracle.register(addr1, 25, RelativeTTL(500), signature = sign1)
-</code></pre></div></p>
+<code>Oracle.register(addr0, 25, RelativeTTL(400))
+  Oracle.register(addr1, 25, RelativeTTL(500), signature = sign1)</code></p>
 <h4 id="get_question">get_question</h4>
-<div class="highlight"><pre><span></span><code>Oracle.get_question(o : oracle(&#39;a, &#39;b), q : oracle_query(&#39;a, &#39;b)) : &#39;a
-</code></pre></div>
+<p><code>Oracle.get_question(o : oracle('a, 'b), q : oracle_query('a, 'b)) : 'a</code></p>
 <p>Checks what was the question of query <code>q</code> on oracle <code>o</code></p>
 <h4 id="respond">respond</h4>
-<div class="highlight"><pre><span></span><code>Oracle.respond(&lt;signature : bytes(64)&gt;, o : oracle(&#39;a, &#39;b), q : oracle_query(&#39;a, &#39;b), &#39;b) : unit
-</code></pre></div>
+<p><code>Oracle.respond(&lt;signature : bytes(64)&gt;, o : oracle('a, 'b), q : oracle_query('a, 'b), 'b) : unit</code></p>
 <p>Responds to the question <code>q</code> on <code>o</code>.
 Unless the contract address is the same as the oracle address the <code>signature</code>
 (which is an optional, named argument)
@@ -1274,19 +1204,16 @@ needs to be provided. Proving that we have the private key of the oracle by
 <a href="../sophia_features/#delegation-signature">signing</a>
 the <code>network id</code> + <code>oracle query id</code> + <code>contract address</code></p>
 <h4 id="extend">extend</h4>
-<div class="highlight"><pre><span></span><code>Oracle.extend(&lt;signature : bytes(64)&gt;, o : oracle(&#39;a, &#39;b), ttl : Chain.ttl) : unit
-</code></pre></div>
+<p><code>Oracle.extend(&lt;signature : bytes(64)&gt;, o : oracle('a, 'b), ttl : Chain.ttl) : unit</code></p>
 <p>Extends TTL of an oracle.
 * <code>singature</code> is a named argument and thus optional. Must be the same as for <code>Oracle.register</code>
 * <code>o</code> is the oracle being extended
 * <code>ttl</code> must be <code>RelativeTTL</code>. The time to live of <code>o</code> will be extended by this value.</p>
 <h4 id="query_fee">query_fee</h4>
-<div class="highlight"><pre><span></span><code>Oracle.query_fee(o : oracle(&#39;a, &#39;b)) : int
-</code></pre></div>
+<p><code>Oracle.query_fee(o : oracle('a, 'b)) : int</code></p>
 <p>Returns the query fee of the oracle</p>
 <h4 id="query">query</h4>
-<div class="highlight"><pre><span></span><code>Oracle.query(o : oracle(&#39;a, &#39;b), q : &#39;a, qfee : int, qttl : Chain.ttl, rttl : Chain.ttl) : oracle_query(&#39;a, &#39;b)
-</code></pre></div>
+<p><code>Oracle.query(o : oracle('a, 'b), q : 'a, qfee : int, qttl : Chain.ttl, rttl : Chain.ttl) : oracle_query('a, 'b)</code></p>
 <p>Asks the oracle a question.
 * The <code>qfee</code> is the query fee debited to the contract account (<code>Contract.address</code>).
 * The <code>qttl</code> controls the last height at which the oracle can submit a response
@@ -1294,64 +1221,50 @@ the <code>network id</code> + <code>oracle query id</code> + <code>contract addr
 * The <code>rttl</code> must be relative and controls how long an answer is kept on the chain.
 The call fails if the oracle could expire before an answer.</p>
 <h4 id="get_answer">get_answer</h4>
-<div class="highlight"><pre><span></span><code>Oracle.get_answer(o : oracle(&#39;a, &#39;b), q : oracle_query(&#39;a, &#39;b)) : option(&#39;b)
-</code></pre></div>
+<p><code>Oracle.get_answer(o : oracle('a, 'b), q : oracle_query('a, 'b)) : option('b)</code></p>
 <p>Checks what is the optional query answer</p>
 <h4 id="expiry">expiry</h4>
-<div class="highlight"><pre><span></span><code>Oracle.expiry(o : oracle(&#39;a, &#39;b)) : int
-</code></pre></div>
+<p><code>Oracle.expiry(o : oracle('a, 'b)) : int</code></p>
 <p>Ask the oracle when it expires. The result is the block height at which it will happen.</p>
 <h4 id="check">check</h4>
-<div class="highlight"><pre><span></span><code>Oracle.check(o : oracle(&#39;a, &#39;b)) : bool
-</code></pre></div>
+<p><code>Oracle.check(o : oracle('a, 'b)) : bool</code></p>
 <p>Returns <code>true</code> iff the oracle <code>o</code> exists and has correct type</p>
 <h4 id="check_query">check_query</h4>
-<div class="highlight"><pre><span></span><code>Oracle.check_query(o : oracle(&#39;a, &#39;b), q : oracle_query(&#39;a, &#39;b)) : bool
-</code></pre></div>
+<p><code>Oracle.check_query(o : oracle('a, 'b), q : oracle_query('a, 'b)) : bool</code></p>
 <p>It returns <code>true</code> iff the oracle query exist and has the expected type.</p>
 <h2 id="includable-namespaces">Includable namespaces</h2>
 <p>These need to be explicitly included (with <code>.aes</code> suffix)</p>
 <h3 id="bitwise">Bitwise</h3>
 <p>Bitwise operations on arbitrary precision integers.</p>
 <h4 id="bsr">bsr</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.bsr(n : int, x : int) : int
-</code></pre></div>
+<p><code>Bitwise.bsr(n : int, x : int) : int</code></p>
 <p>Logical bit shift <code>x</code> right <code>n</code> positions.</p>
 <h4 id="bsl">bsl</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.bsl(n : int, x : int) : int
-</code></pre></div>
+<p><code>Bitwise.bsl(n : int, x : int) : int</code></p>
 <p>Logical bit shift <code>x</code> left <code>n</code> positions.</p>
 <h4 id="bsli">bsli</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.bsli(n : int, x : int, lim : int) : int
-</code></pre></div>
+<p><code>Bitwise.bsli(n : int, x : int, lim : int) : int</code></p>
 <p>Logical bit shift <code>x</code> left <code>n</code> positions, limit to <code>lim</code> bits.</p>
 <h4 id="band">band</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.band(x : int, y : int) : int
-</code></pre></div>
+<p><code>Bitwise.band(x : int, y : int) : int</code></p>
 <p>Bitwise <code>and</code> of <code>x</code> and <code>y</code>.</p>
 <h4 id="bor">bor</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.bor(x : int, y : int) : int
-</code></pre></div>
+<p><code>Bitwise.bor(x : int, y : int) : int</code></p>
 <p>Bitwise <code>or</code> of <code>x</code> and <code>y</code>.</p>
 <h4 id="bxor">bxor</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.bxor(x : int, y : int) : int
-</code></pre></div>
+<p><code>Bitwise.bxor(x : int, y : int) : int</code></p>
 <p>Bitwise <code>xor</code> of <code>x</code> and <code>y</code>.</p>
 <h4 id="bnot">bnot</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.bnot(x : int) : int
-</code></pre></div>
+<p><code>Bitwise.bnot(x : int) : int</code></p>
 <p>Bitwise <code>not</code> of <code>x</code>. Defined and implemented as <code>bnot(x) = bxor(x, -1)</code>.</p>
 <h4 id="uband">uband</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.uband(x : int, y : int) : int
-</code></pre></div>
+<p><code>Bitwise.uband(x : int, y : int) : int</code></p>
 <p>Bitwise <code>and</code> of <em>non-negative</em> numbers <code>x</code> and <code>y</code>.</p>
 <h4 id="ubor">ubor</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.ubor(x : int, y : int) : int
-</code></pre></div>
+<p><code>Bitwise.ubor(x : int, y : int) : int</code></p>
 <p>Bitwise <code>or</code> of <em>non-negative</em> <code>x</code> and <code>y</code>.</p>
 <h4 id="ubxor">ubxor</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.ubxor(x : int, y : int) : int
-</code></pre></div>
+<p><code>Bitwise.ubxor(x : int, y : int) : int</code></p>
 <p>Bitwise <code>xor</code> of <em>non-negative</em> <code>x</code> and <code>y</code>.</p>
 <h3 id="bls12_381">BLS12_381</h3>
 <h4 id="types_2">Types</h4>
@@ -1360,199 +1273,155 @@ The call fails if the oracle could expire before an answer.</p>
 <h5 id="fr">fr</h5>
 <p>Built-in (Montgomery) integer representation 48 bytes</p>
 <h5 id="fp2">fp2</h5>
-<div class="highlight"><pre><span></span><code>record fp2 = { x1 : fp, x2 : fp }`
-</code></pre></div>
+<p><code>record fp2 = { x1 : fp, x2 : fp }`</code></p>
 <h5 id="g1">g1</h5>
-<div class="highlight"><pre><span></span><code>record g1  = { x : fp, y : fp, z : fp }
-</code></pre></div>
+<p><code>record g1  = { x : fp, y : fp, z : fp }</code></p>
 <h5 id="g2">g2</h5>
-<div class="highlight"><pre><span></span><code>record g2  = { x : fp2, y : fp2, z : fp2 }
-</code></pre></div>
+<p><code>record g2  = { x : fp2, y : fp2, z : fp2 }</code></p>
 <h5 id="gt">gt</h5>
-<div class="highlight"><pre><span></span><code>record gt  = { x1 : fp, x2 : fp, x3 : fp, x4 : fp, x5 : fp, x6 : fp, x7 : fp, x8 : fp, x9 : fp, x10 : fp, x11 : fp, x12 : fp }
-</code></pre></div>
+<p><code>record gt  = { x1 : fp, x2 : fp, x3 : fp, x4 : fp, x5 : fp, x6 : fp, x7 : fp, x8 : fp, x9 : fp, x10 : fp, x11 : fp, x12 : fp }</code></p>
 <h4 id="functions_2">Functions</h4>
 <h5 id="pairing_check">pairing_check</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.pairing_check(xs : list(g1), ys : list(g2)) : bool
-</code></pre></div>
+<p><code>BLS12_381.pairing_check(xs : list(g1), ys : list(g2)) : bool</code></p>
 <p>Pairing check of a list of points, <code>xs</code> and <code>ys</code> should be of equal length.</p>
 <h5 id="int_to_fr">int_to_fr</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.int_to_fr(x : int) : fr
-</code></pre></div>
+<p><code>BLS12_381.int_to_fr(x : int) : fr</code></p>
 <p>Convert an integer to an <code>fr</code> - a 32 bytes internal (Montgomery) integer representation.</p>
 <h5 id="int_to_fp">int_to_fp</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.int_to_fp(x : int) : fp
-</code></pre></div>
+<p><code>BLS12_381.int_to_fp(x : int) : fp</code></p>
 <p>Convert an integer to an <code>fp</code> - a 48 bytes internal (Montgomery) integer representation.</p>
 <h5 id="fr_to_int">fr_to_int</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.fr_to_int(x : fr)  : int
-</code></pre></div>
+<p><code>BLS12_381.fr_to_int(x : fr)  : int</code></p>
 <p>Convert a <code>fr</code> value into an integer.</p>
 <h5 id="fp_to_int">fp_to_int</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.fp_to_int(x : fp)  : int
-</code></pre></div>
+<p><code>BLS12_381.fp_to_int(x : fp)  : int</code></p>
 <p>Convert a <code>fp</code> value into an integer.</p>
 <h5 id="mk_g1">mk_g1</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.mk_g1(x : int, y : int, z : int) : g1
-</code></pre></div>
+<p><code>BLS12_381.mk_g1(x : int, y : int, z : int) : g1</code></p>
 <p>Construct a <code>g1</code> point from three integers.</p>
 <h5 id="mk_g2">mk_g2</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.mk_g2(x1 : int, x2 : int, y1 : int, y2 : int, z1 : int, z2 : int) : g2
-</code></pre></div>
+<p><code>BLS12_381.mk_g2(x1 : int, x2 : int, y1 : int, y2 : int, z1 : int, z2 : int) : g2</code></p>
 <p>Construct a <code>g2</code> point from six integers.</p>
 <h5 id="g1_neg">g1_neg</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.g1_neg(p : g1) : g1
-</code></pre></div>
+<p><code>BLS12_381.g1_neg(p : g1) : g1</code></p>
 <p>Negate a <code>g1</code> value.</p>
 <h5 id="g1_norm">g1_norm</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.g1_norm(p : g1) : g1
-</code></pre></div>
+<p><code>BLS12_381.g1_norm(p : g1) : g1</code></p>
 <p>Normalize a <code>g1</code> value.</p>
 <h5 id="g1_valid">g1_valid</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.g1_valid(p : g1) : bool
-</code></pre></div>
+<p><code>BLS12_381.g1_valid(p : g1) : bool</code></p>
 <p>Check that a <code>g1</code> value is a group member.</p>
 <h5 id="g1_is_zero">g1_is_zero</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.g1_is_zero(p : g1) : bool
-</code></pre></div>
+<p><code>BLS12_381.g1_is_zero(p : g1) : bool</code></p>
 <p>Check if a <code>g1</code> value corresponds to the zero value of the group.</p>
 <h5 id="g1_add">g1_add</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.g1_add(p : g1, q : g1) : g1
-</code></pre></div>
+<p><code>BLS12_381.g1_add(p : g1, q : g1) : g1</code></p>
 <p>Add two <code>g1</code> values.</p>
 <h5 id="g1_mul">g1_mul</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.g1_mul(k : fr, p : g1) : g1
-</code></pre></div>
+<p><code>BLS12_381.g1_mul(k : fr, p : g1) : g1</code></p>
 <p>Scalar multiplication for <code>g1</code>.</p>
 <h5 id="g2_neg">g2_neg</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.g2_neg(p : g2) : g2
-</code></pre></div>
+<p><code>BLS12_381.g2_neg(p : g2) : g2</code></p>
 <p>Negate a <code>g2</code> value.</p>
 <h5 id="g2_norm">g2_norm</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.g2_norm(p : g2) : g2
-</code></pre></div>
+<p><code>BLS12_381.g2_norm(p : g2) : g2</code></p>
 <p>Normalize a <code>g2</code> value.</p>
 <h5 id="g2_valid">g2_valid</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.g2_valid(p : g2) : bool
-</code></pre></div>
+<p><code>BLS12_381.g2_valid(p : g2) : bool</code></p>
 <p>Check that a <code>g2</code> value is a group member.</p>
 <h5 id="g2_is_zero">g2_is_zero</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.g2_is_zero(p : g2) : bool
-</code></pre></div>
+<p><code>BLS12_381.g2_is_zero(p : g2) : bool</code></p>
 <p>Check if a <code>g2</code> value corresponds to the zero value of the group.</p>
 <h5 id="g2_add">g2_add</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.g2_add(p : g2, q : g2) : g2
-</code></pre></div>
+<p><code>BLS12_381.g2_add(p : g2, q : g2) : g2</code></p>
 <p>Add two <code>g2</code> values.</p>
 <h5 id="g2_mul">g2_mul</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.g2_mul(k : fr, p : g2) : g2
-</code></pre></div>
+<p><code>BLS12_381.g2_mul(k : fr, p : g2) : g2</code></p>
 <p>Scalar multiplication for <code>g2</code>.</p>
 <h5 id="gt_inv">gt_inv</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.gt_inv(p : gt) : gt
-</code></pre></div>
+<p><code>BLS12_381.gt_inv(p : gt) : gt</code></p>
 <p>Invert a <code>gt</code> value.</p>
 <h5 id="gt_add">gt_add</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.gt_add(p : gt, q : gt) : gt
-</code></pre></div>
+<p><code>BLS12_381.gt_add(p : gt, q : gt) : gt</code></p>
 <p>Add two <code>gt</code> values.</p>
 <h5 id="gt_mul">gt_mul</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.gt_mul(p : gt, q : gt) : gt
-</code></pre></div>
+<p><code>BLS12_381.gt_mul(p : gt, q : gt) : gt</code></p>
 <p>Multiply two <code>gt</code> values.</p>
 <h5 id="gt_pow">gt_pow</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.gt_pow(p : gt, k : fr) : gt
-</code></pre></div>
+<p><code>BLS12_381.gt_pow(p : gt, k : fr) : gt</code></p>
 <p>Calculate exponentiation <code>p ^ k</code>.</p>
 <h5 id="gt_is_one">gt_is_one</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.gt_is_one(p : gt) : bool
-</code></pre></div>
+<p><code>BLS12_381.gt_is_one(p : gt) : bool</code></p>
 <p>Compare a <code>gt</code> value to the unit value of the Gt group.</p>
 <h5 id="pairing">pairing</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.pairing(p : g1, q : g2) : gt
-</code></pre></div>
+<p><code>BLS12_381.pairing(p : g1, q : g2) : gt</code></p>
 <p>Compute the pairing of a <code>g1</code> value and a <code>g2</code> value.</p>
 <h5 id="miller_loop">miller_loop</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.miller_loop(p : g1, q : g2) : gt
-</code></pre></div>
+<p><code>BLS12_381.miller_loop(p : g1, q : g2) : gt</code></p>
 <p>Do the Miller loop stage of pairing for <code>g1</code> and <code>g2</code>.</p>
 <h5 id="final_exp">final_exp</h5>
-<div class="highlight"><pre><span></span><code>BLS12_381.final_exp(p : gt) : gt
-</code></pre></div>
+<p><code>BLS12_381.final_exp(p : gt) : gt</code></p>
 <p>Perform the final exponentiation step of pairing for a <code>gt</code> value.</p>
 <h3 id="func">Func</h3>
 <p>Functional combinators.</p>
 <h4 id="id">id</h4>
-<div class="highlight"><pre><span></span><code>Func.id(x : &#39;a) : &#39;a
-</code></pre></div>
+<p><code>Func.id(x : 'a) : 'a</code></p>
 <p>Identity function. Returns its argument.</p>
 <h4 id="const">const</h4>
-<div class="highlight"><pre><span></span><code>Func.const(x : &#39;a) : &#39;b =&gt; &#39;a = (y) =&gt; x
-</code></pre></div>
+<p><code>Func.const(x : 'a) : 'b =&gt; 'a = (y) =&gt; x</code></p>
 <p>Constant function constructor. Given <code>x</code> returns a function that returns <code>x</code> regardless of its argument.</p>
 <h4 id="flip">flip</h4>
-<div class="highlight"><pre><span></span><code>Func.flip(f : (&#39;a, &#39;b) =&gt; &#39;c) : (&#39;b, &#39;a) =&gt; &#39;c
-</code></pre></div>
+<p><code>Func.flip(f : ('a, 'b) =&gt; 'c) : ('b, 'a) =&gt; 'c</code></p>
 <p>Switches order of arguments of arity 2 function.</p>
 <h4 id="comp">comp</h4>
-<div class="highlight"><pre><span></span><code>Func.comp(f : &#39;b =&gt; &#39;c, g : &#39;a =&gt; &#39;b) : &#39;a =&gt; &#39;c
-</code></pre></div>
+<p><code>Func.comp(f : 'b =&gt; 'c, g : 'a =&gt; 'b) : 'a =&gt; 'c</code></p>
 <p>Function composition. <code>comp(f, g)(x) == f(g(x))</code>.</p>
 <h4 id="pipe">pipe</h4>
-<div class="highlight"><pre><span></span><code>Func.pipe(f : &#39;a =&gt; &#39;b, g : &#39;b =&gt; &#39;c) : &#39;a =&gt; &#39;c
-</code></pre></div>
+<p><code>Func.pipe(f : 'a =&gt; 'b, g : 'b =&gt; 'c) : 'a =&gt; 'c</code></p>
 <p>Flipped function composition. <code>pipe(f, g)(x) == g(f(x))</code>.</p>
 <h4 id="rapply">rapply</h4>
-<div class="highlight"><pre><span></span><code>Func.rapply(x : &#39;a, f : &#39;a =&gt; &#39;b) : &#39;b
-</code></pre></div>
+<p><code>Func.rapply(x : 'a, f : 'a =&gt; 'b) : 'b</code></p>
 <p>Reverse application. <code>rapply(x, f) == f(x)</code>.</p>
 <h4 id="recur">recur</h4>
-<div class="highlight"><pre><span></span><code>Func.recur(f : (&#39;arg =&gt; &#39;res, &#39;arg) =&gt; &#39;res) : &#39;arg =&gt; &#39;res
-</code></pre></div>
+<p><code>Func.recur(f : ('arg =&gt; 'res, 'arg) =&gt; 'res) : 'arg =&gt; 'res</code></p>
 <p>The Z combinator. Allows performing local recursion and having anonymous recursive lambdas. To make function <code>A =&gt; B</code> recursive the user needs to transform it to take two arguments instead – one of type <code>A =&gt; B</code> which is going to work as a self-reference, and the other one of type <code>A</code>  which is the original argument. Therefore, transformed function should have <code>(A =&gt; B, A) =&gt; B</code> signature.</p>
 <p>Example usage:
-<div class="highlight"><pre><span></span><code>let factorial = recur((fac, n) =&gt; if(n &lt; 2) 1 else n * fac(n - 1))
-</code></pre></div></p>
+<code>let factorial = recur((fac, n) =&gt; if(n &lt; 2) 1 else n * fac(n - 1))</code></p>
 <p>If the function is going to take more than one argument it will need to be either tuplified or have curried out latter arguments.</p>
 <p>Example (factorial with custom step):</p>
-<div class="highlight"><pre><span></span><code>// tuplified version
+<p>```
+// tuplified version
 let factorial_t(n, step) =
   let fac(rec, args) =
     let (n, step) = args
     if(n &lt; 2) 1 else n * rec((n - step, step))
-  recur(fac)((n, step))
-
-// curried version
+  recur(fac)((n, step))</p>
+<p>// curried version
 let factorial_c(n, step) =
   let fac(rec, n) = (step) =&gt;
     if(n &lt; 2) 1 else n * rec(n - 1)(step)
   recur(fac)(n)(step)
-</code></pre></div>
+```</p>
 <h4 id="iter">iter</h4>
-<div class="highlight"><pre><span></span><code>Func.iter(n : int, f : &#39;a =&gt; &#39;a) : &#39;a =&gt; &#39;a
-</code></pre></div>
+<p><code>Func.iter(n : int, f : 'a =&gt; 'a) : 'a =&gt; 'a</code></p>
 <p><code>n</code>th composition of f with itself, for instance <code>iter(3, f)</code> is equivalent to <code>(x) =&gt; f(f(f(x)))</code>.</p>
 <h4 id="curry">curry</h4>
-<div class="highlight"><pre><span></span><code>Func.curry2(f : (&#39;a, &#39;b) =&gt; &#39;c) : &#39;a =&gt; (&#39;b =&gt; &#39;c)
-Func.curry3(f : (&#39;a, &#39;b, &#39;c) =&gt; &#39;d) : &#39;a =&gt; (&#39;b =&gt; (&#39;c =&gt; &#39;d))
-</code></pre></div>
+<p><code>Func.curry2(f : ('a, 'b) =&gt; 'c) : 'a =&gt; ('b =&gt; 'c)
+Func.curry3(f : ('a, 'b, 'c) =&gt; 'd) : 'a =&gt; ('b =&gt; ('c =&gt; 'd))</code></p>
 <p>Turns a function that takes n arguments into a curried function that takes
 one argument and returns a function that waits for the rest in the same
 manner. For instance <code>curry2((a, b) =&gt; a + b)(1)(2) == 3</code>.</p>
 <h4 id="uncurry">uncurry</h4>
-<div class="highlight"><pre><span></span><code>Func.uncurry2(f : &#39;a =&gt; (&#39;b =&gt; &#39;c)) : (&#39;a, &#39;b) =&gt; &#39;c
-Func.uncurry3(f : &#39;a =&gt; (&#39;b =&gt; (&#39;c =&gt; &#39;d))) : (&#39;a, &#39;b, &#39;c) =&gt; &#39;d
-</code></pre></div>
+<p><code>Func.uncurry2(f : 'a =&gt; ('b =&gt; 'c)) : ('a, 'b) =&gt; 'c
+Func.uncurry3(f : 'a =&gt; ('b =&gt; ('c =&gt; 'd))) : ('a, 'b, 'c) =&gt; 'd</code></p>
 <p>Opposite to <a href="#curry">curry</a>.</p>
 <h4 id="tuplify">tuplify</h4>
-<div class="highlight"><pre><span></span><code>Func.tuplify2(f : (&#39;a, &#39;b) =&gt; &#39;c) : ((&#39;a * &#39;b)) =&gt; &#39;c
-Func.tuplify3(f : (&#39;a, &#39;b, &#39;c) =&gt; &#39;d) : &#39;a * &#39;b * &#39;c =&gt; &#39;d
-</code></pre></div>
+<p><code>Func.tuplify2(f : ('a, 'b) =&gt; 'c) : (('a * 'b)) =&gt; 'c
+Func.tuplify3(f : ('a, 'b, 'c) =&gt; 'd) : 'a * 'b * 'c =&gt; 'd</code></p>
 <p>Turns a function that takes n arguments into a function that takes an n-tuple.</p>
 <h4 id="untuplify">untuplify</h4>
-<div class="highlight"><pre><span></span><code>Func.untuplify2(f : &#39;a * &#39;b =&gt; &#39;c) : (&#39;a, &#39;b) =&gt; &#39;c
-Func.untuplify3(f : &#39;a * &#39;b * &#39;c =&gt; &#39;d) : (&#39;a, &#39;b, &#39;c) =&gt; &#39;d
-</code></pre></div>
+<p><code>Func.untuplify2(f : 'a * 'b =&gt; 'c) : ('a, 'b) =&gt; 'c
+Func.untuplify3(f : 'a * 'b * 'c =&gt; 'd) : ('a, 'b, 'c) =&gt; 'd</code></p>
 <p>Opposite to <a href="#tuplify">tuplify</a>.</p>
 <h3 id="frac">Frac</h3>
 <p>This namespace provides operations on rational numbers. A rational number is represented
@@ -1575,8 +1444,7 @@ language provides checkers to prevent unintended usage of them. Therefore the ty
 You should use <a href="#lt">lt</a>, <a href="#geq">geq</a>, <a href="#eq">eq</a> etc instead.</p>
 <h4 id="types_3">Types</h4>
 <h5 id="frac_1">frac</h5>
-<div class="highlight"><pre><span></span><code>datatype frac = Pos(int, int) | Zero | Neg(int, int)
-</code></pre></div>
+<p><code>datatype frac = Pos(int, int) | Zero | Neg(int, int)</code></p>
 <p>Internal representation of fractional numbers. First integer encodes the numerator and the second the denominator –
 both must be always positive, as the sign is being handled by the choice of the constructor.</p>
 <h4 id="functions_3">Functions</h4>
@@ -1629,7 +1497,7 @@ both must be always positive, as the sign is being handled by the choice of the 
 <h5 id="abs">abs</h5>
 <p><code>Frac.abs(f : frac) : frac</code></p>
 <p>Absolute value.</p>
-<h5 id="from_int">from_int</h5>
+<h5 id="from_int_1">from_int</h5>
 <p><code>Frac.from_int(n : int) : frac</code></p>
 <p>From integer conversion. Effectively <code>make_frac(n, 1)</code>.</p>
 <h5 id="floor">floor</h5>
@@ -1685,376 +1553,281 @@ this function to verify the input.</p>
 <h3 id="list">List</h3>
 <p>This module contains common operations on lists like constructing, querying, traversing etc.</p>
 <h4 id="is_empty">is_empty</h4>
-<div class="highlight"><pre><span></span><code>List.is_empty(l : list(&#39;a)) : bool
-</code></pre></div>
+<p><code>List.is_empty(l : list('a)) : bool</code></p>
 <p>Returns <code>true</code> iff the list is equal to <code>[]</code>.</p>
 <h4 id="first">first</h4>
-<div class="highlight"><pre><span></span><code>List.first(l : list(&#39;a)) : option(&#39;a)
-</code></pre></div>
+<p><code>List.first(l : list('a)) : option('a)</code></p>
 <p>Returns <code>Some</code> of the first element of a list or <code>None</code> if the list is empty.</p>
 <h4 id="tail">tail</h4>
-<div class="highlight"><pre><span></span><code>List.tail(l : list(&#39;a)) : option(list(&#39;a))
-</code></pre></div>
+<p><code>List.tail(l : list('a)) : option(list('a))</code></p>
 <p>Returns <code>Some</code> of a list without its first element or <code>None</code> if the list is empty.</p>
 <h4 id="last">last</h4>
-<div class="highlight"><pre><span></span><code>List.last(l : list(&#39;a)) : option(&#39;a)
-</code></pre></div>
+<p><code>List.last(l : list('a)) : option('a)</code></p>
 <p>Returns <code>Some</code> of the last element of a list or <code>None</code> if the list is empty.</p>
 <h4 id="contains">contains</h4>
-<p><div class="highlight"><pre><span></span><code>List.contains(e : &#39;a, l : list(&#39;a)) : bool
-</code></pre></div>
+<p><code>List.contains(e : 'a, l : list('a)) : bool</code>
 Checks if list <code>l</code> contains element <code>e</code>. Equivalent to <code>List.find(x =&gt; x == e, l) != None</code>.</p>
 <h4 id="find">find</h4>
-<div class="highlight"><pre><span></span><code>List.find(p : &#39;a =&gt; bool, l : list(&#39;a)) : option(&#39;a)
-</code></pre></div>
+<p><code>List.find(p : 'a =&gt; bool, l : list('a)) : option('a)</code></p>
 <p>Finds first element of <code>l</code> fulfilling predicate <code>p</code> as <code>Some</code> or <code>None</code> if no such element exists.</p>
 <h4 id="find_indices">find_indices</h4>
-<div class="highlight"><pre><span></span><code>List.find_indices(p : &#39;a =&gt; bool, l : list(&#39;a)) : list(int)
-</code></pre></div>
+<p><code>List.find_indices(p : 'a =&gt; bool, l : list('a)) : list(int)</code></p>
 <p>Returns list of all indices of elements from <code>l</code> that fulfill the predicate <code>p</code>.</p>
 <h4 id="nth">nth</h4>
-<div class="highlight"><pre><span></span><code>List.nth(n : int, l : list(&#39;a)) : option(&#39;a)
-</code></pre></div>
+<p><code>List.nth(n : int, l : list('a)) : option('a)</code></p>
 <p>Gets <code>n</code>th element of <code>l</code> as <code>Some</code> or <code>None</code> if <code>l</code> is shorter than <code>n + 1</code> or <code>n</code> is negative.</p>
 <h4 id="get">get</h4>
-<div class="highlight"><pre><span></span><code>List.get(n : int, l : list(&#39;a)) : &#39;a
-</code></pre></div>
+<p><code>List.get(n : int, l : list('a)) : 'a</code></p>
 <p>Gets <code>n</code>th element of <code>l</code> forcefully, throwing and error if <code>l</code> is shorter than <code>n + 1</code> or <code>n</code> is negative.</p>
 <h4 id="length">length</h4>
-<div class="highlight"><pre><span></span><code>List.length(l : list(&#39;a)) : int
-</code></pre></div>
+<p><code>List.length(l : list('a)) : int</code></p>
 <p>Returns length of a list.</p>
 <h4 id="from_to">from_to</h4>
-<div class="highlight"><pre><span></span><code>List.from_to(a : int, b : int) : list(int)
-</code></pre></div>
+<p><code>List.from_to(a : int, b : int) : list(int)</code></p>
 <p>Creates an ascending sequence of all integer numbers between <code>a</code> and <code>b</code> (including <code>a</code> and <code>b</code>).</p>
 <h4 id="from_to_step">from_to_step</h4>
-<div class="highlight"><pre><span></span><code>List.from_to_step(a : int, b : int, step : int) : list(int)
-</code></pre></div>
+<p><code>List.from_to_step(a : int, b : int, step : int) : list(int)</code></p>
 <p>Creates an ascending sequence of integer numbers betweeen <code>a</code> and <code>b</code> jumping by given <code>step</code>. Includes <code>a</code> and takes <code>b</code> only if <code>(b - a) mod step == 0</code>. <code>step</code> should be bigger than 0.</p>
 <h4 id="replace_at">replace_at</h4>
-<div class="highlight"><pre><span></span><code>List.replace_at(n : int, e : &#39;a, l : list(&#39;a)) : list(&#39;a)
-</code></pre></div>
+<p><code>List.replace_at(n : int, e : 'a, l : list('a)) : list('a)</code></p>
 <p>Replaces <code>n</code>th element of <code>l</code> with <code>e</code>. Throws an error if <code>n</code> is negative or would cause an overflow.</p>
 <h4 id="insert_at">insert_at</h4>
-<div class="highlight"><pre><span></span><code>List.insert_at(n : int, e : &#39;a, l : list(&#39;a)) : list(&#39;a)
-</code></pre></div>
+<p><code>List.insert_at(n : int, e : 'a, l : list('a)) : list('a)</code></p>
 <p>Inserts <code>e</code> into <code>l</code> to be on position <code>n</code> by shifting following elements further. For instance,
-<div class="highlight"><pre><span></span><code>insert_at(2, 9, [1,2,3,4])
-</code></pre></div>
+<code>insert_at(2, 9, [1,2,3,4])</code>
 will yield <code>[1,2,9,3,4]</code>.</p>
 <h4 id="insert_by">insert_by</h4>
-<div class="highlight"><pre><span></span><code>List.insert_by(cmp : ((&#39;a, &#39;a) =&gt; bool), x : &#39;a, l : list(&#39;a)) : list(&#39;a)
-</code></pre></div>
+<p><code>List.insert_by(cmp : (('a, 'a) =&gt; bool), x : 'a, l : list('a)) : list('a)</code></p>
 <p>Assuming that cmp represents <code>&lt;</code> comparison, inserts <code>x</code> before the first element in the list <code>l</code> which is greater than it. For instance,
-<div class="highlight"><pre><span></span><code>insert_by((a, b) =&gt; a &lt; b, 4, [1,2,3,5,6,7])
-</code></pre></div>
+<code>insert_by((a, b) =&gt; a &lt; b, 4, [1,2,3,5,6,7])</code>
 will yield <code>[1,2,3,4,5,6,7]</code></p>
 <h4 id="foldr">foldr</h4>
-<div class="highlight"><pre><span></span><code>List.foldr(cons : (&#39;a, &#39;b) =&gt; &#39;b, nil : &#39;b, l : list(&#39;a)) : &#39;b
-</code></pre></div>
+<p><code>List.foldr(cons : ('a, 'b) =&gt; 'b, nil : 'b, l : list('a)) : 'b</code></p>
 <p>Right fold of a list. Assuming <code>l = [x, y, z]</code> will return <code>f(x, f(y, f(z, nil)))</code>.
 Not tail recursive.</p>
 <h4 id="foldl">foldl</h4>
-<div class="highlight"><pre><span></span><code>List.foldl(rcons : (&#39;b, &#39;a) =&gt; &#39;b, acc : &#39;b, l : list(&#39;a)) : &#39;b
-</code></pre></div>
+<p><code>List.foldl(rcons : ('b, 'a) =&gt; 'b, acc : 'b, l : list('a)) : 'b</code></p>
 <p>Left fold of a list. Assuming <code>l = [x, y, z]</code> will return <code>f(f(f(acc, x), y), z)</code>.
 Tail recursive.</p>
 <h4 id="foreach">foreach</h4>
-<div class="highlight"><pre><span></span><code>List.foreach(l : list(&#39;a), f : &#39;a =&gt; unit) : unit
-</code></pre></div>
+<p><code>List.foreach(l : list('a), f : 'a =&gt; unit) : unit</code></p>
 <p>Evaluates <code>f</code> on each element of a list.</p>
 <h4 id="reverse">reverse</h4>
-<div class="highlight"><pre><span></span><code>List.reverse(l : list(&#39;a)) : list(&#39;a)
-</code></pre></div>
+<p><code>List.reverse(l : list('a)) : list('a)</code></p>
 <p>Returns a copy of <code>l</code> with reversed order of elements.</p>
 <h4 id="map_1">map</h4>
-<div class="highlight"><pre><span></span><code>List.map(f : &#39;a =&gt; &#39;b, l : list(&#39;a)) : list(&#39;b)
-</code></pre></div>
+<p><code>List.map(f : 'a =&gt; 'b, l : list('a)) : list('b)</code></p>
 <p>Maps function <code>f</code> over a list. For instance
-<div class="highlight"><pre><span></span><code>map((x) =&gt; x == 0, [1, 2, 0, 3, 0])
-</code></pre></div>
+<code>map((x) =&gt; x == 0, [1, 2, 0, 3, 0])</code>
 will yield <code>[false, false, true, false, true]</code></p>
 <h4 id="flat_map">flat_map</h4>
-<div class="highlight"><pre><span></span><code>List.flat_map(f : &#39;a =&gt; list(&#39;b), l : list(&#39;a)) : list(&#39;b)
-</code></pre></div>
+<p><code>List.flat_map(f : 'a =&gt; list('b), l : list('a)) : list('b)</code></p>
 <p>Maps <code>f</code> over a list and then flattens it. For instance
-<div class="highlight"><pre><span></span><code>flat_map((x) =&gt; [x, x * 10], [1, 2, 3])
-</code></pre></div>
+<code>flat_map((x) =&gt; [x, x * 10], [1, 2, 3])</code>
 will yield <code>[1, 10, 2, 20, 3, 30]</code></p>
 <h4 id="filter">filter</h4>
-<div class="highlight"><pre><span></span><code>List.filter(p : &#39;a =&gt; bool, l : list(&#39;a)) : list(&#39;a)
-</code></pre></div>
+<p><code>List.filter(p : 'a =&gt; bool, l : list('a)) : list('a)</code></p>
 <p>Filters out elements of <code>l</code> that fulfill predicate <code>p</code>. For instance
-<div class="highlight"><pre><span></span><code>filter((x) =&gt; x &gt; 0, [-1, 1, -2, 0, 1, 2, -3])
-</code></pre></div>
+<code>filter((x) =&gt; x &gt; 0, [-1, 1, -2, 0, 1, 2, -3])</code>
 will yield <code>[1, 1, 2]</code></p>
 <h4 id="take">take</h4>
-<div class="highlight"><pre><span></span><code>List.take(n : int, l : list(&#39;a)) : list(&#39;a)
-</code></pre></div>
+<p><code>List.take(n : int, l : list('a)) : list('a)</code></p>
 <p>Takes <code>n</code> first elements of <code>l</code>. Fails if <code>n</code> is negative. If <code>n</code> is greater than length of a list it will return whole list.</p>
 <h4 id="drop">drop</h4>
-<div class="highlight"><pre><span></span><code>List.drop(n : int, l : list(&#39;a)) : list(&#39;a)
-</code></pre></div>
+<p><code>List.drop(n : int, l : list('a)) : list('a)</code></p>
 <p>Removes <code>n</code> first elements of <code>l</code>. Fails if <code>n</code> is negative. If <code>n</code> is greater than length of a list it will return <code>[]</code>.</p>
 <h4 id="take_while">take_while</h4>
-<div class="highlight"><pre><span></span><code>List.take_while(p : &#39;a =&gt; bool, l : list(&#39;a)) : list(&#39;a)
-</code></pre></div>
+<p><code>List.take_while(p : 'a =&gt; bool, l : list('a)) : list('a)</code></p>
 <p>Returns longest prefix of <code>l</code> in which all elements fulfill <code>p</code>.</p>
 <h4 id="drop_while">drop_while</h4>
-<div class="highlight"><pre><span></span><code>List.drop_while(p : &#39;a =&gt; bool, l : list(&#39;a)) : list(&#39;a)
-</code></pre></div>
+<p><code>List.drop_while(p : 'a =&gt; bool, l : list('a)) : list('a)</code></p>
 <p>Removes longest prefix from <code>l</code> in which all elements fulfill <code>p</code>.</p>
 <h4 id="partition">partition</h4>
-<div class="highlight"><pre><span></span><code>List.partition(p : &#39;a =&gt; bool, l : list(&#39;a)) : (list(&#39;a) * list(&#39;a))
-</code></pre></div>
+<p><code>List.partition(p : 'a =&gt; bool, l : list('a)) : (list('a) * list('a))</code></p>
 <p>Separates elements of <code>l</code> that fulfill <code>p</code> and these that do not. Elements fulfilling predicate will be in the right list. For instance
-<div class="highlight"><pre><span></span><code>partition((x) =&gt; x &gt; 0, [-1, 1, -2, 0, 1, 2, -3])
-</code></pre></div>
+<code>partition((x) =&gt; x &gt; 0, [-1, 1, -2, 0, 1, 2, -3])</code>
 will yield <code>([1, 1, 2], [-1, -2, 0, -3])</code></p>
 <h4 id="flatten">flatten</h4>
-<div class="highlight"><pre><span></span><code>List.flatten(ll : list(list(&#39;a))) : list(&#39;a)
-</code></pre></div>
+<p><code>List.flatten(ll : list(list('a))) : list('a)</code></p>
 <p>Flattens a list of lists into a one list.</p>
 <h4 id="all_1">all</h4>
-<div class="highlight"><pre><span></span><code>List.all(p : &#39;a =&gt; bool, l : list(&#39;a)) : bool
-</code></pre></div>
+<p><code>List.all(p : 'a =&gt; bool, l : list('a)) : bool</code></p>
 <p>Checks if all elements of a list fulfill predicate <code>p</code>.</p>
 <h4 id="any">any</h4>
-<div class="highlight"><pre><span></span><code>List.any(p : &#39;a =&gt; bool, l : list(&#39;a)) : bool
-</code></pre></div>
+<p><code>List.any(p : 'a =&gt; bool, l : list('a)) : bool</code></p>
 <p>Checks if any element of a list fulfills predicate <code>p</code>.</p>
 <h4 id="sum_1">sum</h4>
-<div class="highlight"><pre><span></span><code>List.sum(l : list(int)) : int
-</code></pre></div>
+<p><code>List.sum(l : list(int)) : int</code></p>
 <p>Sums elements of a list. Returns 0 if the list is empty.</p>
 <h4 id="product">product</h4>
-<div class="highlight"><pre><span></span><code>List.product(l : list(int)) : int
-</code></pre></div>
+<p><code>List.product(l : list(int)) : int</code></p>
 <p>Multiplies elements of a list. Returns 1 if the list is empty.</p>
 <h4 id="zip_with">zip_with</h4>
-<div class="highlight"><pre><span></span><code>List.zip_with(f : (&#39;a, &#39;b) =&gt; &#39;c, l1 : list(&#39;a), l2 : list(&#39;b)) : list(&#39;c)
-</code></pre></div>
+<p><code>List.zip_with(f : ('a, 'b) =&gt; 'c, l1 : list('a), l2 : list('b)) : list('c)</code></p>
 <p>"zips" two lists with a function. n-th element of resulting list will be equal to <code>f(x1, x2)</code> where <code>x1</code> and <code>x2</code> are n-th elements of <code>l1</code> and <code>l2</code> respectively. Will cut off the tail of the longer list. For instance
-<div class="highlight"><pre><span></span><code>zip_with((a, b) =&gt; a + b, [1,2], [1,2,3])
-</code></pre></div>
+<code>zip_with((a, b) =&gt; a + b, [1,2], [1,2,3])</code>
 will yield <code>[2,4]</code></p>
 <h4 id="zip">zip</h4>
-<div class="highlight"><pre><span></span><code>List.zip(l1 : list(&#39;a), l2 : list(&#39;b)) : list(&#39;a * &#39;b)
-</code></pre></div>
+<p><code>List.zip(l1 : list('a), l2 : list('b)) : list('a * 'b)</code></p>
 <p>Special case of <a href="#zip_with">zip_with</a> where the zipping function is <code>(a, b) =&gt; (a, b)</code>.</p>
 <h4 id="unzip">unzip</h4>
-<div class="highlight"><pre><span></span><code>List.unzip(l : list(&#39;a * &#39;b)) : list(&#39;a) * list(&#39;b)
-</code></pre></div>
+<p><code>List.unzip(l : list('a * 'b)) : list('a) * list('b)</code></p>
 <p>Opposite to the <code>zip</code> operation. Takes a list of pairs and returns pair of lists with respective elements on same indices.</p>
 <h4 id="merge">merge</h4>
-<div class="highlight"><pre><span></span><code>List.merge(lesser_cmp : (&#39;a, &#39;a) =&gt; bool, l1 : list(&#39;a), l2 : list(&#39;a)) : list(&#39;a)
-</code></pre></div>
+<p><code>List.merge(lesser_cmp : ('a, 'a) =&gt; bool, l1 : list('a), l2 : list('a)) : list('a)</code></p>
 <p>Merges two sorted lists into a single sorted list. O(length(l1) + length(l2))</p>
 <h4 id="sort">sort</h4>
-<div class="highlight"><pre><span></span><code>List.sort(lesser_cmp : (&#39;a, &#39;a) =&gt; bool, l : list(&#39;a)) : list(&#39;a)
-</code></pre></div>
+<p><code>List.sort(lesser_cmp : ('a, 'a) =&gt; bool, l : list('a)) : list('a)</code></p>
 <p>Sorts a list using given comparator. <code>lesser_cmp(x, y)</code> should return <code>true</code> iff <code>x &lt; y</code>. If <code>lesser_cmp</code> is not transitive or there exists an element <code>x</code> such that <code>lesser_cmp(x, x)</code> or there exists a pair of elements <code>x</code> and <code>y</code> such that <code>lesser_cmp(x, y) &amp;&amp; lesser_cmp(y, x)</code> then the result is undefined. O(length(l) * log_2(length(l))).</p>
 <h4 id="intersperse">intersperse</h4>
-<div class="highlight"><pre><span></span><code>List.intersperse(delim : &#39;a, l : list(&#39;a)) : list(&#39;a)
-</code></pre></div>
+<p><code>List.intersperse(delim : 'a, l : list('a)) : list('a)</code></p>
 <p>Intersperses elements of <code>l</code> with <code>delim</code>. Does nothing on empty lists and singletons. For instance
-<div class="highlight"><pre><span></span><code>intersperse(0, [1, 2, 3, 4])
-</code></pre></div>
+<code>intersperse(0, [1, 2, 3, 4])</code>
 will yield <code>[1, 0, 2, 0, 3, 0, 4]</code></p>
 <h4 id="enumerate">enumerate</h4>
-<div class="highlight"><pre><span></span><code>List.enumerate(l : list(&#39;a)) : list(int * &#39;a)
-</code></pre></div>
+<p><code>List.enumerate(l : list('a)) : list(int * 'a)</code></p>
 <p>Equivalent to <a href="#zip">zip</a> with <code>[0..length(l)]</code>, but slightly faster.</p>
 <h3 id="option">Option</h3>
 <p>Common operations on <code>option</code> types and lists of <code>option</code>s.</p>
 <h4 id="is_none">is_none</h4>
-<div class="highlight"><pre><span></span><code>Option.is_none(o : option(&#39;a)) : bool
-</code></pre></div>
+<p><code>Option.is_none(o : option('a)) : bool</code></p>
 <p>Returns true iff <code>o == None</code></p>
 <h4 id="is_some">is_some</h4>
-<div class="highlight"><pre><span></span><code>Option.is_some(o : option(&#39;a)) : bool
-</code></pre></div>
+<p><code>Option.is_some(o : option('a)) : bool</code></p>
 <p>Returns true iff <code>o</code> is not <code>None</code>.</p>
 <h4 id="match">match</h4>
-<div class="highlight"><pre><span></span><code>Option.match(n : &#39;b, s : &#39;a =&gt; &#39;b, o : option(&#39;a)) : &#39;b
-</code></pre></div>
+<p><code>Option.match(n : 'b, s : 'a =&gt; 'b, o : option('a)) : 'b</code></p>
 <p>Behaves like pattern matching on <code>option</code> using two case functions.</p>
 <h4 id="default">default</h4>
-<div class="highlight"><pre><span></span><code>Option.default(def : &#39;a, o : option(&#39;a)) : &#39;a
-</code></pre></div>
+<p><code>Option.default(def : 'a, o : option('a)) : 'a</code></p>
 <p>Escapes <code>option</code> wrapping by providing default value for <code>None</code>.</p>
 <h4 id="force">force</h4>
-<div class="highlight"><pre><span></span><code>Option.force(o : option(&#39;a)) : &#39;a
-</code></pre></div>
+<p><code>Option.force(o : option('a)) : 'a</code></p>
 <p>Forcefully escapes the <code>option</code> wrapping assuming it is <code>Some</code>.
 Aborts on <code>None</code>.</p>
 <h4 id="force_msg">force_msg</h4>
-<div class="highlight"><pre><span></span><code>Option.force_msg(o : option(&#39;a), err : string) : &#39;a
-</code></pre></div>
+<p><code>Option.force_msg(o : option('a), err : string) : 'a</code></p>
 <p>Forcefully escapes the <code>option</code> wrapping assuming it is <code>Some</code>.
 Aborts with <code>err</code> error message on <code>None</code>.</p>
 <h4 id="contains_1">contains</h4>
-<p><div class="highlight"><pre><span></span><code>Option.contains(e : &#39;a, o : option(&#39;a)) : bool
-</code></pre></div>
+<p><code>Option.contains(e : 'a, o : option('a)) : bool</code>
 Returns <code>true</code> if and only if <code>o</code> contains element equal to <code>e</code>. Equivalent to <code>Option.match(false, x =&gt; x == e, o)</code>.</p>
 <h4 id="on_elem">on_elem</h4>
-<div class="highlight"><pre><span></span><code>Option.on_elem(o : option(&#39;a), f : &#39;a =&gt; unit) : unit
-</code></pre></div>
+<p><code>Option.on_elem(o : option('a), f : 'a =&gt; unit) : unit</code></p>
 <p>Evaluates <code>f</code> on element under <code>Some</code>. Does nothing on <code>None</code>.</p>
 <h4 id="map_2">map</h4>
-<div class="highlight"><pre><span></span><code>Option.map(f : &#39;a =&gt; &#39;b, o : option(&#39;a)) : option(&#39;b)
-</code></pre></div>
+<p><code>Option.map(f : 'a =&gt; 'b, o : option('a)) : option('b)</code></p>
 <p>Maps element under <code>Some</code>. Leaves <code>None</code> unchanged.</p>
 <h4 id="map2">map2</h4>
-<div class="highlight"><pre><span></span><code>Option.map2(f : (&#39;a, &#39;b) =&gt; &#39;c, o1 : option(&#39;a), o2 : option(&#39;b)) : option(&#39;c)
-</code></pre></div>
+<p><code>Option.map2(f : ('a, 'b) =&gt; 'c, o1 : option('a), o2 : option('b)) : option('c)</code></p>
 <p>Applies arity 2 function over two <code>option</code>s' elements. Returns <code>Some</code> iff both of <code>o1</code> and <code>o2</code> were <code>Some</code>, or <code>None</code> otherwise. For instance
-<div class="highlight"><pre><span></span><code>map2((a, b) =&gt; a + b, Some(1), Some(2))
-</code></pre></div>
+<code>map2((a, b) =&gt; a + b, Some(1), Some(2))</code>
 will yield <code>Some(3)</code> and
-<div class="highlight"><pre><span></span><code>map2((a, b) =&gt; a + b, Some(1), None)
-</code></pre></div>
+<code>map2((a, b) =&gt; a + b, Some(1), None)</code>
 will yield <code>None</code>.</p>
 <h4 id="map3">map3</h4>
-<div class="highlight"><pre><span></span><code>Option.map3(f : (&#39;a, &#39;b, &#39;c) =&gt; &#39;d, o1 : option(&#39;a), o2 : option(&#39;b), o3 : option(&#39;c)) : option(&#39;d)
-</code></pre></div>
+<p><code>Option.map3(f : ('a, 'b, 'c) =&gt; 'd, o1 : option('a), o2 : option('b), o3 : option('c)) : option('d)</code></p>
 <p>Same as <a href="#map2">map2</a> but with arity 3 function.</p>
 <h4 id="app_over">app_over</h4>
-<div class="highlight"><pre><span></span><code>Option.app_over(f : option (&#39;a =&gt; &#39;b), o : option(&#39;a)) : option(&#39;b)
-</code></pre></div>
+<p><code>Option.app_over(f : option ('a =&gt; 'b), o : option('a)) : option('b)</code></p>
 <p>Applies function under <code>option</code> over argument under <code>option</code>. If either of them is <code>None</code> the result will be <code>None</code> as well. For instance
-<div class="highlight"><pre><span></span><code>app_over(Some((x) =&gt; x + 1), Some(1))
-</code></pre></div>
+<code>app_over(Some((x) =&gt; x + 1), Some(1))</code>
 will yield <code>Some(2)</code> and
-<div class="highlight"><pre><span></span><code>app_over(Some((x) =&gt; x + 1), None)
-</code></pre></div>
+<code>app_over(Some((x) =&gt; x + 1), None)</code>
 will yield <code>None</code>.</p>
 <h4 id="flat_map_1">flat_map</h4>
-<div class="highlight"><pre><span></span><code>Option.flat_map(f : &#39;a =&gt; option(&#39;b), o : option(&#39;a)) : option(&#39;b)
-</code></pre></div>
+<p><code>Option.flat_map(f : 'a =&gt; option('b), o : option('a)) : option('b)</code></p>
 <p>Performs monadic bind on an <code>option</code>. Extracts element from <code>o</code> (if present) and forms new <code>option</code> from it. For instance
-<div class="highlight"><pre><span></span><code>flat_map((x) =&gt; Some(x + 1), Some(1))
-</code></pre></div>
+<code>flat_map((x) =&gt; Some(x + 1), Some(1))</code>
 will yield <code>Some(2)</code> and
-<div class="highlight"><pre><span></span><code>flat_map((x) =&gt; Some(x + 1), None)
-</code></pre></div>
+<code>flat_map((x) =&gt; Some(x + 1), None)</code>
 will yield <code>None</code>.</p>
 <h4 id="to_list_1">to_list</h4>
-<div class="highlight"><pre><span></span><code>Option.to_list(o : option(&#39;a)) : list(&#39;a)
-</code></pre></div>
+<p><code>Option.to_list(o : option('a)) : list('a)</code></p>
 <p>Turns <code>o</code> into an empty (if <code>None</code>) or singleton (if <code>Some</code>) list.</p>
 <h4 id="filter_options">filter_options</h4>
-<div class="highlight"><pre><span></span><code>Option.filter_options(l : list(option(&#39;a))) : list(&#39;a)
-</code></pre></div>
+<p><code>Option.filter_options(l : list(option('a))) : list('a)</code></p>
 <p>Removes <code>None</code>s from list and unpacks all remaining <code>Some</code>s. For instance
-<div class="highlight"><pre><span></span><code>filter_options([Some(1), None, Some(2)])
-</code></pre></div>
+<code>filter_options([Some(1), None, Some(2)])</code>
 will yield <code>[1, 2]</code>.</p>
 <h4 id="seq_options">seq_options</h4>
-<div class="highlight"><pre><span></span><code>Option.seq_options(l : list (option(&#39;a))) : option (list(&#39;a))
-</code></pre></div>
+<p><code>Option.seq_options(l : list (option('a))) : option (list('a))</code></p>
 <p>Tries to unpack all elements of a list from <code>Some</code>s. Returns <code>None</code> if at least element of <code>l</code> is <code>None</code>. For instance
-<div class="highlight"><pre><span></span><code>seq_options([Some(1), Some(2)])
-</code></pre></div>
+<code>seq_options([Some(1), Some(2)])</code>
 will yield <code>Some([1, 2])</code>, but
-<div class="highlight"><pre><span></span><code>seq_options([Some(1), Some(2), None])
-</code></pre></div>
+<code>seq_options([Some(1), Some(2), None])</code>
 will yield <code>None</code>.</p>
 <h4 id="choose">choose</h4>
-<div class="highlight"><pre><span></span><code>Option.choose(o1 : option(&#39;a), o2 : option(&#39;a)) : option(&#39;a)
-</code></pre></div>
+<p><code>Option.choose(o1 : option('a), o2 : option('a)) : option('a)</code></p>
 <p>Out of two <code>option</code>s choose the one that is <code>Some</code>, or <code>None</code> if both are <code>None</code>s.</p>
 <h4 id="choose_first">choose_first</h4>
-<div class="highlight"><pre><span></span><code>Option.choose_first(l : list(option(&#39;a))) : option(&#39;a)
-</code></pre></div>
+<p><code>Option.choose_first(l : list(option('a))) : option('a)</code></p>
 <p>Same as <a href="#choose">choose</a>, but chooses from a list insted of two arguments.</p>
 <h3 id="pair">Pair</h3>
 <p>Common operations on 2-tuples.</p>
 <h4 id="fst">fst</h4>
-<div class="highlight"><pre><span></span><code>Pair.fst(t : (&#39;a * &#39;b)) : &#39;a
-</code></pre></div>
+<p><code>Pair.fst(t : ('a * 'b)) : 'a</code></p>
 <p>First element projection.</p>
 <h4 id="snd">snd</h4>
-<div class="highlight"><pre><span></span><code>Pair.snd(t : (&#39;a * &#39;b)) : &#39;b
-</code></pre></div>
+<p><code>Pair.snd(t : ('a * 'b)) : 'b</code></p>
 <p>Second element projection.</p>
 <h4 id="map1">map1</h4>
-<div class="highlight"><pre><span></span><code>Pair.map1(f : &#39;a =&gt; &#39;c, t : (&#39;a * &#39;b)) : (&#39;c * &#39;b)
-</code></pre></div>
+<p><code>Pair.map1(f : 'a =&gt; 'c, t : ('a * 'b)) : ('c * 'b)</code></p>
 <p>Applies function over first element.</p>
 <h4 id="map2_1">map2</h4>
-<div class="highlight"><pre><span></span><code>Pair.map2(f : &#39;b =&gt; &#39;c, t : (&#39;a * &#39;b)) : (&#39;a * &#39;c)
-</code></pre></div>
+<p><code>Pair.map2(f : 'b =&gt; 'c, t : ('a * 'b)) : ('a * 'c)</code></p>
 <p>Applies function over second element.</p>
 <h4 id="bimap">bimap</h4>
-<div class="highlight"><pre><span></span><code>Pair.bimap(f : &#39;a =&gt; &#39;c, g : &#39;b =&gt; &#39;d, t : (&#39;a * &#39;b)) : (&#39;c * &#39;d)
-</code></pre></div>
+<p><code>Pair.bimap(f : 'a =&gt; 'c, g : 'b =&gt; 'd, t : ('a * 'b)) : ('c * 'd)</code></p>
 <p>Applies functions over respective elements.</p>
 <h4 id="swap">swap</h4>
-<div class="highlight"><pre><span></span><code>Pair.swap(t : (&#39;a * &#39;b)) : (&#39;b * &#39;a)
-</code></pre></div>
+<p><code>Pair.swap(t : ('a * 'b)) : ('b * 'a)</code></p>
 <p>Swaps elements.</p>
 <h3 id="set_1"><a name='set-stdlib'>Set</a></h3>
 <h4 id="types_4">Types</h4>
-<div class="highlight"><pre><span></span><code>record set(&#39;a) = { to_map : map(&#39;a, unit) }
-</code></pre></div>
+<p><code>record set('a) = { to_map : map('a, unit) }</code></p>
 <h4 id="functions_4">Functions</h4>
 <h5 id="new">new</h5>
-<div class="highlight"><pre><span></span><code>Set.new() : set(&#39;a)
-</code></pre></div>
+<p><code>Set.new() : set('a)</code></p>
 <p>Returns an empty set</p>
 <h5 id="member_1">member</h5>
-<div class="highlight"><pre><span></span><code>member(e : &#39;a, s : set(&#39;a)) : bool
-</code></pre></div>
+<p><code>member(e : 'a, s : set('a)) : bool</code></p>
 <p>Checks if the element <code>e</code> is present in the set <code>s</code></p>
 <h5 id="insert">insert</h5>
-<div class="highlight"><pre><span></span><code>insert(e : &#39;a, s : set(&#39;a)) : set(&#39;a)
-</code></pre></div>
+<p><code>insert(e : 'a, s : set('a)) : set('a)</code></p>
 <p>Inserts the element <code>e</code> in the set <code>s</code></p>
 <h5 id="delete_1">delete</h5>
-<div class="highlight"><pre><span></span><code>Set.delete(e : &#39;a, s : set(&#39;a)) : set(&#39;a)
-</code></pre></div>
+<p><code>Set.delete(e : 'a, s : set('a)) : set('a)</code></p>
 <p>Removes the element <code>e</code> from the set <code>s</code></p>
 <h5 id="size_1">size</h5>
-<div class="highlight"><pre><span></span><code>size(s : set(&#39;a)) : int
-</code></pre></div>
+<p><code>size(s : set('a)) : int</code></p>
 <p>Returns the number of elements in the set <code>s</code></p>
 <h5 id="to_list_2">to_list</h5>
-<div class="highlight"><pre><span></span><code>Set.to_list(s : set(&#39;a)) : list(&#39;a)
-</code></pre></div>
+<p><code>Set.to_list(s : set('a)) : list('a)</code></p>
 <p>Returns a list containing the elements of the set <code>s</code></p>
 <h5 id="from_list_1">from_list</h5>
-<div class="highlight"><pre><span></span><code>Set.from_list(l : list(&#39;a)) : set(&#39;a)
-</code></pre></div>
+<p><code>Set.from_list(l : list('a)) : set('a)</code></p>
 <p>Turns the list <code>l</code> into a set</p>
 <h5 id="filter_1">filter</h5>
-<div class="highlight"><pre><span></span><code>Set.filter(p : &#39;a =&gt; bool, s : set(&#39;a)) : set(&#39;a)
-</code></pre></div>
+<p><code>Set.filter(p : 'a =&gt; bool, s : set('a)) : set('a)</code></p>
 <p>Filters out elements of <code>s</code> that fulfill predicate <code>p</code></p>
 <h5 id="fold">fold</h5>
-<div class="highlight"><pre><span></span><code>Set.fold(f : (&#39;a, &#39;b) =&gt; &#39;b, acc : &#39;b, s : set(&#39;a)) : &#39;b
-</code></pre></div>
+<p><code>Set.fold(f : ('a, 'b) =&gt; 'b, acc : 'b, s : set('a)) : 'b</code></p>
 <p>Folds the function <code>f</code> over every element in the set <code>s</code> and returns the final value of the accumulator <code>acc</code>.</p>
 <h5 id="subtract">subtract</h5>
-<div class="highlight"><pre><span></span><code>Set.subtract(s1 : set(&#39;a), s2 : set(&#39;a)) : set(&#39;a)
-</code></pre></div>
+<p><code>Set.subtract(s1 : set('a), s2 : set('a)) : set('a)</code></p>
 <p>Returns the elements of <code>s1</code> that are not members of <code>s2</code></p>
 <h5 id="intersection_1">intersection</h5>
-<div class="highlight"><pre><span></span><code>Set.intersection(s1 : set(&#39;a), s2 : set(&#39;a)) : set(&#39;a)
-</code></pre></div>
+<p><code>Set.intersection(s1 : set('a), s2 : set('a)) : set('a)</code></p>
 <p>Returns the intersection of the two sets <code>s1</code> and <code>s2</code></p>
 <h5 id="intersection_list">intersection_list</h5>
-<div class="highlight"><pre><span></span><code>Set.intersection_list(sets : list(set(&#39;a))) : set(&#39;a)
-</code></pre></div>
+<p><code>Set.intersection_list(sets : list(set('a))) : set('a)</code></p>
 <p>Returns the intersection of all the sets in the given list</p>
 <h5 id="union_1">union</h5>
-<div class="highlight"><pre><span></span><code>Set.union(s1 : set(&#39;a), s2 : set(&#39;a)) : set(&#39;a)
-</code></pre></div>
+<p><code>Set.union(s1 : set('a), s2 : set('a)) : set('a)</code></p>
 <p>Returns the union of the two sets <code>s1</code> and <code>s2</code></p>
 <h5 id="union_list">union_list</h5>
-<div class="highlight"><pre><span></span><code>Set.union_list(sets : list(set(&#39;a))) : set(&#39;a)
-</code></pre></div>
+<p><code>Set.union_list(sets : list(set('a))) : set('a)</code></p>
 <p>Returns the union of all the sets in the given list</p>
 <h3 id="string">String</h3>
 <p>Operations on the <code>string</code> type. A <code>string</code> is a UTF-8 encoded byte array.</p>
@@ -2063,107 +1836,83 @@ will yield <code>None</code>.</p>
 <p>The length of a string.</p>
 <p>Note: not equivalent to byte size of the string, rather <code>List.length(String.to_list(s))</code></p>
 <h4 id="concat_1">concat</h4>
-<div class="highlight"><pre><span></span><code>concat(s1 : string, s2 : string) : string
-</code></pre></div>
+<p><code>concat(s1 : string, s2 : string) : string</code></p>
 <p>Concatenates <code>s1</code> and <code>s2</code>.</p>
 <h4 id="concats">concats</h4>
-<div class="highlight"><pre><span></span><code>concats(ss : list(string)) : string
-</code></pre></div>
+<p><code>concats(ss : list(string)) : string</code></p>
 <p>Concatenates a list of strings.</p>
 <h4 id="to_list_3">to_list</h4>
-<div class="highlight"><pre><span></span><code>to_list(s : string) : list(char)
-</code></pre></div>
+<p><code>to_list(s : string) : list(char)</code></p>
 <p>Converts a <code>string</code> to a list of <code>char</code> - the code points are normalized, but
 composite characters are possibly converted to multiple <code>char</code>s. For example the
 string "😜i̇" is converted to <code>[128540,105,775]</code> - where the smiley is the first
 code point and the strangely dotted <code>i</code> becomes <code>[105, 775]</code>.</p>
 <h4 id="from_list_2">from_list</h4>
-<div class="highlight"><pre><span></span><code>from_list(cs : list(char)) : string
-</code></pre></div>
+<p><code>from_list(cs : list(char)) : string</code></p>
 <p>Converts a list of characters into a normalized UTF-8 string.</p>
 <h4 id="to_lower">to_lower</h4>
-<div class="highlight"><pre><span></span><code>to_lower(s : string) : string
-</code></pre></div>
+<p><code>to_lower(s : string) : string</code></p>
 <p>Converts a string to lowercase.</p>
 <h4 id="to_upper">to_upper</h4>
-<div class="highlight"><pre><span></span><code>to_upper(s : string) : string
-</code></pre></div>
+<p><code>to_upper(s : string) : string</code></p>
 <p>Converts a string to uppercase.</p>
 <h4 id="at">at</h4>
-<div class="highlight"><pre><span></span><code>at(ix : int, s : string) : option(char)
-</code></pre></div>
+<p><code>at(ix : int, s : string) : option(char)</code></p>
 <p>Returns the character/codepoint at (zero-based) index <code>ix</code>. Basically the equivalent to
 <code>List.nth(ix, String.to_list(s))</code>.</p>
 <h4 id="split_1">split</h4>
-<div class="highlight"><pre><span></span><code>split(ix : int, s:string) : string * string
-</code></pre></div>
+<p><code>split(ix : int, s:string) : string * string</code></p>
 <p>Splits a string at (zero-based) index <code>ix</code>.</p>
 <h4 id="contains_2">contains</h4>
-<div class="highlight"><pre><span></span><code>contains(str : string, pat : string) : option(int)
-</code></pre></div>
+<p><code>contains(str : string, pat : string) : option(int)</code></p>
 <p>Searches for <code>pat</code> in <code>str</code>, returning <code>Some(ix)</code> if <code>pat</code> is a substring of
 <code>str</code> starting at position <code>ix</code>, otherwise returns <code>None</code>.</p>
 <h4 id="tokens">tokens</h4>
-<div class="highlight"><pre><span></span><code>tokens(str : string, pat : string) : list(string)
-</code></pre></div>
+<p><code>tokens(str : string, pat : string) : list(string)</code></p>
 <p>Splits <code>str</code> into tokens, <code>pat</code> is the divider of tokens.</p>
 <h4 id="to_int_2">to_int</h4>
-<div class="highlight"><pre><span></span><code>to_int(s : string) : option(int)
-</code></pre></div>
+<p><code>to_int(s : string) : option(int)</code></p>
 <p>Converts a decimal ("123", "-253") or a hexadecimal ("0xa2f", "-0xBBB") string into
 an integer. If the string doesn't contain a valid number <code>None</code> is returned.</p>
 <h4 id="sha3_1">sha3</h4>
-<div class="highlight"><pre><span></span><code>sha3(s : string) : hash
-</code></pre></div>
+<p><code>sha3(s : string) : hash</code></p>
 <p>Computes the SHA3/Keccak hash of the string.</p>
 <h4 id="sha256_1">sha256</h4>
-<div class="highlight"><pre><span></span><code>sha256(s : string) : hash
-</code></pre></div>
+<p><code>sha256(s : string) : hash</code></p>
 <p>Computes the SHA256 hash of the string.</p>
 <h4 id="blake2b_1">blake2b</h4>
-<div class="highlight"><pre><span></span><code>blake2b(s : string) : hash
-</code></pre></div>
+<p><code>blake2b(s : string) : hash</code></p>
 <p>Computes the Blake2B hash of the string.</p>
 <h3 id="triple">Triple</h3>
 <h4 id="fst_1">fst</h4>
-<div class="highlight"><pre><span></span><code>Triple.fst(t : (&#39;a * &#39;b * &#39;c)) : &#39;a
-</code></pre></div>
+<p><code>Triple.fst(t : ('a * 'b * 'c)) : 'a</code></p>
 <p>First element projection.</p>
 <h4 id="snd_1">snd</h4>
-<div class="highlight"><pre><span></span><code>Triple.snd(t : (&#39;a * &#39;b * &#39;c)) : &#39;b
-</code></pre></div>
+<p><code>Triple.snd(t : ('a * 'b * 'c)) : 'b</code></p>
 <p>Second element projection.</p>
 <h4 id="thd">thd</h4>
-<div class="highlight"><pre><span></span><code>Triple.thd(t : (&#39;a * &#39;b * &#39;c)) : &#39;c
-</code></pre></div>
+<p><code>Triple.thd(t : ('a * 'b * 'c)) : 'c</code></p>
 <p>Third element projection.</p>
 <h4 id="map1_1">map1</h4>
-<div class="highlight"><pre><span></span><code>Triple.map1(f : &#39;a =&gt; &#39;m, t : (&#39;a * &#39;b * &#39;c)) : (&#39;m * &#39;b * &#39;c)
-</code></pre></div>
+<p><code>Triple.map1(f : 'a =&gt; 'm, t : ('a * 'b * 'c)) : ('m * 'b * 'c)</code></p>
 <p>Applies function over first element.</p>
 <h4 id="map2_2">map2</h4>
-<div class="highlight"><pre><span></span><code>Triple.map2(f : &#39;b =&gt; &#39;m, t : (&#39;a * &#39;b * &#39;c)) : (&#39;a * &#39;m * &#39;c)
-</code></pre></div>
+<p><code>Triple.map2(f : 'b =&gt; 'm, t : ('a * 'b * 'c)) : ('a * 'm * 'c)</code></p>
 <p>Applies function over second element.</p>
 <h4 id="map3_1">map3</h4>
-<div class="highlight"><pre><span></span><code>Triple.map3(f : &#39;c =&gt; &#39;m, t : (&#39;a * &#39;b * &#39;c)) : (&#39;a * &#39;b * &#39;m)
-</code></pre></div>
+<p><code>Triple.map3(f : 'c =&gt; 'm, t : ('a * 'b * 'c)) : ('a * 'b * 'm)</code></p>
 <p>Applies function over third element.</p>
 <h4 id="trimap">trimap</h4>
-<div class="highlight"><pre><span></span><code>Triple.trimap(f : &#39;a =&gt; &#39;x, g : &#39;b =&gt; &#39;y, h : &#39;c =&gt; &#39;z, t : (&#39;a * &#39;b * &#39;c)) : (&#39;x * &#39;y * &#39;z)
-</code></pre></div>
+<p><code>Triple.trimap(f : 'a =&gt; 'x, g : 'b =&gt; 'y, h : 'c =&gt; 'z, t : ('a * 'b * 'c)) : ('x * 'y * 'z)</code></p>
 <p>Applies functions over respective elements.</p>
 <h4 id="swap_1">swap</h4>
-<div class="highlight"><pre><span></span><code>Triple.swap(t : (&#39;a * &#39;b * &#39;c)) : (&#39;c * &#39;b * &#39;a)
-</code></pre></div>
+<p><code>Triple.swap(t : ('a * 'b * 'c)) : ('c * 'b * 'a)</code></p>
 <p>Swaps first and third element.</p>
 <h4 id="rotr">rotr</h4>
-<div class="highlight"><pre><span></span><code>Triple.rotr(t : (&#39;a * &#39;b * &#39;c)) : (&#39;c * &#39;a * &#39;b)
-</code></pre></div>
+<p><code>Triple.rotr(t : ('a * 'b * 'c)) : ('c * 'a * 'b)</code></p>
 <p>Cyclic rotation of the elements to the right.</p>
 <h4 id="rotl">rotl</h4>
-<div class="highlight"><pre><span></span><code>Triple.rotl(t : (&#39;a * &#39;b * &#39;c)) : (&#39;b * &#39;c * &#39;a)
-</code></pre></div>
+<p><code>Triple.rotl(t : ('a * 'b * 'c)) : ('b * 'c * 'a)</code></p>
 <p>Cyclic rotation of the elements to the left.</p>
                 
               

@@ -562,9 +562,8 @@
 <p>Single line comments start with <code>//</code> and block comments are enclosed in <code>/*</code>
 and <code>*/</code> and can be nested.</p>
 <h3 id="keywords">Keywords</h3>
-<div class="highlight"><pre><span></span><code>contract elif else entrypoint false function if import include let mod namespace
-private payable stateful switch true type record datatype main interface
-</code></pre></div>
+<p><code>contract elif else entrypoint false function if import include let mod namespace
+private payable stateful switch true type record datatype main interface</code></p>
 <h3 id="tokens">Tokens</h3>
 <ul>
 <li><code>Id = [a-z_][A-Za-z0-9_']*</code> identifiers start with a lower case letter.</li>
@@ -642,13 +641,13 @@ indented more than the currently enclosing layout block. Blocks with a single
 element can be written on the same line as the previous token.</p>
 <p>Each element of the block must share the same indentation and no part of an
 element may be indented less than the indentation of the block. For instance</p>
-<div class="highlight"><pre><span></span><code><span class="k">contract</span><span class="w"> </span><span class="nf">Layout</span><span class="w"> </span><span class="ow">=</span><span class="w"></span>
-<span class="w">  </span><span class="k">function</span><span class="w"> </span><span class="n">foo</span><span class="p">()</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="mi">0</span><span class="w">  </span><span class="c1">// no layout</span>
-<span class="w">  </span><span class="k">function</span><span class="w"> </span><span class="n">bar</span><span class="p">()</span><span class="w"> </span><span class="ow">=</span><span class="w">    </span><span class="c1">// layout block starts on next line</span>
-<span class="w">    </span><span class="k">let</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">foo</span><span class="p">()</span><span class="w">     </span><span class="c1">// indented more than 2 spaces</span>
-<span class="w">    </span><span class="n">x</span><span class="w"></span>
-<span class="w">     </span><span class="ow">+</span><span class="w"> </span><span class="mi">1</span><span class="w">              </span><span class="c1">// the &#39;+&#39; is indented more than the &#39;x&#39;</span>
-</code></pre></div>
+<p><code>sophia
+contract Layout =
+  function foo() = 0  // no layout
+  function bar() =    // layout block starts on next line
+    let x = foo()     // indented more than 2 spaces
+    x
+     + 1              // the '+' is indented more than the 'x'</code></p>
 <h2 id="notation">Notation</h2>
 <p>In describing the syntax below, we use the following conventions:</p>
 <ul>
@@ -667,130 +666,121 @@ element may be indented less than the indentation of the block. For instance</p>
 </ul>
 <h2 id="declarations">Declarations</h2>
 <p>A Sophia file consists of a sequence of <em>declarations</em> in a layout block.</p>
-<div class="highlight"><pre><span></span><code><span class="n">File</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">TopDecl</span><span class="p">)</span><span class="w"></span>
-
-<span class="n">TopDecl</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="p">[</span><span class="err">&#39;</span><span class="n">payable</span><span class="err">&#39;</span><span class="p">]</span><span class="w"> </span><span class="err">&#39;</span><span class="n">contract</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Con</span><span class="w"> </span><span class="sc">&#39;=&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Decl</span><span class="p">)</span><span class="w"></span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">namespace</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Con</span><span class="w"> </span><span class="sc">&#39;=&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Decl</span><span class="p">)</span><span class="w"></span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;@</span><span class="n">compiler</span><span class="err">&#39;</span><span class="w"> </span><span class="n">PragmaOp</span><span class="w"> </span><span class="n">Version</span><span class="w"></span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">include</span><span class="err">&#39;</span><span class="w"> </span><span class="n">String</span><span class="w"></span>
-
-<span class="n">Decl</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="err">&#39;</span><span class="n">type</span><span class="err">&#39;</span><span class="w">     </span><span class="n">Id</span><span class="w"> </span><span class="p">[</span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">TVar</span><span class="o">*</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="p">]</span><span class="w"> </span><span class="sc">&#39;=&#39;</span><span class="w"> </span><span class="n">TypeAlias</span><span class="w"></span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">record</span><span class="err">&#39;</span><span class="w">   </span><span class="n">Id</span><span class="w"> </span><span class="p">[</span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">TVar</span><span class="o">*</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="p">]</span><span class="w"> </span><span class="sc">&#39;=&#39;</span><span class="w"> </span><span class="n">RecordType</span><span class="w"></span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">datatype</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Id</span><span class="w"> </span><span class="p">[</span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">TVar</span><span class="o">*</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="p">]</span><span class="w"> </span><span class="sc">&#39;=&#39;</span><span class="w"> </span><span class="n">DataType</span><span class="w"></span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="p">(</span><span class="n">EModifier</span><span class="o">*</span><span class="w"> </span><span class="err">&#39;</span><span class="n">entrypoint</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">FModifier</span><span class="o">*</span><span class="w"> </span><span class="err">&#39;</span><span class="n">function</span><span class="err">&#39;</span><span class="p">)</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">FunDecl</span><span class="p">)</span><span class="w"></span>
-
-<span class="n">FunDecl</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Id</span><span class="w"> </span><span class="sc">&#39;:&#39;</span><span class="w"> </span><span class="n">Type</span><span class="w">                             </span><span class="c1">// Type signature</span>
-<span class="w">          </span><span class="o">|</span><span class="w"> </span><span class="n">Id</span><span class="w"> </span><span class="n">Args</span><span class="w"> </span><span class="p">[</span><span class="sc">&#39;:&#39;</span><span class="w"> </span><span class="n">Type</span><span class="p">]</span><span class="w"> </span><span class="sc">&#39;=&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Stmt</span><span class="p">)</span><span class="w">      </span><span class="c1">// Definition</span>
-
-<span class="n">PragmaOp</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="sc">&#39;&lt;&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">=&lt;</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">==</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">&gt;=</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;&gt;&#39;</span><span class="w"></span>
-<span class="n">Version</span><span class="w">  </span><span class="o">::=</span><span class="w"> </span><span class="n">Sep1</span><span class="p">(</span><span class="n">Int</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;.&#39;</span><span class="p">)</span><span class="w"></span>
-
-<span class="n">EModifier</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="err">&#39;</span><span class="n">payable</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">stateful</span><span class="err">&#39;</span><span class="w"></span>
-<span class="n">FModifier</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="err">&#39;</span><span class="n">stateful</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">private</span><span class="err">&#39;</span><span class="w"></span>
-
-<span class="n">Args</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">Pattern</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w"></span>
-</code></pre></div>
+<p>```c
+File ::= Block(TopDecl)</p>
+<p>TopDecl ::= ['payable'] 'contract' Con '=' Block(Decl)
+       | 'namespace' Con '=' Block(Decl)
+       | '@compiler' PragmaOp Version
+       | 'include' String</p>
+<p>Decl ::= 'type'     Id ['(' TVar<em> ')'] '=' TypeAlias
+       | 'record'   Id ['(' TVar</em> ')'] '=' RecordType
+       | 'datatype' Id ['(' TVar<em> ')'] '=' DataType
+       | (EModifier</em> 'entrypoint' | FModifier* 'function') Block(FunDecl)</p>
+<p>FunDecl ::= Id ':' Type                             // Type signature
+          | Id Args [':' Type] '=' Block(Stmt)      // Definition</p>
+<p>PragmaOp ::= '&lt;' | '=&lt;' | '==' | '&gt;=' | '&gt;'
+Version  ::= Sep1(Int, '.')</p>
+<p>EModifier ::= 'payable' | 'stateful'
+FModifier ::= 'stateful' | 'private'</p>
+<p>Args ::= '(' Sep(Pattern, ',') ')'
+```</p>
 <p>Contract declarations must appear at the top-level.</p>
 <p>For example,
-<div class="highlight"><pre><span></span><code><span class="k">contract</span><span class="w"> </span><span class="nf">Test</span><span class="w"> </span><span class="ow">=</span><span class="w"></span>
-<span class="w">  </span><span class="k">type</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="kt">int</span><span class="w"></span>
-<span class="w">  </span><span class="k">entrypoint</span><span class="w"> </span><span class="n">add</span><span class="w"> </span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="n">t</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="ow">+</span><span class="w"> </span><span class="n">y</span><span class="w"></span>
-</code></pre></div></p>
+<code>sophia
+contract Test =
+  type t = int
+  entrypoint add (x : t, y : t) = x + y</code></p>
 <p>There are three forms of type declarations: type aliases (declared with the
 <code>type</code> keyword), record type definitions (<code>record</code>) and data type definitions
 (<code>datatype</code>):</p>
-<div class="highlight"><pre><span></span><code><span class="n">TypeAlias</span><span class="w">  </span><span class="o">::=</span><span class="w"> </span><span class="n">Type</span><span class="w"></span>
-<span class="n">RecordType</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="sc">&#39;{&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">FieldType</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;}&#39;</span><span class="w"></span>
-<span class="n">DataType</span><span class="w">   </span><span class="o">::=</span><span class="w"> </span><span class="n">Sep1</span><span class="p">(</span><span class="n">ConDecl</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;|&#39;</span><span class="p">)</span><span class="w"></span>
-
-<span class="n">FieldType</span><span class="w">  </span><span class="o">::=</span><span class="w"> </span><span class="n">Id</span><span class="w"> </span><span class="sc">&#39;:&#39;</span><span class="w"> </span><span class="n">Type</span><span class="w"></span>
-<span class="n">ConDecl</span><span class="w">    </span><span class="o">::=</span><span class="w"> </span><span class="n">Con</span><span class="w"> </span><span class="p">[</span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">Sep1</span><span class="p">(</span><span class="n">Type</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="p">]</span><span class="w"></span>
-</code></pre></div>
+<p>```c
+TypeAlias  ::= Type
+RecordType ::= '{' Sep(FieldType, ',') '}'
+DataType   ::= Sep1(ConDecl, '|')</p>
+<p>FieldType  ::= Id ':' Type
+ConDecl    ::= Con ['(' Sep1(Type, ',') ')']
+```</p>
 <p>For example,
-<div class="highlight"><pre><span></span><code><span class="k">record</span><span class="w">   </span><span class="n">point</span><span class="p">(</span><span class="nv">&#39;a</span><span class="p">)</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="p">{</span><span class="n">x</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="nv">&#39;a</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="nv">&#39;a</span><span class="p">}</span><span class="w"></span>
-<span class="k">datatype</span><span class="w"> </span><span class="n">shape</span><span class="p">(</span><span class="nv">&#39;a</span><span class="p">)</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="nf">Circle</span><span class="p">(</span><span class="n">point</span><span class="p">(</span><span class="nv">&#39;a</span><span class="p">),</span><span class="w"> </span><span class="nv">&#39;a</span><span class="p">)</span><span class="w"> </span><span class="ow">|</span><span class="w"> </span><span class="nf">Rect</span><span class="p">(</span><span class="n">point</span><span class="p">(</span><span class="nv">&#39;a</span><span class="p">),</span><span class="w"> </span><span class="n">point</span><span class="p">(</span><span class="nv">&#39;a</span><span class="p">))</span><span class="w"></span>
-<span class="k">type</span><span class="w">     </span><span class="n">int_shape</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">shape</span><span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="w"></span>
-</code></pre></div></p>
+<code>sophia
+record   point('a) = {x : 'a, y : 'a}
+datatype shape('a) = Circle(point('a), 'a) | Rect(point('a), point('a))
+type     int_shape = shape(int)</code></p>
 <h2 id="types">Types</h2>
-<div class="highlight"><pre><span></span><code><span class="n">Type</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Domain</span><span class="w"> </span><span class="err">&#39;</span><span class="o">=&gt;</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Type</span><span class="w">             </span><span class="c1">// Function type</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Type</span><span class="w"> </span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">Type</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w">  </span><span class="c1">// Type application</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">Type</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w">                 </span><span class="c1">// Parens</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">unit</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">Type</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;*&#39;</span><span class="p">)</span><span class="w">      </span><span class="c1">// Tuples</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Id</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">QId</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">TVar</span><span class="w"></span>
-
-<span class="n">Domain</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Type</span><span class="w">                       </span><span class="c1">// Single argument</span>
-<span class="w">         </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">Type</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w">     </span><span class="c1">// Multiple arguments</span>
-</code></pre></div>
+<p>```c
+Type ::= Domain '=&gt;' Type             // Function type
+       | Type '(' Sep(Type, ',') ')'  // Type application
+       | '(' Type ')'                 // Parens
+       | 'unit' | Sep(Type, '*')      // Tuples
+       | Id | QId | TVar</p>
+<p>Domain ::= Type                       // Single argument
+         | '(' Sep(Type, ',') ')'     // Multiple arguments
+```</p>
 <p>The function type arrow associates to the right.</p>
 <p>Example,
-<div class="highlight"><pre><span></span><code><span class="nv">&#39;a</span><span class="w"> </span><span class="ow">=&gt;</span><span class="w"> </span><span class="kt">list</span><span class="p">(</span><span class="nv">&#39;a</span><span class="p">)</span><span class="w"> </span><span class="ow">=&gt;</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="ow">*</span><span class="w"> </span><span class="kt">list</span><span class="p">(</span><span class="nv">&#39;a</span><span class="p">))</span><span class="w"></span>
-</code></pre></div></p>
+<code>sophia
+'a =&gt; list('a) =&gt; (int * list('a))</code></p>
 <h2 id="statements">Statements</h2>
 <p>Function bodies are blocks of <em>statements</em>, where a statement is one of the following</p>
-<div class="highlight"><pre><span></span><code><span class="n">Stmt</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="err">&#39;</span><span class="k">switch</span><span class="sc">&#39; &#39;</span><span class="p">(</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Case</span><span class="p">)</span><span class="w"></span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="k">if</span><span class="sc">&#39; &#39;</span><span class="p">(</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Stmt</span><span class="p">)</span><span class="w"></span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">elif</span><span class="sc">&#39; &#39;</span><span class="p">(</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Stmt</span><span class="p">)</span><span class="w"></span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="k">else</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Stmt</span><span class="p">)</span><span class="w"></span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">let</span><span class="err">&#39;</span><span class="w"> </span><span class="n">LetDef</span><span class="w"></span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Expr</span><span class="w"></span>
-
-<span class="n">LetDef</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Id</span><span class="w"> </span><span class="n">Args</span><span class="w"> </span><span class="p">[</span><span class="sc">&#39;:&#39;</span><span class="w"> </span><span class="n">Type</span><span class="p">]</span><span class="w"> </span><span class="sc">&#39;=&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Stmt</span><span class="p">)</span><span class="w">   </span><span class="c1">// Function definition</span>
-<span class="w">         </span><span class="o">|</span><span class="w"> </span><span class="n">Pattern</span><span class="w"> </span><span class="sc">&#39;=&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Stmt</span><span class="p">)</span><span class="w">              </span><span class="c1">// Value definition</span>
-
-<span class="n">Case</span><span class="w">    </span><span class="o">::=</span><span class="w"> </span><span class="n">Pattern</span><span class="w"> </span><span class="err">&#39;</span><span class="o">=&gt;</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Stmt</span><span class="p">)</span><span class="w"></span>
-<span class="n">Pattern</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Expr</span><span class="w"></span>
-</code></pre></div>
+<p>```c
+Stmt ::= 'switch' '(' Expr ')' Block(Case)
+       | 'if' '(' Expr ')' Block(Stmt)
+       | 'elif' '(' Expr ')' Block(Stmt)
+       | 'else' Block(Stmt)
+       | 'let' LetDef
+       | Expr</p>
+<p>LetDef ::= Id Args [':' Type] '=' Block(Stmt)   // Function definition
+         | Pattern '=' Block(Stmt)              // Value definition</p>
+<p>Case    ::= Pattern '=&gt;' Block(Stmt)
+Pattern ::= Expr
+```</p>
 <p><code>if</code> statements can be followed by zero or more <code>elif</code> statements and an optional final <code>else</code> statement. For example,</p>
-<div class="highlight"><pre><span></span><code><span class="k">let</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="mi">4</span><span class="w"></span>
-<span class="k">switch</span><span class="p">(</span><span class="n">f</span><span class="p">(</span><span class="n">x</span><span class="p">))</span><span class="w"></span>
-<span class="w">  </span><span class="nf">None</span><span class="w"> </span><span class="ow">=&gt;</span><span class="w"> </span><span class="mi">0</span><span class="w"></span>
-<span class="w">  </span><span class="nf">Some</span><span class="p">(</span><span class="n">y</span><span class="p">)</span><span class="w"> </span><span class="ow">=&gt;</span><span class="w"></span>
-<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">y</span><span class="w"> </span><span class="ow">&gt;</span><span class="w"> </span><span class="mi">10</span><span class="p">)</span><span class="w"></span>
-<span class="w">      </span><span class="s2">&quot;too big&quot;</span><span class="w"></span>
-<span class="w">    </span><span class="k">elif</span><span class="p">(</span><span class="n">y</span><span class="w"> </span><span class="ow">&lt;</span><span class="w"> </span><span class="mi">3</span><span class="p">)</span><span class="w"></span>
-<span class="w">      </span><span class="s2">&quot;too small&quot;</span><span class="w"></span>
-<span class="w">    </span><span class="k">else</span><span class="w"></span>
-<span class="w">      </span><span class="s2">&quot;just right&quot;</span><span class="w"></span>
-</code></pre></div>
+<p><code>sophia
+let x : int = 4
+switch(f(x))
+  None =&gt; 0
+  Some(y) =&gt;
+    if(y &gt; 10)
+      "too big"
+    elif(y &lt; 3)
+      "too small"
+    else
+      "just right"</code></p>
 <h2 id="expressions">Expressions</h2>
-<div class="highlight"><pre><span></span><code><span class="n">Expr</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">LamArgs</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w"> </span><span class="err">&#39;</span><span class="o">=&gt;</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Block</span><span class="p">(</span><span class="n">Stmt</span><span class="p">)</span><span class="w">   </span><span class="c1">// Anonymous function    (x) =&gt; x + 1</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="k">if</span><span class="sc">&#39; &#39;</span><span class="p">(</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="err">&#39;</span><span class="k">else</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="c1">// If expression         if(x &lt; y) y else x</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;:&#39;</span><span class="w"> </span><span class="n">Type</span><span class="w">                      </span><span class="c1">// Type annotation       5 : int</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="n">BinOp</span><span class="w"> </span><span class="n">Expr</span><span class="w">                    </span><span class="c1">// Binary operator       x + y</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">UnOp</span><span class="w"> </span><span class="n">Expr</span><span class="w">                          </span><span class="c1">// Unary operator        ! b</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">Expr</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w">        </span><span class="c1">// Application           f(x, y)</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;.&#39;</span><span class="w"> </span><span class="n">Id</span><span class="w">                        </span><span class="c1">// Projection            state.x</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;[&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;]&#39;</span><span class="w">                  </span><span class="c1">// Map lookup            map[key]</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;{&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">FieldUpdate</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;}&#39;</span><span class="w"> </span><span class="c1">// Record or map update  r{ fld[key].x = y }</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;[&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">Expr</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;]&#39;</span><span class="w">             </span><span class="c1">// List                  [1, 2, 3]</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;[&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;|&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">Generator</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;]&#39;</span><span class="w"></span>
-<span class="w">                                            </span><span class="c1">// List comprehension    [k | x &lt;- [1], if (f(x)), let k = x+1]</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;[&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="err">&#39;</span><span class="p">..</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;]&#39;</span><span class="w">             </span><span class="c1">// List range            [1..n]</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;{&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">FieldUpdate</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;}&#39;</span><span class="w">      </span><span class="c1">// Record or map value   {x = 0, y = 1}, {[key] = val}</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w">                       </span><span class="c1">// Parens                (1 + 2) * 3</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Id</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Con</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">QId</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">QCon</span><span class="w">              </span><span class="c1">// Identifiers           x, None, Map.member, AELib.Token</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Int</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Bytes</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Char</span><span class="w">        </span><span class="c1">// Literals              123, 0xff, #00abc123, &quot;foo&quot;, &#39;%&#39;</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">AccountAddress</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">ContractAddress</span><span class="w">   </span><span class="c1">// Chain identifiers</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">OracleAddress</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">OracleQueryId</span><span class="w">      </span><span class="c1">// Chain identifiers</span>
-
-<span class="n">Generator</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Pattern</span><span class="w"> </span><span class="err">&#39;</span><span class="o">&lt;-</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w">   </span><span class="c1">// Generator</span>
-<span class="w">            </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="k">if</span><span class="sc">&#39; &#39;</span><span class="p">(</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w">   </span><span class="c1">// Guard</span>
-<span class="w">            </span><span class="o">|</span><span class="w"> </span><span class="n">LetDef</span><span class="w">              </span><span class="c1">// Definition</span>
-
-<span class="n">LamArgs</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="sc">&#39;(&#39;</span><span class="w"> </span><span class="n">Sep</span><span class="p">(</span><span class="n">LamArg</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;,&#39;</span><span class="p">)</span><span class="w"> </span><span class="sc">&#39;)&#39;</span><span class="w"></span>
-<span class="n">LamArg</span><span class="w">  </span><span class="o">::=</span><span class="w"> </span><span class="n">Id</span><span class="w"> </span><span class="p">[</span><span class="sc">&#39;:&#39;</span><span class="w"> </span><span class="n">Type</span><span class="p">]</span><span class="w"></span>
-
-<span class="n">FieldUpdate</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Path</span><span class="w"> </span><span class="sc">&#39;=&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"></span>
-<span class="n">Path</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Id</span><span class="w">                 </span><span class="c1">// Record field</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;[&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;]&#39;</span><span class="w">       </span><span class="c1">// Map key</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Path</span><span class="w"> </span><span class="sc">&#39;.&#39;</span><span class="w"> </span><span class="n">Id</span><span class="w">        </span><span class="c1">// Nested record field</span>
-<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Path</span><span class="w"> </span><span class="sc">&#39;[&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w"> </span><span class="sc">&#39;]&#39;</span><span class="w">  </span><span class="c1">// Nested map key</span>
-
-<span class="n">BinOp</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="err">&#39;</span><span class="o">||</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">&amp;&amp;</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;&lt;&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;&gt;&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">=&lt;</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">&gt;=</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">==</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">!=</span><span class="err">&#39;</span><span class="w"></span>
-<span class="w">        </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">::</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">++</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;+&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;-&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;*&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;/&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">mod</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;^&#39;</span><span class="w"></span>
-<span class="w">        </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">|&gt;</span><span class="err">&#39;</span><span class="w"></span>
-<span class="n">UnOp</span><span class="w">  </span><span class="o">::=</span><span class="w"> </span><span class="sc">&#39;-&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;!&#39;</span><span class="w"></span>
-</code></pre></div>
+<p>```c
+Expr ::= '(' LamArgs ')' '=&gt;' Block(Stmt)   // Anonymous function    (x) =&gt; x + 1
+       | 'if' '(' Expr ')' Expr 'else' Expr // If expression         if(x &lt; y) y else x
+       | Expr ':' Type                      // Type annotation       5 : int
+       | Expr BinOp Expr                    // Binary operator       x + y
+       | UnOp Expr                          // Unary operator        ! b
+       | Expr '(' Sep(Expr, ',') ')'        // Application           f(x, y)
+       | Expr '.' Id                        // Projection            state.x
+       | Expr '[' Expr ']'                  // Map lookup            map[key]
+       | Expr '{' Sep(FieldUpdate, ',') '}' // Record or map update  r{ fld[key].x = y }
+       | '[' Sep(Expr, ',') ']'             // List                  [1, 2, 3]
+       | '[' Expr '|' Sep(Generator, ',') ']'
+                                            // List comprehension    [k | x &lt;- [1], if (f(x)), let k = x+1]
+       | '[' Expr '..' Expr ']'             // List range            [1..n]
+       | '{' Sep(FieldUpdate, ',') '}'      // Record or map value   {x = 0, y = 1}, {[key] = val}
+       | '(' Expr ')'                       // Parens                (1 + 2) * 3
+       | Id | Con | QId | QCon              // Identifiers           x, None, Map.member, AELib.Token
+       | Int | Bytes | String | Char        // Literals              123, 0xff, #00abc123, "foo", '%'
+       | AccountAddress | ContractAddress   // Chain identifiers
+       | OracleAddress | OracleQueryId      // Chain identifiers</p>
+<p>Generator ::= Pattern '&lt;-' Expr   // Generator
+            | 'if' '(' Expr ')'   // Guard
+            | LetDef              // Definition</p>
+<p>LamArgs ::= '(' Sep(LamArg, ',') ')'
+LamArg  ::= Id [':' Type]</p>
+<p>FieldUpdate ::= Path '=' Expr
+Path ::= Id                 // Record field
+       | '[' Expr ']'       // Map key
+       | Path '.' Id        // Nested record field
+       | Path '[' Expr ']'  // Nested map key</p>
+<p>BinOp ::= '||' | '&amp;&amp;' | '&lt;' | '&gt;' | '=&lt;' | '&gt;=' | '==' | '!='
+        | '::' | '++' | '+' | '-' | '*' | '/' | 'mod' | '^'
+        | '|&gt;'
+UnOp  ::= '-' | '!'
+```</p>
 <h2 id="operators-types">Operators types</h2>
 <table>
 <thead>
