@@ -32,7 +32,7 @@ include "List.aes"
 ```
 
 - [Bitwise](#bitwise)
-- [BLS12_381](bls12_381)
+- [BLS12_381](#bls12_381)
 - [Func](#func)
 - [Frac](#frac)
 - [List](#list)
