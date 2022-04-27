@@ -1002,12 +1002,12 @@ Bitwise `xor` of _non-negative_ `x` and `y`.
 
 #### Types
 
-##### fp
+##### fr
 
 Built-in (Montgomery) integer representation 32 bytes
 
 
-##### fr
+##### fp
 
 Built-in (Montgomery) integer representation 48 bytes
 
@@ -1016,6 +1016,7 @@ Built-in (Montgomery) integer representation 48 bytes
 ```
 record fp2 = { x1 : fp, x2 : fp }`
 ```
+
 
 ##### g1
 ```
