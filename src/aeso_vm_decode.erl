@@ -136,6 +136,8 @@ from_fate_builtin(QType, Val) ->
     Str = {id, [], "string"},
     Adr = {id, [], "address"},
     Hsh = {bytes_t, [], 32},
+    I32 = {bytes_t, [], 32},
+    I48 = {bytes_t, [], 48},
     Qid = fun(Name) -> {qid, [], Name} end,
     Map = fun(KT, VT) -> {app_t, [], {id, [], "map"}, [KT, VT]} end,
     ChainTxArities = [3, 0, 0, 0, 0, 0, 1, 1, 1, 2, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2, 0],
@@ -207,6 +209,11 @@ from_fate_builtin(QType, Val) ->
             App(["Chain","ContractCallTx"], [Chk(Adr, Addr), Chk(Int, Amount)]);
         {["Chain", "base_tx"], {variant, ChainTxArities, 21, {}}} ->
             App(["Chain","GAAttachTx"], []);
+
+        {["MCL_BLS12_381", "fp"], X} ->
+            App(["MCL_BLS12_381", "fp"], [Chk(I32, X)]);
+        {["MCL_BLS12_381", "fr"], X} ->
+            App(["MCL_BLS12_381", "fr"], [Chk(I48, X)]);
 
         _ ->
             throw(cannot_translate_to_sophia)
