@@ -1,0 +1,8 @@
+namespace Nmsp =
+    type x = int
+
+namespace Nmsp =
+    type y = string
+
+main contract Bug =
+    type number = int

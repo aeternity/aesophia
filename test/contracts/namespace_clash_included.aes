@@ -1,0 +1,9 @@
+@compiler >= 6
+
+include "BLS12_381.aes"
+
+namespace BLS12_381 =
+    type fp = int
+
+main contract Bug =
+    type number = int

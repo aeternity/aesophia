@@ -3490,6 +3490,7 @@ pp_type(Label, Type) ->
     prettypr:format(prettypr:beside(prettypr:text(Label), aeso_pretty:type(Type, [show_generated])), 80, 80).
 
 src_file(T)      -> aeso_syntax:get_ann(file, T, no_file).
+include_type(T)  -> aeso_syntax:get_ann(include_type, T, none).
 line_number(T)   -> aeso_syntax:get_ann(line, T, 0).
 column_number(T) -> aeso_syntax:get_ann(col, T, 0).
 
@@ -3497,13 +3498,16 @@ pos(T)    -> aeso_errors:pos(src_file(T), line_number(T), column_number(T)).
 pos(L, C) -> aeso_errors:pos(L, C).
 
 loc(T) ->
-    {line_number(T), column_number(T)}.
+    {src_file(T), include_type(T), line_number(T), column_number(T)}.
 
 pp_loc(T) ->
-    {Line, Col} = loc(T),
+    {File, IncludeType, Line, Col} = loc(T),
     case {Line, Col} of
         {0, 0} -> "(builtin location)";
-        _      -> io_lib:format("line ~p, column ~p", [Line, Col])
+        _      -> case IncludeType of
+                      none -> io_lib:format("line ~p, column ~p", [Line, Col]);
+                      _    -> io_lib:format("line ~p, column ~p in ~s", [Line, Col, File])
+                  end
     end.
 
 plural(No, _Yes, [_]) -> No;
