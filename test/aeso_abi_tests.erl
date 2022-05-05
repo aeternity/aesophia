@@ -72,6 +72,27 @@ encode_decode_sophia_test() ->
     ok = Check("r", "{x = (\"foo\", 0), y = Red}"),
     ok.
 
+to_sophia_value_mcl_bls12_381_test() ->
+    Code = "include \"BLS12_381.aes\"\n"
+           "contract C =\n"
+           "  entrypoint test_bls12_381_fp(x : int) = BLS12_381.int_to_fp(x)\n"
+           "  entrypoint test_bls12_381_fr(x : int) = BLS12_381.int_to_fr(x)\n"
+           "  entrypoint test_bls12_381_g1(x : int) = BLS12_381.mk_g1(x, x, x)\n",
+
+    Opts = [{backend, fate}],
+
+    CallValue32 = aeb_fate_encoding:serialize({bytes, <<20:256>>}),
+    CallValue48 = aeb_fate_encoding:serialize({bytes, <<55:384>>}),
+    CallValueTp = aeb_fate_encoding:serialize({tuple, {{bytes, <<15:256>>}, {bytes, <<160:256>>}, {bytes, <<1234:256>>}}}),
+
+    {ok,     _} = aeso_compiler:to_sophia_value(Code, "test_bls12_381_fp", ok, CallValue32, Opts),
+    {error,  _} = aeso_compiler:to_sophia_value(Code, "test_bls12_381_fp", ok, CallValue48, Opts),
+    {ok,     _} = aeso_compiler:to_sophia_value(Code, "test_bls12_381_fr", ok, CallValue48, Opts),
+    {error,  _} = aeso_compiler:to_sophia_value(Code, "test_bls12_381_fr", ok, CallValue32, Opts),
+    {ok,     _} = aeso_compiler:to_sophia_value(Code, "test_bls12_381_g1", ok, CallValueTp, Opts),
+
+    ok.
+
 to_sophia_value_neg_test() ->
     Code = [ "contract Foo =\n"
              "  entrypoint x(y : int) : string = \"hello\"\n" ],
