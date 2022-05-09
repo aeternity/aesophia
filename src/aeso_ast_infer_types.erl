@@ -888,27 +888,27 @@ check_implemented_interfaces(Env, {_Contract, _Ann, ConName, Impls, Code}, What,
             ImplementedInterfaces = [I || I <- [proplists:get_value(Name, AllInterfaces) || Name <- ImplsNames],
                                           I /= undefined],
             Letfuns = [ Fun || Fun = {letfun, _, _, _, _, _} <- Code ],
-            check_implemented_interfaces_recursive(ImplementedInterfaces, ConName, Letfuns, AllInterfaces);
+            check_implemented_interfaces1(ImplementedInterfaces, ConName, Letfuns, AllInterfaces);
         contract_interface ->
             ok
     end,
     destroy_and_report_type_errors(Env).
 
-check_implemented_interfaces_recursive(ImplementedInterfaces, ConId, Letfuns, AllInterfaces) ->
-    check_implemented_interfaces_recursive(ImplementedInterfaces, ConId, Letfuns, [], AllInterfaces).
+check_implemented_interfaces1(ImplementedInterfaces, ConId, Letfuns, AllInterfaces) ->
+    check_implemented_interfaces1(ImplementedInterfaces, ConId, Letfuns, [], AllInterfaces).
 
 %% Recursively check that all directly and indirectly referenced interfaces are implemented
-check_implemented_interfaces_recursive([], _, _, _, _) ->
+check_implemented_interfaces1([], _, _, _, _) ->
     ok;
-check_implemented_interfaces_recursive([{contract_interface, _, IName, Extensions, Decls} | Interfaces],
+check_implemented_interfaces1([{contract_interface, _, IName, Extensions, Decls} | Interfaces],
                                        ConId, Impls, Acc, AllInterfaces) ->
     case lists:member(name(IName), Acc) of
         true ->
-            check_implemented_interfaces_recursive(Interfaces, ConId, Impls, Acc, AllInterfaces);
+            check_implemented_interfaces1(Interfaces, ConId, Impls, Acc, AllInterfaces);
         false ->
             Unmatched = match_impls(Decls, ConId, name(IName), Impls),
             NewInterfaces = Interfaces ++ [proplists:get_value(name(I), AllInterfaces) || I <- Extensions],
-            check_implemented_interfaces_recursive(NewInterfaces, ConId, Unmatched, [name(IName) | Acc], AllInterfaces)
+            check_implemented_interfaces1(NewInterfaces, ConId, Unmatched, [name(IName) | Acc], AllInterfaces)
     end.
 
 %% Match the functions of the contract with the interfaces functions, and return unmatched functions
