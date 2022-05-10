@@ -12,8 +12,8 @@ sandbox(Code) ->
     Tag    = make_ref(),
     {Pid, Ref} = spawn_monitor(fun() -> Parent ! {Tag, Code()} end),
     receive
-        {Tag1, Res} when Tag1 =:= Tag -> erlang:demonitor(Ref, [flush]), {ok, Res};
-        {'DOWN', Ref1, process, Pid1, Reason} when Ref1 =:= Ref andalso Pid1 =:= Pid -> {error, Reason}
+        {Tag, Res} -> erlang:demonitor(Ref, [flush]), {ok, Res};
+        {'DOWN', Ref, process, Pid, Reason} -> {error, Reason}
     after 100 ->
         exit(Pid, kill),
         {error, loop}
