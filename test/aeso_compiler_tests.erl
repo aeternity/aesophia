@@ -405,9 +405,15 @@ failing_contracts() ->
           "The field `y` is missing when constructing an element of type `r(int)`">>,
         <<?Pos(6, 42)
           "The fields `y`, `z` are missing when constructing an element of type `r('a)`">>])
-    , ?TYPE_ERROR(namespace_clash,
+    , ?TYPE_ERROR(namespace_clash_builtin,
        [<<?Pos(4, 10)
           "The contract `Call` has the same name as a namespace at (builtin location)">>])
+    , ?TYPE_ERROR(namespace_clash_included,
+       [<<?Pos(5, 11)
+          "The namespace `BLS12_381` has the same name as a namespace at line 1, column 11 in BLS12_381.aes">>])
+    , ?TYPE_ERROR(namespace_clash_same_file,
+       [<<?Pos(4, 11)
+          "The namespace `Nmsp` has the same name as a namespace at line 1, column 11">>])
     , ?TYPE_ERROR(bad_events,
         [<<?Pos(9, 25)
            "The indexed type `string` is not a word type">>,
