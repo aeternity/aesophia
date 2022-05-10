@@ -1,4 +1,4 @@
-// Builtins without named arguments can appear unapplied in both AEVM and FATE.
+// Builtins without named arguments can appear unapplied.
 // Named argument builtins are:
 //    Oracle.register
 //    Oracle.respond

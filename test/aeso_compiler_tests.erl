@@ -24,20 +24,15 @@ run_test(Test) ->
 %%  are made on the output, just that it is a binary which indicates
 %%  that the compilation worked.
 simple_compile_test_() ->
-    [ {"Testing the " ++ ContractName ++ " contract with the " ++ atom_to_list(Backend) ++ " backend",
+    [ {"Testing the " ++ ContractName ++ " contract",
        fun() ->
-           case compile(Backend, ContractName) of
-               #{byte_code := ByteCode,
-                 contract_source := _,
-                 type_info := _} when Backend == aevm ->
-                   ?assertMatch(Code when is_binary(Code), ByteCode);
-               #{fate_code := Code} when Backend == fate ->
+           case compile(ContractName) of
+               #{fate_code := Code} ->
                    Code1 = aeb_fate_code:deserialize(aeb_fate_code:serialize(Code)),
                    ?assertMatch({X, X}, {Code1, Code});
                Error -> io:format("\n\n~p\n\n", [Error]), print_and_throw(Error)
            end
-       end} || ContractName <- compilable_contracts(), Backend <- [aevm, fate],
-               not lists:member(ContractName, not_compilable_on(Backend))] ++
+       end} || ContractName <- compilable_contracts()] ++
     [ {"Test file not found error",
        fun() ->
            {error, Errors} = aeso_compiler:file("does_not_exist.aes"),
@@ -46,26 +41,16 @@ simple_compile_test_() ->
        end} ] ++
     [ {"Testing error messages of " ++ ContractName,
        fun() ->
-           Errors = compile(aevm, ContractName, [warn_all, warn_error]),
+           Errors = compile(ContractName, [warn_all, warn_error]),
            check_errors(ExpectedErrors, Errors)
        end} ||
            {ContractName, ExpectedErrors} <- failing_contracts() ] ++
-    [ {"Testing " ++ atom_to_list(Backend) ++ " code generation error messages of " ++ ContractName,
+    [ {"Testing code generation error messages of " ++ ContractName,
        fun() ->
-           Errors = compile(Backend, ContractName),
-           Expect =
-               case is_binary(ExpectedError) of
-                   true  -> [ExpectedError];
-                   false ->
-                       case proplists:get_value(Backend, ExpectedError, no_error) of
-                           no_error -> no_error;
-                           Err      -> [Err]
-                       end
-               end,
-           check_errors(Expect, Errors)
+               Errors = compile(ContractName),
+               check_errors([ExpectedError], Errors)
        end} ||
-           {ContractName, ExpectedError} <- failing_code_gen_contracts(),
-           Backend <- [aevm, fate] ] ++
+           {ContractName, ExpectedError} <- failing_code_gen_contracts()] ++
     [ {"Testing include with explicit files",
        fun() ->
            FileSystem = maps:from_list(
@@ -73,26 +58,25 @@ simple_compile_test_() ->
                    {ok, Bin} = file:read_file(filename:join([aeso_test_utils:contract_path(), File])),
                    {File, Bin}
                  end || File <- ["included.aes", "../contracts/included2.aes"] ]),
-           #{byte_code := Code1} = compile(aevm, "include", [{include, {explicit_files, FileSystem}}]),
-           #{byte_code := Code2} = compile(aevm, "include"),
+           #{byte_code := Code1} = compile("include", [{include, {explicit_files, FileSystem}}]),
+           #{byte_code := Code2} = compile("include"),
            ?assertMatch(true, Code1 == Code2)
        end} ] ++
-    [ {"Testing deadcode elimination for " ++ atom_to_list(Backend),
+    [ {"Testing deadcode elimination",
        fun() ->
-           #{ byte_code := NoDeadCode } = compile(Backend, "nodeadcode"),
-           #{ byte_code := DeadCode   } = compile(Backend, "deadcode"),
+           #{ byte_code := NoDeadCode } = compile("nodeadcode"),
+           #{ byte_code := DeadCode   } = compile("deadcode"),
            SizeNoDeadCode = byte_size(NoDeadCode),
            SizeDeadCode   = byte_size(DeadCode),
-           Delta          = if Backend == aevm -> 40;
-                               Backend == fate -> 20 end,
+           Delta          = 20,
            ?assertMatch({_, _, true}, {SizeDeadCode, SizeNoDeadCode, SizeDeadCode + Delta < SizeNoDeadCode}),
            ok
-       end} || Backend <- [aevm, fate] ] ++
+       end} ] ++
     [ {"Testing warning messages",
        fun() ->
-           #{ warnings := Warnings } = compile(Backend, "warnings", [warn_all]),
+           #{ warnings := Warnings } = compile("warnings", [warn_all]),
            check_warnings(warnings(), Warnings)
-       end} || Backend <- [aevm, fate] ] ++
+       end} ] ++
     [].
 
 %% Check if all modules in the standard library compile
@@ -101,7 +85,7 @@ stdlib_test_() ->
     [ { "Testing " ++ File ++ " from the stdlib",
       fun() ->
           String = "include \"" ++ File ++ "\"\nmain contract Test =\n  entrypoint f(x) = x",
-          Options = [{src_file, File}, {backend, fate}],
+          Options = [{src_file, File}],
           case aeso_compiler:from_string(String, Options) of
               {ok, #{fate_code := Code}} ->
                   Code1 = aeb_fate_code:deserialize(aeb_fate_code:serialize(Code)),
@@ -133,18 +117,17 @@ check_warnings(Expect0, Actual0) ->
         {Missing, Extra} -> ?assertEqual(Missing, Extra)
     end.
 
-compile(Backend, Name) ->
-    compile(Backend, Name,
-            [{include, {file_system, [aeso_test_utils:contract_path()]}}]).
+compile(Name) ->
+    compile( Name, [{include, {file_system, [aeso_test_utils:contract_path()]}}]).
 
-compile(Backend, Name, Options) ->
+compile(Name, Options) ->
     String = aeso_test_utils:read_contract(Name),
     Options1 =
         case lists:member(Name, debug_mode_contracts()) of
             true  -> [debug_mode];
             false -> []
         end ++
-        [ {src_file, Name ++ ".aes"}, {backend, Backend}
+        [ {src_file, Name ++ ".aes"}
         , {include, {file_system, [aeso_test_utils:contract_path()]}}
         ] ++ Options,
     case aeso_compiler:from_string(String, Options1) of
@@ -221,9 +204,6 @@ compilable_contracts() ->
      "pipe_operator",
      "test" % Custom general-purpose test file. Keep it last on the list.
     ].
-
-not_compilable_on(fate) -> [];
-not_compilable_on(aevm) -> compilable_contracts().
 
 debug_mode_contracts() ->
     ["hermetization_turnoff"].
@@ -840,113 +820,51 @@ failing_contracts() ->
 -define(Path(File), "code_errors/" ??File).
 -define(Msg(File, Line, Col, Err), <<?Pos("Code generation", ?Path(File), Line, Col) Err>>).
 
--define(SAME(File, Line, Col, Err), {?Path(File), ?Msg(File, Line, Col, Err)}).
--define(AEVM(File, Line, Col, Err), {?Path(File), [{aevm, ?Msg(File, Line, Col, Err)}]}).
--define(FATE(File, Line, Col, Err), {?Path(File), [{fate, ?Msg(File, Line, Col, Err)}]}).
--define(BOTH(File, Line, Col, ErrAEVM, ErrFATE),
-        {?Path(File), [{aevm, ?Msg(File, Line, Col, ErrAEVM)},
-                       {fate, ?Msg(File, Line, Col, ErrFATE)}]}).
+-define(FATE_ERR(File, Line, Col, Err), {?Path(File), ?Msg(File, Line, Col, Err)}).
 
 failing_code_gen_contracts() ->
-    [ ?SAME(missing_definition, 2, 14,
+    [ ?FATE_ERR(missing_definition, 2, 14,
             "Missing definition of function 'foo'.")
-    , ?AEVM(polymorphic_entrypoint, 2, 17,
-            "The argument\n"
-            "  x : 'a\n"
-            "of entrypoint 'id' has a polymorphic (contains type variables) type.\n"
-            "Use the FATE backend if you want polymorphic entrypoints.")
-    , ?AEVM(polymorphic_entrypoint_return, 2, 3,
-            "The return type\n"
-            "  'a\n"
-            "of entrypoint 'fail' is polymorphic (contains type variables).\n"
-            "Use the FATE backend if you want polymorphic entrypoints.")
-    , ?SAME(higher_order_entrypoint, 2, 20,
+    , ?FATE_ERR(higher_order_entrypoint, 2, 20,
             "The argument\n"
             "  f : (int) => int\n"
             "of entrypoint 'apply' has a higher-order (contains function types) type.")
-    , ?SAME(higher_order_entrypoint_return, 2, 3,
+    , ?FATE_ERR(higher_order_entrypoint_return, 2, 3,
             "The return type\n"
             "  (int) => int\n"
             "of entrypoint 'add' is higher-order (contains function types).")
-    , ?SAME(missing_init_function, 1, 10,
+    , ?FATE_ERR(missing_init_function, 1, 10,
             "Missing init function for the contract 'MissingInitFunction'.\n"
             "The 'init' function can only be omitted if the state type is 'unit'.")
-    , ?SAME(parameterised_state, 3, 8,
+    , ?FATE_ERR(parameterised_state, 3, 8,
             "The state type cannot be parameterized.")
-    , ?SAME(parameterised_event, 3, 12,
+    , ?FATE_ERR(parameterised_event, 3, 12,
             "The event type cannot be parameterized.")
-    , ?SAME(polymorphic_aens_resolve, 4, 5,
+    , ?FATE_ERR(polymorphic_aens_resolve, 4, 5,
             "Invalid return type of AENS.resolve:\n"
             "  'a\n"
             "It must be a string or a pubkey type (address, oracle, etc).")
-    , ?SAME(bad_aens_resolve, 6, 5,
+    , ?FATE_ERR(bad_aens_resolve, 6, 5,
             "Invalid return type of AENS.resolve:\n"
             "  list(int)\n"
             "It must be a string or a pubkey type (address, oracle, etc).")
-    , ?AEVM(polymorphic_compare, 4, 5,
-            "Cannot compare values of type\n"
-            "  'a\n"
-            "The AEVM only supports '==' on values of\n"
-            "- word type (int, bool, bits, address, oracle(_, _), etc)\n"
-            "- type string\n"
-            "- tuple or record of word type\n"
-            "Use FATE if you need to compare arbitrary types.")
-    , ?AEVM(complex_compare, 4, 5,
-            "Cannot compare values of type\n"
-            "  (string * int)\n"
-            "The AEVM only supports '!=' on values of\n"
-            "- word type (int, bool, bits, address, oracle(_, _), etc)\n"
-            "- type string\n"
-            "- tuple or record of word type\n"
-            "Use FATE if you need to compare arbitrary types.")
-    , ?AEVM(complex_compare_leq, 4, 5,
-            "Cannot compare values of type\n"
-            "  (int * int)\n"
-            "The AEVM only supports '=<' on values of\n"
-            "- word type (int, bool, bits, address, oracle(_, _), etc)\n"
-            "Use FATE if you need to compare arbitrary types.")
-    , ?AEVM(higher_order_compare, 4, 5,
-            "Cannot compare values of type\n"
-            "  (int) => int\n"
-            "The AEVM only supports '<' on values of\n"
-            "- word type (int, bool, bits, address, oracle(_, _), etc)\n"
-            "Use FATE if you need to compare arbitrary types.")
-    , ?AEVM(unapplied_contract_call, 6, 19,
-            "The AEVM does not support unapplied contract call to\n"
-            "  r : Remote\n"
-            "Use FATE if you need this.")
-    , ?AEVM(unapplied_named_arg_builtin, 4, 15,
-            "The AEVM does not support unapplied use of Oracle.register.\n"
-            "Use FATE if you need this.")
-    , ?AEVM(polymorphic_map_keys, 4, 34,
-            "Invalid map key type\n"
-            "  'a\n"
-            "Map keys cannot be polymorphic in the AEVM. Use FATE if you need this.")
-    , ?AEVM(higher_order_map_keys, 4, 42,
-            "Invalid map key type\n"
-            "  (int) => int\n"
-            "Map keys cannot be higher-order.")
-    , ?SAME(polymorphic_query_type, 3, 5,
+    , ?FATE_ERR(polymorphic_query_type, 3, 5,
             "Invalid oracle type\n"
             "  oracle('a, 'b)\n"
             "The query type must not be polymorphic (contain type variables).")
-    , ?SAME(polymorphic_response_type, 3, 5,
+    , ?FATE_ERR(polymorphic_response_type, 3, 5,
             "Invalid oracle type\n"
             "  oracle(string, 'r)\n"
             "The response type must not be polymorphic (contain type variables).")
-    , ?SAME(higher_order_query_type, 3, 5,
+    , ?FATE_ERR(higher_order_query_type, 3, 5,
             "Invalid oracle type\n"
             "  oracle((int) => int, string)\n"
             "The query type must not be higher-order (contain function types).")
-    , ?SAME(higher_order_response_type, 3, 5,
+    , ?FATE_ERR(higher_order_response_type, 3, 5,
             "Invalid oracle type\n"
             "  oracle(string, (int) => int)\n"
             "The response type must not be higher-order (contain function types).")
-    , ?AEVM(higher_order_state, 3, 3,
-            "Invalid state type\n"
-            "  {f : (int) => int}\n"
-            "The state cannot contain functions in the AEVM. Use FATE if you need this.")
-    , ?FATE(child_with_decls, 2, 14,
+    , ?FATE_ERR(child_with_decls, 2, 14,
             "Missing definition of function 'f'.")
     ].
 
@@ -985,7 +903,7 @@ validation_fails() ->
          "Byte code contract is not payable, but source code contract is.">>]}].
 
 validate(Contract1, Contract2) ->
-    case compile(fate, Contract1) of
+    case compile(Contract1) of
         ByteCode = #{ fate_code := FCode } ->
             FCode1   = aeb_fate_code:serialize(aeb_fate_code:strip_init_function(FCode)),
             Source   = aeso_test_utils:read_contract(Contract2),
@@ -995,7 +913,7 @@ validate(Contract1, Contract2) ->
                   true  -> [debug_mode];
                   false -> []
               end ++
-                  [{backend, fate}, {include, {file_system, [aeso_test_utils:contract_path()]}}]);
+                  [{include, {file_system, [aeso_test_utils:contract_path()]}}]);
         Error -> print_and_throw(Error)
     end.
 

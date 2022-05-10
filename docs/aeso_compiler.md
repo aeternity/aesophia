@@ -49,11 +49,7 @@ The **pp_** options all print to standard output the following:
 
 `pp_typed_ast` - print the AST with type information at each node
 
-`pp_icode` - print the internal code structure
-
 `pp_assembler` - print the generated assembler code
-
-`pp_bytecode` - print the bytecode instructions
 
 #### check_call(ContractString, Options) -> CheckRet
 
@@ -65,15 +61,6 @@ Types = [Type]
 Type = term()
 ```
 Check a call in contract through the `__call` function.
-
-#### sophia_type_to_typerep(String) -> TypeRep
-
-Types
-``` erlang
- {ok,TypeRep} | {error, badtype}
-```
-
-Get the type representation of a type declaration.
 
 #### version() -> {ok, Version} | {error, term()}
 

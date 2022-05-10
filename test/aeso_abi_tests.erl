@@ -5,7 +5,6 @@
 
 -define(SANDBOX(Code), sandbox(fun() -> Code end)).
 -define(DUMMY_HASH_WORD, 16#123).
--define(DUMMY_HASH, <<0:30/unit:8, 127, 119>>). %% 16#123
 -define(DUMMY_HASH_LIT, "#0000000000000000000000000000000000000000000000000000000000000123").
 
 sandbox(Code) ->
@@ -20,12 +19,6 @@ sandbox(Code) ->
         {error, loop}
     end.
 
-malicious_from_binary_test() ->
-    CircularList = from_words([32, 1, 32]), %% Xs = 1 :: Xs
-    {ok, {error, circular_references}}   = ?SANDBOX(aeb_heap:from_binary({list, word}, CircularList)),
-    {ok, {error, {binary_too_short, _}}} = ?SANDBOX(aeb_heap:from_binary(word, <<1, 2, 3, 4>>)),
-    ok.
-
 from_words(Ws) ->
     << <<(from_word(W))/binary>> || W <- Ws >>.
 
@@ -37,23 +30,14 @@ from_word(S) when is_list(S) ->
     <<Len:256, Bin/binary>>.
 
 encode_decode_test() ->
-    encode_decode(word, 42),
-    42 = encode_decode(word, 42),
-    -1 = encode_decode(signed_word, -1),
-    <<"Hello world">> = encode_decode(string, <<"Hello world">>),
-    {} = encode_decode({tuple, []}, {}),
-    {42} = encode_decode({tuple, [word]}, {42}),
-    {42, 0} = encode_decode({tuple, [word, word]}, {42, 0}),
-    [] = encode_decode({list, word}, []),
-    [32] = encode_decode({list, word}, [32]),
-    none = encode_decode({option, word}, none),
-    {some, 1} = encode_decode({option, word}, {some, 1}),
-    string = encode_decode(typerep, string),
-    word = encode_decode(typerep, word),
-    {list, word} = encode_decode(typerep, {list, word}),
-    {tuple, [word]} = encode_decode(typerep, {tuple, [word]}),
-    1 = encode_decode(word, 1),
-    0 = encode_decode(word, 0),
+    Tests =
+        [42, 1, 0 -1, <<"Hello">>,
+         {tuple, {}}, {tuple, {42}}, {tuple, {21, 37}},
+         [], [42], [21, 37],
+         {variant, [0, 1], 0, {}}, {variant, [0, 1], 1, {42}}, {variant, [2], 0, {21, 37}},
+         {typerep, string}, {typerep, integer}, {typerep, {list, integer}}, {typerep, {tuple, [integer]}}
+        ],
+    [?assertEqual(Test, encode_decode(Test)) || Test <- Tests],
     ok.
 
 encode_decode_sophia_test() ->
@@ -95,55 +79,44 @@ to_sophia_value_mcl_bls12_381_test() ->
 
 to_sophia_value_neg_test() ->
     Code = [ "contract Foo =\n"
-             "  entrypoint x(y : int) : string = \"hello\"\n" ],
+             "  entrypoint f(x : int) : string = \"hello\"\n" ],
 
-    {error, [Err1]} = aeso_compiler:to_sophia_value(Code, "x", ok, encode(12)),
-    ?assertEqual("Data error:\nFailed to decode binary as type string\n", aeso_errors:pp(Err1)),
-    {error, [Err2]} = aeso_compiler:to_sophia_value(Code, "x", ok, encode(12), [{backend, fate}]),
-    ?assertEqual("Data error:\nFailed to decode binary as type string\n", aeso_errors:pp(Err2)),
+    {error, [Err1]} = aeso_compiler:to_sophia_value(Code, "f", ok, encode(12)),
+    ?assertEqual("Data error:\nCannot translate FATE value 12\n  of Sophia type string\n", aeso_errors:pp(Err1)),
 
-    {error, [Err3]} = aeso_compiler:to_sophia_value(Code, "x", revert, encode(12)),
-    ?assertEqual("Data error:\nCould not interpret the revert message\n", aeso_errors:pp(Err3)),
-    {error, [Err4]} = aeso_compiler:to_sophia_value(Code, "x", revert, encode(12), [{backend, fate}]),
-    ?assertEqual("Data error:\nCould not deserialize the revert message\n", aeso_errors:pp(Err4)),
+    {error, [Err2]} = aeso_compiler:to_sophia_value(Code, "f", revert, encode(12)),
+    ?assertEqual("Data error:\nCould not deserialize the revert message\n", aeso_errors:pp(Err2)),
     ok.
 
 encode_calldata_neg_test() ->
     Code = [ "contract Foo =\n"
-             "  entrypoint x(y : int) : string = \"hello\"\n" ],
+             "  entrypoint f(x : int) : string = \"hello\"\n" ],
 
     ExpErr1 = "Type error at line 5, col 34:\nCannot unify `int` and `bool`\n"
               "when checking the application of\n"
-              "  `x : (int) => string`\n"
+              "  `f : (int) => string`\n"
               "to arguments\n"
               "  `true : bool`\n",
-    {error, [Err1]} = aeso_compiler:create_calldata(Code, "x", ["true"]),
+    {error, [Err1]} = aeso_compiler:create_calldata(Code, "f", ["true"]),
     ?assertEqual(ExpErr1, aeso_errors:pp(Err1)),
-    {error, [Err2]} = aeso_compiler:create_calldata(Code, "x", ["true"], [{backend, fate}]),
-    ?assertEqual(ExpErr1, aeso_errors:pp(Err2)),
 
     ok.
 
 decode_calldata_neg_test() ->
     Code1 = [ "contract Foo =\n"
-              "  entrypoint x(y : int) : string = \"hello\"\n" ],
+              "  entrypoint f(x : int) : string = \"hello\"\n" ],
     Code2 = [ "contract Foo =\n"
-              "  entrypoint x(y : string) : int = 42\n" ],
+              "  entrypoint f(x : string) : int = 42\n" ],
 
-    {ok, CallDataAEVM} = aeso_compiler:create_calldata(Code1, "x", ["42"]),
-    {ok, CallDataFATE} = aeso_compiler:create_calldata(Code1, "x", ["42"], [{backend, fate}]),
+    {ok, CallDataFATE} = aeso_compiler:create_calldata(Code1, "f", ["42"]),
 
-    {error, [Err1]} = aeso_compiler:decode_calldata(Code2, "x", CallDataAEVM),
-    ?assertEqual("Data error:\nFailed to decode calldata as type {tuple,[string]}\n", aeso_errors:pp(Err1)),
-    {error, [Err2]} = aeso_compiler:decode_calldata(Code2, "x", <<1,2,3>>, [{backend, fate}]),
-    ?assertEqual("Data error:\nFailed to decode calldata binary\n", aeso_errors:pp(Err2)),
-    {error, [Err3]} = aeso_compiler:decode_calldata(Code2, "x", CallDataFATE, [{backend, fate}]),
-    ?assertEqual("Data error:\nCannot translate FATE value \"*\"\n  to Sophia type (string)\n", aeso_errors:pp(Err3)),
+    {error, [Err1]} = aeso_compiler:decode_calldata(Code2, "f", <<1,2,3>>),
+    ?assertEqual("Data error:\nFailed to decode calldata binary\n", aeso_errors:pp(Err1)),
+    {error, [Err2]} = aeso_compiler:decode_calldata(Code2, "f", CallDataFATE),
+    ?assertEqual("Data error:\nCannot translate FATE value \"*\"\n  to Sophia type (string)\n", aeso_errors:pp(Err2)),
 
-    {error, [Err4]} = aeso_compiler:decode_calldata(Code2, "y", CallDataAEVM),
-    ?assertEqual("Data error at line 1, col 1:\nFunction 'y' is missing in contract\n", aeso_errors:pp(Err4)),
-    {error, [Err5]} = aeso_compiler:decode_calldata(Code2, "y", CallDataFATE, [{backend, fate}]),
-    ?assertEqual("Data error at line 1, col 1:\nFunction 'y' is missing in contract\n", aeso_errors:pp(Err5)),
+    {error, [Err3]} = aeso_compiler:decode_calldata(Code2, "x", CallDataFATE),
+    ?assertEqual("Data error at line 1, col 1:\nFunction 'x' is missing in contract\n", aeso_errors:pp(Err3)),
     ok.
 
 
@@ -156,8 +129,7 @@ encode_decode_sophia_string(SophiaType, String) ->
            , "  datatype variant = Red | Blue(map(string, int))\n"
            , "  entrypoint foo : arg_type => arg_type\n" ],
     case aeso_compiler:check_call(lists:flatten(Code), "foo", [String], [no_code]) of
-        {ok, _, {[Type], _}, [Arg]} ->
-            io:format("Type ~p~n", [Type]),
+        {ok, _, [Arg]} ->
             Data = encode(Arg),
             case aeso_compiler:to_sophia_value(Code, "foo", ok, Data, [no_code]) of
                 {ok, Sophia} ->
@@ -173,30 +145,32 @@ encode_decode_sophia_string(SophiaType, String) ->
 
 calldata_test() ->
     [42, <<"foobar">>] = encode_decode_calldata("foo", ["int", "string"], ["42", "\"foobar\""]),
-    Map = #{ <<"a">> => 4 },
-    [{variant, 1, [Map]}, {{<<"b">>, 5}, {variant, 0, []}}] =
+    [{variant, [0,1], 1, {#{ <<"a">> := 4 }}}, {tuple, {{tuple, {<<"b">>, 5}}, {variant, [0,1], 0, {}}}}] =
         encode_decode_calldata("foo", ["variant", "r"], ["Blue({[\"a\"] = 4})", "{x = (\"b\", 5), y = Red}"]),
-    [?DUMMY_HASH_WORD, 16#456] = encode_decode_calldata("foo", ["bytes(32)", "address"],
-                                                        [?DUMMY_HASH_LIT, "ak_1111111111111111111111111111113AFEFpt5"]),
-    [?DUMMY_HASH_WORD, ?DUMMY_HASH_WORD] =
+    [{bytes, <<291:256>>}, {address, <<1110:256>>}] =
+        encode_decode_calldata("foo", ["bytes(32)", "address"],
+                               [?DUMMY_HASH_LIT, "ak_1111111111111111111111111111113AFEFpt5"]),
+    [{bytes, <<291:256>>}, {bytes, <<291:256>>}] =
         encode_decode_calldata("foo", ["bytes(32)", "hash"], [?DUMMY_HASH_LIT, ?DUMMY_HASH_LIT]),
 
-    [119, {0, 0}] = encode_decode_calldata("foo", ["int", "signature"], ["119", [$# | lists:duplicate(128, $0)]]),
+    [119, {bytes, <<0:64/unit:8>>}] = encode_decode_calldata("foo", ["int", "signature"], ["119", [$# | lists:duplicate(128, $0)]]),
 
-    [16#456] = encode_decode_calldata("foo", ["Remote"], ["ct_1111111111111111111111111111113AFEFpt5"]),
+    [{contract, <<1110:256>>}] = encode_decode_calldata("foo", ["Remote"], ["ct_1111111111111111111111111111113AFEFpt5"]),
 
     ok.
 
 calldata_init_test() ->
-    encode_decode_calldata("init", ["int"], ["42"], {tuple, [typerep, word]}),
+    encode_decode_calldata("init", ["int"], ["42"]),
 
     Code = parameterized_contract("foo", ["int"]),
-    encode_decode_calldata_(Code, "init", [], {tuple, [typerep, {tuple, []}]}).
+    encode_decode_calldata_(Code, "init", []),
+
+    ok.
 
 calldata_indent_test() ->
     Test = fun(Extra) ->
             Code = parameterized_contract(Extra, "foo", ["int"]),
-            encode_decode_calldata_(Code, "foo", ["42"], word)
+            encode_decode_calldata_(Code, "foo", ["42"])
            end,
     Test("  stateful entrypoint bla() = ()"),
     Test("  type x = int"),
@@ -225,9 +199,9 @@ oracle_test() ->
         "contract OracleTest =\n"
         "  entrypoint question(o, q : oracle_query(list(string), option(int))) =\n"
         "    Oracle.get_question(o, q)\n",
-    {ok, _, {[word, word], {list, string}}, [16#123, 16#456]} =
-        aeso_compiler:check_call(Contract, "question", ["ok_111111111111111111111111111111ZrdqRz9",
-                                                        "oq_1111111111111111111111111111113AFEFpt5"], [no_code]),
+    ?assertEqual({ok, "question", [{oracle, <<291:256>>}, {oracle_query, <<1110:256>>}]},
+                 aeso_compiler:check_call(Contract, "question", ["ok_111111111111111111111111111111ZrdqRz9",
+                                                                 "oq_1111111111111111111111111111113AFEFpt5"], [no_code])),
 
     ok.
 
@@ -243,35 +217,26 @@ permissive_literals_fail_test() ->
     ok.
 
 encode_decode_calldata(FunName, Types, Args) ->
-    encode_decode_calldata(FunName, Types, Args, word).
-
-encode_decode_calldata(FunName, Types, Args, RetType) ->
     Code = parameterized_contract(FunName, Types),
-    encode_decode_calldata_(Code, FunName, Args, RetType).
+    encode_decode_calldata_(Code, FunName, Args).
 
-encode_decode_calldata_(Code, FunName, Args, RetVMType) ->
+encode_decode_calldata_(Code, FunName, Args) ->
     {ok, Calldata} = aeso_compiler:create_calldata(Code, FunName, Args, []),
-    {ok, _, {ArgTypes, RetType}, _} = aeso_compiler:check_call(Code, FunName, Args, [{backend, aevm}, no_code]),
-    ?assertEqual(RetType, RetVMType),
-    CalldataType = {tuple, [word, {tuple, ArgTypes}]},
-    {ok, {_Hash, ArgTuple}} = aeb_heap:from_binary(CalldataType, Calldata),
+    {ok, _, _} = aeso_compiler:check_call(Code, FunName, Args, [no_code]),
     case FunName of
         "init" ->
-            ok;
+            [];
         _ ->
-            {ok, _ArgTypes, ValueASTs} = aeso_compiler:decode_calldata(Code, FunName, Calldata, []),
-            Values = [ prettypr:format(aeso_pretty:expr(V)) || V <- ValueASTs ],
-            ?assertMatch({X, X}, {Args, Values})
-    end,
-    tuple_to_list(ArgTuple).
+            {ok, FateArgs} = aeb_fate_abi:decode_calldata(FunName, Calldata),
+            FateArgs
+    end.
 
-encode_decode(T, D) ->
-    ?assertEqual(D, decode(T, encode(D))),
+encode_decode(D) ->
+    ?assertEqual(D, decode(encode(D))),
     D.
 
 encode(D) ->
-    aeb_heap:to_binary(D).
+    aeb_fate_encoding:serialize(D).
 
-decode(T,B) ->
-    {ok, D} = aeb_heap:from_binary(T, B),
-    D.
+decode(B) ->
+    aeb_fate_encoding:deserialize(B).

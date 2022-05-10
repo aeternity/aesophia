@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Error messages have been restructured (less newlines) to provide more unified errors. Also `pp_oneline/1` has been added.
 ### Removed
+- Support for AEVM has been entirely wiped
 
 ## [6.1.0] - 2021-10-20
 ### Added
