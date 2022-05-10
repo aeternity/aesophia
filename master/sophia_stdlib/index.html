@@ -986,7 +986,7 @@ namespace Chain =
 <p><code>Chain.block_hash(h : int) : option(bytes(32))</code></p>
 <p>The hash of the block at height <code>h</code>. <code>h</code> has to be within 256 blocks from the
 current height of the chain or else the function will return <code>None</code>.</p>
-<p>NOTE: In AEVM and FATE VM version 1 <code>Chain.block_height</code> was not considered an
+<p>NOTE: In FATE VM version 1 <code>Chain.block_height</code> was not considered an
 allowed height. From FATE VM version 2 (IRIS) it will return the block hash of
 the current generation.</p>
 <h5 id="block_height">block_height</h5>

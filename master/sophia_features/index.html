@@ -1184,8 +1184,6 @@ payable stateful entrypoint buy(to : address) =
     transfer_item(to)
   else
     abort("Value too low")</code></p>
-<p>Note: In the æternity VM (AEVM) contracts and entrypoints were by default
-payable until the Lima release.</p>
 <h2 id="namespaces">Namespaces</h2>
 <p>Code can be split into libraries using the <code>namespace</code> construct. Namespaces
 can appear at the top-level and can contain type and function definitions, but
@@ -1482,7 +1480,7 @@ include "Pair.aes"
 </tbody>
 </table>
 <h2 id="arithmetic">Arithmetic</h2>
-<p>Sophia integers (<code>int</code>) are represented by 256-bit (AEVM) or arbitrary-sized (FATE) signed words and supports the following
+<p>Sophia integers (<code>int</code>) are represented by arbitrary-sized signed words and support the following
 arithmetic operations:
 - addition (<code>x + y</code>)
 - subtraction (<code>x - y</code>)
@@ -1490,18 +1488,13 @@ arithmetic operations:
 - division (<code>x / y</code>), truncated towards zero
 - remainder (<code>x mod y</code>), satisfying <code>y * (x / y) + x mod y == x</code> for non-zero <code>y</code>
 - exponentiation (<code>x ^ y</code>)</p>
-<p>All operations are <em>safe</em> with respect to overflow and underflow. On AEVM they behave as the corresponding
-operations on arbitrary-size integers and fail with <code>arithmetic_error</code> if the
-result cannot be represented by a 256-bit signed word. For example, <code>2 ^ 255</code>
-fails rather than wrapping around to -2²⁵⁵.</p>
-<p>The division and modulo operations also throw an arithmetic error if the
-second argument is zero.</p>
+<p>All operations are <em>safe</em> with respect to overflow and underflow. 
+The division and modulo operations throw an arithmetic error if the
+right-hand operand is zero.</p>
 <h2 id="bit-fields">Bit fields</h2>
 <p>Sophia integers do not support bit arithmetic. Instead there is a separate
 type <code>bits</code>. See the standard library <a href="../sophia_stdlib/#bits">documentation</a>.</p>
-<p>On the AEVM a bit field is represented by a 256-bit word and reading or writing
-a bit outside the 0..255 range fails with an <code>arithmetic_error</code>. On FATE a bit
-field can be of arbitrary size (but it is still represented by the
+<p>A bit field can be of arbitrary size (but it is still represented by the
 corresponding integer, so setting very high bits can be expensive).</p>
 <h2 id="type-aliases">Type aliases</h2>
 <p>Type aliases can be introduced with the <code>type</code> keyword and can be

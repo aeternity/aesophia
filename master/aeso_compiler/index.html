@@ -411,9 +411,7 @@ ErrorString = errorstring()</code></p>
 <p><code>pp_ast</code> - print the AST of the code</p>
 <p><code>pp_types</code> - print information about the types</p>
 <p><code>pp_typed_ast</code> - print the AST with type information at each node</p>
-<p><code>pp_icode</code> - print the internal code structure</p>
 <p><code>pp_assembler</code> - print the generated assembler code</p>
-<p><code>pp_bytecode</code> - print the bytecode instructions</p>
 <h4 id="check_callcontractstring-options-checkret">check_call(ContractString, Options) -&gt; CheckRet</h4>
 <p>Types
 <code>ContractString = string() | binary()
@@ -421,11 +419,6 @@ CheckRet = {ok,string(),{Types,Type | any()},Terms} | {error,Term}
 Types = [Type]
 Type = term()</code>
 Check a call in contract through the <code>__call</code> function.</p>
-<h4 id="sophia_type_to_typerepstring-typerep">sophia_type_to_typerep(String) -&gt; TypeRep</h4>
-<p>Types
-<code>erlang
- {ok,TypeRep} | {error, badtype}</code></p>
-<p>Get the type representation of a type declaration.</p>
 <h4 id="version-ok-version-error-term">version() -&gt; {ok, Version} | {error, term()}</h4>
 <p>Types</p>
 <p><code>erlang
