@@ -205,6 +205,7 @@ compilable_contracts() ->
      "contract_polymorphism",
      "contract_polymorphism_multi_interface",
      "contract_interface_polymorphism",
+     "contract_polymorphism_interface_extensions",
      "contract_interface_polymorphism_same_decl_multi_interface",
      "contract_interface_polymorphism_same_name_same_type",
      "test" % Custom general-purpose test file. Keep it last on the list.
