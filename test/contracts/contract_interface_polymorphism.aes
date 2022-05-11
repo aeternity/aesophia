@@ -2,6 +2,7 @@ contract interface II =
     entrypoint f : () => unit
 
 contract interface I : II =
+    entrypoint f : () => unit
     entrypoint g : () => unit
 
 contract C : I =

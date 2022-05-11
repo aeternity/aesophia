@@ -205,6 +205,8 @@ compilable_contracts() ->
      "contract_polymorphism",
      "contract_polymorphism_multi_interface",
      "contract_interface_polymorphism",
+     "contract_interface_polymorphism_same_decl_multi_interface",
+     "contract_interface_polymorphism_same_name_same_type",
      "test" % Custom general-purpose test file. Keep it last on the list.
     ].
 
@@ -832,23 +834,12 @@ failing_contracts() ->
                   [<<?Pos(1,24)
                      "Trying to implement or extend an undefined interface `Z`">>
                   ])
-    , ?TYPE_ERROR(contract_interface_polymorphism_same_decl_multi_interface,
-                  [<<?Pos(7,10)
-                     "Unimplemented function `f` from the interface `I` in the contract `C`">>
-                  ])
-    , ?TYPE_ERROR(contract_interface_polymorphism_same_name_same_type,
-                  [<<?Pos(7,10)
-                     "Unimplemented function `f` from the interface `I1` in the contract `C`">>
-                  ])
     , ?TYPE_ERROR(contract_interface_polymorphism_same_name_different_type,
-                  [<<?Pos(9,5)
-                     "Duplicate definitions of `f` at\n"
-                     "  - line 8, column 5\n"
-                     "  - line 9, column 5">>
-                  ])
+                  [<<?Pos(4,20)
+                     "Unimplemented function `f` from the interface `I1` in the contract `I2`">>])
     , ?TYPE_ERROR(contract_polymorphism_missing_implementation,
-                  [<<?Pos(7,10)
-                     "Unimplemented function `f` from the interface `I1` in the contract `C`">>
+                  [<<?Pos(4,20)
+                     "Unimplemented function `f` from the interface `I1` in the contract `I2`">>
                   ])
     , ?TYPE_ERROR(contract_polymorphism_same_decl_multi_interface,
                   [<<?Pos(7,10)
@@ -869,22 +860,22 @@ failing_contracts() ->
                      "Trying to implement or extend an undefined interface `H`">>
                   ])
     , ?TYPE_ERROR(polymorphism_variance_switching,
-                  [<<?Pos(38,49)
+                  [<<?Pos(39,49)
                      "Cannot unify `Cat` and `Animal`\n"
                      "when checking the application of\n"
                      "  `g2 : (Cat) => Cat`\n"
                      "to arguments\n"
                      "  `x : Animal`">>,
-                   <<?Pos(41,43)
+                   <<?Pos(42,43)
                      "Cannot unify `Animal` and `Cat`\n"
                      "when checking the type of the expression `g3(x) : Animal` against the expected type `Cat`">>,
-                   <<?Pos(50,55)
+                   <<?Pos(51,55)
                      "Cannot unify `Animal` and `Cat`\n"
                      "when checking the application of\n"
                      "  `g5 : ((Animal) => Animal) => Cat`\n"
                      "to arguments\n"
                      "  `x : (Cat) => Cat`">>,
-                   <<?Pos(54, 44)
+                   <<?Pos(55, 44)
                      "Cannot unify `Animal` and `Cat`\n"
                      "when checking the type of the expression `f6() : option(Animal)` against the expected type `option(Cat)`">>
                   ])

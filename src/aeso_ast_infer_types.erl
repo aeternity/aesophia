@@ -855,7 +855,7 @@ infer1(Env0, [{Contract, Ann, ConName, Impls, Code} | Rest], Acc, Options)
     end,
     {Env1, Code1} = infer_contract_top(push_scope(contract, ConName, Env), What, Code, Options),
     Contract1 = {Contract, Ann, ConName, Impls, Code1},
-    check_implemented_interfaces(Env1, Contract1, What, Acc),
+    check_implemented_interfaces(Env1, Contract1, Acc),
     Env2 = pop_scope(Env1),
     Env3 = bind_contract(Contract1, Env2),
     infer1(Env3, Rest, [Contract1 | Acc], Options);
@@ -871,7 +871,7 @@ infer1(Env, [{pragma, _, _} | Rest], Acc, Options) ->
     %% Pragmas are checked in check_modifiers
     infer1(Env, Rest, Acc, Options).
 
-check_implemented_interfaces(Env, {_Contract, _Ann, ConName, Impls, Code}, What, DefinedContracts) ->
+check_implemented_interfaces(Env, {_Contract, _Ann, ConName, Impls, Code}, DefinedContracts) ->
     create_type_errors(),
     AllInterfaces = [{name(IName), I} || I = {contract_interface, _, IName, _, _} <- DefinedContracts],
     ImplsNames = lists:map(fun name/1, Impls),
@@ -883,43 +883,32 @@ check_implemented_interfaces(Env, {_Contract, _Ann, ConName, Impls, Code}, What,
                                end
                   end, Impls),
 
-    case What of
-        contract ->
-            ImplementedInterfaces = [I || I <- [proplists:get_value(Name, AllInterfaces) || Name <- ImplsNames],
-                                          I /= undefined],
-            Letfuns = [ Fun || Fun = {letfun, _, _, _, _, _} <- Code ],
-            check_implemented_interfaces1(ImplementedInterfaces, ConName, Letfuns, AllInterfaces);
-        contract_interface ->
-            ok
-    end,
+    ImplementedInterfaces = [I || I <- [proplists:get_value(Name, AllInterfaces) || Name <- ImplsNames],
+                                    I /= undefined],
+    Funs = [ Fun || Fun <- Code,
+                    element(1, Fun) == letfun orelse element(1, Fun) == fun_decl ],
+    check_implemented_interfaces1(ImplementedInterfaces, ConName, Funs, AllInterfaces),
     destroy_and_report_type_errors(Env).
 
-check_implemented_interfaces1(ImplementedInterfaces, ConId, Letfuns, AllInterfaces) ->
-    check_implemented_interfaces1(ImplementedInterfaces, ConId, Letfuns, [], AllInterfaces).
-
 %% Recursively check that all directly and indirectly referenced interfaces are implemented
-check_implemented_interfaces1([], _, _, _, _) ->
+check_implemented_interfaces1([], _, _, _) ->
     ok;
-check_implemented_interfaces1([{contract_interface, _, IName, Extensions, Decls} | Interfaces],
-                                       ConId, Impls, Acc, AllInterfaces) ->
-    case lists:member(name(IName), Acc) of
-        true ->
-            check_implemented_interfaces1(Interfaces, ConId, Impls, Acc, AllInterfaces);
-        false ->
-            Unmatched = match_impls(Decls, ConId, name(IName), Impls),
-            NewInterfaces = Interfaces ++ [proplists:get_value(name(I), AllInterfaces) || I <- Extensions],
-            check_implemented_interfaces1(NewInterfaces, ConId, Unmatched, [name(IName) | Acc], AllInterfaces)
-    end.
+check_implemented_interfaces1([{contract_interface, _, IName, _, Decls} | Interfaces],
+                                       ConId, Impls, AllInterfaces) ->
+    Unmatched = match_impls(Decls, ConId, name(IName), Impls),
+    check_implemented_interfaces1(Interfaces, ConId, Unmatched, AllInterfaces).
 
 %% Match the functions of the contract with the interfaces functions, and return unmatched functions
 match_impls([], _, _, Impls) ->
     Impls;
-match_impls([{fun_decl, _, {id, _, FunName}, {fun_t, _, _, ArgsTypes, RetDecl}} | Decls], ConId, IName, Impls) ->
+match_impls([{fun_decl, _, {id, _, FunName}, FunType = {fun_t, _, _, ArgsTypes, RetDecl}} | Decls], ConId, IName, Impls) ->
     Match = fun({letfun, _, {id, _, FName}, Args, RetFun, _}) when FName == FunName ->
                     length(ArgsTypes) == length(Args) andalso
                     compare_types(RetDecl, RetFun) andalso
                     lists:all(fun({T1, {typed, _, _, T2}}) -> compare_types(T1, T2) end,
                               lists:zip(ArgsTypes, Args));
+               ({fun_decl, _, {id, _, FName}, FunT}) when FName == FunName ->
+                    compare_types(FunT, FunType);
                (_) -> false
             end,
     UnmatchedImpls = case lists:search(Match, Impls) of
