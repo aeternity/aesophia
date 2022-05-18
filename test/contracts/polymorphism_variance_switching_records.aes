@@ -1,0 +1,50 @@
+contract interface Animal =
+    entrypoint sound : () => string
+
+contract Cat : Animal =
+    entrypoint sound() = "meow"
+
+main contract Main =
+    record rec_a('a) = { x : 'a }
+    record rec_b('a) = { x : 'a => unit }
+    record rec_c('a) = { x : () => 'a}
+    record rec_d('a) = { x : 'a => unit,
+                         y : () => 'a }
+
+    stateful entrypoint new_cat() : Cat = Chain.create()
+    stateful entrypoint new_animal() : Animal = new_cat()
+    stateful entrypoint animal_to_unit(_ : Animal) : unit = ()
+    stateful entrypoint cat_to_unit(_ : Cat) : unit = ()
+    stateful entrypoint unit_to_animal() : Animal = new_animal()
+    stateful entrypoint unit_to_cat() : Cat = new_cat()
+
+    stateful entrypoint init() =
+        let ra : rec_a(Animal) = { x = new_animal() }
+        let rc : rec_a(Cat) = { x = new_cat() }
+        let r01 : rec_a(Animal) = ra  // success
+        let r02 : rec_a(Animal) = rc  // success
+        let r03 : rec_a(Cat)    = ra  // fail
+        let r04 : rec_a(Cat)    = rc  // sucess
+
+        let ratu : rec_b(Animal) = { x = animal_to_unit }
+        let rctu : rec_b(Cat) = { x = cat_to_unit }
+        let r05 : rec_b(Animal) = ratu  // success
+        let r06 : rec_b(Animal) = rctu  // fail
+        let r07 : rec_b(Cat)    = ratu  // success
+        let r08 : rec_b(Cat)    = rctu  // success
+
+        let ruta : rec_c(Animal) = { x = unit_to_animal }
+        let rutc : rec_c(Cat) = { x = unit_to_cat }
+        let r09 : rec_c(Animal) = ruta  // success
+        let r10 : rec_c(Animal) = rutc  // success
+        let r11 : rec_c(Cat)    = ruta  // fail
+        let r12 : rec_c(Cat)    = rutc  // success
+
+        let rxaya : rec_d(Animal) = { x = animal_to_unit, y = unit_to_animal }
+        let rxcyc : rec_d(Cat) = { x = cat_to_unit, y = unit_to_cat }
+        let r13 : rec_d(Animal) = rxaya  // success
+        let r16 : rec_d(Animal) = rxcyc  // fail
+        let r17 : rec_d(Cat)    = rxaya  // fail
+        let r20 : rec_d(Cat)    = rxcyc  // success
+
+        ()
