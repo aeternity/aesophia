@@ -1107,6 +1107,8 @@ check_typedef_sccs(Env, TypeMap, [{acyclic, Name} | SCCs], Acc) ->
                     type_error({empty_record_definition, Ann, Name}),
                     check_typedef_sccs(Env1, TypeMap, SCCs, Acc1);
                 {record_t, Fields} ->
+                    ets_insert(type_vars_variance, {Env#env.namespace ++ qname(D),
+                                                    infer_type_vars_variance(Xs, Fields)}),
                     %% check_type to get qualified name
                     RecTy = check_type(Env1, app_t(Ann, D, Xs)),
                     Env2 = check_fields(Env1, TypeMap, RecTy, Fields),
@@ -1141,7 +1143,7 @@ check_typedef(Env, {variant_t, Cons}) ->
 
 infer_type_vars_variance(TypeParams, Cons) ->
     % args from all type constructors
-    FlatArgs = lists:flatten([Args || {constr_t, _, _, Args} <- Cons]),
+    FlatArgs = lists:flatten([Args || {constr_t, _, _, Args} <- Cons]) ++ [Type || {field_t, _, _, Type} <- Cons],
 
     Vs = lists:flatten([element(1, infer_type_vars_variance(Arg)) || Arg <- FlatArgs]),
     lists:map(fun({tvar, _, TVar}) ->
@@ -1188,7 +1190,7 @@ infer_type_vars_variance({fun_t, _, [], [{tvar, _, TVar}], Res}) ->
               1 -> {TVar, contravariant}
           end,
     {[Cur | TVVs], Depth + 1};
-infer_type_vars_variance({fun_t, _, [], [_Arg], Res}) ->
+infer_type_vars_variance({fun_t, _, [], _, Res}) ->
     {X, Depth} = infer_type_vars_variance(Res),
     {X, Depth + 1};
 infer_type_vars_variance({tvar, _, TVar}) ->
