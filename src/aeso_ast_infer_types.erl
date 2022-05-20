@@ -142,6 +142,7 @@
     , in_pattern       = false              :: boolean()
     , in_guard         = false              :: boolean()
     , stateful         = false              :: boolean()
+    , unify_throws     = true               :: boolean()
     , current_function = none               :: none | aeso_syntax:id()
     , what             = top                :: top | namespace | contract | contract_interface
     }).
@@ -893,28 +894,28 @@ check_implemented_interfaces(Env, {_Contract, _Ann, ConName, Impls, Code}, Defin
                                     I /= undefined],
     Funs = [ Fun || Fun <- Code,
                     element(1, Fun) == letfun orelse element(1, Fun) == fun_decl ],
-    check_implemented_interfaces1(ImplementedInterfaces, ConName, Funs, AllInterfaces),
+    check_implemented_interfaces1(Env, ImplementedInterfaces, ConName, Funs, AllInterfaces),
     destroy_and_report_type_errors(Env).
 
 %% Recursively check that all directly and indirectly referenced interfaces are implemented
-check_implemented_interfaces1([], _, _, _) ->
+check_implemented_interfaces1(_, [], _, _, _) ->
     ok;
-check_implemented_interfaces1([{contract_interface, _, IName, _, Decls} | Interfaces],
-                                       ConId, Impls, AllInterfaces) ->
-    Unmatched = match_impls(Decls, ConId, name(IName), Impls),
-    check_implemented_interfaces1(Interfaces, ConId, Unmatched, AllInterfaces).
+check_implemented_interfaces1(Env, [{contract_interface, _, IName, _, Decls} | Interfaces],
+                              ConId, Impls, AllInterfaces) ->
+    Unmatched = match_impls(Env, Decls, ConId, name(IName), Impls),
+    check_implemented_interfaces1(Env, Interfaces, ConId, Unmatched, AllInterfaces).
 
 %% Match the functions of the contract with the interfaces functions, and return unmatched functions
-match_impls([], _, _, Impls) ->
+match_impls(_, [], _, _, Impls) ->
     Impls;
-match_impls([{fun_decl, _, {id, _, FunName}, FunType = {fun_t, _, _, ArgsTypes, RetDecl}} | Decls], ConId, IName, Impls) ->
+match_impls(Env, [{fun_decl, _, {id, _, FunName}, FunType = {fun_t, _, _, ArgsTypes, RetDecl}} | Decls], ConId, IName, Impls) ->
     Match = fun({letfun, _, {id, _, FName}, Args, RetFun, _}) when FName == FunName ->
                     length(ArgsTypes) == length(Args) andalso
-                    compare_types(RetDecl, RetFun) andalso
-                    lists:all(fun({T1, {typed, _, _, T2}}) -> compare_types(T1, T2) end,
+                    unify(Env#env{unify_throws = false}, RetDecl, RetFun, unknown) andalso
+                    lists:all(fun({T1, {typed, _, _, T2}}) -> unify(Env#env{unify_throws = false}, T1, T2, unknown) end,
                               lists:zip(ArgsTypes, Args));
                ({fun_decl, _, {id, _, FName}, FunT}) when FName == FunName ->
-                    compare_types(FunT, FunType);
+                    unify(Env#env{unify_throws = false}, FunT, FunType, unknown);
                (_) -> false
             end,
     UnmatchedImpls = case lists:search(Match, Impls) of
@@ -924,34 +925,7 @@ match_impls([{fun_decl, _, {id, _, FunName}, FunType = {fun_t, _, _, ArgsTypes, 
                              type_error({unimplemented_interface_function, ConId, IName, FunName}),
                              Impls
                      end,
-    match_impls(Decls, ConId, IName, UnmatchedImpls).
-
-
--spec compare_types(T, T) -> boolean() when T :: utype() | [utype()].
-compare_types(Types1, Types2)
-  when is_list(Types1) andalso is_list(Types2) ->
-    length(Types1) == length(Types2) andalso
-    lists:all(fun({T1, T2}) -> compare_types(T1, T2) end, lists:zip(Types1, Types2));
-compare_types({fun_t, _, NamedArgs1, Types1, RetType1}, {fun_t, _, NamedArgs2, Types2, RetType2}) ->
-    compare_types(NamedArgs1, NamedArgs2) andalso
-    compare_types(RetType1, RetType2) andalso
-    compare_types(Types1, Types2);
-compare_types({app_t, _, Type1, ArgsTypes1}, {app_t, _, Type2, ArgsTypes2}) ->
-    compare_types(Type1, Type2) andalso compare_types(ArgsTypes1, ArgsTypes2);
-compare_types({tuple_t, _, Types1}, {tuple_t, _, Types2}) ->
-    compare_types(Types1, Types2);
-compare_types({tuple_t, _, []}, {id, _, "unit"}) ->
-    true;
-compare_types({id, _, "unit"}, {tuple_t, _, []}) ->
-    true;
-compare_types(T1 = {Id, _, Type}, {Id, _, Type}) when ?is_type_id(T1) ->
-    true;
-compare_types({if_t, _, {id, _, Id}, Ta1, Tb1}, {if_t, _, {id, _, Id}, Ta2, Tb2}) ->
-    compare_types(Ta1, Ta2) andalso compare_types(Tb1, Tb2);
-compare_types({named_arg_t, _, {id, _, Name}, T1, _}, {named_arg_t, _, {id, _, Name}, T2, _}) ->
-    compare_types(T1, T2);
-compare_types(_, _) ->
-    false.
+    match_impls(Env, Decls, ConId, IName, UnmatchedImpls).
 
 %% Asserts that the main contract is somehow defined.
 identify_main_contract(Contracts, Options) ->
@@ -2732,10 +2706,15 @@ unify0(Env, A, B, Variance0, When) ->
 
 unify1(_Env, {uvar, _, R}, {uvar, _, R}, _Variance, _When) ->
     true;
-unify1(_Env, {uvar, A, R}, T, _Variance, When) ->
+unify1(Env, {uvar, A, R}, T, _Variance, When) ->
     case occurs_check(R, T) of
         true ->
-            cannot_unify({uvar, A, R}, T, When),
+            if
+                Env#env.unify_throws ->
+                    cannot_unify({uvar, A, R}, T, When);
+                true ->
+                    ok
+            end,
             false;
         false ->
             ets_insert(type_vars, {R, T}),
@@ -2756,7 +2735,12 @@ unify1(Env, A = {con, _, NameA}, B = {con, _, NameB}, Variance, When) ->
     case is_subtype(Env, NameA, NameB, Variance) of
         true -> true;
         false ->
-            cannot_unify(A, B, When),
+            if
+                Env#env.unify_throws ->
+                    cannot_unify(A, B, When);
+                true ->
+                    ok
+            end,
             false
     end;
 unify1(_Env, {qid, _, Name}, {qid, _, Name}, _Variance, _When) ->
@@ -2803,8 +2787,13 @@ unify1(Env, {app_t, _, T, []}, B, Variance, When) ->
     unify0(Env, T, B, Variance, When);
 unify1(Env, A, {app_t, _, T, []}, Variance, When) ->
     unify0(Env, A, T, Variance, When);
-unify1(_Env, A, B, _Variance, When) ->
-    cannot_unify(A, B, When),
+unify1(Env, A, B, _Variance, When) ->
+    if
+        Env#env.unify_throws ->
+            cannot_unify(A, B, When);
+        true ->
+            ok
+    end,
     false.
 
 is_subtype(_Env, NameA, NameB, invariant) ->
