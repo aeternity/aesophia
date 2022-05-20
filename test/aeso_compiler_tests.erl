@@ -1006,6 +1006,49 @@ failing_contracts() ->
                    <<?Pos(47,13)
                      "Cannot unify `Animal` and `Cat`\n"
                      "when checking the type of the pattern `r17 : rec_d(Cat)` against the expected type `Main.rec_d(Animal)`">>])
+    , ?TYPE_ERROR(polymorphism_variance_switching_oracles,
+                  [<<?Pos(15,13)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the type of the pattern `o03 : oracle(Animal, Animal)` against the expected type `oracle(Cat, Animal)`">>,
+                   <<?Pos(16,13)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the type of the pattern `o04 : oracle(Animal, Animal)` against the expected type `oracle(Cat, Cat)`">>,
+                   <<?Pos(17,13)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the pattern `o05 : oracle(Animal, Cat)` against the expected type `oracle(Animal, Animal)`">>,
+                   <<?Pos(19,13)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the type of the pattern `o07 : oracle(Animal, Cat)` against the expected type `oracle(Cat, Animal)`">>,
+                   <<?Pos(20,13)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the type of the pattern `o08 : oracle(Animal, Cat)` against the expected type `oracle(Cat, Cat)`">>,
+                   <<?Pos(25,13)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the pattern `o13 : oracle(Cat, Cat)` against the expected type `oracle(Animal, Animal)`">>,
+                   <<?Pos(27,13)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the pattern `o15 : oracle(Cat, Cat)` against the expected type `oracle(Cat, Animal)`">>,
+                   <<?Pos(31,13)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the type of the pattern `q02 : oracle_query(Animal, Animal)` against the expected type `oracle_query(Animal, Cat)`">>,
+                   <<?Pos(33,13)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the type of the pattern `q04 : oracle_query(Animal, Animal)` against the expected type `oracle_query(Cat, Cat)`">>,
+                   <<?Pos(38,13)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the pattern `q09 : oracle_query(Cat, Animal)` against the expected type `oracle_query(Animal, Animal)`">>,
+                   <<?Pos(39,13)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the pattern `q10 : oracle_query(Cat, Animal)` against the expected type `oracle_query(Animal, Cat)`">>,
+                   <<?Pos(41,13)
+                     "Cannot unify `Cat` and `Animal`\n"
+                     "when checking the type of the pattern `q12 : oracle_query(Cat, Animal)` against the expected type `oracle_query(Cat, Cat)`">>,
+                   <<?Pos(42,13)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the pattern `q13 : oracle_query(Cat, Cat)` against the expected type `oracle_query(Animal, Animal)`">>,
+                   <<?Pos(43,13)
+                     "Cannot unify `Animal` and `Cat`\n"
+                     "when checking the type of the pattern `q14 : oracle_query(Cat, Cat)` against the expected type `oracle_query(Animal, Cat)`">>])
     ].
 
 -define(Path(File), "code_errors/" ??File).

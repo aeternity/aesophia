@@ -808,9 +808,15 @@ infer(Contracts, Options) ->
         create_options(Options),
         ets_new(defined_contracts, [bag]),
         ets_new(type_vars, [set]),
-        ets_new(type_vars_variance, [set]),
         ets_new(type_vars_uvar, [set]),
         ets_new(warnings, [bag]),
+        ets_new(type_vars_variance, [set]),
+        %% Set the variance for builtin types
+        ets_insert(type_vars_variance, {"list", [covariant]}),
+        ets_insert(type_vars_variance, {"option", [covariant]}),
+        ets_insert(type_vars_variance, {"oracle", [contravariant, covariant]}),
+        ets_insert(type_vars_variance, {"oracle_query", [covariant, contravariant]}),
+
         when_warning(warn_unused_functions, fun() -> create_unused_functions() end),
         check_modifiers(Env, Contracts),
         create_type_errors(),
@@ -2775,7 +2781,12 @@ unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result
 unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, Variance, When)
   when length(Args1) == length(Args2), Tag == id orelse Tag == qid ->
     Variances = case ets_lookup(type_vars_variance, F) of
-                    [{_, Vs}] -> Vs;
+                    [{_, Vs}] ->
+                        case Variance of
+                            contravariant -> lists:map(fun opposite_variance/1, Vs);
+                            invariant     -> invariant;
+                            _             -> Vs
+                        end;
                     _ -> Variance
                 end,
     unify1(Env, Args1, Args2, Variances, When);
