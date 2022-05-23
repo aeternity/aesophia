@@ -791,7 +791,7 @@ failing_contracts() ->
                      "when checking the type of the expression `\"y\" : string` "
                      "against the expected type `bool`">>
                   ])
-    , ?TYPE_ERROR(empty_record_declaration,
+    , ?TYPE_ERROR(empty_record_definition,
                   [<<?Pos(2,5)
                      "Empty record definitions are not allowed. Cannot define the record `r`">>
                   ])
