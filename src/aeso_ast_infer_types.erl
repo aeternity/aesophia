@@ -1019,7 +1019,7 @@ check_typedef_sccs(Env, TypeMap, [{acyclic, Name} | SCCs], Acc) ->
             case Def of
                 {alias_t, _}  -> check_typedef_sccs(Env1, TypeMap, SCCs, Acc1);
                 {record_t, []} ->
-                    type_error({empty_record_declaration, Ann, Name}),
+                    type_error({empty_record_definition, Ann, Name}),
                     check_typedef_sccs(Env1, TypeMap, SCCs, Acc1);
                 {record_t, Fields} ->
                     %% check_type to get qualified name
@@ -3282,8 +3282,8 @@ mk_error({using_undefined_namespace_parts, Ann, Namespace, Parts}) ->
 mk_error({unknown_warning, Warning}) ->
     Msg = io_lib:format("Trying to report unknown warning: ~p", [Warning]),
     mk_t_err(pos(0, 0), Msg);
-mk_error({empty_record_declaration, Ann, Name}) ->
-    Msg = io_lib:format("Empty record declarations are not allowed. Cannot declare the record `~s`", [Name]),
+mk_error({empty_record_definition, Ann, Name}) ->
+    Msg = io_lib:format("Empty record definitions are not allowed. Cannot define the record `~s`", [Name]),
     mk_t_err(pos(Ann), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),

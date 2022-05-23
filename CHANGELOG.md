@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ```
 ### Changed
 - Error messages have been restructured (less newlines) to provide more unified errors. Also `pp_oneline/1` has been added.
-- Ban empty record declarations (e.g. `record r = {}` would give an error).
+- Ban empty record definitions (e.g. `record r = {}` would give an error).
 ### Removed
 - Support for AEVM has been entirely wiped
 

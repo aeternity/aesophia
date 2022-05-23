@@ -793,7 +793,7 @@ failing_contracts() ->
                   ])
     , ?TYPE_ERROR(empty_record_declaration,
                   [<<?Pos(2,5)
-                     "Empty record declarations are not allowed. Cannot declare the record `r`">>
+                     "Empty record definitions are not allowed. Cannot define the record `r`">>
                   ])
     , ?TYPE_ERROR(warnings,
                   [<<?Pos(0, 0)
