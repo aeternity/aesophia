@@ -5,12 +5,12 @@ contract Cat : Animal =
     entrypoint sound() = "meow"
 
 main contract Main =
-    record rec_a('a) = { x : 'a }
-    record rec_b('a) = { x : 'a => unit }
-    record rec_c('a) = { x : () => 'a}
-    record rec_d('a) = { x : 'a => unit,
-                         y : () => 'a }
-    record rec_e('a) = { x : int }
+    record rec_co('a)     = { x : 'a ,
+                              y : () => 'a }
+    record rec_contra('a) = { x : 'a => unit }
+    record rec_inv('a)    = { x : 'a => unit,
+                              y : () => 'a }
+    record rec_biv('a)    = { x : int }
 
     stateful entrypoint new_cat() : Cat = Chain.create()
     stateful entrypoint new_animal() : Animal = new_cat()
@@ -20,39 +20,32 @@ main contract Main =
     stateful entrypoint unit_to_cat() : Cat = new_cat()
 
     stateful entrypoint init() =
-        let ra : rec_a(Animal) = { x = new_animal() }
-        let rc : rec_a(Cat) = { x = new_cat() }
-        let r01 : rec_a(Animal) = ra  // success
-        let r02 : rec_a(Animal) = rc  // success
-        let r03 : rec_a(Cat)    = ra  // fail
-        let r04 : rec_a(Cat)    = rc  // sucess
+        let ra  : rec_co(Animal) = { x = new_animal(), y = unit_to_animal }
+        let rc  : rec_co(Cat)    = { x = new_cat(), y = unit_to_cat }
+        let r01 : rec_co(Animal) = ra  // success
+        let r02 : rec_co(Animal) = rc  // success
+        let r03 : rec_co(Cat)    = ra  // fail
+        let r04 : rec_co(Cat)    = rc  // sucess
 
-        let ratu : rec_b(Animal) = { x = animal_to_unit }
-        let rctu : rec_b(Cat) = { x = cat_to_unit }
-        let r05 : rec_b(Animal) = ratu  // success
-        let r06 : rec_b(Animal) = rctu  // fail
-        let r07 : rec_b(Cat)    = ratu  // success
-        let r08 : rec_b(Cat)    = rctu  // success
+        let ratu : rec_contra(Animal) = { x = animal_to_unit }
+        let rctu : rec_contra(Cat)    = { x = cat_to_unit }
+        let r05  : rec_contra(Animal) = ratu  // success
+        let r06  : rec_contra(Animal) = rctu  // fail
+        let r07  : rec_contra(Cat)    = ratu  // success
+        let r08  : rec_contra(Cat)    = rctu  // success
 
-        let ruta : rec_c(Animal) = { x = unit_to_animal }
-        let rutc : rec_c(Cat) = { x = unit_to_cat }
-        let r09 : rec_c(Animal) = ruta  // success
-        let r10 : rec_c(Animal) = rutc  // success
-        let r11 : rec_c(Cat)    = ruta  // fail
-        let r12 : rec_c(Cat)    = rutc  // success
+        let rxaya : rec_inv(Animal) = { x = animal_to_unit, y = unit_to_animal }
+        let rxcyc : rec_inv(Cat)    = { x = cat_to_unit, y = unit_to_cat }
+        let r09   : rec_inv(Animal) = rxaya  // success
+        let r10   : rec_inv(Animal) = rxcyc  // fail
+        let r11   : rec_inv(Cat)    = rxaya  // fail
+        let r12   : rec_inv(Cat)    = rxcyc  // success
 
-        let rxaya : rec_d(Animal) = { x = animal_to_unit, y = unit_to_animal }
-        let rxcyc : rec_d(Cat) = { x = cat_to_unit, y = unit_to_cat }
-        let r13 : rec_d(Animal) = rxaya  // success
-        let r16 : rec_d(Animal) = rxcyc  // fail
-        let r17 : rec_d(Cat)    = rxaya  // fail
-        let r20 : rec_d(Cat)    = rxcyc  // success
-
-        let rba : rec_e(Animal) = { x = 1 }
-        let rbc : rec_e(Cat) = { x = 1 }
-        let r21 : rec_e(Animal) = rba  // success
-        let r21 : rec_e(Animal) = rbc  // success
-        let r22 : rec_e(Cat)    = rba  // success
-        let r22 : rec_e(Cat)    = rbc  // success
+        let rba : rec_biv(Animal) = { x = 1 }
+        let rbc : rec_biv(Cat)    = { x = 1 }
+        let r13 : rec_biv(Animal) = rba  // success
+        let r14 : rec_biv(Animal) = rbc  // success
+        let r15 : rec_biv(Cat)    = rba  // success
+        let r16 : rec_biv(Cat)    = rbc  // success
 
         ()

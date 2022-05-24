@@ -993,19 +993,16 @@ failing_contracts() ->
     , ?TYPE_ERROR(polymorphism_variance_switching_records,
                   [<<?Pos(27,13)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
-                     "when checking the type of the pattern `r03 : rec_a(Cat)` against the expected type `Main.rec_a(Animal)`">>,
+                     "when checking the type of the pattern `r03 : rec_co(Cat)` against the expected type `Main.rec_co(Animal)`">>,
                    <<?Pos(33,13)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
-                     "when checking the type of the pattern `r06 : rec_b(Animal)` against the expected type `Main.rec_b(Cat)`">>,
-                   <<?Pos(41,13)
-                     "Cannot unify `Animal` and `Cat` in a covariant context\n"
-                     "when checking the type of the pattern `r11 : rec_c(Cat)` against the expected type `Main.rec_c(Animal)`">>,
-                   <<?Pos(47,13)
+                     "when checking the type of the pattern `r06 : rec_contra(Animal)` against the expected type `Main.rec_contra(Cat)`">>,
+                   <<?Pos(40,13)
                      "Cannot unify `Cat` and `Animal` in a invariant context\n"
-                     "when checking the type of the pattern `r16 : rec_d(Animal)` against the expected type `Main.rec_d(Cat)`">>,
-                   <<?Pos(48,13)
+                     "when checking the type of the pattern `r10 : rec_inv(Animal)` against the expected type `Main.rec_inv(Cat)`">>,
+                   <<?Pos(41,13)
                      "Cannot unify `Animal` and `Cat` in a invariant context\n"
-                     "when checking the type of the pattern `r17 : rec_d(Cat)` against the expected type `Main.rec_d(Animal)`">>])
+                     "when checking the type of the pattern `r11 : rec_inv(Cat)` against the expected type `Main.rec_inv(Animal)`">>])
     , ?TYPE_ERROR(polymorphism_variance_switching_oracles,
                   [<<?Pos(15,13)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
