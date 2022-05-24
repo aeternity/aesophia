@@ -10,6 +10,7 @@ main contract Main =
     record rec_c('a) = { x : () => 'a}
     record rec_d('a) = { x : 'a => unit,
                          y : () => 'a }
+    record rec_e('a) = { x : int }
 
     stateful entrypoint new_cat() : Cat = Chain.create()
     stateful entrypoint new_animal() : Animal = new_cat()
@@ -46,5 +47,12 @@ main contract Main =
         let r16 : rec_d(Animal) = rxcyc  // fail
         let r17 : rec_d(Cat)    = rxaya  // fail
         let r20 : rec_d(Cat)    = rxcyc  // success
+
+        let rba : rec_e(Animal) = { x = 1 }
+        let rbc : rec_e(Cat) = { x = 1 }
+        let r21 : rec_e(Animal) = rba  // success
+        let r21 : rec_e(Animal) = rbc  // success
+        let r22 : rec_e(Cat)    = rba  // success
+        let r22 : rec_e(Cat)    = rbc  // success
 
         ()

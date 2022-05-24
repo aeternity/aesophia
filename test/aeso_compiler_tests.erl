@@ -991,19 +991,19 @@ failing_contracts() ->
                      "when checking the type of the expression `TK(f_a_to_c_to_u) : tk(Animal, Cat)` against the expected type `tk(Cat, Cat)`">>
                   ])
     , ?TYPE_ERROR(polymorphism_variance_switching_records,
-                  [<<?Pos(26,13)
+                  [<<?Pos(27,13)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
                      "when checking the type of the pattern `r03 : rec_a(Cat)` against the expected type `Main.rec_a(Animal)`">>,
-                   <<?Pos(32,13)
+                   <<?Pos(33,13)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
                      "when checking the type of the pattern `r06 : rec_b(Animal)` against the expected type `Main.rec_b(Cat)`">>,
-                   <<?Pos(40,13)
+                   <<?Pos(41,13)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
                      "when checking the type of the pattern `r11 : rec_c(Cat)` against the expected type `Main.rec_c(Animal)`">>,
-                   <<?Pos(46,13)
+                   <<?Pos(47,13)
                      "Cannot unify `Cat` and `Animal` in a invariant context\n"
                      "when checking the type of the pattern `r16 : rec_d(Animal)` against the expected type `Main.rec_d(Cat)`">>,
-                   <<?Pos(47,13)
+                   <<?Pos(48,13)
                      "Cannot unify `Animal` and `Cat` in a invariant context\n"
                      "when checking the type of the pattern `r17 : rec_d(Cat)` against the expected type `Main.rec_d(Animal)`">>])
     , ?TYPE_ERROR(polymorphism_variance_switching_oracles,
