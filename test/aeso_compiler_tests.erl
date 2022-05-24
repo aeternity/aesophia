@@ -861,22 +861,22 @@ failing_contracts() ->
                      "Trying to implement or extend an undefined interface `H`">>
                   ])
     , ?TYPE_ERROR(polymorphism_variance_switching,
-                  [<<?Pos(39,49)
+                  [<<?Pos(36,49)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
                      "when checking the application of\n"
                      "  `g2 : (Cat) => Cat`\n"
                      "to arguments\n"
                      "  `x : Animal`">>,
-                   <<?Pos(42,43)
+                   <<?Pos(39,43)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
                      "when checking the type of the expression `g3(x) : Animal` against the expected type `Cat`">>,
-                   <<?Pos(51,55)
+                   <<?Pos(48,55)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
                      "when checking the application of\n"
                      "  `g5 : ((Animal) => Animal) => Cat`\n"
                      "to arguments\n"
                      "  `x : (Cat) => Cat`">>,
-                   <<?Pos(55, 44)
+                   <<?Pos(52, 44)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
                      "when checking the type of the expression `f6() : option(Animal)` against the expected type `option(Cat)`">>
                   ])

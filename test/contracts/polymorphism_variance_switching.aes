@@ -12,8 +12,8 @@ contract Cat : Animal =
 main contract Main =
     entrypoint init() = ()
 
-    stateful function g0(x : Creature) : Cat = Chain.create()
-    stateful function f0(x : Cat) : Creature = g1(x)
+    stateful function g0(_ : Creature) : Cat = Chain.create()
+    stateful function f0(x : Cat) : Creature = g0(x)
     stateful function h0() =
         let a : Animal = (Chain.create() : Cat)
         let c : Creature = (Chain.create() : Cat)
@@ -22,9 +22,6 @@ main contract Main =
 
     stateful function g1(x : Animal) : Cat = Chain.create()
     stateful function f1(x : Cat) : Animal = g1(x)
-    stateful function h1() =
-        let x : Animal = (Chain.create() : Cat)
-        ()
 
     stateful function g11(x : list(Animal)) : list(Cat) = [Chain.create()]
     stateful function f11(x : list(Cat)) : list(Animal) = g11(x)
@@ -36,10 +33,10 @@ main contract Main =
     stateful function f13() : map(Animal, Animal) = g13()
 
     stateful function g2(x : Cat) : Cat = Chain.create()
-    stateful function f2(x : Animal) : Animal = g2(x)
+    stateful function f2(x : Animal) : Animal = g2(x)  // fail
 
     stateful function g3(x : Cat) : Animal = f1(x)
-    stateful function f3(x : Cat) : Cat = g3(x)
+    stateful function f3(x : Cat) : Cat = g3(x)  // fail
 
     stateful function g4(x : (Cat => Animal)) : Cat = Chain.create()
     stateful function f4(x : (Animal => Cat)) : Animal = g4(x)
@@ -48,11 +45,11 @@ main contract Main =
     stateful function f44(x : list(list(Animal) => list(Cat))) : Animal = g44(x)
 
     stateful function g5(x : (Animal => Animal)) : Cat = Chain.create()
-    stateful function f5(x : (Cat => Cat)) : Animal = g5(x)
+    stateful function f5(x : (Cat => Cat)) : Animal = g5(x)  // fail
 
     stateful function g6() : option(Cat) = Some(Chain.create())
     stateful function f6() : option(Animal) = g6()
-    stateful function h6() : option(Cat) = f6()
+    stateful function h6() : option(Cat) = f6()  // fail
 
     type cat_type = Cat
     type animal_type = Animal
