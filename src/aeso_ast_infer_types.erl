@@ -2711,7 +2711,7 @@ unify1(Env, {uvar, A, R}, T, _Variance, When) ->
         true ->
             if
                 Env#env.unify_throws ->
-                    cannot_unify({uvar, A, R}, T, When);
+                    cannot_unify({uvar, A, R}, T, none, When);
                 true ->
                     ok
             end,
@@ -2737,7 +2737,13 @@ unify1(Env, A = {con, _, NameA}, B = {con, _, NameB}, Variance, When) ->
         false ->
             if
                 Env#env.unify_throws ->
-                    cannot_unify(A, B, When);
+                    IsSubtype = is_subtype(Env, NameA, NameB, contravariant) orelse
+                                is_subtype(Env, NameA, NameB, covariant),
+                    Cxt = case IsSubtype of
+                              true  -> Variance;
+                              false -> none
+                          end,
+                    cannot_unify(A, B, Cxt, When);
                 true ->
                     ok
             end,
@@ -2790,7 +2796,7 @@ unify1(Env, A, {app_t, _, T, []}, Variance, When) ->
 unify1(Env, A, B, _Variance, When) ->
     if
         Env#env.unify_throws ->
-            cannot_unify(A, B, When);
+            cannot_unify(A, B, none, When);
         true ->
             ok
     end,
@@ -3102,8 +3108,8 @@ warn_potential_negative_spend(Ann, Fun, Args) ->
 
 %% Save unification failures for error messages.
 
-cannot_unify(A, B, When) ->
-    type_error({cannot_unify, A, B, When}).
+cannot_unify(A, B, Cxt, When) ->
+    type_error({cannot_unify, A, B, Cxt, When}).
 
 type_error(Err) ->
     ets_insert(type_errors, Err).
@@ -3172,8 +3178,12 @@ mk_error({fundecl_must_have_funtype, _Ann, Id, Type}) ->
                        "Entrypoints and functions must have functional types"
                        , [pp(Id), pp(instantiate(Type))]),
     mk_t_err(pos(Id), Msg);
-mk_error({cannot_unify, A, B, When}) ->
-    Msg = io_lib:format("Cannot unify `~s` and `~s`",
+mk_error({cannot_unify, A, B, Cxt, When}) ->
+    VarianceContext = case Cxt of
+                          none -> "";
+                          _    -> io_lib:format(" in a ~p context", [Cxt])
+                      end,
+    Msg = io_lib:format("Cannot unify `~s` and `~s`" ++ VarianceContext,
                         [pp(instantiate(A)), pp(instantiate(B))]),
     {Pos, Ctxt} = pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
