@@ -934,16 +934,16 @@ failing_contracts() ->
                      "when checking the type of the expression `DT_INV_SEP_B(f_u_to_a) : dt_inv_sep(Animal)` against the expected type `dt_inv_sep(Cat)`">>,
                    <<?Pos(88,42)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
-                     "when checking the type of the expression `DT_CO_NEST_A(f_ta_a_to_u) : dt_co_nest_a(Animal)` against the expected type `dt_co_nest_a(Cat)`">>,
+                     "when checking the type of the expression `DT_CO_NEST_A(f_dt_contra_a_to_u) : dt_co_nest_a(Animal)` against the expected type `dt_co_nest_a(Cat)`">>,
                    <<?Pos(92,46)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
-                     "when checking the type of the expression `DT_CONTRA_NEST_A(f_tb_c_to_u) : dt_contra_nest_a(Cat)` against the expected type `dt_contra_nest_a(Animal)`">>,
+                     "when checking the type of the expression `DT_CONTRA_NEST_A(f_dt_co_c_to_u) : dt_contra_nest_a(Cat)` against the expected type `dt_contra_nest_a(Animal)`">>,
                    <<?Pos(97,46)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
-                     "when checking the type of the expression `DT_CONTRA_NEST_B(f_u_to_ta_c) : dt_contra_nest_b(Cat)` against the expected type `dt_contra_nest_b(Animal)`">>,
+                     "when checking the type of the expression `DT_CONTRA_NEST_B(f_u_to_dt_contra_c) : dt_contra_nest_b(Cat)` against the expected type `dt_contra_nest_b(Animal)`">>,
                    <<?Pos(103,42)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
-                     "when checking the type of the expression `DT_CO_NEST_B(f_u_to_tb_a) : dt_co_nest_b(Animal)` against the expected type `dt_co_nest_b(Cat)`">>,
+                     "when checking the type of the expression `DT_CO_NEST_B(f_u_to_dt_co_a) : dt_co_nest_b(Animal)` against the expected type `dt_co_nest_b(Cat)`">>,
                    <<?Pos(107,41)
                      "Cannot unify `Animal` and `Cat` in a invariant context\n"
                      "when checking the application of\n"

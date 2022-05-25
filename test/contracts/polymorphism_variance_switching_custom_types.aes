@@ -26,12 +26,12 @@ main contract Main =
     function f_a_to_u(_ : Animal) : unit = ()
     function f_c_to_u(_ : Cat) : unit = ()
 
-    function f_ta_a_to_u(_ : dt_contra(Animal)) : unit = ()
-    function f_ta_c_to_u(_ : dt_contra(Cat)) : unit = ()
-    function f_tb_a_to_u(_ : dt_co(Animal)) : unit = ()
-    function f_tb_c_to_u(_ : dt_co(Cat)) : unit = ()
-    function f_u_to_ta_a(_ : unit) : dt_contra(Animal) = DT_CONTRA(f_a_to_u)
-    function f_u_to_ta_c(_ : unit) : dt_contra(Cat) = DT_CONTRA(f_c_to_u)
+    function f_dt_contra_a_to_u(_ : dt_contra(Animal)) : unit = ()
+    function f_dt_contra_c_to_u(_ : dt_contra(Cat)) : unit = ()
+    function f_dt_co_a_to_u(_ : dt_co(Animal)) : unit = ()
+    function f_dt_co_c_to_u(_ : dt_co(Cat)) : unit = ()
+    function f_u_to_dt_contra_a(_ : unit) : dt_contra(Animal) = DT_CONTRA(f_a_to_u)
+    function f_u_to_dt_contra_c(_ : unit) : dt_contra(Cat) = DT_CONTRA(f_c_to_u)
 
     stateful function f_c() : Cat = Chain.create()
     stateful function f_a() : Animal = f_c()
@@ -48,8 +48,8 @@ main contract Main =
     stateful function f_c_to_u_to_a(_ : Cat) : (unit => Animal) = f_u_to_a
     stateful function f_c_to_u_to_c(_ : Cat) : (unit => Cat) = f_u_to_c
 
-    stateful function f_u_to_tb_a(_ : unit) : dt_co(Animal) = DT_CO(f_u_to_a)
-    stateful function f_u_to_tb_c(_ : unit) : dt_co(Cat) = DT_CO(f_u_to_c)
+    stateful function f_u_to_dt_co_a(_ : unit) : dt_co(Animal) = DT_CO(f_u_to_a)
+    stateful function f_u_to_dt_co_c(_ : unit) : dt_co(Cat) = DT_CO(f_u_to_c)
 
     stateful entrypoint init() =
         let va1 : dt_contra(Animal) = DT_CONTRA(f_a_to_u)  // success
@@ -83,25 +83,25 @@ main contract Main =
         let ve7 : dt_inv_sep(Cat)    = DT_INV_SEP_B(f_u_to_a)  // fail
         let ve8 : dt_inv_sep(Cat)    = DT_INV_SEP_B(f_u_to_c)  // success
 
-        let vf1 : dt_co_nest_a(Animal) = DT_CO_NEST_A(f_ta_a_to_u)  // success
-        let vf2 : dt_co_nest_a(Animal) = DT_CO_NEST_A(f_ta_c_to_u)  // success
-        let vf3 : dt_co_nest_a(Cat)    = DT_CO_NEST_A(f_ta_a_to_u)  // fail
-        let vf4 : dt_co_nest_a(Cat)    = DT_CO_NEST_A(f_ta_c_to_u)  // success
+        let vf1 : dt_co_nest_a(Animal) = DT_CO_NEST_A(f_dt_contra_a_to_u)  // success
+        let vf2 : dt_co_nest_a(Animal) = DT_CO_NEST_A(f_dt_contra_c_to_u)  // success
+        let vf3 : dt_co_nest_a(Cat)    = DT_CO_NEST_A(f_dt_contra_a_to_u)  // fail
+        let vf4 : dt_co_nest_a(Cat)    = DT_CO_NEST_A(f_dt_contra_c_to_u)  // success
 
-        let vg1 : dt_contra_nest_a(Animal) = DT_CONTRA_NEST_A(f_tb_a_to_u)  // success
-        let vg2 : dt_contra_nest_a(Animal) = DT_CONTRA_NEST_A(f_tb_c_to_u)  // fail
-        let vg3 : dt_contra_nest_a(Cat)    = DT_CONTRA_NEST_A(f_tb_a_to_u)  // success
-        let vg4 : dt_contra_nest_a(Cat)    = DT_CONTRA_NEST_A(f_tb_c_to_u)  // success
+        let vg1 : dt_contra_nest_a(Animal) = DT_CONTRA_NEST_A(f_dt_co_a_to_u)  // success
+        let vg2 : dt_contra_nest_a(Animal) = DT_CONTRA_NEST_A(f_dt_co_c_to_u)  // fail
+        let vg3 : dt_contra_nest_a(Cat)    = DT_CONTRA_NEST_A(f_dt_co_a_to_u)  // success
+        let vg4 : dt_contra_nest_a(Cat)    = DT_CONTRA_NEST_A(f_dt_co_c_to_u)  // success
 
-        let vh1 : dt_contra_nest_b(Animal) = DT_CONTRA_NEST_B(f_u_to_ta_a)  // success
-        let vh2 : dt_contra_nest_b(Animal) = DT_CONTRA_NEST_B(f_u_to_ta_c)  // fail
-        let vh3 : dt_contra_nest_b(Cat)    = DT_CONTRA_NEST_B(f_u_to_ta_a)  // success
-        let vh4 : dt_contra_nest_b(Cat)    = DT_CONTRA_NEST_B(f_u_to_ta_c)  // success
+        let vh1 : dt_contra_nest_b(Animal) = DT_CONTRA_NEST_B(f_u_to_dt_contra_a)  // success
+        let vh2 : dt_contra_nest_b(Animal) = DT_CONTRA_NEST_B(f_u_to_dt_contra_c)  // fail
+        let vh3 : dt_contra_nest_b(Cat)    = DT_CONTRA_NEST_B(f_u_to_dt_contra_a)  // success
+        let vh4 : dt_contra_nest_b(Cat)    = DT_CONTRA_NEST_B(f_u_to_dt_contra_c)  // success
 
-        let vi1 : dt_co_nest_b(Animal) = DT_CO_NEST_B(f_u_to_tb_a)  // success
-        let vi2 : dt_co_nest_b(Animal) = DT_CO_NEST_B(f_u_to_tb_c)  // success
-        let vi3 : dt_co_nest_b(Cat)    = DT_CO_NEST_B(f_u_to_tb_a)  // fail
-        let vi4 : dt_co_nest_b(Cat)    = DT_CO_NEST_B(f_u_to_tb_c)  // success
+        let vi1 : dt_co_nest_b(Animal) = DT_CO_NEST_B(f_u_to_dt_co_a)  // success
+        let vi2 : dt_co_nest_b(Animal) = DT_CO_NEST_B(f_u_to_dt_co_c)  // success
+        let vi3 : dt_co_nest_b(Cat)    = DT_CO_NEST_B(f_u_to_dt_co_a)  // fail
+        let vi4 : dt_co_nest_b(Cat)    = DT_CO_NEST_B(f_u_to_dt_co_c)  // success
 
         let vj1 : dt_co_twice(Animal) = DT_CO_TWICE(f_a_to_u_to_a)  // success
         let vj2 : dt_co_twice(Animal) = DT_CO_TWICE(f_a_to_u_to_c)  // fail
