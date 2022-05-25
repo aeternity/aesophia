@@ -876,9 +876,12 @@ failing_contracts() ->
                      "  `g5 : ((Animal) => Animal) => Cat`\n"
                      "to arguments\n"
                      "  `x : (Cat) => Cat`">>,
-                   <<?Pos(52, 44)
+                   <<?Pos(52,44)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
-                     "when checking the type of the expression `f6() : option(Animal)` against the expected type `option(Cat)`">>
+                     "when checking the type of the expression `f6() : option(Animal)` against the expected type `option(Cat)`">>,
+                   <<?Pos(73,43)
+                     "Cannot unify `Animal` and `Cat` in a covariant context\n"
+                     "when checking the type of the expression `some_animal : Animal` against the expected type `Cat`">>
                   ])
     , ?TYPE_ERROR(polymorphism_variance_switching_custom_types,
                   [<<?Pos(56,39)

@@ -61,3 +61,15 @@ main contract Main =
 
     stateful function g72() : cat_cat_map = { [Chain.create()] = Chain.create() }
     stateful function f72() : animal_animal_map = g13()
+
+    stateful function g73() =
+        let some_cat : Cat = Chain.create()
+        let some_animal : Animal = some_cat
+
+        let some_cat_cat_map : map(Cat, Cat) = g13()
+        let some_animal_animal_map : map(Animal, Animal) = some_cat_cat_map
+
+        let x : Animal = some_animal_animal_map[some_cat]  // success
+        let y : Cat    = some_cat_cat_map[some_animal]     // fail
+
+        ()
