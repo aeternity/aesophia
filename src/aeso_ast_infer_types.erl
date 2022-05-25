@@ -816,7 +816,7 @@ infer(Contracts, Options) ->
         ets_insert(type_vars_variance, {"list", [covariant]}),
         ets_insert(type_vars_variance, {"option", [covariant]}),
         ets_insert(type_vars_variance, {"oracle", [contravariant, covariant]}),
-        ets_insert(type_vars_variance, {"oracle_query", [covariant, contravariant]}),
+        ets_insert(type_vars_variance, {"oracle_query", [covariant, covariant]}),
 
         when_warning(warn_unused_functions, fun() -> create_unused_functions() end),
         check_modifiers(Env, Contracts),

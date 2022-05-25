@@ -1025,27 +1025,27 @@ failing_contracts() ->
                    <<?Pos(27,13)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
                      "when checking the type of the pattern `o15 : oracle(Cat, Cat)` against the expected type `oracle(Cat, Animal)`">>,
-                   <<?Pos(31,13)
-                     "Cannot unify `Cat` and `Animal` in a contravariant context\n"
-                     "when checking the type of the pattern `q02 : oracle_query(Animal, Animal)` against the expected type `oracle_query(Animal, Cat)`">>,
-                   <<?Pos(33,13)
-                     "Cannot unify `Cat` and `Animal` in a contravariant context\n"
-                     "when checking the type of the pattern `q04 : oracle_query(Animal, Animal)` against the expected type `oracle_query(Cat, Cat)`">>,
+                   <<?Pos(34,13)
+                     "Cannot unify `Animal` and `Cat` in a covariant context\n"
+                     "when checking the type of the pattern `q05 : oracle_query(Animal, Cat)` against the expected type `oracle_query(Animal, Animal)`">>,
+                   <<?Pos(36,13)
+                     "Cannot unify `Animal` and `Cat` in a covariant context\n"
+                     "when checking the type of the pattern `q07 : oracle_query(Animal, Cat)` against the expected type `oracle_query(Cat, Animal)`">>,
                    <<?Pos(38,13)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
                      "when checking the type of the pattern `q09 : oracle_query(Cat, Animal)` against the expected type `oracle_query(Animal, Animal)`">>,
                    <<?Pos(39,13)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
                      "when checking the type of the pattern `q10 : oracle_query(Cat, Animal)` against the expected type `oracle_query(Animal, Cat)`">>,
-                   <<?Pos(41,13)
-                     "Cannot unify `Cat` and `Animal` in a contravariant context\n"
-                     "when checking the type of the pattern `q12 : oracle_query(Cat, Animal)` against the expected type `oracle_query(Cat, Cat)`">>,
                    <<?Pos(42,13)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
                      "when checking the type of the pattern `q13 : oracle_query(Cat, Cat)` against the expected type `oracle_query(Animal, Animal)`">>,
                    <<?Pos(43,13)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
-                     "when checking the type of the pattern `q14 : oracle_query(Cat, Cat)` against the expected type `oracle_query(Animal, Cat)`">>])
+                     "when checking the type of the pattern `q14 : oracle_query(Cat, Cat)` against the expected type `oracle_query(Animal, Cat)`">>,
+                   <<?Pos(44,13)
+                     "Cannot unify `Animal` and `Cat` in a covariant context\n"
+                     "when checking the type of the pattern `q15 : oracle_query(Cat, Cat)` against the expected type `oracle_query(Cat, Animal)`">>])
     ].
 
 -define(Path(File), "code_errors/" ??File).
