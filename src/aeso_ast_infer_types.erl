@@ -815,6 +815,7 @@ infer(Contracts, Options) ->
         %% Set the variance for builtin types
         ets_insert(type_vars_variance, {"list", [covariant]}),
         ets_insert(type_vars_variance, {"option", [covariant]}),
+        ets_insert(type_vars_variance, {"map", [covariant, covariant]}),
         ets_insert(type_vars_variance, {"oracle", [contravariant, covariant]}),
         ets_insert(type_vars_variance, {"oracle_query", [covariant, covariant]}),
 
@@ -2777,7 +2778,7 @@ unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, Vari
                             invariant     -> invariant;
                             _             -> Vs
                         end;
-                    _ -> Variance
+                    _ -> invariant
                 end,
     unify1(Env, Args1, Args2, Variances, When);
 unify1(Env, {tuple_t, _, As}, {tuple_t, _, Bs}, Variance, When)
