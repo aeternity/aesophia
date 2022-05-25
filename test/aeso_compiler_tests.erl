@@ -202,12 +202,12 @@ compilable_contracts() ->
      "assign_patterns",
      "patterns_guards",
      "pipe_operator",
-     "contract_polymorphism",
-     "contract_polymorphism_multi_interface",
-     "contract_interface_polymorphism",
-     "contract_polymorphism_interface_extensions",
-     "contract_interface_polymorphism_same_decl_multi_interface",
-     "contract_interface_polymorphism_same_name_same_type",
+     "polymorphism_contract_implements_interface",
+     "polymorphism_contract_multi_interface",
+     "polymorphism_contract_interface_extends_interface",
+     "polymorphism_contract_interface_extensions",
+     "polymorphism_contract_interface_same_decl_multi_interface",
+     "polymorphism_contract_interface_same_name_same_type",
      "test" % Custom general-purpose test file. Keep it last on the list.
     ].
 
@@ -831,32 +831,32 @@ failing_contracts() ->
                    <<?Pos(48, 5)
                      "Unused return value.">>
                   ])
-    , ?TYPE_ERROR(contract_interface_polymorphism_recursive,
+    , ?TYPE_ERROR(polymorphism_contract_interface_recursive,
                   [<<?Pos(1,24)
                      "Trying to implement or extend an undefined interface `Z`">>
                   ])
-    , ?TYPE_ERROR(contract_interface_polymorphism_same_name_different_type,
+    , ?TYPE_ERROR(polymorphism_contract_interface_same_name_different_type,
                   [<<?Pos(4,20)
                      "Unimplemented function `f` from the interface `I1` in the contract `I2`">>])
-    , ?TYPE_ERROR(contract_polymorphism_missing_implementation,
+    , ?TYPE_ERROR(polymorphism_contract_missing_implementation,
                   [<<?Pos(4,20)
                      "Unimplemented function `f` from the interface `I1` in the contract `I2`">>
                   ])
-    , ?TYPE_ERROR(contract_polymorphism_same_decl_multi_interface,
+    , ?TYPE_ERROR(polymorphism_contract_same_decl_multi_interface,
                   [<<?Pos(7,10)
                      "Unimplemented function `f` from the interface `J` in the contract `C`">>
                   ])
-    , ?TYPE_ERROR(contract_polymorphism_undefined_interface,
+    , ?TYPE_ERROR(polymorphism_contract_undefined_interface,
                   [<<?Pos(1,14)
                      "Trying to implement or extend an undefined interface `I`">>
                   ])
-    , ?TYPE_ERROR(contract_polymorphism_same_name_different_type_multi_interface,
+    , ?TYPE_ERROR(polymorphism_contract_same_name_different_type_multi_interface,
                   [<<?Pos(9,5)
                      "Duplicate definitions of `f` at\n"
                      "  - line 8, column 5\n"
                      "  - line 9, column 5">>
                   ])
-    , ?TYPE_ERROR(contract_interface_polymorphism_undefined_interface,
+    , ?TYPE_ERROR(polymorphism_contract_interface_undefined_interface,
                   [<<?Pos(1,24)
                      "Trying to implement or extend an undefined interface `H`">>
                   ])
