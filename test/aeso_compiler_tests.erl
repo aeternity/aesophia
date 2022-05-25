@@ -791,6 +791,10 @@ failing_contracts() ->
                      "when checking the type of the expression `\"y\" : string` "
                      "against the expected type `bool`">>
                   ])
+    , ?TYPE_ERROR(empty_record_definition,
+                  [<<?Pos(2,5)
+                     "Empty record definitions are not allowed. Cannot define the record `r`">>
+                  ])
     , ?TYPE_ERROR(warnings,
                   [<<?Pos(0, 0)
                       "The file `Triple.aes` is included but not used.">>,
