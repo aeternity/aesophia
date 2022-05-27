@@ -809,7 +809,6 @@ infer(Contracts, Options) ->
         create_options(Options),
         ets_new(defined_contracts, [bag]),
         ets_new(type_vars, [set]),
-        ets_new(type_vars_uvar, [set]),
         ets_new(warnings, [bag]),
         ets_new(type_vars_variance, [set]),
         %% Set the variance for builtin types
@@ -1126,7 +1125,7 @@ infer_type_vars_variance(TypeParams, Cons) ->
     % args from all type constructors
     FlatArgs = lists:flatten([Args || {constr_t, _, _, Args} <- Cons]) ++ [Type || {field_t, _, _, Type} <- Cons],
 
-    Vs = lists:flatten([element(1, infer_type_vars_variance(Arg)) || Arg <- FlatArgs]),
+    Vs = lists:flatten([infer_type_vars_variance(Arg) || Arg <- FlatArgs]),
     lists:map(fun({tvar, _, TVar}) ->
                       S = sets:from_list([Variance || {TV, Variance} <- Vs, TV == TVar]),
                       IsCovariant     = sets:is_element(covariant, S),
@@ -1139,7 +1138,10 @@ infer_type_vars_variance(TypeParams, Cons) ->
                       end
               end, TypeParams).
 
--spec infer_type_vars_variance(utype()) -> {[{name(), variance()}], integer()}.
+-spec infer_type_vars_variance(utype()) -> [{name(), variance()}].
+infer_type_vars_variance(Types)
+  when is_list(Types) ->
+    lists:flatten([infer_type_vars_variance(T) || T <- Types]);
 infer_type_vars_variance({app_t, _, Type, Args}) ->
     Variances = case ets_lookup(type_vars_variance, qname(Type)) of
                     [{_, Vs}] -> Vs;
@@ -1147,36 +1149,14 @@ infer_type_vars_variance({app_t, _, Type, Args}) ->
                 end,
     TypeVarsVariance = [{TVar, Variance}
                         || {{tvar, _, TVar}, Variance} <- lists:zip(Args, Variances)],
-    {TypeVarsVariance, 0};
-infer_type_vars_variance({fun_t, _, [], [{app_t, _, Type, Args}], Res}) ->
-    Variances = case ets_lookup(type_vars_variance, qname(Type)) of
-                    [{_, Vs}] -> Vs;
-                    _ -> lists:duplicate(length(Args), covariant)
-                end,
-    TypeVarsVariance = [{TVar, Variance}
-                        || {{tvar, _, TVar}, Variance} <- lists:zip(Args, Variances)],
-    FlipVariance = fun({TVar, covariant}) -> {TVar, contravariant};
-                      ({TVar, contravariant}) -> {TVar, covariant}
-                   end,
-    {TVVs, Depth} = infer_type_vars_variance(Res),
-    Cur = case (Depth + 1) rem 2 of
-              0 -> TypeVarsVariance;
-              1 -> lists:map(FlipVariance, TypeVarsVariance)
-          end,
-    {Cur ++ TVVs, Depth + 1};
-infer_type_vars_variance({fun_t, _, [], [{tvar, _, TVar}], Res}) ->
-    {TVVs, Depth} = infer_type_vars_variance(Res),
-    Cur = case (Depth + 1) rem 2 of
-              0 -> {TVar, covariant};
-              1 -> {TVar, contravariant}
-          end,
-    {[Cur | TVVs], Depth + 1};
-infer_type_vars_variance({fun_t, _, [], _, Res}) ->
-    {X, Depth} = infer_type_vars_variance(Res),
-    {X, Depth + 1};
-infer_type_vars_variance({tvar, _, TVar}) ->
-    {[{TVar, covariant}], 0};
-infer_type_vars_variance(_) -> {[], 0}.
+    TypeVarsVariance;
+infer_type_vars_variance({tvar, _, TVar}) -> [{TVar, covariant}];
+infer_type_vars_variance({fun_t, _, [], Args, Res}) ->
+    ArgsVariance = infer_type_vars_variance(Args),
+    ResVariance = infer_type_vars_variance(Res),
+    FlippedArgsVariance = lists:map(fun({TVar, Variance}) -> {TVar, opposite_variance(Variance)} end, ArgsVariance),
+    FlippedArgsVariance ++ ResVariance;
+infer_type_vars_variance(_) -> [].
 
 opposite_variance(invariant) -> invariant;
 opposite_variance(covariant) -> contravariant;
@@ -1773,16 +1753,6 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
             ResultType = fresh_uvar(Ann),
             when_warning(warn_unused_functions,
                          fun() -> register_function_call(Namespace ++ qname(CurrentFun), Name) end),
-            % the uvars of tvars are stored so that no variance switching happens
-            % in between them (e.g. in TC('a => 'a), 'a should be a single type)
-            case FunType of
-                {fun_t, _, _, _, {app_t, _, _, TArgs}} ->
-                    lists:foreach(fun({uvar, _, URef}) ->
-                                          ets_insert(type_vars_uvar, {URef});
-                                     (_) -> ok
-                                  end, TArgs);
-                _ -> ok
-            end,
             unify(Env, FunType, {fun_t, [], NamedArgsVar, ArgTypes, GeneralResultType}, When),
             when_warning(warn_negative_spend, fun() -> warn_potential_negative_spend(Ann, NewFun1, NewArgs) end),
             add_constraint(
@@ -2143,7 +2113,7 @@ next_count() ->
 ets_tables() ->
     [options, type_vars, constraints, freshen_tvars, type_errors,
      defined_contracts, warnings, function_calls, all_functions,
-     type_vars_variance, type_vars_uvar].
+     type_vars_variance].
 
 clean_up_ets() ->
     [ catch ets_delete(Tab) || Tab <- ets_tables() ],
@@ -2687,7 +2657,7 @@ unify(Env, A, B, When) -> unify0(Env, A, B, covariant, When).
 
 unify0(_, {id, _, "_"}, _, _Variance, _When) -> true;
 unify0(_, _, {id, _, "_"}, _Variance, _When) -> true;
-unify0(Env, A, B, Variance0, When) ->
+unify0(Env, A, B, Variance, When) ->
     Options =
         case When of    %% Improve source location for map_in_map_key errors
             {check_expr, E, _, _} -> [{ann, aeso_syntax:get_ann(E)}];
@@ -2695,14 +2665,6 @@ unify0(Env, A, B, Variance0, When) ->
         end,
     A1 = dereference(unfold_types_in_type(Env, A, Options)),
     B1 = dereference(unfold_types_in_type(Env, B, Options)),
-    Variance = case A of
-                   {uvar, _,URef} ->
-                       case ets_lookup(type_vars_uvar, URef) of
-                           [_] -> invariant;
-                           _   -> Variance0
-                       end;
-                   _ -> Variance0
-               end,
     unify1(Env, A1, B1, Variance, When).
 
 unify1(_Env, {uvar, _, R}, {uvar, _, R}, _Variance, _When) ->

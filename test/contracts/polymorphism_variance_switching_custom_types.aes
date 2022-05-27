@@ -14,8 +14,9 @@ main contract Main =
     datatype dt_contra_nest_a('a) = DT_CONTRA_NEST_A(dt_co('a) => unit)
     datatype dt_contra_nest_b('a) = DT_CONTRA_NEST_B(unit => dt_contra('a))
     datatype dt_co_nest_b('a) = DT_CO_NEST_B(unit => dt_co('a))
-    datatype dt_co_twice('a) = DT_CO_TWICE('a => unit => 'a)
-    datatype dt_a_co_b_contra('a, 'b) = DT_A_CO_B_CONTRA('a => 'b => unit)
+    datatype dt_co_twice('a) = DT_CO_TWICE(('a => unit) => 'a)
+    datatype dt_contra_twice('a) = DT_CONTRA_TWICE('a => 'a => unit)
+    datatype dt_a_contra_b_contra('a, 'b) = DT_A_CONTRA_B_CONTRA('a => 'b => unit)
 
     function f_a_to_a_to_u(_ : Animal) : (Animal => unit) = f_a_to_u
     function f_a_to_c_to_u(_ : Animal) : (Cat => unit) = f_c_to_u
@@ -43,10 +44,10 @@ main contract Main =
     stateful function f_c_to_a(_ : Cat) : Animal = f_a()
     stateful function f_c_to_c(_ : Cat) : Cat = f_c()
 
-    stateful function f_a_to_u_to_a(_ : Animal) : (unit => Animal) = f_u_to_a
-    stateful function f_a_to_u_to_c(_ : Animal) : (unit => Cat) = f_u_to_c
-    stateful function f_c_to_u_to_a(_ : Cat) : (unit => Animal) = f_u_to_a
-    stateful function f_c_to_u_to_c(_ : Cat) : (unit => Cat) = f_u_to_c
+    stateful function f_a_to_u_to_a(_ : (Animal => unit)) : Animal = f_a()
+    stateful function f_a_to_u_to_c(_ : (Animal => unit)) : Cat = f_c()
+    stateful function f_c_to_u_to_a(_ : (Cat => unit)) : Animal = f_a()
+    stateful function f_c_to_u_to_c(_ : (Cat => unit)) : Cat = f_c()
 
     stateful function f_u_to_dt_co_a(_ : unit) : dt_co(Animal) = DT_CO(f_u_to_a)
     stateful function f_u_to_dt_co_c(_ : unit) : dt_co(Cat) = DT_CO(f_u_to_c)
@@ -63,7 +64,7 @@ main contract Main =
         let vb4 : dt_co(Cat)    = DT_CO(f_u_to_c)  // success
 
         let vc1 : dt_inv(Animal) = DT_INV(f_a_to_a)  // success
-        let vc2 : dt_inv(Animal) = DT_INV(f_a_to_c)  // fail
+        let vc2 : dt_inv(Animal) = DT_INV(f_a_to_c)  // success
         let vc3 : dt_inv(Animal) = DT_INV(f_c_to_a)  // fail
         let vc4 : dt_inv(Animal) = DT_INV(f_c_to_c)  // fail
         let vc5 : dt_inv(Cat)    = DT_INV(f_a_to_a)  // fail
@@ -71,8 +72,8 @@ main contract Main =
         let vc7 : dt_inv(Cat)    = DT_INV(f_c_to_a)  // fail
         let vc8 : dt_inv(Cat)    = DT_INV(f_c_to_c)  // success
 
-        let vd1 : dt_biv(Animal) = DT_BIV(f_u_to_u)  // success
-        let vd2 : dt_biv(Cat)    = DT_BIV(f_u_to_u)  // success
+        let vd1 : dt_biv(Animal) = DT_BIV(f_u_to_u) : dt_biv(Cat)     // success
+        let vd2 : dt_biv(Cat)    = DT_BIV(f_u_to_u) : dt_biv(Animal)  // success
 
         let ve1 : dt_inv_sep(Animal) = DT_INV_SEP_A(f_a_to_u)  // success
         let ve2 : dt_inv_sep(Animal) = DT_INV_SEP_A(f_c_to_u)  // fail
@@ -104,29 +105,37 @@ main contract Main =
         let vi4 : dt_co_nest_b(Cat)    = DT_CO_NEST_B(f_u_to_dt_co_c)  // success
 
         let vj1 : dt_co_twice(Animal) = DT_CO_TWICE(f_a_to_u_to_a)  // success
-        let vj2 : dt_co_twice(Animal) = DT_CO_TWICE(f_a_to_u_to_c)  // fail
+        let vj2 : dt_co_twice(Animal) = DT_CO_TWICE(f_a_to_u_to_c)  // success
         let vj3 : dt_co_twice(Animal) = DT_CO_TWICE(f_c_to_u_to_a)  // fail
         let vj4 : dt_co_twice(Animal) = DT_CO_TWICE(f_c_to_u_to_c)  // success
         let vj5 : dt_co_twice(Cat)    = DT_CO_TWICE(f_a_to_u_to_a)  // fail
         let vj6 : dt_co_twice(Cat)    = DT_CO_TWICE(f_a_to_u_to_c)  // fail
         let vj7 : dt_co_twice(Cat)    = DT_CO_TWICE(f_c_to_u_to_a)  // fail
-        let vj8 : dt_co_twice(Cat)    = DT_CO_TWICE(f_c_to_u_to_c)  // success
 
-        let vk01 : dt_a_co_b_contra(Animal, Animal) = DT_A_CO_B_CONTRA(f_a_to_a_to_u)  // success
-        let vk02 : dt_a_co_b_contra(Animal, Animal) = DT_A_CO_B_CONTRA(f_a_to_c_to_u)  // fail
-        let vk03 : dt_a_co_b_contra(Animal, Animal) = DT_A_CO_B_CONTRA(f_c_to_a_to_u)  // success
-        let vk04 : dt_a_co_b_contra(Animal, Animal) = DT_A_CO_B_CONTRA(f_c_to_c_to_u)  // fail
-        let vk05 : dt_a_co_b_contra(Animal, Cat)    = DT_A_CO_B_CONTRA(f_a_to_a_to_u)  // success
-        let vk06 : dt_a_co_b_contra(Animal, Cat)    = DT_A_CO_B_CONTRA(f_a_to_c_to_u)  // success
-        let vk07 : dt_a_co_b_contra(Animal, Cat)    = DT_A_CO_B_CONTRA(f_c_to_a_to_u)  // success
-        let vk08 : dt_a_co_b_contra(Animal, Cat)    = DT_A_CO_B_CONTRA(f_c_to_c_to_u)  // success
-        let vk09 : dt_a_co_b_contra(Cat, Animal)    = DT_A_CO_B_CONTRA(f_a_to_a_to_u)  // fail
-        let vk10 : dt_a_co_b_contra(Cat, Animal)    = DT_A_CO_B_CONTRA(f_a_to_c_to_u)  // fail
-        let vk11 : dt_a_co_b_contra(Cat, Animal)    = DT_A_CO_B_CONTRA(f_c_to_a_to_u)  // success
-        let vk12 : dt_a_co_b_contra(Cat, Animal)    = DT_A_CO_B_CONTRA(f_c_to_c_to_u)  // fail
-        let vk13 : dt_a_co_b_contra(Cat, Cat)       = DT_A_CO_B_CONTRA(f_a_to_a_to_u)  // fail
-        let vk14 : dt_a_co_b_contra(Cat, Cat)       = DT_A_CO_B_CONTRA(f_a_to_c_to_u)  // fail
-        let vk15 : dt_a_co_b_contra(Cat, Cat)       = DT_A_CO_B_CONTRA(f_c_to_a_to_u)  // success
-        let vk16 : dt_a_co_b_contra(Cat, Cat)       = DT_A_CO_B_CONTRA(f_c_to_c_to_u)  // success
+        let vk01 : dt_a_contra_b_contra(Animal, Animal) = DT_A_CONTRA_B_CONTRA(f_a_to_a_to_u)  // success
+        let vk02 : dt_a_contra_b_contra(Animal, Animal) = DT_A_CONTRA_B_CONTRA(f_a_to_c_to_u)  // fail
+        let vk03 : dt_a_contra_b_contra(Animal, Animal) = DT_A_CONTRA_B_CONTRA(f_c_to_a_to_u)  // fail
+        let vk04 : dt_a_contra_b_contra(Animal, Animal) = DT_A_CONTRA_B_CONTRA(f_c_to_c_to_u)  // fail
+        let vk05 : dt_a_contra_b_contra(Animal, Cat)    = DT_A_CONTRA_B_CONTRA(f_a_to_a_to_u)  // success
+        let vk06 : dt_a_contra_b_contra(Animal, Cat)    = DT_A_CONTRA_B_CONTRA(f_a_to_c_to_u)  // success
+        let vk07 : dt_a_contra_b_contra(Animal, Cat)    = DT_A_CONTRA_B_CONTRA(f_c_to_a_to_u)  // fail
+        let vk08 : dt_a_contra_b_contra(Animal, Cat)    = DT_A_CONTRA_B_CONTRA(f_c_to_c_to_u)  // fail
+        let vk09 : dt_a_contra_b_contra(Cat, Animal)    = DT_A_CONTRA_B_CONTRA(f_a_to_a_to_u)  // success
+        let vk10 : dt_a_contra_b_contra(Cat, Animal)    = DT_A_CONTRA_B_CONTRA(f_a_to_c_to_u)  // fail
+        let vk11 : dt_a_contra_b_contra(Cat, Animal)    = DT_A_CONTRA_B_CONTRA(f_c_to_a_to_u)  // success
+        let vk12 : dt_a_contra_b_contra(Cat, Animal)    = DT_A_CONTRA_B_CONTRA(f_c_to_c_to_u)  // fail
+        let vk13 : dt_a_contra_b_contra(Cat, Cat)       = DT_A_CONTRA_B_CONTRA(f_a_to_a_to_u)  // success
+        let vk14 : dt_a_contra_b_contra(Cat, Cat)       = DT_A_CONTRA_B_CONTRA(f_a_to_c_to_u)  // success
+        let vk15 : dt_a_contra_b_contra(Cat, Cat)       = DT_A_CONTRA_B_CONTRA(f_c_to_a_to_u)  // success
+        let vk16 : dt_a_contra_b_contra(Cat, Cat)       = DT_A_CONTRA_B_CONTRA(f_c_to_c_to_u)  // success
+
+        let vl1 : dt_contra_twice(Animal) = DT_CONTRA_TWICE(f_a_to_a_to_u)  // success
+        let vl2 : dt_contra_twice(Animal) = DT_CONTRA_TWICE(f_a_to_c_to_u)  // fail
+        let vl3 : dt_contra_twice(Animal) = DT_CONTRA_TWICE(f_c_to_a_to_u)  // fail
+        let vl4 : dt_contra_twice(Animal) = DT_CONTRA_TWICE(f_c_to_c_to_u)  // fail
+        let vl5 : dt_contra_twice(Cat)    = DT_CONTRA_TWICE(f_a_to_a_to_u)  // success
+        let vl6 : dt_contra_twice(Cat)    = DT_CONTRA_TWICE(f_a_to_c_to_u)  // fail
+        let vl7 : dt_contra_twice(Cat)    = DT_CONTRA_TWICE(f_c_to_a_to_u)  // success
+        let vl8 : dt_contra_twice(Cat)    = DT_CONTRA_TWICE(f_c_to_c_to_u)  // success
 
         ()
