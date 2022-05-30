@@ -71,8 +71,10 @@ main contract Main =
         let vc7 : dt_inv(Cat)    = DT_INV(f_c_to_a)  // fail
         let vc8 : dt_inv(Cat)    = DT_INV(f_c_to_c)  // success
 
-        let vd1 : dt_biv(Animal) = DT_BIV(f_u_to_u) : dt_biv(Cat)     // success
-        let vd2 : dt_biv(Cat)    = DT_BIV(f_u_to_u) : dt_biv(Animal)  // success
+        let vd1 : dt_biv(Animal) = DT_BIV(f_u_to_u) : dt_biv(Animal)  // success
+        let vd2 : dt_biv(Animal) = DT_BIV(f_u_to_u) : dt_biv(Cat)     // success
+        let vd3 : dt_biv(Cat)    = DT_BIV(f_u_to_u) : dt_biv(Animal)  // success
+        let vd4 : dt_biv(Cat)    = DT_BIV(f_u_to_u) : dt_biv(Cat)     // success
 
         let ve1 : dt_inv_sep(Animal) = DT_INV_SEP_A(f_a_to_u)  // success
         let ve2 : dt_inv_sep(Animal) = DT_INV_SEP_A(f_c_to_u)  // fail
