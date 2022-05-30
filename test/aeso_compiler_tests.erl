@@ -884,105 +884,78 @@ failing_contracts() ->
                      "when checking the type of the expression `some_animal : Animal` against the expected type `Cat`">>
                   ])
     , ?TYPE_ERROR(polymorphism_variance_switching_custom_types,
-                  [<<?Pos(57,39)
+                  [<<?Pos(56,39)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
                      "when checking the type of the expression `DT_CONTRA(f_c_to_u) : dt_contra(Cat)` against the expected type `dt_contra(Animal)`">>,
-                   <<?Pos(63,35)
+                   <<?Pos(62,35)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
                      "when checking the type of the expression `DT_CO(f_u_to_a) : dt_co(Animal)` against the expected type `dt_co(Cat)`">>,
-                   <<?Pos(68,36)
+                   <<?Pos(67,36)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
                      "when checking the application of\n  `DT_INV : ((Cat) => Cat) => dt_inv(Cat)`\nto arguments\n  `f_c_to_a : (Cat) => Animal`">>,
-                   <<?Pos(69,36)
+                   <<?Pos(68,36)
                      "Cannot unify `Cat` and `Animal` in a invariant context\n"
                      "when checking the type of the expression `DT_INV(f_c_to_c) : dt_inv(Cat)` against the expected type `dt_inv(Animal)`">>,
-                   <<?Pos(70,36)
+                   <<?Pos(69,36)
                      "Cannot unify `Animal` and `Cat` in a invariant context\n"
                      "when checking the type of the expression `DT_INV(f_a_to_a) : dt_inv(Animal)` against the expected type `dt_inv(Cat)`">>,
-                   <<?Pos(71,36)
+                   <<?Pos(70,36)
                      "Cannot unify `Animal` and `Cat` in a invariant context\n"
                      "when checking the type of the expression `DT_INV(f_a_to_c) : dt_inv(Animal)` against the expected type `dt_inv(Cat)`">>,
-                   <<?Pos(72,36)
+                   <<?Pos(71,36)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
                      "when checking the application of\n  `DT_INV : ((Cat) => Cat) => dt_inv(Cat)`\nto arguments\n  `f_c_to_a : (Cat) => Animal`">>,
-                   <<?Pos(79,40)
+                   <<?Pos(78,40)
                      "Cannot unify `Cat` and `Animal` in a invariant context\n"
                      "when checking the type of the expression `DT_INV_SEP_A(f_c_to_u) : dt_inv_sep(Cat)` against the expected type `dt_inv_sep(Animal)`">>,
-                   <<?Pos(81,40)
+                   <<?Pos(80,40)
                      "Cannot unify `Cat` and `Animal` in a invariant context\n"
                      "when checking the type of the expression `DT_INV_SEP_B(f_u_to_c) : dt_inv_sep(Cat)` against the expected type `dt_inv_sep(Animal)`">>,
-                   <<?Pos(82,40)
+                   <<?Pos(81,40)
                      "Cannot unify `Animal` and `Cat` in a invariant context\n"
                      "when checking the type of the expression `DT_INV_SEP_A(f_a_to_u) : dt_inv_sep(Animal)` against the expected type `dt_inv_sep(Cat)`">>,
-                   <<?Pos(84,40)
+                   <<?Pos(83,40)
                      "Cannot unify `Animal` and `Cat` in a invariant context\n"
                      "when checking the type of the expression `DT_INV_SEP_B(f_u_to_a) : dt_inv_sep(Animal)` against the expected type `dt_inv_sep(Cat)`">>,
-                   <<?Pos(89,42)
+                   <<?Pos(88,42)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
                      "when checking the type of the expression `DT_CO_NEST_A(f_dt_contra_a_to_u) : dt_co_nest_a(Animal)` against the expected type `dt_co_nest_a(Cat)`">>,
-                   <<?Pos(93,46)
+                   <<?Pos(92,46)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
                      "when checking the type of the expression `DT_CONTRA_NEST_A(f_dt_co_c_to_u) : dt_contra_nest_a(Cat)` against the expected type `dt_contra_nest_a(Animal)`">>,
-                   <<?Pos(98,46)
+                   <<?Pos(97,46)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
                      "when checking the type of the expression `DT_CONTRA_NEST_B(f_u_to_dt_contra_c) : dt_contra_nest_b(Cat)` against the expected type `dt_contra_nest_b(Animal)`">>,
-                   <<?Pos(104,42)
+                   <<?Pos(103,42)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
                      "when checking the type of the expression `DT_CO_NEST_B(f_u_to_dt_co_a) : dt_co_nest_b(Animal)` against the expected type `dt_co_nest_b(Cat)`">>,
-                   <<?Pos(109,41)
-                     "Cannot unify `Cat` and `Animal` in a contravariant context\n"
-                     "when checking the application of\n"
-                     "  `DT_CO_TWICE : (((Cat) => unit) => Cat) => dt_co_twice(Cat)`\n"
-                     "to arguments\n"
-                     "  `f_c_to_u_to_a : ((Cat) => unit) => Animal`">>,
-                   <<?Pos(111,41)
+                   <<?Pos(108,13)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
-                     "when checking the type of the expression `DT_CO_TWICE(f_a_to_u_to_a) : dt_co_twice(Animal)` against the expected type `dt_co_twice(Cat)`">>,
-                   <<?Pos(112,41)
-                     "Cannot unify `Animal` and `Cat` in a covariant context\n"
-                     "when checking the type of the expression `DT_CO_TWICE(f_a_to_u_to_c) : dt_co_twice(Animal)` against the expected type `dt_co_twice(Cat)`">>,
-                   <<?Pos(113,41)
-                     "Cannot unify `Cat` and `Animal` in a contravariant context\n"
-                     "when checking the application of\n"
-                     "  `DT_CO_TWICE : (((Cat) => unit) => Cat) => dt_co_twice(Cat)`\n"
-                     "to arguments\n"
-                     "  `f_c_to_u_to_a : ((Cat) => unit) => Animal`">>,
-                   <<?Pos(116,59)
+                     "when checking the type of the pattern `vj3 : dt_co_twice(Cat)` against the expected type `dt_co_twice(Animal)`">>,
+                   <<?Pos(112,59)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
                      "when checking the type of the expression `DT_A_CONTRA_B_CONTRA(f_a_to_c_to_u) : dt_a_contra_b_contra(Animal, Cat)` against the expected type `dt_a_contra_b_contra(Animal, Animal)`">>,
-                   <<?Pos(117,59)
+                   <<?Pos(113,59)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
                      "when checking the type of the expression `DT_A_CONTRA_B_CONTRA(f_c_to_a_to_u) : dt_a_contra_b_contra(Cat, Animal)` against the expected type `dt_a_contra_b_contra(Animal, Animal)`">>,
-                   <<?Pos(118,59)
+                   <<?Pos(114,59)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
                      "when checking the type of the expression `DT_A_CONTRA_B_CONTRA(f_c_to_c_to_u) : dt_a_contra_b_contra(Cat, Cat)` against the expected type `dt_a_contra_b_contra(Animal, Animal)`">>,
-                   <<?Pos(121,59)
+                   <<?Pos(117,59)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
                      "when checking the type of the expression `DT_A_CONTRA_B_CONTRA(f_c_to_a_to_u) : dt_a_contra_b_contra(Cat, Animal)` against the expected type `dt_a_contra_b_contra(Animal, Cat)`">>,
-                   <<?Pos(122,59)
+                   <<?Pos(118,59)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
                      "when checking the type of the expression `DT_A_CONTRA_B_CONTRA(f_c_to_c_to_u) : dt_a_contra_b_contra(Cat, Cat)` against the expected type `dt_a_contra_b_contra(Animal, Cat)`">>,
-                   <<?Pos(124,59)
+                   <<?Pos(120,59)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
                      "when checking the type of the expression `DT_A_CONTRA_B_CONTRA(f_a_to_c_to_u) : dt_a_contra_b_contra(Animal, Cat)` against the expected type `dt_a_contra_b_contra(Cat, Animal)`">>,
-                   <<?Pos(126,59)
+                   <<?Pos(122,59)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
                      "when checking the type of the expression `DT_A_CONTRA_B_CONTRA(f_c_to_c_to_u) : dt_a_contra_b_contra(Cat, Cat)` against the expected type `dt_a_contra_b_contra(Cat, Animal)`">>,
-                   <<?Pos(133,45)
-                     "Cannot unify `Animal` and `Cat` in a covariant context\n"
-                     "when checking the application of\n  `DT_CONTRA_TWICE : ((Animal) => (Animal) => unit) => dt_contra_twice(Animal)`\nto arguments\n  `f_a_to_c_to_u : (Animal) => (Cat) => unit`">>,
-                   <<?Pos(134,45)
+                   <<?Pos(129,13)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
-                     "when checking the type of the expression `DT_CONTRA_TWICE(f_c_to_a_to_u) : dt_contra_twice(Cat)` against the expected type `dt_contra_twice(Animal)`">>,
-                   <<?Pos(135,45)
-                     "Cannot unify `Cat` and `Animal` in a contravariant context\n"
-                     "when checking the type of the expression `DT_CONTRA_TWICE(f_c_to_c_to_u) : dt_contra_twice(Cat)` against the expected type `dt_contra_twice(Animal)`">>,
-                   <<?Pos(137,45)
-                     "Cannot unify `Animal` and `Cat` in a covariant context\n"
-                     "when checking the application of\n"
-                     "  `DT_CONTRA_TWICE : ((Animal) => (Animal) => unit) => dt_contra_twice(Animal)`\n"
-                     "to arguments\n"
-                     "  `f_a_to_c_to_u : (Animal) => (Cat) => unit`">>
+                     "when checking the type of the pattern `vl2 : dt_contra_twice(Animal)` against the expected type `dt_contra_twice(Cat)`">>
                   ])
     , ?TYPE_ERROR(polymorphism_variance_switching_records,
                   [<<?Pos(27,13)
