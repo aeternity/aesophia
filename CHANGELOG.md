@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ```
   [1, 2, 3] |> List.first |> Option.is_some  // Option.is_some(List.first([1, 2, 3]))
   ```
+- Allow binary operators to be used as lambdas
+  ```
+  function sum(l : list(int)) : int = foldl((+), 0, l)
+  function logical_and(x, y) = (&&)(x, y)
+  ```
 ### Changed
 - Error messages have been restructured (less newlines) to provide more unified errors. Also `pp_oneline/1` has been added.
 - Ban empty record definitions (e.g. `record r = {}` would give an error).
