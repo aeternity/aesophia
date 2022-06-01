@@ -1,0 +1,14 @@
+include "List.aes"
+
+contract C =
+    type state = int
+
+    function sum(l : list(bool)) : bool = List.foldl((||), false, l)
+
+    entrypoint init() =
+        let bad_application = (+)(1)
+        let good_application = (-)(3, 4)
+        let op_var = (+)
+        let op_var_application = op_var(3, 4)
+
+        good_application + op_var_application
