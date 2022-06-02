@@ -3,7 +3,7 @@ include "List.aes"
 contract C =
     type state = int
 
-    function sum(l : list(bool)) : bool = List.foldl((||), false, l)
+    function any(l : list(bool)) : bool = List.foldl((||), false, l)
 
     entrypoint init() =
         let bad_application = (+)(1)
