@@ -1308,6 +1308,9 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>Compiler warnings for the follwing: shadowing, negative spends, division by zero, unused functions, unused includes, unused stateful annotations, unused variables, unused parameters, unused user-defined type, dead return value.</li>
 <li>The pipe operator |&gt;
   <code>[1, 2, 3] |&gt; List.first |&gt; Option.is_some  // Option.is_some(List.first([1, 2, 3]))</code></li>
+<li>Allow binary operators to be used as lambdas
+  <code>function sum(l : list(int)) : int = foldl((+), 0, l)
+  function logical_and(x, y) = (&amp;&amp;)(x, y)</code></li>
 </ul>
 <h3 id="changed">Changed</h3>
 <ul>

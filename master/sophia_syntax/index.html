@@ -748,6 +748,7 @@ switch(f(x))
 <h2 id="expressions">Expressions</h2>
 <p>```c
 Expr ::= '(' LamArgs ')' '=&gt;' Block(Stmt)   // Anonymous function    (x) =&gt; x + 1
+       | '(' BinOp ')'                      // Operator lambda       (+)
        | 'if' '(' Expr ')' Expr 'else' Expr // If expression         if(x &lt; y) y else x
        | Expr ':' Type                      // Type annotation       5 : int
        | Expr BinOp Expr                    // Binary operator       x + y
