@@ -200,6 +200,7 @@ switch(f(x))
 
 ```c
 Expr ::= '(' LamArgs ')' '=>' Block(Stmt)   // Anonymous function    (x) => x + 1
+       | '(' BinOp ')'                      // Operator lambda       (+)
        | 'if' '(' Expr ')' Expr 'else' Expr // If expression         if(x < y) y else x
        | Expr ':' Type                      // Type annotation       5 : int
        | Expr BinOp Expr                    // Binary operator       x + y

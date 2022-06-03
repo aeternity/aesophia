@@ -335,7 +335,7 @@ exprAtom() ->
     ?LAZY_P(begin
         Expr = ?LAZY_P(expr()),
         choice(
-        [ id_or_addr(), con(), token(qid), token(qcon)
+        [ id_or_addr(), con(), token(qid), token(qcon), binop_as_lam()
         , token(bytes), token(string), token(char)
         , token(int)
         , ?RULE(token(hex), set_ann(format, hex, setelement(1, _1, int)))
@@ -471,6 +471,19 @@ con()      -> token(con).
 id()       -> token(id).
 tvar()     -> token(tvar).
 str()      -> token(string).
+
+binop_as_lam() ->
+    BinOps = ['&&', '||',
+              '+', '-', '*', '/', '^', 'mod',
+              '==', '!=', '<', '>', '<=', '=<', '>=',
+              '::', '++', '|>'],
+    OpToLam = fun(Op = {_, Ann}) ->
+                  IdL = {id, Ann, "l"},
+                  IdR = {id, Ann, "r"},
+                  Arg = fun(Id) -> {arg, Ann, Id, type_wildcard(Ann)} end,
+                  {lam, Ann, [Arg(IdL), Arg(IdR)], infix(IdL, Op, IdR)}
+              end,
+    ?RULE(parens(choice(lists:map(fun token/1, BinOps))), OpToLam(_1)).
 
 token(Tag) ->
     ?RULE(tok(Tag),

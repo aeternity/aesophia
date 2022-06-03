@@ -1641,7 +1641,10 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
             GeneralResultType = fresh_uvar(Ann),
             ResultType = fresh_uvar(Ann),
             when_warning(warn_unused_functions,
-                         fun() -> register_function_call(Namespace ++ qname(CurrentFun), Name) end),
+                         fun() -> if element(1, Name) == lam -> ok;
+                                     true -> register_function_call(Namespace ++ qname(CurrentFun), Name)
+                                  end
+                         end),
             unify(Env, FunType, {fun_t, [], NamedArgsVar, ArgTypes, GeneralResultType}, When),
             when_warning(warn_negative_spend, fun() -> warn_potential_negative_spend(Ann, NewFun1, NewArgs) end),
             add_constraint(

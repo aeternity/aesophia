@@ -795,6 +795,14 @@ failing_contracts() ->
                   [<<?Pos(2,5)
                      "Empty record definitions are not allowed. Cannot define the record `r`">>
                   ])
+    , ?TYPE_ERROR(operator_lambdas,
+                  [<<?Pos(9,32)
+                     "Cannot unify `(int, int) => int` and `(int) => 'a`\n"
+                     "when checking the application of\n"
+                     "  `(l : _, r : _) => l + r : (int, int) => int`\n"
+                     "to arguments\n"
+                     "  `1 : int`">>
+                  ])
     , ?TYPE_ERROR(warnings,
                   [<<?Pos(0, 0)
                       "The file `Triple.aes` is included but not used.">>,
