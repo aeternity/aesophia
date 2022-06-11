@@ -134,9 +134,20 @@ fun_block(Mods, Kind, [Decl]) ->
 fun_block(Mods, Kind, Decls) ->
     {block, get_ann(Kind), [ add_modifiers(Mods, Kind, Decl) || Decl <- Decls ]}.
 
+typevar_constraint() ->
+    ?RULE(tvar(), keyword(is), choice([tok(eq), tok(ord)]),
+          {constraint, element(2, _1), element(3, _1), element(1, _3)}).
+
+typevars_constraints() ->
+    ?RULE(comma_sep1(typevar_constraint()), tok(';'), _1).
+
+fundecl() ->
+    choice([?RULE(id(), tok(':'), typevars_constraints(), type(),
+                  {fun_decl, get_ann(_1), _1, {constrained_t, get_ann(_1), _3, _4}}),
+            ?RULE(id(), tok(':'), type(), {fun_decl, get_ann(_1), _1, _3})]).
+
 fundef_or_decl() ->
-    choice([?RULE(id(), tok(':'), type(), {fun_decl, get_ann(_1), _1, _3}),
-            fundef()]).
+    choice([fundecl(), fundef()]).
 
 using() ->
     Alias = {keyword(as), con()},
@@ -527,6 +538,7 @@ parens(P)   -> between(tok('('), P, tok(')')).
 braces(P)   -> between(tok('{'), P, tok('}')).
 brackets(P) -> between(tok('['), P, tok(']')).
 comma_sep(P) -> sep(P, tok(',')).
+comma_sep1(P) -> sep1(P, tok(',')).
 
 paren_list(P)   -> parens(comma_sep(P)).
 brace_list(P)   -> braces(comma_sep(P)).
