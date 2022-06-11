@@ -98,10 +98,10 @@ namespace String =
 
   private function
     to_int_([], _, x, _) = Some(x)
-    to_int_(i :: is, value, x, b) =
+    to_int_(i :: ints, value, x, b) =
       switch(value(i))
         None => None
-        Some(n) => to_int_(is, value, x * b + n, b)
+        Some(i) => to_int_(ints, value, x * b + i, b)
 
   private function ch_to_int_10(ch) =
     let c = Char.to_int(ch)

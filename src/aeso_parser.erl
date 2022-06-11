@@ -135,8 +135,7 @@ fun_block(Mods, Kind, Decls) ->
     {block, get_ann(Kind), [ add_modifiers(Mods, Kind, Decl) || Decl <- Decls ]}.
 
 typevar_constraint() ->
-    ?RULE(tvar(), keyword(is), choice([tok(eq), tok(ord)]),
-          {constraint, element(2, _1), element(3, _1), element(1, _3)}).
+    ?RULE(tvar(), keyword(is), id(), {constraint, get_ann(_1), _1, _3}).
 
 typevars_constraints() ->
     ?RULE(comma_sep1(typevar_constraint()), tok(';'), _1).

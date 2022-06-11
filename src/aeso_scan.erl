@@ -45,7 +45,7 @@ lexer() ->
 
     Keywords = ["contract", "include", "let", "switch", "type", "record", "datatype", "if", "elif", "else", "function",
                 "stateful", "payable", "true", "false", "mod", "public", "entrypoint", "private", "indexed", "namespace",
-                "interface", "main", "using", "as", "for", "hiding", "is", "eq", "ord"
+                "interface", "main", "using", "as", "for", "hiding", "is"
                ],
     KW = string:join(Keywords, "|"),
 
