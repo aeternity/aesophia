@@ -30,7 +30,9 @@ namespace Option =
     None    => abort(err)
     Some(x) => x
 
-  function contains(e : 'a, o : option('a)) = o == Some(e)
+  function
+    contains : 'a is eq; ('a, option('a)) => bool
+    contains(e, o) = o == Some(e)
 
   function on_elem(o : option('a), f : 'a => unit) : unit = match((), f, o)
 

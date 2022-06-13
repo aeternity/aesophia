@@ -265,7 +265,9 @@ warnings() ->
         "The function `called_unused_function2` is defined but never used.">>,
       <<?PosW(48, 5)
         "Unused return value.">>,
-      <<?PosW(60, 5)
+      <<?PosW(53, 44)
+        "The constraint on the type variable `'a` is a duplication of the constraint at line 53, column 34">>,
+      <<?PosW(65, 5)
         "The function `dec` is defined but never used.">>
      ]).
 
@@ -805,6 +807,82 @@ failing_contracts() ->
                      "to arguments\n"
                      "  `1 : int`">>
                   ])
+    , ?TYPE_ERROR(comparable_typevar_constraints,
+                  [<<?Pos(21,30)
+                     "Values of type `'a` are not comparable by equality">>,
+                   <<?Pos(25,37)
+                     "The type variable `'b` is constrained but never used">>,
+                   <<?Pos(56,56)
+                     "Values of type `address` are not comparable by inequality">>,
+                   <<?Pos(59,58)
+                     "Values of type `Chain.ttl` are not comparable by inequality">>,
+                   <<?Pos(62,45)
+                     "Values of type `A` are not comparable by inequality">>,
+                   <<?Pos(69,47)
+                     "Values of type `(int, char) => bool` are not comparable by inequality">>,
+                   <<?Pos(70,47)
+                     "Values of type `(int, char) => bool` are not comparable by equality">>,
+                   <<?Pos(85,71)
+                     "Values of type `list(address)` are not comparable by inequality">>,
+                   <<?Pos(88,77)
+                     "Values of type `option(address)` are not comparable by inequality">>,
+                   <<?Pos(91,76)
+                     "Values of type `(address * int)` are not comparable by inequality">>,
+                   <<?Pos(92,76)
+                     "Values of type `(address * int)` are not comparable by equality">>,
+                   <<?Pos(96,68)
+                     "Values of type `list((int, char) => bool)` are not comparable by inequality">>,
+                   <<?Pos(97,68)
+                     "Values of type `list((int, char) => bool)` are not comparable by equality">>,
+                   <<?Pos(99,74)
+                     "Values of type `option((int, char) => bool)` are not comparable by inequality">>,
+                   <<?Pos(100,74)
+                     "Values of type `option((int, char) => bool)` are not comparable by equality">>,
+                   <<?Pos(102,73)
+                     "Values of type `((int, char) => bool * int)` are not comparable by inequality">>,
+                   <<?Pos(103,73)
+                     "Values of type `((int, char) => bool * int)` are not comparable by equality">>,
+                   <<?Pos(107,71)
+                     "Values of type `map(int, int)` are not comparable by inequality">>,
+                   <<?Pos(110,80)
+                     "Values of type `oracle(int, int)` are not comparable by inequality">>,
+                   <<?Pos(113,98)
+                     "Values of type `oracle_query(int, int)` are not comparable by inequality">>,
+                   <<?Pos(116,90)
+                     "Values of type `custom_datatype(int)` are not comparable by inequality">>,
+                   <<?Pos(119,84)
+                     "Values of type `custom_record(int)` are not comparable by inequality">>,
+                   <<?Pos(124,86)
+                     "Values of type `map(address, address)` are not comparable by inequality">>,
+                   <<?Pos(127,95)
+                     "Values of type `oracle(address, address)` are not comparable by inequality">>,
+                   <<?Pos(130,113)
+                     "Values of type `oracle_query(address, address)` are not comparable by inequality">>,
+                   <<?Pos(133,97)
+                     "Values of type `custom_datatype(address)` are not comparable by inequality">>,
+                   <<?Pos(136,91)
+                     "Values of type `custom_record(address)` are not comparable by inequality">>,
+                   <<?Pos(141,75)
+                     "Values of type `map((int, char) => bool, (int, char) => bool)` are not comparable by inequality">>,
+                   <<?Pos(142,75)
+                     "Values of type `map((int, char) => bool, (int, char) => bool)` are not comparable by equality">>,
+                   <<?Pos(144,84)
+                     "Values of type `oracle((int, char) => bool, (int, char) => bool)` are not comparable by inequality">>,
+                   <<?Pos(145,84)
+                     "Values of type `oracle((int, char) => bool, (int, char) => bool)` are not comparable by equality">>,
+                   <<?Pos(147,102)
+                     "Values of type `oracle_query((int, char) => bool, (int, char) => bool)` are not comparable by inequality">>,
+                   <<?Pos(148,102)
+                     "Values of type `oracle_query((int, char) => bool, (int, char) => bool)` are not comparable by equality">>,
+                   <<?Pos(150,94)
+                     "Values of type `custom_datatype((int, char) => bool)` are not comparable by inequality">>,
+                   <<?Pos(151,94)
+                     "Values of type `custom_datatype((int, char) => bool)` are not comparable by equality">>,
+                   <<?Pos(153,88)
+                     "Values of type `custom_record((int, char) => bool)` are not comparable by inequality">>,
+                   <<?Pos(154,88)
+                     "Values of type `custom_record((int, char) => bool)` are not comparable by equality">>
+                  ])
     , ?TYPE_ERROR(warnings,
                   [<<?Pos(0, 0)
                       "The file `Triple.aes` is included but not used.">>,
@@ -834,7 +912,9 @@ failing_contracts() ->
                      "The function `called_unused_function2` is defined but never used.">>,
                    <<?Pos(48, 5)
                      "Unused return value.">>,
-                   <<?Pos(60, 5)
+                   <<?Pos(53, 44)
+                     "The constraint on the type variable `'a` is a duplication of the constraint at line 53, column 34">>,
+                   <<?Pos(65, 5)
                      "The function `dec` is defined but never used.">>
                   ])
     ].

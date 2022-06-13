@@ -90,6 +90,7 @@ namespace String =
           Some(ix)
 
   private function
+    is_prefix : (list(char), list(char)) => option(list(char))
     is_prefix([], ys) = Some(ys)
     is_prefix(_, [])  = None
     is_prefix(x :: xs, y :: ys) =
