@@ -881,7 +881,13 @@ failing_contracts() ->
                    <<?Pos(153,88)
                      "Values of type `custom_record((int, char) => bool)` are not comparable by inequality">>,
                    <<?Pos(154,88)
-                     "Values of type `custom_record((int, char) => bool)` are not comparable by equality">>
+                     "Values of type `custom_record((int, char) => bool)` are not comparable by equality">>,
+                   <<?Pos(158,35)
+                     "Values of type `map(int, int)` are not comparable by inequality">>,
+                   <<?Pos(159,35)
+                     "Values of type `('a) => 'a` are not comparable by inequality">>,
+                   <<?Pos(163,34)
+                     "Values of type `('b) => 'b` are not comparable by equality">>
                   ])
     , ?TYPE_ERROR(warnings,
                   [<<?Pos(0, 0)

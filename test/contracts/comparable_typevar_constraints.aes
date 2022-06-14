@@ -153,4 +153,13 @@ main contract C =
     function record_of_nomcomp_ord(x : custom_record(lam), y : custom_record(lam)) = x >= y  // fail
     function record_of_nomcomp_eq (x : custom_record(lam), y : custom_record(lam)) = x == y  // pass
 
-    entrypoint init() = ()
+    entrypoint init() =
+        let passing_ord_ord     = passing_ord([1], [2])              // pass
+        let passing_ord_eq      = passing_ord({[1] = 2}, {[2] = 3})  // fail
+        let passing_ord_noncomp = passing_ord((x) => x, (x) => x)    // fail
+
+        let passing_eq_ord     = passing_eq([1], [2])              // pass
+        let passing_eq_eq      = passing_eq({[1] = 2}, {[2] = 3})  // pass
+        let passing_eq_noncomp = passing_eq((x) => x, (x) => x)    // fail
+
+        ()

@@ -2645,6 +2645,14 @@ unify1(_Env, {uvar, A, R}, T, When) ->
     end;
 unify1(Env, T, {uvar, A, R}, When) ->
     unify1(Env, {uvar, A, R}, T, When);
+unify1(Env, {constrained_t, _, Cs, UVar = {uvar, _, _}}, Type2, When) ->
+    [ add_constraint({is_ord, UVar}) || {id, _, "ord"} <- Cs ],
+    [ add_constraint({is_eq, UVar}) || {id, _, "eq"} <- Cs ],
+    unify1(Env, UVar, Type2, When);
+unify1(Env, Type1, UVar = {constrained_t, _, Cs, {uvar, _, _}}, When) ->
+    [ add_constraint({is_ord, UVar}) || {id, _, "ord"} <- Cs ],
+    [ add_constraint({is_eq, UVar}) || {id, _, "eq"} <- Cs ],
+    unify1(Env, Type1, UVar, When);
 unify1(_Env, {tvar, _, X}, {tvar, _, X}, _When) -> true; %% Rigid type variables
 unify1(_Env, {constrained_t, _, Cs, {tvar, _, X}}, {constrained_t, _, Cs, {tvar, _, X}}, _When) -> true;
 unify1(Env, [A|B], [C|D], When) ->
