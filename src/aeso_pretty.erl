@@ -284,7 +284,9 @@ type(T = {id, _, _})   -> name(T);
 type(T = {qid, _, _})  -> name(T);
 type(T = {con, _, _})  -> name(T);
 type(T = {qcon, _, _}) -> name(T);
-type(T = {tvar, _, _}) -> name(T).
+type(T = {tvar, _, _}) -> name(T);
+type({constrained_t, _, Cs, T}) ->
+    beside([name(T), text(" is "), tuple(lists:map(fun expr/1, Cs))]).
 
 -spec args_type([aeso_syntax:type()]) -> doc().
 args_type(Args) ->

@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   function sum(l : list(int)) : int = foldl((+), 0, l)
   function logical_and(x, y) = (&&)(x, y)
   ```
+- Add comparable typevar constraints (`ord` and `eq`)
+  ```
+  lt : 'a is ord ; ('a, 'a) => bool
+  lt(x, y) = x < y
+
+  is_eq : 'a is eq ; ('a, 'a) => bool
+  is_eq(x, y) = x == y
+  ```
 ### Changed
 - Error messages have been restructured (less newlines) to provide more unified errors. Also `pp_oneline/1` has been added.
 - Ban empty record definitions (e.g. `record r = {}` would give an error).

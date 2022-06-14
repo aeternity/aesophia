@@ -87,7 +87,10 @@
 -type byte_constraint() :: {is_bytes, utype()}
                          | {add_bytes, aeso_syntax:ann(), concat | split, utype(), utype(), utype()}.
 
--type constraint() :: named_argument_constraint() | field_constraint() | byte_constraint().
+-type tvar_constraint() :: {is_eq, utype()}
+                         | {is_ord, utype()}.
+
+-type constraint() :: named_argument_constraint() | field_constraint() | byte_constraint() | tvar_constraint().
 
 -record(field_info,
     { ann      :: aeso_syntax:ann()
@@ -818,6 +821,12 @@ infer(Contracts, Options) ->
         ets_new(defined_contracts, [bag]),
         ets_new(type_vars, [set]),
         ets_new(warnings, [bag]),
+
+        %% Set the constraints for the builtin types
+        ets_new(ord_constraint_types, [set]),
+        OrdTypes = [ {"int"}, {"bool"}, {"bits"}, {"char"}, {"string"}, {"list"}, {"option"} ],
+        ets_insert(ord_constraint_types, OrdTypes),
+
         when_warning(warn_unused_functions, fun() -> create_unused_functions() end),
         check_modifiers(Env, Contracts),
         create_type_errors(),
@@ -1177,6 +1186,14 @@ check_modifiers1(What, Decl) when element(1, Decl) == letfun; element(1, Decl) =
     ok;
 check_modifiers1(_, _) -> ok.
 
+extract_typevars(Type) ->
+    case Type of
+        TVar = {tvar, _, _}    -> [TVar];
+        Tup when is_tuple(Tup) -> extract_typevars(tuple_to_list(Tup));
+        [H | T]                -> extract_typevars(H) ++ extract_typevars(T);
+        _                      -> []
+    end.
+
 -spec check_type(env(), aeso_syntax:type()) -> aeso_syntax:type().
 check_type(Env, T) ->
     check_type(Env, T, 0).
@@ -1219,6 +1236,15 @@ check_type(Env, Type = {fun_t, Ann, NamedArgs, Args, Ret}, Arity) ->
 check_type(_Env, Type = {uvar, _, _}, Arity) ->
     ensure_base_type(Type, Arity),
     Type;
+check_type(Env, {constrained_t, Ann, Constraints, Type}, Arity) ->
+    when_warning(warn_duplicated_constraints, fun() -> warn_duplicated_constraints(Constraints) end),
+    TVars = [ Name || {tvar, _, Name} <- extract_typevars(Type) ],
+    [ type_error({unused_constraint, C}) || C = {constraint, _, {tvar, _, Name}, _} <- Constraints,
+                                            not lists:member(Name, TVars) ],
+    [ type_error({unknown_tvar_constraint, C}) || C = {constraint, _, _, {id, _, Name}} <- Constraints,
+                                                  not lists:member(Name, ["eq", "ord"]) ],
+
+    {constrained_t, Ann, Constraints, check_type(Env, Type, Arity)};
 check_type(_Env, {args_t, Ann, Ts}, _) ->
     type_error({new_tuple_syntax, Ann, Ts}),
     {tuple_t, Ann, Ts}.
@@ -1398,7 +1424,7 @@ infer_letfun(Env = #env{ namespace = Namespace }, LetFun = {letfun, Ann, Fun, _,
     {{Name, Sig}, Clause} = infer_letfun1(Env, LetFun),
     {{Name, Sig}, desugar_clauses(Ann, Fun, Sig, [Clause])}.
 
-infer_letfun1(Env0 = #env{ namespace = NS }, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What,  GuardedBodies}) ->
+infer_letfun1(Env0 = #env{ namespace = NS }, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, GuardedBodies}) ->
     Env = Env0#env{ stateful = aeso_syntax:get_ann(stateful, Attrib, false),
                     current_function = Fun },
     {NewEnv, {typed, _, {tuple, _, TypedArgs}, {tuple_t, _, ArgTypes}}} = infer_pattern(Env, {tuple, [{origin, system} | NameAttrib], Args}),
@@ -1943,10 +1969,16 @@ infer_infix({IntOp, As})
     Int = {id, As, "int"},
     {fun_t, As, [], [Int, Int], Int};
 infer_infix({RelOp, As})
-  when RelOp == '=='; RelOp == '!=';
-       RelOp == '<';  RelOp == '>';
+  when RelOp == '=='; RelOp == '!=' ->
+    T = fresh_uvar(As),
+    add_constraint({is_eq, T}),
+    Bool = {id, As, "bool"},
+    {fun_t, As, [], [T, T], Bool};
+infer_infix({RelOp, As})
+  when RelOp == '<';  RelOp == '>';
        RelOp == '<='; RelOp == '=<'; RelOp == '>=' ->
-    T = fresh_uvar(As),     %% allow any type here, check in the backend that we have comparison for it
+    T = fresh_uvar(As),
+    add_constraint({is_ord, T}),
     Bool = {id, As, "bool"},
     {fun_t, As, [], [T, T], Bool};
 infer_infix({'..', As}) ->
@@ -2016,7 +2048,8 @@ next_count() ->
 
 ets_tables() ->
     [options, type_vars, constraints, freshen_tvars, type_errors,
-     defined_contracts, warnings, function_calls, all_functions].
+     defined_contracts, warnings, function_calls, all_functions,
+     ord_constraint_types].
 
 clean_up_ets() ->
     [ catch ets_delete(Tab) || Tab <- ets_tables() ],
@@ -2178,11 +2211,16 @@ destroy_and_report_unsolved_constraints(Env) ->
                            (#named_argument_constraint{}) -> true;
                            (_)                            -> false
                         end, OtherCs2),
-    {BytesCs, []} =
+    {BytesCs, OtherCs4} =
         lists:partition(fun({is_bytes, _})              -> true;
                            ({add_bytes, _, _, _, _, _}) -> true;
                            (_)                          -> false
                         end, OtherCs3),
+    {TVarsCs, []} =
+        lists:partition(fun({is_eq, _})              -> true;
+                           ({is_ord, _}) -> true;
+                           (_)                          -> false
+                        end, OtherCs4),
 
     Unsolved = [ S || S <- [ solve_constraint(Env, dereference_deep(C)) || C <- NamedArgCs ],
                       S == unsolved ],
@@ -2200,6 +2238,7 @@ destroy_and_report_unsolved_constraints(Env) ->
     check_record_create_constraints(Env, CreateCs),
     check_is_contract_constraints(Env, ContractCs),
     check_bytes_constraints(Env, BytesCs),
+    check_tvars_constraints(Env, TVarsCs),
 
     destroy_constraints().
 
@@ -2328,6 +2367,33 @@ check_bytes_constraint(Env, {add_bytes, Ann, Fun, A0, B0, C0}) ->
             ok; %% If all are solved we checked M + N == R in solve_constraint.
         _ -> type_error({unsolved_bytes_constraint, Ann, Fun, A, B, C})
     end.
+
+%% -- Typevars constraints --
+
+check_tvars_constraints(Env, Constraints) ->
+    [ check_tvars_constraint(Env, C) || C <- Constraints ].
+
+check_tvars_constraint(Env, {is_eq, Type = {uvar, Ann, _}}) ->
+    Type1 = unfold_types_in_type(Env, instantiate(Type)),
+    type_is_eq(Type1) orelse type_error({type_not_eq, Ann, Type1});
+check_tvars_constraint(Env, {is_ord, Type = {uvar, Ann, _}}) ->
+    Type1 = unfold_types_in_type(Env, instantiate(Type)),
+    type_is_ord(Type1) orelse type_error({type_not_ord, Ann, Type1}).
+
+type_is_ord({app_t, _, Id, Ts}) -> type_is_ord(Id) andalso lists:all(fun type_is_ord/1, Ts);
+type_is_ord({tuple_t, _, Ts}) -> lists:all(fun type_is_ord/1, Ts);
+type_is_ord({bytes_t, _, _}) -> true;
+type_is_ord({constrained_t, _, Constraints, {tvar, _, _}}) -> lists:keyfind("ord", 3, Constraints) =/= false;
+type_is_ord({id, _, Id}) -> ets_lookup(ord_constraint_types, Id) =/= [];
+type_is_ord(_) -> false.
+
+type_is_eq({app_t, _, Id, Ts}) -> type_is_eq(Id) andalso lists:all(fun type_is_eq/1, Ts);
+type_is_eq({con, _, _}) -> true;
+type_is_eq({qcon, _, _}) -> true;
+type_is_eq({id, _, _}) -> true;
+type_is_eq({qid, _, _}) -> true;
+type_is_eq({constrained_t, _, Constraints, {tvar, _, _}}) -> lists:keyfind("eq", 3, Constraints) =/= false;
+type_is_eq(T) -> type_is_ord(T).
 
 %% -- Field constraints --
 
@@ -2581,7 +2647,16 @@ unify1(_Env, {uvar, A, R}, T, When) ->
     end;
 unify1(Env, T, {uvar, A, R}, When) ->
     unify1(Env, {uvar, A, R}, T, When);
+unify1(Env, {constrained_t, _, Cs, UVar = {uvar, _, _}}, Type2, When) ->
+    [ add_constraint({is_ord, UVar}) || {id, _, "ord"} <- Cs ],
+    [ add_constraint({is_eq, UVar}) || {id, _, "eq"} <- Cs ],
+    unify1(Env, UVar, Type2, When);
+unify1(Env, Type1, UVar = {constrained_t, _, Cs, {uvar, _, _}}, When) ->
+    [ add_constraint({is_ord, UVar}) || {id, _, "ord"} <- Cs ],
+    [ add_constraint({is_eq, UVar}) || {id, _, "eq"} <- Cs ],
+    unify1(Env, Type1, UVar, When);
 unify1(_Env, {tvar, _, X}, {tvar, _, X}, _When) -> true; %% Rigid type variables
+unify1(_Env, {constrained_t, _, Cs, {tvar, _, X}}, {constrained_t, _, Cs, {tvar, _, X}}, _When) -> true;
 unify1(Env, [A|B], [C|D], When) ->
     unify(Env, A, C, When) andalso unify(Env, B, D, When);
 unify1(_Env, X, X, _When) ->
@@ -2617,6 +2692,10 @@ unify1(Env, {tuple_t, _, As}, {tuple_t, _, Bs}, When)
 unify1(Env, {named_arg_t, _, Id1, Type1, _}, {named_arg_t, _, Id2, Type2, _}, When) ->
     unify1(Env, Id1, Id2, {arg_name, Id1, Id2, When}),
     unify1(Env, Type1, Type2, When);
+unify1(Env, {constrained_t, _, Constraints, Type1 = {fun_t, _, _, _, _}}, Type2, When) ->
+    unify1(Env, constrain_tvars(Type1, Constraints), Type2, When);
+unify1(Env, Type1, {constrained_t, _, Constraints, Type2 = {fun_t, _, _, _, _}}, When) ->
+    unify1(Env, Type1, constrain_tvars(Type2, Constraints), When);
 %% The grammar is a bit inconsistent about whether types without
 %% arguments are represented as applications to an empty list of
 %% parameters or not. We therefore allow them to unify.
@@ -2627,6 +2706,28 @@ unify1(Env, A, {app_t, _, T, []}, When) ->
 unify1(_Env, A, B, When) ->
     cannot_unify(A, B, When),
     false.
+
+%% Propagate the constraints to their corresponding type vars
+-spec constrain_tvars(utype() | [utype()], [constraint()]) -> utype().
+constrain_tvars(Types, Constraints)
+  when is_list(Types) ->
+    [ constrain_tvars(Type, Constraints) || Type <- Types ];
+constrain_tvars({fun_t, Ann, NamedArgs, ArgsT, RetT}, Constraints) ->
+    ConstrainedArgsT = constrain_tvars(ArgsT, Constraints),
+    ConstrainedRetT = constrain_tvars(RetT, Constraints),
+    {fun_t, Ann, NamedArgs, ConstrainedArgsT, ConstrainedRetT};
+constrain_tvars({app_t, Ann, AppT, ArgsT}, Constraints) ->
+    ConstrainedAppT = constrain_tvars(AppT, Constraints),
+    ConstrainedArgsT = constrain_tvars(ArgsT, Constraints),
+    {app_t, Ann, ConstrainedAppT, ConstrainedArgsT};
+constrain_tvars({tuple_t, Ann, ElemsT}, Constraints) ->
+    ConstrainedElemsT = constrain_tvars(ElemsT, Constraints),
+    {tuple_t, Ann, ConstrainedElemsT};
+constrain_tvars(TVar = {tvar, Ann, NameT}, Constraints) ->
+    TVarConstraints = [ C || {constraint, _, {tvar, _, NameC}, C} <- Constraints, NameT == NameC ],
+    {constrained_t, Ann, TVarConstraints, TVar};
+constrain_tvars(Type, _) ->
+    Type.
 
 dereference(T = {uvar, _, R}) ->
     case ets_lookup(type_vars, R) of
@@ -2655,6 +2756,7 @@ occurs_check1(_, {con, _, _}) -> false;
 occurs_check1(_, {qid, _, _}) -> false;
 occurs_check1(_, {qcon, _, _}) -> false;
 occurs_check1(_, {tvar, _, _}) -> false;
+occurs_check1(_, {constrained_t, _, _, _}) -> false;
 occurs_check1(_, {bytes_t, _, _}) -> false;
 occurs_check1(R, {fun_t, _, Named, Args, Res}) ->
     occurs_check(R, [Res, Named | Args]);
@@ -2771,7 +2873,8 @@ all_warnings() ->
     , warn_unused_functions
     , warn_shadowing
     , warn_division_by_zero
-    , warn_negative_spend ].
+    , warn_negative_spend
+    , warn_duplicated_constraints ].
 
 when_warning(Warn, Do) ->
     case lists:member(Warn, all_warnings()) of
@@ -2906,6 +3009,19 @@ warn_potential_negative_spend(Ann, Fun, Args) ->
         , [_, {typed, _, {app, _, {'-', _}, [{typed, _, {int, _, X}, _}]}, _}]} when X > 0 ->
             ets_insert(warnings, {negative_spend, Ann});
         _ -> ok
+    end.
+
+%% Warnings (Duplicated tvar constraints)
+
+warn_duplicated_constraints(Constraints) ->
+    warn_duplicated_constraints([], Constraints).
+
+warn_duplicated_constraints(_, []) -> ok;
+warn_duplicated_constraints(UniqueConstraints, [Constraint = {constraint, _, {tvar, _, Name1}, {id, _, Constr1}}| Rest]) ->
+    case [ C || C = {constraint, _, {tvar, _, Name2}, {id, _, Constr2}} <- UniqueConstraints,
+                Name1 == Name2 andalso Constr1 == Constr2 ] of
+        []       -> warn_duplicated_constraints([Constraint | UniqueConstraints], Rest);
+        [Unique] -> ets_insert(warnings, {duplicated_constraint, Constraint, Unique})
     end.
 
 %% Save unification failures for error messages.
@@ -3299,6 +3415,18 @@ mk_error({unknown_warning, Warning}) ->
 mk_error({empty_record_definition, Ann, Name}) ->
     Msg = io_lib:format("Empty record definitions are not allowed. Cannot define the record `~s`", [Name]),
     mk_t_err(pos(Ann), Msg);
+mk_error({type_not_eq, Ann, Type}) ->
+    Msg = io_lib:format("Values of type `~s` are not comparable by equality", [pp_type("", Type)]),
+    mk_t_err(pos(Ann), Msg);
+mk_error({type_not_ord, Ann, Type}) ->
+    Msg = io_lib:format("Values of type `~s` are not comparable by inequality", [pp_type("", Type)]),
+    mk_t_err(pos(Ann), Msg);
+mk_error({unused_constraint, {constraint, Ann, {tvar, _, Name}, _}}) ->
+    Msg = io_lib:format("The type variable `~s` is constrained but never used", [Name]),
+    mk_t_err(pos(Ann), Msg);
+mk_error({unknown_tvar_constraint, {constraint, _, {tvar, _, TVar}, {id, Ann, C}}}) ->
+    Msg = io_lib:format("Unknown constraint `~s` used on the type variable `~s`", [C, TVar]),
+    mk_t_err(pos(Ann), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),
     mk_t_err(pos(0, 0), Msg).
@@ -3329,6 +3457,10 @@ mk_warning({division_by_zero, Ann}) ->
     aeso_warnings:new(pos(Ann), Msg);
 mk_warning({negative_spend, Ann}) ->
     Msg = io_lib:format("Negative spend.", []),
+    aeso_warnings:new(pos(Ann), Msg);
+mk_warning({duplicated_constraint, {constraint, Ann, {tvar, _, Name}, _}, {constraint, AnnFirst, _, _}}) ->
+    Msg = io_lib:format("The constraint on the type variable `~s` is a duplication of the constraint at ~s",
+                        [Name, pp_loc(AnnFirst)]),
     aeso_warnings:new(pos(Ann), Msg);
 mk_warning(Warn) ->
     Msg = io_lib:format("Unknown warning: ~p", [Warn]),
@@ -3554,6 +3686,8 @@ pp({uvar, _, Ref}) ->
     ["?u" | integer_to_list(erlang:phash2(Ref, 16384)) ];
 pp({tvar, _, Name}) ->
     Name;
+pp(T = {constrained_t, _, _, {tvar, _, _}}) ->
+    prettypr:format(aeso_pretty:type(T));
 pp({if_t, _, Id, Then, Else}) ->
     ["if(", pp([Id, Then, Else]), ")"];
 pp({tuple_t, _, []}) ->

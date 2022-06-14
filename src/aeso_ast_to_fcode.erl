@@ -495,6 +495,8 @@ type_to_fcode(_Env, _Sub, {tvar, Ann, "void"}) ->
     fcode_error({found_void, Ann});
 type_to_fcode(_Env, Sub, {tvar, _, X}) ->
     maps:get(X, Sub, {tvar, X});
+type_to_fcode(Env, Sub, {constrained_t, _, _, TVar = {tvar, _, _}}) ->
+    type_to_fcode(Env, Sub, TVar);
 type_to_fcode(_Env, _Sub, {fun_t, Ann, _, var_args, _}) ->
     fcode_error({var_args_not_set, {id, Ann, "a very suspicious function"}});
 type_to_fcode(Env, Sub, {fun_t, _, Named, Args, Res}) ->

@@ -357,7 +357,8 @@ Sophia has the following types:
 | Type                 | Description                                                                                 | Example                                                      |
 |----------------------|---------------------------------------------------------------------------------------------|--------------------------------------------------------------|
 | int                  | A 2-complement integer                                                                      | ```-1```                                                     |
-| address              | æternity address, 32 bytes                                                                 | ```Call.origin```                                            |
+| char                 | A single character                                                                          | ```'c'```                                                    |
+| address              | æternity address, 32 bytes                                                                  | ```Call.origin```                                            |
 | bool                 | A Boolean                                                                                   | ```true```                                                   |
 | bits                 | A bit field                                                                                 | ```Bits.none```                                              |
 | bytes(n)             | A byte array with `n` bytes                                                                 | ```#fedcba9876543210```                                      |
@@ -500,6 +501,67 @@ function
 ```
 
 Guards cannot be stateful even when used inside a stateful function.
+
+## Constrainted type variables
+
+Comparing types by equality (using `==` and `!=`) or by inequality
+(using `<`, `>`, `<=`, `=<`, and `>=`) only makes sense by some types.
+For example, it is possible to compare two `int`s by inequality
+(e.g. `1 < 2`), but it would not make sense to compare two instances of
+a contract by inequality.
+
+```
+contract C = ...
+contract Main =
+  function f(x : C, y : c) = x > y  // this is wrong
+```
+
+This is solved in Sophia by adding type variable constraints
+(`ord` and `eq`) to limit what can be passed to the binary comparison
+operators.
+
+The type of the equality comparison operators is `'a is eq ; ('a, 'a) => bool`
+and of the inequality comparison operators is `'a is ord ; ('a, 'a) => bool`
+which means that these operators can only accept types that are comparable by
+equality or by inequality respectively.
+
+The builtin types `bool`, `int`, `char`, `bits`, `bytes`, `string`, `hash`,
+and `signature` are comparable by inequality (and equality) while the types
+`address`, `event` are only comparable by equality.
+
+The composite types `list`, `option`, and `tuple` are comparable by inequality
+if and only if their type argmuments are comparable by inequality.
+
+The composite types `map`, `oracle`, and `oracle_query` are comparable by
+equality if and only if their type arguments are comparable by equality.
+
+All user-defined records and datatypes are comparable by equality if their
+type arguments are also comparable by equality. In addition to that, all
+user-defined contracts are comparable by equality.
+
+Anonymous functions (or lambda functions) are not comparable neither by
+equality nor by inequality.
+
+All types that are comparable by inequality are also comparable by equality.
+In other words, if a type has `ord` constraint, that implies that it also
+have `eq` constraint.
+
+The type variable constraints can be specified in the type signature of any
+function.
+
+```
+// Comparison with < is only allowed because 'a has the constraint ord
+lt : 'a is ord ; ('a, 'a) => bool
+lt(x, y) = x < y
+
+// Multiple constraints can be specified
+ord_and_eq : 'a is ord, 'b is eq ; ('a, 'a, 'b, 'b) => bool
+ord_and_eq(x, y, p, q) = x > y && p == q
+```
+
+If the constraints are not mentioned, the type variable is assumed to
+have no constraints, and calling any equality or inequality operation
+on it will cause an error.
 
 ## Lists
 

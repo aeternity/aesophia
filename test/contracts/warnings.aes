@@ -48,6 +48,11 @@ contract Warnings =
     rv()
     2
 
+  // Duplicated constraint on 'a
+  entrypoint
+    duplicated_tvar_constraint : 'a is eq, 'a is eq ; ('a, 'a) => bool
+    duplicated_tvar_constraint (x, y) = x == y
+
 namespace FunctionsAsArgs =
     function f() = g()
 
