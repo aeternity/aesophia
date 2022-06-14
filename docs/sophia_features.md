@@ -357,7 +357,8 @@ Sophia has the following types:
 | Type                 | Description                                                                                 | Example                                                      |
 |----------------------|---------------------------------------------------------------------------------------------|--------------------------------------------------------------|
 | int                  | A 2-complement integer                                                                      | ```-1```                                                     |
-| address              | æternity address, 32 bytes                                                                 | ```Call.origin```                                            |
+| char                 | A single character                                                                          | ```'c'```                                                    |
+| address              | æternity address, 32 bytes                                                                  | ```Call.origin```                                            |
 | bool                 | A Boolean                                                                                   | ```true```                                                   |
 | bits                 | A bit field                                                                                 | ```Bits.none```                                              |
 | bytes(n)             | A byte array with `n` bytes                                                                 | ```#fedcba9876543210```                                      |
