@@ -7,12 +7,12 @@ main contract C =
 
     // pass
     function
-        passing_ord: 'a is ord ; ('a, 'a) => bool
+        passing_ord : 'a is ord ; ('a, 'a) => bool
         passing_ord(x, y) = x >= y
 
     // pass
     function
-        passing_eq: 'a is eq ; ('a, 'a) => bool
+        passing_eq : 'a is eq ; ('a, 'a) => bool
         passing_eq(x, y) = x == y
 
     // fail because eq is not specified for 'a
@@ -22,8 +22,12 @@ main contract C =
 
     // fail because 'b is not used
     function
-        fail_unused_tvar: 'a is eq, 'b is eq ; ('a, 'a) => bool
+        fail_unused_tvar : 'a is eq, 'b is eq ; ('a, 'a) => bool
         fail_unused_tvar(x, y) = x == y
+
+    function
+        fail_unknown_constraint : 'a is foo ; ('a) => 'a
+        fail_unknown_constraint(x) = x
 
     // Ord types
 

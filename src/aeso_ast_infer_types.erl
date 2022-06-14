@@ -1241,6 +1241,8 @@ check_type(Env, {constrained_t, Ann, Constraints, Type}, Arity) ->
     TVars = [ Name || {tvar, _, Name} <- extract_typevars(Type) ],
     [ type_error({unused_constraint, C}) || C = {constraint, _, {tvar, _, Name}, _} <- Constraints,
                                             not lists:member(Name, TVars) ],
+    [ type_error({unknown_tvar_constraint, C}) || C = {constraint, _, _, {id, _, Name}} <- Constraints,
+                                                  not lists:member(Name, ["eq", "ord"]) ],
 
     {constrained_t, Ann, Constraints, check_type(Env, Type, Arity)};
 check_type(_Env, {args_t, Ann, Ts}, _) ->
@@ -3421,6 +3423,9 @@ mk_error({type_not_ord, Ann, Type}) ->
     mk_t_err(pos(Ann), Msg);
 mk_error({unused_constraint, {constraint, Ann, {tvar, _, Name}, _}}) ->
     Msg = io_lib:format("The type variable `~s` is constrained but never used", [Name]),
+    mk_t_err(pos(Ann), Msg);
+mk_error({unknown_tvar_constraint, {constraint, _, {tvar, _, TVar}, {id, Ann, C}}}) ->
+    Msg = io_lib:format("Unknown constraint `~s` used on the type variable `~s`", [C, TVar]),
     mk_t_err(pos(Ann), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),

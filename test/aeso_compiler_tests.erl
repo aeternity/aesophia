@@ -810,83 +810,85 @@ failing_contracts() ->
     , ?TYPE_ERROR(comparable_typevar_constraints,
                   [<<?Pos(21,30)
                      "Values of type `'a` are not comparable by equality">>,
-                   <<?Pos(25,37)
+                   <<?Pos(25,38)
                      "The type variable `'b` is constrained but never used">>,
-                   <<?Pos(56,56)
+                   <<?Pos(29,41)
+                     "Unknown constraint `foo` used on the type variable `'a`">>,
+                   <<?Pos(60,56)
                      "Values of type `address` are not comparable by inequality">>,
-                   <<?Pos(59,58)
+                   <<?Pos(63,58)
                      "Values of type `Chain.ttl` are not comparable by inequality">>,
-                   <<?Pos(62,45)
+                   <<?Pos(66,45)
                      "Values of type `A` are not comparable by inequality">>,
-                   <<?Pos(69,47)
+                   <<?Pos(73,47)
                      "Values of type `(int, char) => bool` are not comparable by inequality">>,
-                   <<?Pos(70,47)
+                   <<?Pos(74,47)
                      "Values of type `(int, char) => bool` are not comparable by equality">>,
-                   <<?Pos(85,71)
+                   <<?Pos(89,71)
                      "Values of type `list(address)` are not comparable by inequality">>,
-                   <<?Pos(88,77)
+                   <<?Pos(92,77)
                      "Values of type `option(address)` are not comparable by inequality">>,
-                   <<?Pos(91,76)
+                   <<?Pos(95,76)
                      "Values of type `(address * int)` are not comparable by inequality">>,
-                   <<?Pos(92,76)
+                   <<?Pos(96,76)
                      "Values of type `(address * int)` are not comparable by equality">>,
-                   <<?Pos(96,68)
+                   <<?Pos(100,68)
                      "Values of type `list((int, char) => bool)` are not comparable by inequality">>,
-                   <<?Pos(97,68)
+                   <<?Pos(101,68)
                      "Values of type `list((int, char) => bool)` are not comparable by equality">>,
-                   <<?Pos(99,74)
+                   <<?Pos(103,74)
                      "Values of type `option((int, char) => bool)` are not comparable by inequality">>,
-                   <<?Pos(100,74)
+                   <<?Pos(104,74)
                      "Values of type `option((int, char) => bool)` are not comparable by equality">>,
-                   <<?Pos(102,73)
+                   <<?Pos(106,73)
                      "Values of type `((int, char) => bool * int)` are not comparable by inequality">>,
-                   <<?Pos(103,73)
+                   <<?Pos(107,73)
                      "Values of type `((int, char) => bool * int)` are not comparable by equality">>,
-                   <<?Pos(107,71)
+                   <<?Pos(111,71)
                      "Values of type `map(int, int)` are not comparable by inequality">>,
-                   <<?Pos(110,80)
+                   <<?Pos(114,80)
                      "Values of type `oracle(int, int)` are not comparable by inequality">>,
-                   <<?Pos(113,98)
+                   <<?Pos(117,98)
                      "Values of type `oracle_query(int, int)` are not comparable by inequality">>,
-                   <<?Pos(116,90)
+                   <<?Pos(120,90)
                      "Values of type `custom_datatype(int)` are not comparable by inequality">>,
-                   <<?Pos(119,84)
+                   <<?Pos(123,84)
                      "Values of type `custom_record(int)` are not comparable by inequality">>,
-                   <<?Pos(124,86)
+                   <<?Pos(128,86)
                      "Values of type `map(address, address)` are not comparable by inequality">>,
-                   <<?Pos(127,95)
+                   <<?Pos(131,95)
                      "Values of type `oracle(address, address)` are not comparable by inequality">>,
-                   <<?Pos(130,113)
+                   <<?Pos(134,113)
                      "Values of type `oracle_query(address, address)` are not comparable by inequality">>,
-                   <<?Pos(133,97)
+                   <<?Pos(137,97)
                      "Values of type `custom_datatype(address)` are not comparable by inequality">>,
-                   <<?Pos(136,91)
+                   <<?Pos(140,91)
                      "Values of type `custom_record(address)` are not comparable by inequality">>,
-                   <<?Pos(141,75)
+                   <<?Pos(145,75)
                      "Values of type `map((int, char) => bool, (int, char) => bool)` are not comparable by inequality">>,
-                   <<?Pos(142,75)
+                   <<?Pos(146,75)
                      "Values of type `map((int, char) => bool, (int, char) => bool)` are not comparable by equality">>,
-                   <<?Pos(144,84)
+                   <<?Pos(148,84)
                      "Values of type `oracle((int, char) => bool, (int, char) => bool)` are not comparable by inequality">>,
-                   <<?Pos(145,84)
+                   <<?Pos(149,84)
                      "Values of type `oracle((int, char) => bool, (int, char) => bool)` are not comparable by equality">>,
-                   <<?Pos(147,102)
+                   <<?Pos(151,102)
                      "Values of type `oracle_query((int, char) => bool, (int, char) => bool)` are not comparable by inequality">>,
-                   <<?Pos(148,102)
+                   <<?Pos(152,102)
                      "Values of type `oracle_query((int, char) => bool, (int, char) => bool)` are not comparable by equality">>,
-                   <<?Pos(150,94)
+                   <<?Pos(154,94)
                      "Values of type `custom_datatype((int, char) => bool)` are not comparable by inequality">>,
-                   <<?Pos(151,94)
+                   <<?Pos(155,94)
                      "Values of type `custom_datatype((int, char) => bool)` are not comparable by equality">>,
-                   <<?Pos(153,88)
+                   <<?Pos(157,88)
                      "Values of type `custom_record((int, char) => bool)` are not comparable by inequality">>,
-                   <<?Pos(154,88)
+                   <<?Pos(158,88)
                      "Values of type `custom_record((int, char) => bool)` are not comparable by equality">>,
-                   <<?Pos(158,35)
+                   <<?Pos(162,35)
                      "Values of type `map(int, int)` are not comparable by inequality">>,
-                   <<?Pos(159,35)
+                   <<?Pos(163,35)
                      "Values of type `('a) => 'a` are not comparable by inequality">>,
-                   <<?Pos(163,34)
+                   <<?Pos(167,34)
                      "Values of type `('b) => 'b` are not comparable by equality">>
                   ])
     , ?TYPE_ERROR(warnings,
