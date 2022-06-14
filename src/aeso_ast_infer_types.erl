@@ -87,7 +87,10 @@
 -type byte_constraint() :: {is_bytes, utype()}
                          | {add_bytes, aeso_syntax:ann(), concat | split, utype(), utype(), utype()}.
 
--type constraint() :: named_argument_constraint() | field_constraint() | byte_constraint().
+-type tvar_constraint() :: {is_eq, utype()}
+                         | {is_ord, utype()}.
+
+-type constraint() :: named_argument_constraint() | field_constraint() | byte_constraint() | tvar_constraint().
 
 -record(field_info,
     { ann      :: aeso_syntax:ann()
@@ -1183,7 +1186,6 @@ check_modifiers1(What, Decl) when element(1, Decl) == letfun; element(1, Decl) =
     ok;
 check_modifiers1(_, _) -> ok.
 
--spec extract_typevars(utype()) -> [aeso_syntax:tvar()].
 extract_typevars(Type) ->
     case Type of
         TVar = {tvar, _, _}    -> [TVar];
