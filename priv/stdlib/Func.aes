@@ -2,7 +2,7 @@ namespace Func =
 
   function id(x : 'a) : 'a = x
 
-  function const(x : 'a) : 'b => 'a = (y) => x
+  function const(x : 'a) : 'b => 'a = (_) => x
 
   function flip(f : ('a, 'b) => 'c) : ('b, 'a) => 'c = (b, a) => f(a, b)
 

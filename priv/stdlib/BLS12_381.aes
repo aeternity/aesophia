@@ -7,13 +7,13 @@ namespace BLS12_381 =
   record gt  = { x1 : fp, x2 : fp, x3 : fp, x4 : fp, x5 : fp, x6 : fp,
                  x7 : fp, x8 : fp, x9 : fp, x10 : fp, x11 : fp, x12 : fp }
 
-  function pairing_check(xs : list(g1), ys : list(g2)) =
-    switch((xs, ys))
+  function pairing_check(us : list(g1), vs : list(g2)) =
+    switch((us, vs))
       ([], []) => true
       (x :: xs, y :: ys) => pairing_check_(pairing(x, y), xs, ys)
 
-  function pairing_check_(acc : gt, xs : list(g1), ys : list(g2)) =
-    switch((xs, ys))
+  function pairing_check_(acc : gt, us : list(g1), vs : list(g2)) =
+    switch((us, vs))
       ([], []) => gt_is_one(acc)
       (x :: xs, y :: ys) =>
         pairing_check_(gt_mul(acc, pairing(x, y)), xs, ys)

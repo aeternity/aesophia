@@ -2,8 +2,8 @@ namespace ListInternal =
 
   // -- Flatmap ----------------------------------------------------------------
 
-  function flat_map(f : 'a => list('b), xs : list('a)) : list('b) =
-    switch(xs)
+  function flat_map(f : 'a => list('b), lst : list('a)) : list('b) =
+    switch(lst)
       []      => []
       x :: xs => f(x) ++ flat_map(f, xs)
 

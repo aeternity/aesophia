@@ -173,7 +173,7 @@ namespace List =
    if (n == 0) l
    else switch(l)
       []   => []
-      h::t => drop_(n-1, t)
+      _::t => drop_(n-1, t)
 
 /** Get the longest prefix of a list in which every element
  * matches predicate `p`
@@ -191,7 +191,7 @@ namespace List =
 /** Splits list into two lists of elements that respectively
  * match and don't match predicate `p`
  */
-  function partition(p : 'a => bool, l : list('a)) : (list('a) * list('a)) = switch(l)
+  function partition(p : 'a => bool, lst : list('a)) : (list('a) * list('a)) = switch(lst)
     []   => ([], [])
     h::t =>
       let (l, r) = partition(p, t)

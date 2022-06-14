@@ -375,7 +375,19 @@ lookup_env(Env, Kind, Ann, Name) ->
             case [ Res || QName <- Names, Res <- [lookup_env1(Env, Kind, Ann, QName)], Res /= false] of
                 []    -> false;
                 [Res = {_, {AnnR, _}}] ->
-                    when_warning(warn_unused_includes, fun() -> used_include(AnnR) end),
+                    when_warning(warn_unused_includes,
+                                 fun() ->
+                                         %% If a file is used from a different file, we
+                                         %% can then mark it as used
+                                         F1 = proplists:get_value(file, Ann, no_file),
+                                         F2 = proplists:get_value(file, AnnR, no_file),
+                                         if
+                                             F1 /= F2 ->
+                                                 used_include(AnnR);
+                                             true ->
+                                                 ok
+                                         end
+                                 end),
                     Res;
                 Many  ->
                     type_error({ambiguous_name, qid(Ann, Name), [{qid, A, Q} || {Q, {A, _}} <- Many]}),
@@ -814,7 +826,8 @@ infer(Contracts, Options) ->
         {Env1, Decls} = infer1(Env, Contracts1, [], Options),
         when_warning(warn_unused_functions, fun() -> destroy_and_report_unused_functions() end),
         when_option(warn_error, fun() -> destroy_and_report_warnings_as_type_errors() end),
-        Warnings = lists:map(fun mk_warning/1, ets_tab2list(warnings)),
+        WarningsUnsorted = lists:map(fun mk_warning/1, ets_tab2list(warnings)),
+        Warnings = aeso_warnings:sort_warnings(WarningsUnsorted),
         {Env2, DeclsFolded, DeclsUnfolded} =
             case proplists:get_value(dont_unfold, Options, false) of
                 true  -> {Env1, Decls, Decls};
@@ -851,7 +864,11 @@ infer1(Env, [{Contract, Ann, ConName, Code} | Rest], Acc, Options)
     Env3 = bind_contract(Contract1, Env2),
     infer1(Env3, Rest, [Contract1 | Acc], Options);
 infer1(Env, [{namespace, Ann, Name, Code} | Rest], Acc, Options) ->
-    when_warning(warn_unused_includes, fun() -> potential_unused_include(Ann, proplists:get_value(src_file, Options, no_file)) end),
+    when_warning(warn_unused_includes,
+                 fun() ->
+                     SrcFile = proplists:get_value(src_file, Options, no_file),
+                     potential_unused_include(Ann, SrcFile)
+                 end),
     check_scope_name_clash(Env, namespace, Name),
     {Env1, Code1} = infer_contract_top(push_scope(namespace, Name, Env), namespace, Code, Options),
     Namespace1 = {namespace, Ann, Name, Code1},
@@ -1440,13 +1457,15 @@ app_t(Ann, Name, Args) -> {app_t, Ann, Name, Args}.
 lookup_name(Env, As, Name) ->
     lookup_name(Env, As, Name, []).
 
-lookup_name(Env = #env{ namespace = NS, current_function = {id, _, Fun} }, As, Id, Options) ->
+lookup_name(Env = #env{ namespace = NS, current_function = {id, _, Fun} = CurFn }, As, Id, Options) ->
     case lookup_env(Env, term, As, qname(Id)) of
         false ->
             type_error({unbound_variable, Id}),
             {Id, fresh_uvar(As)};
         {QId, {_, Ty}} ->
             when_warning(warn_unused_variables, fun() -> used_variable(NS, Fun, QId) end),
+            when_warning(warn_unused_functions,
+                         fun() -> register_function_call(NS ++ qname(CurFn), QId) end),
             Freshen = proplists:get_value(freshen, Options, false),
             check_stateful(Env, Id, Ty),
             Ty1 = case Ty of
@@ -1629,22 +1648,15 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
         prefix ->
             infer_op(Env, Ann, Fun, Args, fun infer_prefix/1);
         _ ->
-            CurrentFun = Env#env.current_function,
-            Namespace = Env#env.namespace,
             NamedArgsVar = fresh_uvar(Ann),
             NamedArgs1 = [ infer_named_arg(Env, NamedArgsVar, Arg) || Arg <- NamedArgs ],
             NewFun0 = infer_expr(Env, Fun),
             NewArgs = [infer_expr(Env, A) || A <- Args],
             ArgTypes = [T || {typed, _, _, T} <- NewArgs],
-            NewFun1 = {typed, _, Name, FunType} = infer_var_args_fun(Env, NewFun0, NamedArgs1, ArgTypes),
+            NewFun1 = {typed, _, _, FunType} = infer_var_args_fun(Env, NewFun0, NamedArgs1, ArgTypes),
             When = {infer_app, Fun, NamedArgs1, Args, FunType, ArgTypes},
             GeneralResultType = fresh_uvar(Ann),
             ResultType = fresh_uvar(Ann),
-            when_warning(warn_unused_functions,
-                         fun() -> if element(1, Name) == lam -> ok;
-                                     true -> register_function_call(Namespace ++ qname(CurrentFun), Name)
-                                  end
-                         end),
             unify(Env, FunType, {fun_t, [], NamedArgsVar, ArgTypes, GeneralResultType}, When),
             when_warning(warn_negative_spend, fun() -> warn_potential_negative_spend(Ann, NewFun1, NewArgs) end),
             add_constraint(
@@ -2838,9 +2850,8 @@ create_unused_functions() ->
     ets_new(function_calls, [bag]),
     ets_new(all_functions, [set]).
 
-register_function_call(_Caller, {proj, _, _, _}) -> ok;
 register_function_call(Caller, Callee) ->
-    ets_insert(function_calls, {Caller, qname(Callee)}).
+    ets_insert(function_calls, {Caller, Callee}).
 
 potential_unused_function(#env{ what = namespace }, Ann, FunQName, FunId) ->
     ets_insert(all_functions, {Ann, FunQName, FunId, not aeso_syntax:get_ann(private, Ann, false)});
