@@ -96,17 +96,29 @@ decl() ->
     choice(
       %% Contract declaration
     [ ?RULE(token(main), keyword(contract),
-            con(), tok('='), maybe_block(decl()), {contract_main, _2, _3, _5})
+            con(), tok('='), maybe_block(decl()), {contract_main, _2, _3, [], _5})
+    , ?RULE(token(main), keyword(contract),
+            con(), tok(':'), comma_sep(con()), tok('='), maybe_block(decl()), {contract_main, _2, _3, _5, _7})
     , ?RULE(keyword(contract),
-            con(), tok('='), maybe_block(decl()), {contract_child, _1, _2, _4})
+            con(), tok('='), maybe_block(decl()), {contract_child, _1, _2, [], _4})
+    , ?RULE(keyword(contract),
+            con(), tok(':'), comma_sep(con()), tok('='), maybe_block(decl()), {contract_child, _1, _2, _4, _6})
     , ?RULE(keyword(contract), token(interface),
-            con(), tok('='), maybe_block(decl()), {contract_interface, _1, _3, _5})
+            con(), tok('='), maybe_block(decl()), {contract_interface, _1, _3, [], _5})
+    , ?RULE(keyword(contract), token(interface),
+            con(), tok(':'), comma_sep(con()), tok('='), maybe_block(decl()), {contract_interface, _1, _3, _5, _7})
     , ?RULE(token(payable), token(main), keyword(contract),
-            con(), tok('='), maybe_block(decl()), add_modifiers([_1], {contract_main, _3, _4, _6}))
+            con(), tok('='), maybe_block(decl()), add_modifiers([_1], {contract_main, _3, _4, [], _6}))
+    , ?RULE(token(payable), token(main), keyword(contract),
+            con(), tok(':'), comma_sep(con()), tok('='), maybe_block(decl()), add_modifiers([_1], {contract_main, _3, _4, _6, _8}))
     , ?RULE(token(payable), keyword(contract),
-            con(), tok('='), maybe_block(decl()), add_modifiers([_1], {contract_child, _2, _3, _5}))
+            con(), tok('='), maybe_block(decl()), add_modifiers([_1], {contract_child, _2, _3, [], _5}))
+    , ?RULE(token(payable), keyword(contract),
+            con(), tok(':'), comma_sep(con()), tok('='), maybe_block(decl()), add_modifiers([_1], {contract_child, _2, _3, _5, _7}))
     , ?RULE(token(payable), keyword(contract), token(interface),
-            con(), tok('='), maybe_block(decl()), add_modifiers([_1], {contract_interface, _2, _4, _6}))
+            con(), tok('='), maybe_block(decl()), add_modifiers([_1], {contract_interface, _2, _4, [], _6}))
+    , ?RULE(token(payable), keyword(contract), token(interface),
+            con(), tok(':'), comma_sep(con()), tok('='), maybe_block(decl()), add_modifiers([_1], {contract_interface, _2, _4, _6, _8}))
 
 
     , ?RULE(keyword(namespace), con(), tok('='), maybe_block(decl()), {namespace, _1, _2, _4})

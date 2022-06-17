@@ -238,8 +238,8 @@ insert_init_function(Code, Options) ->
 
 last_contract_indent(Decls) ->
     case lists:last(Decls) of
-        {_, _, _, [Decl | _]} -> aeso_syntax:get_ann(col, Decl, 1) - 1;
-        _                     -> 0
+        {_, _, _, _, [Decl | _]} -> aeso_syntax:get_ann(col, Decl, 1) - 1;
+        _                        -> 0
     end.
 
 -spec to_sophia_value(string(), string(), ok | error | revert, binary()) ->
@@ -338,7 +338,7 @@ decode_calldata(ContractString, FunName, Calldata, Options0) ->
     end.
 
 -dialyzer({nowarn_function, get_decode_type/2}).
-get_decode_type(FunName, [{Contract, Ann, _, Defs}]) when ?IS_CONTRACT_HEAD(Contract) ->
+get_decode_type(FunName, [{Contract, Ann, _, _, Defs}]) when ?IS_CONTRACT_HEAD(Contract) ->
     GetType = fun({letfun, _, {id, _, Name}, Args, Ret, _})               when Name == FunName -> [{Args, Ret}];
                  ({fun_decl, _, {id, _, Name}, {fun_t, _, _, Args, Ret}}) when Name == FunName -> [{Args, Ret}];
                  (_) -> [] end,

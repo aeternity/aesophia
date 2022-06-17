@@ -151,12 +151,16 @@ decl(D, Options) ->
     with_options(Options, fun() -> decl(D) end).
 
 -spec decl(aeso_syntax:decl()) -> doc().
-decl({Con, Attrs, C, Ds}) when ?IS_CONTRACT_HEAD(Con) ->
+decl({Con, Attrs, C, Is, Ds}) when ?IS_CONTRACT_HEAD(Con) ->
     Mod = fun({Mod, true}) when Mod == payable ->
                   text(atom_to_list(Mod));
              (_) -> empty() end,
+    ImplsList = case Is of
+                    [] -> [empty()];
+                    _  -> [text(":"), par(punctuate(text(","), lists:map(fun name/1, Is)), 0)]
+                end,
     block(follow( hsep(lists:map(Mod, Attrs) ++ [contract_head(Con)])
-                , hsep(name(C), text("="))), decls(Ds));
+                , hsep([name(C)] ++ ImplsList ++ [text("=")])), decls(Ds));
 decl({namespace, _, C, Ds}) ->
     block(follow(text("namespace"), hsep(name(C), text("="))), decls(Ds));
 decl({pragma, _, Pragma}) -> pragma(Pragma);

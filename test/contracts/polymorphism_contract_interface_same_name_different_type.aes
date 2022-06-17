@@ -1,0 +1,9 @@
+contract interface I1 =
+    entrypoint f : () => int
+
+contract interface I2 : I1 =
+    entrypoint f : () => char
+
+contract C : I2 =
+    entrypoint f() = 1
+    entrypoint f() = 'c'

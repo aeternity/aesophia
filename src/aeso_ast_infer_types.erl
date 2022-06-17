@@ -113,6 +113,8 @@
 
 -type type_constraints() :: none | bytes_concat | bytes_split | address_to_contract | bytecode_hash.
 
+-type variance() :: invariant | covariant | contravariant | bivariant.
+
 -type fun_info()  :: {aeso_syntax:ann(), typesig() | type()}.
 -type type_info() :: {aeso_syntax:ann(), typedef()}.
 -type var_info()  :: {aeso_syntax:ann(), utype()}.
@@ -134,11 +136,13 @@
     , vars             = []                 :: [{name(), var_info()}]
     , typevars         = unrestricted       :: unrestricted | [name()]
     , fields           = #{}                :: #{ name() => [field_info()] }    %% fields are global
+    , contract_parents = #{}                :: #{ name() => [name()] }
     , namespace        = []                 :: qname()
     , used_namespaces  = []                 :: used_namespaces()
     , in_pattern       = false              :: boolean()
     , in_guard         = false              :: boolean()
     , stateful         = false              :: boolean()
+    , unify_throws     = true               :: boolean()
     , current_function = none               :: none | aeso_syntax:id()
     , what             = top                :: top | namespace | contract | contract_interface
     }).
@@ -280,7 +284,7 @@ contract_call_type({fun_t, Ann, [], Args, Ret}) ->
      Args, {if_t, Ann, Id("protected"), {app_t, Ann, {id, Ann, "option"}, [Ret]}, Ret}}.
 
 -spec bind_contract(aeso_syntax:decl(), env()) -> env().
-bind_contract({Contract, Ann, Id, Contents}, Env)
+bind_contract({Contract, Ann, Id, _Impls, Contents}, Env)
   when ?IS_CONTRACT_HEAD(Contract) ->
     Key    = name(Id),
     Sys    = [{origin, system}],
@@ -818,6 +822,14 @@ infer(Contracts, Options) ->
         ets_new(defined_contracts, [bag]),
         ets_new(type_vars, [set]),
         ets_new(warnings, [bag]),
+        ets_new(type_vars_variance, [set]),
+        %% Set the variance for builtin types
+        ets_insert(type_vars_variance, {"list", [covariant]}),
+        ets_insert(type_vars_variance, {"option", [covariant]}),
+        ets_insert(type_vars_variance, {"map", [covariant, covariant]}),
+        ets_insert(type_vars_variance, {"oracle", [contravariant, covariant]}),
+        ets_insert(type_vars_variance, {"oracle_query", [covariant, covariant]}),
+
         when_warning(warn_unused_functions, fun() -> create_unused_functions() end),
         check_modifiers(Env, Contracts),
         create_type_errors(),
@@ -845,9 +857,12 @@ infer(Contracts, Options) ->
 -spec infer1(env(), [aeso_syntax:decl()], [aeso_syntax:decl()], list(option())) ->
     {env(), [aeso_syntax:decl()]}.
 infer1(Env, [], Acc, _Options) -> {Env, lists:reverse(Acc)};
-infer1(Env, [{Contract, Ann, ConName, Code} | Rest], Acc, Options)
+infer1(Env0, [{Contract, Ann, ConName, Impls, Code} | Rest], Acc, Options)
   when ?IS_CONTRACT_HEAD(Contract) ->
     %% do type inference on each contract independently.
+    Env = Env0#env{ contract_parents = maps:put(name(ConName),
+                                                [name(Impl) || Impl <- Impls],
+                                                Env0#env.contract_parents) },
     check_scope_name_clash(Env, contract, ConName),
     What = case Contract of
                contract_main -> contract;
@@ -859,7 +874,8 @@ infer1(Env, [{Contract, Ann, ConName, Code} | Rest], Acc, Options)
         contract_interface -> ok
     end,
     {Env1, Code1} = infer_contract_top(push_scope(contract, ConName, Env), What, Code, Options),
-    Contract1 = {Contract, Ann, ConName, Code1},
+    Contract1 = {Contract, Ann, ConName, Impls, Code1},
+    check_implemented_interfaces(Env1, Contract1, Acc),
     Env2 = pop_scope(Env1),
     Env3 = bind_contract(Contract1, Env2),
     infer1(Env3, Rest, [Contract1 | Acc], Options);
@@ -879,17 +895,66 @@ infer1(Env, [{pragma, _, _} | Rest], Acc, Options) ->
     %% Pragmas are checked in check_modifiers
     infer1(Env, Rest, Acc, Options).
 
+check_implemented_interfaces(Env, {_Contract, _Ann, ConName, Impls, Code}, DefinedContracts) ->
+    create_type_errors(),
+    AllInterfaces = [{name(IName), I} || I = {contract_interface, _, IName, _, _} <- DefinedContracts],
+    ImplsNames = lists:map(fun name/1, Impls),
+
+    %% All implemented intrefaces should already be defined
+    lists:foreach(fun(Impl) -> case proplists:get_value(name(Impl), AllInterfaces) of
+                                   undefined -> type_error({referencing_undefined_interface, Impl});
+                                   _         -> ok
+                               end
+                  end, Impls),
+
+    ImplementedInterfaces = [I || I <- [proplists:get_value(Name, AllInterfaces) || Name <- ImplsNames],
+                                    I /= undefined],
+    Funs = [ Fun || Fun <- Code,
+                    element(1, Fun) == letfun orelse element(1, Fun) == fun_decl ],
+    check_implemented_interfaces1(Env, ImplementedInterfaces, ConName, Funs, AllInterfaces),
+    destroy_and_report_type_errors(Env).
+
+%% Recursively check that all directly and indirectly referenced interfaces are implemented
+check_implemented_interfaces1(_, [], _, _, _) ->
+    ok;
+check_implemented_interfaces1(Env, [{contract_interface, _, IName, _, Decls} | Interfaces],
+                              ConId, Impls, AllInterfaces) ->
+    Unmatched = match_impls(Env, Decls, ConId, name(IName), Impls),
+    check_implemented_interfaces1(Env, Interfaces, ConId, Unmatched, AllInterfaces).
+
+%% Match the functions of the contract with the interfaces functions, and return unmatched functions
+match_impls(_, [], _, _, Impls) ->
+    Impls;
+match_impls(Env, [{fun_decl, _, {id, _, FunName}, FunType = {fun_t, _, _, ArgsTypes, RetDecl}} | Decls], ConId, IName, Impls) ->
+    Match = fun({letfun, _, {id, _, FName}, Args, RetFun, _}) when FName == FunName ->
+                    length(ArgsTypes) == length(Args) andalso
+                    unify(Env#env{unify_throws = false}, RetDecl, RetFun, unknown) andalso
+                    lists:all(fun({T1, {typed, _, _, T2}}) -> unify(Env#env{unify_throws = false}, T1, T2, unknown) end,
+                              lists:zip(ArgsTypes, Args));
+               ({fun_decl, _, {id, _, FName}, FunT}) when FName == FunName ->
+                    unify(Env#env{unify_throws = false}, FunT, FunType, unknown);
+               (_) -> false
+            end,
+    UnmatchedImpls = case lists:search(Match, Impls) of
+                         {value, V} ->
+                             lists:delete(V, Impls);
+                         false ->
+                             type_error({unimplemented_interface_function, ConId, IName, FunName}),
+                             Impls
+                     end,
+    match_impls(Env, Decls, ConId, IName, UnmatchedImpls).
+
 %% Asserts that the main contract is somehow defined.
 identify_main_contract(Contracts, Options) ->
-    Children   = [C || C = {contract_child, _, _, _} <- Contracts],
-    Mains      = [C || C = {contract_main, _, _, _} <- Contracts],
+    Children   = [C || C = {contract_child, _, _, _, _} <- Contracts],
+    Mains      = [C || C = {contract_main, _, _, _, _} <- Contracts],
     case Mains of
         [] -> case Children of
                   [] -> type_error(
                           {main_contract_undefined,
                            [{file, File} || {src_file, File} <- Options]});
-                  [{contract_child, Ann, Con, Body}] ->
-                      (Contracts -- Children) ++ [{contract_main, Ann, Con, Body}];
+                  [{contract_child, Ann, Con, Impls, Body}] ->
+                      (Contracts -- Children) ++ [{contract_main, Ann, Con, Impls, Body}];
                   [H|_] -> type_error({ambiguous_main_contract,
                                        aeso_syntax:get_ann(H)})
               end;
@@ -1039,11 +1104,15 @@ check_typedef_sccs(Env, TypeMap, [{acyclic, Name} | SCCs], Acc) ->
                     type_error({empty_record_definition, Ann, Name}),
                     check_typedef_sccs(Env1, TypeMap, SCCs, Acc1);
                 {record_t, Fields} ->
+                    ets_insert(type_vars_variance, {Env#env.namespace ++ qname(D),
+                                                    infer_type_vars_variance(Xs, Fields)}),
                     %% check_type to get qualified name
                     RecTy = check_type(Env1, app_t(Ann, D, Xs)),
                     Env2 = check_fields(Env1, TypeMap, RecTy, Fields),
                     check_typedef_sccs(Env2, TypeMap, SCCs, Acc1);
                 {variant_t, Cons} ->
+                    ets_insert(type_vars_variance, {Env#env.namespace ++ qname(D),
+                                                    infer_type_vars_variance(Xs, Cons)}),
                     Target   = check_type(Env1, app_t(Ann, D, Xs)),
                     ConType  = fun([]) -> Target; (Args) -> {type_sig, Ann, none, [], Args, Target} end,
                     ConTypes = [ begin
@@ -1068,6 +1137,48 @@ check_typedef(Env, {record_t, Fields}) ->
 check_typedef(Env, {variant_t, Cons}) ->
     {variant_t, [ {constr_t, Ann, Con, [ check_type(Env, Arg) || Arg <- Args ]}
                 || {constr_t, Ann, Con, Args} <- Cons ]}.
+
+infer_type_vars_variance(TypeParams, Cons) ->
+    % args from all type constructors
+    FlatArgs = lists:flatten([Args || {constr_t, _, _, Args} <- Cons]) ++ [Type || {field_t, _, _, Type} <- Cons],
+
+    Vs = lists:flatten([infer_type_vars_variance(Arg) || Arg <- FlatArgs]),
+    lists:map(fun({tvar, _, TVar}) ->
+                      S = sets:from_list([Variance || {TV, Variance} <- Vs, TV == TVar]),
+                      IsCovariant     = sets:is_element(covariant, S),
+                      IsContravariant = sets:is_element(contravariant, S),
+                      case {IsCovariant, IsContravariant} of
+                          {true,   true} -> invariant;
+                          {true,  false} -> covariant;
+                          {false,  true} -> contravariant;
+                          {false, false} -> bivariant
+                      end
+              end, TypeParams).
+
+-spec infer_type_vars_variance(utype()) -> [{name(), variance()}].
+infer_type_vars_variance(Types)
+  when is_list(Types) ->
+    lists:flatten([infer_type_vars_variance(T) || T <- Types]);
+infer_type_vars_variance({app_t, _, Type, Args}) ->
+    Variances = case ets_lookup(type_vars_variance, qname(Type)) of
+                    [{_, Vs}] -> Vs;
+                    _ -> lists:duplicate(length(Args), covariant)
+                end,
+    TypeVarsVariance = [{TVar, Variance}
+                        || {{tvar, _, TVar}, Variance} <- lists:zip(Args, Variances)],
+    TypeVarsVariance;
+infer_type_vars_variance({tvar, _, TVar}) -> [{TVar, covariant}];
+infer_type_vars_variance({fun_t, _, [], Args, Res}) ->
+    ArgsVariance = infer_type_vars_variance(Args),
+    ResVariance = infer_type_vars_variance(Res),
+    FlippedArgsVariance = lists:map(fun({TVar, Variance}) -> {TVar, opposite_variance(Variance)} end, ArgsVariance),
+    FlippedArgsVariance ++ ResVariance;
+infer_type_vars_variance(_) -> [].
+
+opposite_variance(invariant) -> invariant;
+opposite_variance(covariant) -> contravariant;
+opposite_variance(contravariant) -> covariant;
+opposite_variance(bivariant) -> bivariant.
 
 check_usings(Env, []) ->
     Env;
@@ -1114,7 +1225,7 @@ check_modifiers(Env, Contracts) ->
     check_modifiers_(Env, Contracts),
     destroy_and_report_type_errors(Env).
 
-check_modifiers_(Env, [{Contract, _, Con, Decls} | Rest])
+check_modifiers_(Env, [{Contract, _, Con, _Impls, Decls} | Rest])
   when ?IS_CONTRACT_HEAD(Contract) ->
     IsInterface = Contract =:= contract_interface,
     check_modifiers1(contract, Decls),
@@ -1398,7 +1509,7 @@ infer_letfun(Env = #env{ namespace = Namespace }, LetFun = {letfun, Ann, Fun, _,
     {{Name, Sig}, Clause} = infer_letfun1(Env, LetFun),
     {{Name, Sig}, desugar_clauses(Ann, Fun, Sig, [Clause])}.
 
-infer_letfun1(Env0 = #env{ namespace = NS }, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What,  GuardedBodies}) ->
+infer_letfun1(Env0 = #env{ namespace = NS }, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, GuardedBodies}) ->
     Env = Env0#env{ stateful = aeso_syntax:get_ann(stateful, Attrib, false),
                     current_function = Fun },
     {NewEnv, {typed, _, {tuple, _, TypedArgs}, {tuple_t, _, ArgTypes}}} = infer_pattern(Env, {tuple, [{origin, system} | NameAttrib], Args}),
@@ -1908,7 +2019,7 @@ infer_case(Env = #env{ namespace = NS, current_function = {id, _, Fun} }, Attrs,
         {guarded, Ann, NewGuards, NewBranch}
     end,
     NewGuardedBranches = lists:map(InferGuardedBranches, GuardedBranches),
-    unify(Env, PatType, ExprType, {case_pat, Pattern, PatType, ExprType}),
+    unify(Env, ExprType, PatType, {case_pat, Pattern, PatType, ExprType}),
     {'case', Attrs, NewPattern, NewGuardedBranches}.
 
 %% NewStmts = infer_block(Env, Attrs, Stmts, BlockType)
@@ -2016,7 +2127,8 @@ next_count() ->
 
 ets_tables() ->
     [options, type_vars, constraints, freshen_tvars, type_errors,
-     defined_contracts, warnings, function_calls, all_functions].
+     defined_contracts, warnings, function_calls, all_functions,
+     type_vars_variance].
 
 clean_up_ets() ->
     [ catch ets_delete(Tab) || Tab <- ets_tables() ],
@@ -2556,9 +2668,11 @@ subst_tvars1(_Env, X) ->
 
 %% Unification
 
-unify(_, {id, _, "_"}, _, _When) -> true;
-unify(_, _, {id, _, "_"}, _When) -> true;
-unify(Env, A, B, When) ->
+unify(Env, A, B, When) -> unify0(Env, A, B, covariant, When).
+
+unify0(_, {id, _, "_"}, _, _Variance, _When) -> true;
+unify0(_, _, {id, _, "_"}, _Variance, _When) -> true;
+unify0(Env, A, B, Variance, When) ->
     Options =
         case When of    %% Improve source location for map_in_map_key errors
             {check_expr, E, _, _} -> [{ann, aeso_syntax:get_ann(E)}];
@@ -2566,67 +2680,128 @@ unify(Env, A, B, When) ->
         end,
     A1 = dereference(unfold_types_in_type(Env, A, Options)),
     B1 = dereference(unfold_types_in_type(Env, B, Options)),
-    unify1(Env, A1, B1, When).
+    unify1(Env, A1, B1, Variance, When).
 
-unify1(_Env, {uvar, _, R}, {uvar, _, R}, _When) ->
+unify1(_Env, {uvar, _, R}, {uvar, _, R}, _Variance, _When) ->
     true;
-unify1(_Env, {uvar, A, R}, T, When) ->
+unify1(Env, {uvar, A, R}, T, _Variance, When) ->
     case occurs_check(R, T) of
         true ->
-            cannot_unify({uvar, A, R}, T, When),
+            if
+                Env#env.unify_throws ->
+                    cannot_unify({uvar, A, R}, T, none, When);
+                true ->
+                    ok
+            end,
             false;
         false ->
             ets_insert(type_vars, {R, T}),
             true
     end;
-unify1(Env, T, {uvar, A, R}, When) ->
-    unify1(Env, {uvar, A, R}, T, When);
-unify1(_Env, {tvar, _, X}, {tvar, _, X}, _When) -> true; %% Rigid type variables
-unify1(Env, [A|B], [C|D], When) ->
-    unify(Env, A, C, When) andalso unify(Env, B, D, When);
-unify1(_Env, X, X, _When) ->
+unify1(Env, T, {uvar, A, R}, Variance, When) ->
+    unify1(Env, {uvar, A, R}, T, Variance, When);
+unify1(_Env, {tvar, _, X}, {tvar, _, X}, _Variance, _When) -> true; %% Rigid type variables
+unify1(Env, [A|B], [C|D], [V|Variances], When) ->
+    unify0(Env, A, C, V, When) andalso unify0(Env, B, D, Variances, When);
+unify1(Env, [A|B], [C|D], Variance, When) ->
+    unify0(Env, A, C, Variance, When) andalso unify0(Env, B, D, Variance, When);
+unify1(_Env, X, X, _Variance, _When) ->
     true;
-unify1(_Env, {id, _, Name}, {id, _, Name}, _When) ->
+unify1(_Env, {id, _, Name}, {id, _, Name}, _Variance, _When) ->
     true;
-unify1(_Env, {con, _, Name}, {con, _, Name}, _When) ->
+unify1(Env, A = {con, _, NameA}, B = {con, _, NameB}, Variance, When) ->
+    case is_subtype(Env, NameA, NameB, Variance) of
+        true -> true;
+        false ->
+            if
+                Env#env.unify_throws ->
+                    IsSubtype = is_subtype(Env, NameA, NameB, contravariant) orelse
+                                is_subtype(Env, NameA, NameB, covariant),
+                    Cxt = case IsSubtype of
+                              true  -> Variance;
+                              false -> none
+                          end,
+                    cannot_unify(A, B, Cxt, When);
+                true ->
+                    ok
+            end,
+            false
+    end;
+unify1(_Env, {qid, _, Name}, {qid, _, Name}, _Variance, _When) ->
     true;
-unify1(_Env, {qid, _, Name}, {qid, _, Name}, _When) ->
+unify1(_Env, {qcon, _, Name}, {qcon, _, Name}, _Variance, _When) ->
     true;
-unify1(_Env, {qcon, _, Name}, {qcon, _, Name}, _When) ->
+unify1(_Env, {bytes_t, _, Len}, {bytes_t, _, Len}, _Variance, _When) ->
     true;
-unify1(_Env, {bytes_t, _, Len}, {bytes_t, _, Len}, _When) ->
-    true;
-unify1(Env, {if_t, _, {id, _, Id}, Then1, Else1}, {if_t, _, {id, _, Id}, Then2, Else2}, When) ->
-    unify(Env, Then1, Then2, When) andalso
-    unify(Env, Else1, Else2, When);
+unify1(Env, {if_t, _, {id, _, Id}, Then1, Else1}, {if_t, _, {id, _, Id}, Then2, Else2}, Variance, When) ->
+    unify0(Env, Then1, Then2, Variance, When) andalso
+    unify0(Env, Else1, Else2, Variance, When);
 
-unify1(_Env, {fun_t, _, _, _, _}, {fun_t, _, _, var_args, _}, When) ->
+unify1(_Env, {fun_t, _, _, _, _}, {fun_t, _, _, var_args, _}, _Variance, When) ->
     type_error({unify_varargs, When});
-unify1(_Env, {fun_t, _, _, var_args, _}, {fun_t, _, _, _, _}, When) ->
+unify1(_Env, {fun_t, _, _, var_args, _}, {fun_t, _, _, _, _}, _Variance, When) ->
     type_error({unify_varargs, When});
-unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, When)
+unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, Variance, When)
   when length(Args1) == length(Args2) ->
-    unify(Env, Named1, Named2, When) andalso
-    unify(Env, Args1, Args2, When) andalso unify(Env, Result1, Result2, When);
-unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, When)
+    unify0(Env, Named1, Named2, opposite_variance(Variance), When) andalso
+    unify0(Env, Args1, Args2, opposite_variance(Variance), When) andalso
+    unify0(Env, Result1, Result2, Variance, When);
+unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, Variance, When)
   when length(Args1) == length(Args2), Tag == id orelse Tag == qid ->
-    unify(Env, Args1, Args2, When);
-unify1(Env, {tuple_t, _, As}, {tuple_t, _, Bs}, When)
+    Variances = case ets_lookup(type_vars_variance, F) of
+                    [{_, Vs}] ->
+                        case Variance of
+                            contravariant -> lists:map(fun opposite_variance/1, Vs);
+                            invariant     -> invariant;
+                            _             -> Vs
+                        end;
+                    _ -> invariant
+                end,
+    unify1(Env, Args1, Args2, Variances, When);
+unify1(Env, {tuple_t, _, As}, {tuple_t, _, Bs}, Variance, When)
   when length(As) == length(Bs) ->
-    unify(Env, As, Bs, When);
-unify1(Env, {named_arg_t, _, Id1, Type1, _}, {named_arg_t, _, Id2, Type2, _}, When) ->
-    unify1(Env, Id1, Id2, {arg_name, Id1, Id2, When}),
-    unify1(Env, Type1, Type2, When);
+    unify0(Env, As, Bs, Variance, When);
+unify1(Env, {named_arg_t, _, Id1, Type1, _}, {named_arg_t, _, Id2, Type2, _}, Variance, When) ->
+    unify1(Env, Id1, Id2, Variance, {arg_name, Id1, Id2, When}),
+    unify1(Env, Type1, Type2, Variance, When);
 %% The grammar is a bit inconsistent about whether types without
 %% arguments are represented as applications to an empty list of
 %% parameters or not. We therefore allow them to unify.
-unify1(Env, {app_t, _, T, []}, B, When) ->
-    unify(Env, T, B, When);
-unify1(Env, A, {app_t, _, T, []}, When) ->
-    unify(Env, A, T, When);
-unify1(_Env, A, B, When) ->
-    cannot_unify(A, B, When),
+unify1(Env, {app_t, _, T, []}, B, Variance, When) ->
+    unify0(Env, T, B, Variance, When);
+unify1(Env, A, {app_t, _, T, []}, Variance, When) ->
+    unify0(Env, A, T, Variance, When);
+unify1(Env, A, B, _Variance, When) ->
+    if
+        Env#env.unify_throws ->
+            cannot_unify(A, B, none, When);
+        true ->
+            ok
+    end,
     false.
+
+is_subtype(_Env, NameA, NameB, invariant) ->
+    NameA == NameB;
+is_subtype(Env, NameA, NameB, covariant) ->
+    is_subtype(Env, NameA, NameB);
+is_subtype(Env, NameA, NameB, contravariant) ->
+    is_subtype(Env, NameB, NameA);
+is_subtype(Env, NameA, NameB, bivariant) ->
+    is_subtype(Env, NameA, NameB) orelse is_subtype(Env, NameB, NameA).
+
+is_subtype(Env, Child, Base) ->
+    Parents = maps:get(Child, Env#env.contract_parents, []),
+    if
+        Child == Base ->
+            true;
+        Parents == [] ->
+            false;
+        true ->
+            case lists:member(Base, Parents) of
+                true -> true;
+                false -> lists:any(fun(Parent) -> is_subtype(Env, Parent, Base) end, Parents)
+            end
+    end.
 
 dereference(T = {uvar, _, R}) ->
     case ets_lookup(type_vars, R) of
@@ -2910,8 +3085,8 @@ warn_potential_negative_spend(Ann, Fun, Args) ->
 
 %% Save unification failures for error messages.
 
-cannot_unify(A, B, When) ->
-    type_error({cannot_unify, A, B, When}).
+cannot_unify(A, B, Cxt, When) ->
+    type_error({cannot_unify, A, B, Cxt, When}).
 
 type_error(Err) ->
     ets_insert(type_errors, Err).
@@ -2980,8 +3155,12 @@ mk_error({fundecl_must_have_funtype, _Ann, Id, Type}) ->
                        "Entrypoints and functions must have functional types"
                        , [pp(Id), pp(instantiate(Type))]),
     mk_t_err(pos(Id), Msg);
-mk_error({cannot_unify, A, B, When}) ->
-    Msg = io_lib:format("Cannot unify `~s` and `~s`",
+mk_error({cannot_unify, A, B, Cxt, When}) ->
+    VarianceContext = case Cxt of
+                          none -> "";
+                          _    -> io_lib:format(" in a ~p context", [Cxt])
+                      end,
+    Msg = io_lib:format("Cannot unify `~s` and `~s`" ++ VarianceContext,
                         [pp(instantiate(A)), pp(instantiate(B))]),
     {Pos, Ctxt} = pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
@@ -3112,7 +3291,7 @@ mk_error({namespace, _Pos, {con, Pos, Name}, _Def}) ->
     Msg = io_lib:format("Nested namespaces are not allowed. Namespace `~s` is not defined at top level.",
                         [Name]),
     mk_t_err(pos(Pos), Msg);
-mk_error({Contract, _Pos, {con, Pos, Name}, _Def}) when ?IS_CONTRACT_HEAD(Contract) ->
+mk_error({Contract, _Pos, {con, Pos, Name}, _Impls, _Def}) when ?IS_CONTRACT_HEAD(Contract) ->
     Msg = io_lib:format("Nested contracts are not allowed. Contract `~s` is not defined at top level.",
                         [Name]),
     mk_t_err(pos(Pos), Msg);
@@ -3299,6 +3478,12 @@ mk_error({unknown_warning, Warning}) ->
 mk_error({empty_record_definition, Ann, Name}) ->
     Msg = io_lib:format("Empty record definitions are not allowed. Cannot define the record `~s`", [Name]),
     mk_t_err(pos(Ann), Msg);
+mk_error({unimplemented_interface_function, ConId, InterfaceName, FunName}) ->
+    Msg = io_lib:format("Unimplemented function `~s` from the interface `~s` in the contract `~s`", [FunName, InterfaceName, pp(ConId)]),
+    mk_t_err(pos(ConId), Msg);
+mk_error({referencing_undefined_interface, InterfaceId}) ->
+    Msg = io_lib:format("Trying to implement or extend an undefined interface `~s`", [pp(InterfaceId)]),
+    mk_t_err(pos(InterfaceId), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),
     mk_t_err(pos(0, 0), Msg).

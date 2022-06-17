@@ -1,0 +1,75 @@
+contract interface Creature =
+    entrypoint is_alive : () => bool
+
+contract interface Animal : Creature =
+    entrypoint is_alive : () => bool
+    entrypoint sound : () => string
+
+contract Cat : Animal =
+    entrypoint sound() = "meow"
+    entrypoint is_alive() = true
+
+main contract Main =
+    entrypoint init() = ()
+
+    stateful function g0(_ : Creature) : Cat = Chain.create()
+    stateful function f0(x : Cat) : Creature = g0(x)
+    stateful function h0() =
+        let a : Animal = (Chain.create() : Cat)
+        let c : Creature = (Chain.create() : Cat)
+        let c1 : Creature = a
+        ()
+
+    stateful function g1(x : Animal) : Cat = Chain.create()
+    stateful function f1(x : Cat) : Animal = g1(x)
+
+    stateful function g11(x : list(Animal)) : list(Cat) = [Chain.create()]
+    stateful function f11(x : list(Cat)) : list(Animal) = g11(x)
+
+    stateful function g12(x : Animal * Animal) : Cat * Cat = (Chain.create(), Chain.create())
+    stateful function f12(x : Cat * Cat) : Animal * Animal = g12(x)
+
+    stateful function g13() : map(Cat, Cat) = { [Chain.create()] = Chain.create() }
+    stateful function f13() : map(Animal, Animal) = g13()
+
+    stateful function g2(x : Cat) : Cat = Chain.create()
+    stateful function f2(x : Animal) : Animal = g2(x)  // fail
+
+    stateful function g3(x : Cat) : Animal = f1(x)
+    stateful function f3(x : Cat) : Cat = g3(x)  // fail
+
+    stateful function g4(x : (Cat => Animal)) : Cat = Chain.create()
+    stateful function f4(x : (Animal => Cat)) : Animal = g4(x)
+
+    stateful function g44(x : list(list(Cat) => list(Animal))) : Cat = Chain.create()
+    stateful function f44(x : list(list(Animal) => list(Cat))) : Animal = g44(x)
+
+    stateful function g5(x : (Animal => Animal)) : Cat = Chain.create()
+    stateful function f5(x : (Cat => Cat)) : Animal = g5(x)  // fail
+
+    stateful function g6() : option(Cat) = Some(Chain.create())
+    stateful function f6() : option(Animal) = g6()
+    stateful function h6() : option(Cat) = f6()  // fail
+
+    type cat_type = Cat
+    type animal_type = Animal
+    type cat_cat_map = map(cat_type, cat_type)
+    type animal_animal_map = map(animal_type, animal_type)
+
+    stateful function g71(x : animal_type) : cat_type = Chain.create()
+    stateful function f71(x : cat_type) : animal_type = g1(x)
+
+    stateful function g72() : cat_cat_map = { [Chain.create()] = Chain.create() }
+    stateful function f72() : animal_animal_map = g13()
+
+    stateful function g73() =
+        let some_cat : Cat = Chain.create()
+        let some_animal : Animal = some_cat
+
+        let some_cat_cat_map : map(Cat, Cat) = g13()
+        let some_animal_animal_map : map(Animal, Animal) = some_cat_cat_map
+
+        let x : Animal = some_animal_animal_map[some_cat]  // success
+        let y : Cat    = some_cat_cat_map[some_animal]     // fail
+
+        ()

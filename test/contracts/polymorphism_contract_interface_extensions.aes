@@ -1,0 +1,9 @@
+contract interface I0 =
+  entrypoint f : () => int
+
+contract interface I1 : I0 =
+  entrypoint f : () => int
+  entrypoint something_else : () => int
+
+main contract C =
+  entrypoint f(x : I1) = x.f() // Here we should know that x has f

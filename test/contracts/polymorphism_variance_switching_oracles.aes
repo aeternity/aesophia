@@ -1,0 +1,47 @@
+contract interface Animal =
+    entrypoint sound : () => string
+
+contract Cat : Animal =
+    entrypoint sound() = "meow"
+
+main contract Main =
+    entrypoint oracle() = ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5
+
+    entrypoint query() = oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY
+
+    entrypoint init() =
+        let o01 : oracle(Animal, Animal) = oracle() : oracle(Animal, Animal)  // success
+        let o02 : oracle(Animal, Animal) = oracle() : oracle(Animal, Cat)     // success
+        let o03 : oracle(Animal, Animal) = oracle() : oracle(Cat, Animal)     // fail
+        let o04 : oracle(Animal, Animal) = oracle() : oracle(Cat, Cat)        // fail
+        let o05 : oracle(Animal, Cat)    = oracle() : oracle(Animal, Animal)  // fail
+        let o06 : oracle(Animal, Cat)    = oracle() : oracle(Animal, Cat)     // success
+        let o07 : oracle(Animal, Cat)    = oracle() : oracle(Cat, Animal)     // fail
+        let o08 : oracle(Animal, Cat)    = oracle() : oracle(Cat, Cat)        // fail
+        let o09 : oracle(Cat, Animal)    = oracle() : oracle(Animal, Animal)  // success
+        let o10 : oracle(Cat, Animal)    = oracle() : oracle(Animal, Cat)     // success
+        let o11 : oracle(Cat, Animal)    = oracle() : oracle(Cat, Animal)     // success
+        let o12 : oracle(Cat, Animal)    = oracle() : oracle(Cat, Cat)        // success
+        let o13 : oracle(Cat, Cat)       = oracle() : oracle(Animal, Animal)  // fail
+        let o14 : oracle(Cat, Cat)       = oracle() : oracle(Animal, Cat)     // success
+        let o15 : oracle(Cat, Cat)       = oracle() : oracle(Cat, Animal)     // fail
+        let o16 : oracle(Cat, Cat)       = oracle() : oracle(Cat, Cat)        // success
+
+        let q01 : oracle_query(Animal, Animal) = query() : oracle_query(Animal, Animal)  // success
+        let q02 : oracle_query(Animal, Animal) = query() : oracle_query(Animal, Cat)     // success
+        let q03 : oracle_query(Animal, Animal) = query() : oracle_query(Cat, Animal)     // success
+        let q04 : oracle_query(Animal, Animal) = query() : oracle_query(Cat, Cat)        // success
+        let q05 : oracle_query(Animal, Cat)    = query() : oracle_query(Animal, Animal)  // fail
+        let q06 : oracle_query(Animal, Cat)    = query() : oracle_query(Animal, Cat)     // success
+        let q07 : oracle_query(Animal, Cat)    = query() : oracle_query(Cat, Animal)     // fail
+        let q08 : oracle_query(Animal, Cat)    = query() : oracle_query(Cat, Cat)        // success
+        let q09 : oracle_query(Cat, Animal)    = query() : oracle_query(Animal, Animal)  // fail
+        let q10 : oracle_query(Cat, Animal)    = query() : oracle_query(Animal, Cat)     // fail
+        let q11 : oracle_query(Cat, Animal)    = query() : oracle_query(Cat, Animal)     // success
+        let q12 : oracle_query(Cat, Animal)    = query() : oracle_query(Cat, Cat)        // success
+        let q13 : oracle_query(Cat, Cat)       = query() : oracle_query(Animal, Animal)  // fail
+        let q14 : oracle_query(Cat, Cat)       = query() : oracle_query(Animal, Cat)     // fail
+        let q15 : oracle_query(Cat, Cat)       = query() : oracle_query(Cat, Animal)     // fail
+        let q16 : oracle_query(Cat, Cat)       = query() : oracle_query(Cat, Cat)        // success
+
+        ()

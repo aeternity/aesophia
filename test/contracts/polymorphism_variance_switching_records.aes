@@ -1,0 +1,51 @@
+contract interface Animal =
+    entrypoint sound : () => string
+
+contract Cat : Animal =
+    entrypoint sound() = "meow"
+
+main contract Main =
+    record rec_co('a)     = { x : 'a ,
+                              y : () => 'a }
+    record rec_contra('a) = { x : 'a => unit }
+    record rec_inv('a)    = { x : 'a => unit,
+                              y : () => 'a }
+    record rec_biv('a)    = { x : int }
+
+    stateful entrypoint new_cat() : Cat = Chain.create()
+    stateful entrypoint new_animal() : Animal = new_cat()
+    stateful entrypoint animal_to_unit(_ : Animal) : unit = ()
+    stateful entrypoint cat_to_unit(_ : Cat) : unit = ()
+    stateful entrypoint unit_to_animal() : Animal = new_animal()
+    stateful entrypoint unit_to_cat() : Cat = new_cat()
+
+    stateful entrypoint init() =
+        let ra  : rec_co(Animal) = { x = new_animal(), y = unit_to_animal }
+        let rc  : rec_co(Cat)    = { x = new_cat(), y = unit_to_cat }
+        let r01 : rec_co(Animal) = ra  // success
+        let r02 : rec_co(Animal) = rc  // success
+        let r03 : rec_co(Cat)    = ra  // fail
+        let r04 : rec_co(Cat)    = rc  // sucess
+
+        let ratu : rec_contra(Animal) = { x = animal_to_unit }
+        let rctu : rec_contra(Cat)    = { x = cat_to_unit }
+        let r05  : rec_contra(Animal) = ratu  // success
+        let r06  : rec_contra(Animal) = rctu  // fail
+        let r07  : rec_contra(Cat)    = ratu  // success
+        let r08  : rec_contra(Cat)    = rctu  // success
+
+        let rxaya : rec_inv(Animal) = { x = animal_to_unit, y = unit_to_animal }
+        let rxcyc : rec_inv(Cat)    = { x = cat_to_unit, y = unit_to_cat }
+        let r09   : rec_inv(Animal) = rxaya  // success
+        let r10   : rec_inv(Animal) = rxcyc  // fail
+        let r11   : rec_inv(Cat)    = rxaya  // fail
+        let r12   : rec_inv(Cat)    = rxcyc  // success
+
+        let rba : rec_biv(Animal) = { x = 1 }
+        let rbc : rec_biv(Cat)    = { x = 1 }
+        let r13 : rec_biv(Animal) = rba  // success
+        let r14 : rec_biv(Animal) = rbc  // success
+        let r15 : rec_biv(Cat)    = rba  // success
+        let r16 : rec_biv(Cat)    = rbc  // success
+
+        ()

@@ -38,9 +38,9 @@
 -type namespace_alias() :: none | con().
 -type namespace_parts() :: none | {for, [id()]} | {hiding, [id()]}.
 
--type decl() :: {contract_main, ann(), con(), [decl()]}
-              | {contract_child, ann(), con(), [decl()]}
-              | {contract_interface, ann(), con(), [decl()]}
+-type decl() :: {contract_main, ann(), con(), [con()], [decl()]}
+              | {contract_child, ann(), con(), [con()], [decl()]}
+              | {contract_interface, ann(), con(), [con()], [decl()]}
               | {namespace, ann(), con(), [decl()]}
               | {pragma, ann(), pragma()}
               | {type_decl, ann(), id(), [tvar()]} % Only for error msgs

@@ -83,7 +83,7 @@ from_typed_ast(Type, TypedAst) ->
         string -> do_render_aci_json(JArray)
     end.
 
-encode_contract(Contract = {Head, _, {con, _, Name}, _}) when ?IS_CONTRACT_HEAD(Head) ->
+encode_contract(Contract = {Head, _, {con, _, Name}, _, _}) when ?IS_CONTRACT_HEAD(Head) ->
     C0 = #{name => encode_name(Name)},
 
     Tdefs0 = [ encode_typedef(T) || T <- sort_decls(contract_types(Contract)) ],
@@ -341,10 +341,12 @@ stateful(false) -> "".
 
 %% #contract{Ann, Con, [Declarations]}.
 
-contract_funcs({C, _, _, Decls}) when ?IS_CONTRACT_HEAD(C); C == namespace ->
+contract_funcs({C, _, _, _, Decls}) when ?IS_CONTRACT_HEAD(C) ->
     [ D || D <- Decls, is_fun(D)].
 
-contract_types({C, _, _, Decls}) when ?IS_CONTRACT_HEAD(C); C == namespace ->
+contract_types({namespace, _, _, Decls}) ->
+    [ D || D <- Decls, is_type(D) ];
+contract_types({C, _, _, _, Decls}) when ?IS_CONTRACT_HEAD(C) ->
     [ D || D <- Decls, is_type(D) ].
 
 is_fun({letfun, _, _, _, _, _}) -> true;

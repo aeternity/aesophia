@@ -1,0 +1,13 @@
+contract interface X : Z =
+    entrypoint x : () => int
+
+contract interface Y : X =
+    entrypoint y : () => int
+
+contract interface Z : Y =
+    entrypoint z : () => int
+
+contract C : Z =
+    entrypoint x() = 1
+    entrypoint y() = 1
+    entrypoint z() = 1
