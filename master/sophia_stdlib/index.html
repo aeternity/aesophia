@@ -1184,8 +1184,8 @@ default value <code>v</code> if the key is not present</p>
   private key of the account, proving you have the private key of the oracle to be. If the
   address is the same as the contract <code>sign</code> is ignored and can be left out entirely.</li>
 <li>The <code>qfee</code> is the minimum query fee to be paid by a user when asking a question of the oracle.</li>
-<li>The <code>ttl</code> is the Time To Live for the oracle, either relative to the current
-  height (<code>RelativeTTL(delta)</code>) or a fixed height (<code>FixedTTL(height)</code>).</li>
+<li>The <code>ttl</code> is the Time To Live for the oracle in key blocks, either relative to the current
+  key block height (<code>RelativeTTL(delta)</code>) or a fixed key block height (<code>FixedTTL(height)</code>).</li>
 <li>The type <code>'a</code> is the type of the question to ask.</li>
 <li>The type <code>'b</code> is the type of the oracle answers.</li>
 </ul>
