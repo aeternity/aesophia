@@ -354,29 +354,29 @@ namespace C =
 ## Types
 Sophia has the following types:
 
-| Type                 | Description                                                                                 | Example                                                      |
-|----------------------|---------------------------------------------------------------------------------------------|--------------------------------------------------------------|
-| int                  | A 2-complement integer                                                                      | ```-1```                                                     |
-| char                 | A single character                                                                          | ```'c'```                                                    |
-| address              | æternity address, 32 bytes                                                                  | ```Call.origin```                                            |
-| bool                 | A Boolean                                                                                   | ```true```                                                   |
-| bits                 | A bit field                                                                                 | ```Bits.none```                                              |
-| bytes(n)             | A byte array with `n` bytes                                                                 | ```#fedcba9876543210```                                      |
-| string               | An array of bytes                                                                           | ```"Foo"```                                                  |
-| list                 | A homogeneous immutable singly linked list.                                                 | ```[1, 2, 3]```                                              |
-| ('a, 'b) => 'c       | A function. Parentheses can be skipped if there is only one argument                        | ```(x : int, y : int) => x + y```                            |
-| tuple                | An ordered heterogeneous array                                                              | ```(42, "Foo", true)```                                      |
-| record               | An immutable key value store with fixed key names and typed values                          | ``` record balance = { owner: address, value: int } ```      |
-| map                  | An immutable key value store with dynamic mapping of keys of one type to values of one type | ```type accounts = map(string, address)```                   |
-| option('a)           | An optional value either None or Some('a)                                                   | ```Some(42)```                                               |
-| state                | A user defined type holding the contract state                                              | ```record state = { owner: address, magic_key: bytes(4) }``` |
-| event                | An append only list of blockchain events (or log entries)                                   | ```datatype event = EventX(indexed int, string)```           |
-| hash                 | A 32-byte hash - equivalent to `bytes(32)`                                                  |                                                              |
-| signature            | A signature - equivalent to `bytes(64)`                                                     |                                                              |
-| Chain.ttl            | Time-to-live (fixed height or relative to current block)                                    | ```FixedTTL(1050)``` ```RelativeTTL(50)```                   |
-| oracle('a, 'b)       | And oracle answering questions of type 'a with answers of type 'b                           | ```Oracle.register(acct, qfee, ttl)```                       |
-| oracle_query('a, 'b) | A specific oracle query                                                                     | ```Oracle.query(o, q, qfee, qttl, rttl)```                   |
-| contract             | A user defined, typed, contract address                                                     | ```function call_remote(r : RemoteContract) = r.fun()```     |
+| Type                 | Description                                                                                 | Example                                                                       |
+|----------------------|---------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|
+| int                  | A 2-complement integer                                                                      | ```-1```                                                                      |
+| char                 | A single character                                                                          | ```'c'```                                                                     |
+| address              | æternity address, 32 bytes                                                                  | ```Call.origin``` ```ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt``` |
+| bool                 | A Boolean                                                                                   | ```true```                                                                    |
+| bits                 | A bit field                                                                                 | ```Bits.none```                                                               |
+| bytes(n)             | A byte array with `n` bytes                                                                 | ```#fedcba9876543210```                                                       |
+| string               | An array of bytes                                                                           | ```"Foo"```                                                                   |
+| list                 | A homogeneous immutable singly linked list.                                                 | ```[1, 2, 3]```                                                               |
+| ('a, 'b) => 'c       | A function. Parentheses can be skipped if there is only one argument                        | ```(x : int, y : int) => x + y```                                             |
+| tuple                | An ordered heterogeneous array                                                              | ```(42, "Foo", true)```                                                       |
+| record               | An immutable key value store with fixed key names and typed values                          | ``` record balance = { owner: address, value: int } ```                       |
+| map                  | An immutable key value store with dynamic mapping of keys of one type to values of one type | ```type accounts = map(string, address)```                                    |
+| option('a)           | An optional value either None or Some('a)                                                   | ```Some(42)```                                                                |
+| state                | A user defined type holding the contract state                                              | ```record state = { owner: address, magic_key: bytes(4) }```                  |
+| event                | An append only list of blockchain events (or log entries)                                   | ```datatype event = EventX(indexed int, string)```                            |
+| hash                 | A 32-byte hash - equivalent to `bytes(32)`                                                  |                                                                               |
+| signature            | A signature - equivalent to `bytes(64)`                                                     |                                                                               |
+| Chain.ttl            | Time-to-live (fixed height or relative to current block)                                    | ```FixedTTL(1050)``` ```RelativeTTL(50)```                                    |
+| oracle('a, 'b)       | And oracle answering questions of type 'a with answers of type 'b                           | ```Oracle.register(acct, qfee, ttl)```                                        |
+| oracle_query('a, 'b) | A specific oracle query                                                                     | ```Oracle.query(o, q, qfee, qttl, rttl)```                                    |
+| contract             | A user defined, typed, contract address                                                     | ```function call_remote(r : RemoteContract) = r.fun()```                      |
 
 ## Literals
 | Type                 | Constant/Literal example(s)                                                                                                         |
