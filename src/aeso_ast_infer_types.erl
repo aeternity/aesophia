@@ -824,7 +824,7 @@ infer(Contracts, Options) ->
 
         %% Set the constraints for the builtin types
         ets_new(ord_constraint_types, [set]),
-        OrdTypes = [ {"int"}, {"bool"}, {"bits"}, {"char"}, {"string"}, {"list"}, {"option"} ],
+        OrdTypes = [ {"int"}, {"bool"}, {"bits"}, {"char"}, {"string"}, {"list"}, {"option"}, {"address"} ],
         ets_insert(ord_constraint_types, OrdTypes),
 
         when_warning(warn_unused_functions, fun() -> create_unused_functions() end),
