@@ -2217,9 +2217,9 @@ destroy_and_report_unsolved_constraints(Env) ->
                            (_)                          -> false
                         end, OtherCs3),
     {TVarsCs, []} =
-        lists:partition(fun({is_eq, _})              -> true;
+        lists:partition(fun({is_eq, _})  -> true;
                            ({is_ord, _}) -> true;
-                           (_)                          -> false
+                           (_)           -> false
                         end, OtherCs4),
 
     Unsolved = [ S || S <- [ solve_constraint(Env, dereference_deep(C)) || C <- NamedArgCs ],
