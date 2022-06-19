@@ -502,66 +502,58 @@ function
 
 Guards cannot be stateful even when used inside a stateful function.
 
-## Constrainted type variables
+## Comparable types
 
-Comparing types by equality (using `==` and `!=`) or by inequality
-(using `<`, `>`, `<=`, `=<`, and `>=`) only makes sense by some types.
-For example, it is possible to compare two `int`s by inequality
-(e.g. `1 < 2`), but it would not make sense to compare two instances of
-a contract by inequality.
+Only certain types are allowed to be compared by equality (`==`, `!=`) and
+inequality (`<`, `>`, `=<`, `>=`). For instance, while it is legal to compare
+integers, comparing functions would lead to an error:
 
 ```
-contract C = ...
-contract Main =
-  function f(x : C, y : c) = x > y  // this is wrong
+function f() = 
+  f == f  // type error
 ```
 
-This is solved in Sophia by adding type variable constraints
-(`ord` and `eq`) to limit what can be passed to the binary comparison
-operators.
+The rules apply as follows:
 
-The type of the equality comparison operators is `'a is eq ; ('a, 'a) => bool`
-and of the inequality comparison operators is `'a is ord ; ('a, 'a) => bool`
-which means that these operators can only accept types that are comparable by
-equality or by inequality respectively.
+- All types that are comparable by inequality are also comparable by equality.
+- The builtin types `bool`, `int`, `char`, `bits`, `bytes`, `string`, `unit`,
+  `hash`, `address` and `signature` are comparable by inequality (and thus by
+  equality).
+- The composite types `list`, `option`, and tuples are comparable by
+  equality/inequality if their type parameters are comparable by
+  equality/inequality.
+- The composite types `map`, `oracle`, and `oracle_query` are comparable by
+  equality if their type parameters are comparable by equality.
+- User-defined records and datatypes are comparable by equality if their type
+  parameters are comparable by equality.
+- Smart contracts are comparable by equality.
+- User-declared type variables are comparable according to the [type
+  constraints](#type-constraints) given in the function signature.
 
-The builtin types `bool`, `int`, `char`, `bits`, `bytes`, `string`, `hash`,
-and `signature` are comparable by inequality (and equality) while the types
-`address`, `event` are only comparable by equality.
+In all other cases the types are not comparable.
 
-The composite types `list`, `option`, and `tuple` are comparable by inequality
-if and only if their type argmuments are comparable by inequality.
+### Type constraints
 
-The composite types `map`, `oracle`, and `oracle_query` are comparable by
-equality if and only if their type arguments are comparable by equality.
-
-All user-defined records and datatypes are comparable by equality if their
-type arguments are also comparable by equality. In addition to that, all
-user-defined contracts are comparable by equality.
-
-Anonymous functions (or lambda functions) are not comparable neither by
-equality nor by inequality.
-
-All types that are comparable by inequality are also comparable by equality.
-In other words, if a type has `ord` constraint, that implies that it also
-have `eq` constraint.
-
-The type variable constraints can be specified in the type signature of any
-function.
+Polymorphic types are not declared as comparable by default. If the user
+specifies the type signature for a function, they need to manually declare type
+constraints in order to allow the variables to be compared. This can only be
+done if the type declaration is separated from the function definition. The
+constraints have to be prepended to the type declaration and separated with a
+semicolon:
 
 ```
-// Comparison with < is only allowed because 'a has the constraint ord
-lt : 'a is ord ; ('a, 'a) => bool
-lt(x, y) = x < y
 
-// Multiple constraints can be specified
-ord_and_eq : 'a is ord, 'b is eq ; ('a, 'a, 'b, 'b) => bool
-ord_and_eq(x, y, p, q) = x > y && p == q
+function eq(x : 'a, y : 'a) = x == y  // Type error, 'a is not comparable
+
+function
+  eq : 'a is eq ; ('a, 'a) => bool
+  eq(x, y) = x == y                   // Compiles
+
+function eq(x, y) = x == y            // Compiles as the constraints are inferred
 ```
 
-If the constraints are not mentioned, the type variable is assumed to
-have no constraints, and calling any equality or inequality operation
-on it will cause an error.
+Currently only two constraints are allowed: `eq` for equality and `ord` for
+inequality. Declaring a type as `ord` automatically implies `eq`.
 
 ## Lists
 
