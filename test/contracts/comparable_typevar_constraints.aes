@@ -55,10 +55,10 @@ main contract C =
     function signature_ord(x : signature, y : signature) = x >= y  // pass
     function signature_eq (x : signature, y : signature) = x == y  // pass
 
-    // Eq types
-
-    function address_ord(x : address, y : address) = x >= y  // fail
+    function address_ord(x : address, y : address) = x >= y  // pass
     function address_eq (x : address, y : address) = x == y  // pass
+
+    // Eq types
 
     function event_ord(x : Chain.ttl, y : Chain.ttl) = x >= y  // fail
     function event_eq (x : Chain.ttl, y : Chain.ttl) = x == y  // pass
@@ -86,14 +86,14 @@ main contract C =
 
     // Ord composite types of eq
 
-    function list_of_eq_ord(x : list(address), y : list(address)) = x >= y  // fail
-    function list_of_eq_eq (x : list(address), y : list(address)) = x == y  // pass
+    function list_of_eq_ord(x : list(A), y : list(A)) = x >= y  // fail
+    function list_of_eq_eq (x : list(A), y : list(A)) = x == y  // pass
 
-    function option_of_eq_ord(x : option(address), y : option(address)) = x >= y  // fail
-    function option_of_eq_eq (x : option(address), y : option(address)) = x == y  // pass
+    function option_of_eq_ord(x : option(A), y : option(A)) = x >= y  // fail
+    function option_of_eq_eq (x : option(A), y : option(A)) = x == y  // pass
 
-    function tuple_of_eq_ord(x : (address * int), y : (address * int)) = x >= y  // fail
-    function tuple_of_eq_eq (x : (address * int), y : (address * int)) = x == y  // pass
+    function tuple_of_eq_ord(x : (A * int), y : (A * int)) = x >= y  // fail
+    function tuple_of_eq_eq (x : (A * int), y : (A * int)) = x == y  // pass
 
     // Ord composite types of nomcomparable
 
@@ -125,20 +125,20 @@ main contract C =
 
     // Eq composite types of eq
 
-    function map_of_eq_ord(x : map(address, address), y : map(address, address)) = x >= y  // fail
-    function map_of_eq_eq (x : map(address, address), y : map(address, address)) = x == y  // pass
+    function map_of_eq_ord(x : map(A, A), y : map(A, A)) = x >= y  // fail
+    function map_of_eq_eq (x : map(A, A), y : map(A, A)) = x == y  // pass
 
-    function oracle_of_eq_ord(x : oracle(address, address), y : oracle(address, address)) = x >= y  // fail
-    function oracle_of_eq_eq (x : oracle(address, address), y : oracle(address, address)) = x == y  // pass
+    function oracle_of_eq_ord(x : oracle(A, A), y : oracle(A, A)) = x >= y  // fail
+    function oracle_of_eq_eq (x : oracle(A, A), y : oracle(A, A)) = x == y  // pass
 
-    function oracle_query_of_eq_ord(x : oracle_query(address, address), y : oracle_query(address, address)) = x >= y  // fail
-    function oracle_query_of_eq_eq (x : oracle_query(address, address), y : oracle_query(address, address)) = x == y  // pass
+    function oracle_query_of_eq_ord(x : oracle_query(A, A), y : oracle_query(A, A)) = x >= y  // fail
+    function oracle_query_of_eq_eq (x : oracle_query(A, A), y : oracle_query(A, A)) = x == y  // pass
 
-    function datatype_of_eq_ord(x : custom_datatype(address), y : custom_datatype(address)) = x >= y  // fail
-    function datatype_of_eq_eq (x : custom_datatype(address), y : custom_datatype(address)) = x == y  // pass
+    function datatype_of_eq_ord(x : custom_datatype(A), y : custom_datatype(A)) = x >= y  // fail
+    function datatype_of_eq_eq (x : custom_datatype(A), y : custom_datatype(A)) = x == y  // pass
 
-    function record_of_eq_ord(x : custom_record(address), y : custom_record(address)) = x >= y  // fail
-    function record_of_eq_eq (x : custom_record(address), y : custom_record(address)) = x == y  // pass
+    function record_of_eq_ord(x : custom_record(A), y : custom_record(A)) = x >= y  // fail
+    function record_of_eq_eq (x : custom_record(A), y : custom_record(A)) = x == y  // pass
 
     // Eq composite types of nomcomparable
 
