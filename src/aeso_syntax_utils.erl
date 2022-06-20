@@ -61,6 +61,7 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
             {fun_t, _, Named, Args, Ret} -> Type([Named, Args, Ret]);
             {app_t, _, T, Ts}            -> Type([T | Ts]);
             {tuple_t, _, Ts}             -> Type(Ts);
+            {constrained_t, _, _, T}     -> Type(T);
             %% named_arg_t()
             {named_arg_t, _, _, T, E} -> Plus(Type(T), Expr(E));
             %% expr()
