@@ -362,8 +362,6 @@ to_fcode(Env, [{Contract, Attrs, {con, _, Name}, _Impls, Decls}|Rest])
             Env1 = decls_to_fcode(Env#{ context => {abstract_contract, Name} }, Decls),
             to_fcode(Env1, Rest)
     end;
-to_fcode(_Env, [NotMain = {NotMainHead, _ ,_ , _}]) when NotMainHead =/= contract_def ->
-    fcode_error({last_declaration_must_be_main_contract, NotMain});
 to_fcode(Env, [{namespace, _, {con, _, Con}, Decls} | Code]) ->
     Env1 = decls_to_fcode(Env#{ context => {namespace, Con} }, Decls),
     to_fcode(Env1, Code).
