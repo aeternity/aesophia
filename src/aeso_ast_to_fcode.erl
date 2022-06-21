@@ -377,11 +377,6 @@ decls_to_fcode(Env, Decls) ->
                 end, Env1, Decls).
 
 -spec decl_to_fcode(env(), aeso_syntax:decl()) -> env().
-decl_to_fcode(Env = #{context := {contract_def, _}}, {fun_decl, _, Id, _}) ->
-    case is_no_code(Env) of
-        false -> fcode_error({missing_definition, Id});
-        true  -> Env
-    end;
 decl_to_fcode(Env, {fun_decl, _, _, _})  -> Env;
 decl_to_fcode(Env, {type_def, _Ann, Name, Args, Def}) ->
     typedef_to_fcode(Env, Name, Args, Def);

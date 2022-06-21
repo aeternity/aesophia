@@ -1013,6 +1013,9 @@ infer_contract(Env0, What, Defs0, Options) ->
             contract           -> bind_state(Env1)   %% bind state and put
         end,
     {ProtoSigs, Decls} = lists:unzip([ check_fundecl(Env1, Decl) || Decl <- Get(prototype, Defs) ]),
+    [ type_error({missing_definition, Id}) || {fun_decl, _, Id, _} <- Decls,
+                                              What =:= contract,
+                                              get_option(no_code, false) =:= false ],
     Env3      = bind_funs(ProtoSigs, Env2),
     Functions = Get(function, Defs),
     %% Check for duplicates in Functions (we turn it into a map below)
@@ -3484,6 +3487,9 @@ mk_error({unimplemented_interface_function, ConId, InterfaceName, FunName}) ->
 mk_error({referencing_undefined_interface, InterfaceId}) ->
     Msg = io_lib:format("Trying to implement or extend an undefined interface `~s`", [pp(InterfaceId)]),
     mk_t_err(pos(InterfaceId), Msg);
+mk_error({missing_definition, Id}) ->
+    Msg = io_lib:format("Missing definition of function `~s`", [name(Id)]),
+    mk_t_err(pos(Id), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),
     mk_t_err(pos(0, 0), Msg).

@@ -289,34 +289,26 @@ failing_contracts() ->
 
     %% Type errors
     , ?TYPE_ERROR(name_clash,
-       [<<?Pos(14, 3)
+       [<<?Pos(4, 3)
+          "Duplicate definitions of `double_def` at\n"
+          "  - line 3, column 3\n"
+          "  - line 4, column 3">>,
+        <<?Pos(7, 3)
           "Duplicate definitions of `abort` at\n"
           "  - (builtin location)\n"
-          "  - line 14, column 3">>,
-        <<?Pos(15, 3)
+          "  - line 7, column 3">>,
+        <<?Pos(8, 3)
           "Duplicate definitions of `require` at\n"
           "  - (builtin location)\n"
-          "  - line 15, column 3">>,
-        <<?Pos(11, 3)
-          "Duplicate definitions of `double_def` at\n"
-          "  - line 10, column 3\n"
-          "  - line 11, column 3">>,
-        <<?Pos(5, 3)
-          "Duplicate definitions of `double_proto` at\n"
-          "  - line 4, column 3\n"
-          "  - line 5, column 3">>,
-        <<?Pos(8, 3)
-          "Duplicate definitions of `proto_and_def` at\n"
-          "  - line 7, column 3\n"
           "  - line 8, column 3">>,
-        <<?Pos(16, 3)
+        <<?Pos(9, 3)
           "Duplicate definitions of `put` at\n"
           "  - (builtin location)\n"
-          "  - line 16, column 3">>,
-        <<?Pos(17, 3)
+          "  - line 9, column 3">>,
+        <<?Pos(10, 3)
           "Duplicate definitions of `state` at\n"
           "  - (builtin location)\n"
-          "  - line 17, column 3">>])
+          "  - line 10, column 3">>])
     , ?TYPE_ERROR(type_errors,
        [<<?Pos(17, 23)
           "Unbound variable `zz`">>,
@@ -1025,6 +1017,12 @@ failing_contracts() ->
                    <<?Pos(44,13)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
                      "when checking the type of the pattern `q15 : oracle_query(Cat, Cat)` against the expected type `oracle_query(Cat, Animal)`">>])
+    , ?TYPE_ERROR(missing_definition,
+                  [<<?Pos(2,14)
+                     "Missing definition of function `foo`">>])
+    , ?TYPE_ERROR(child_with_decls,
+                  [<<?Pos(2,14)
+                     "Missing definition of function `f`">>])
     ].
 
 -define(Path(File), "code_errors/" ??File).
@@ -1033,9 +1031,7 @@ failing_contracts() ->
 -define(FATE_ERR(File, Line, Col, Err), {?Path(File), ?Msg(File, Line, Col, Err)}).
 
 failing_code_gen_contracts() ->
-    [ ?FATE_ERR(missing_definition, 2, 14,
-            "Missing definition of function 'foo'.")
-    , ?FATE_ERR(higher_order_entrypoint, 2, 20,
+    [ ?FATE_ERR(higher_order_entrypoint, 2, 20,
             "The argument\n"
             "  f : (int) => int\n"
             "of entrypoint 'apply' has a higher-order (contains function types) type.")
@@ -1074,8 +1070,6 @@ failing_code_gen_contracts() ->
             "Invalid oracle type\n"
             "  oracle(string, (int) => int)\n"
             "The response type must not be higher-order (contain function types).")
-    , ?FATE_ERR(child_with_decls, 2, 14,
-            "Missing definition of function 'f'.")
     ].
 
 validation_test_() ->

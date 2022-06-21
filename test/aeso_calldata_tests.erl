@@ -29,7 +29,7 @@ calldata_aci_test_() ->
      [ {"Testing " ++ ContractName ++ " contract calling " ++ Fun,
         fun() ->
            ContractString       = aeso_test_utils:read_contract(ContractName),
-           {ok, ContractACIBin} = aeso_aci:contract_interface(string, ContractString),
+           {ok, ContractACIBin} = aeso_aci:contract_interface(string, ContractString, [no_code]),
            ContractACI = binary_to_list(ContractACIBin),
            io:format("ACI:\n~s\n", [ContractACIBin]),
            FateExprs = ast_exprs(ContractACI, Fun, Args),
