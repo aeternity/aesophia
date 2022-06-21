@@ -1030,8 +1030,8 @@ infer_contract(Env0, What, Defs0, Options) ->
     {Env4, Defs1} = check_sccs(Env3, FunMap, SCCs, []),
     %% Remove namespaces used in the current namespace
     Env5 = Env4#env{ used_namespaces = OldUsedNamespaces },
-    %% Check that `init` doesn't read or write the state
-    check_state_dependencies(Env4, Defs1),
+    %% Check that `init` doesn't read or write the state and that `init` is not missing
+    check_state(Env4, Defs1),
     destroy_and_report_type_errors(Env4),
     %% Add inferred types of definitions
     {Env5, TypeDefs ++ Decls ++ Defs1}.
@@ -1623,8 +1623,22 @@ check_stateful_named_arg(#env{ stateful = false, current_function = Fun }, {id, 
     end;
 check_stateful_named_arg(_, _, _) -> ok.
 
-%% Check that `init` doesn't read or write the state
-check_state_dependencies(Env, Defs) ->
+check_state_init(Env) ->
+    Top = Env#env.namespace,
+    StateType = lookup_type(Env, {id, [{origin, system}], "state"}),
+    case unfold_types_in_type(Env, StateType) of
+        false  ->
+            ok;
+        {_, {_, {_, {alias_t, {tuple_t, _, []}}}}} ->
+            ok;
+        _ ->
+            #scope{ ann = AnnCon } = get_scope(Env, Top),
+            type_error({missing_init_function, {con, AnnCon, lists:last(Top)}})
+    end.
+
+%% Check that `init` doesn't read or write the state and that `init` is defined
+%% when the state type is not unit
+check_state(Env, Defs) ->
     Top       = Env#env.namespace,
     GetState  = Top ++ ["state"],
     SetState  = Top ++ ["put"],
@@ -1633,7 +1647,7 @@ check_state_dependencies(Env, Defs) ->
     Funs      = [ {Top ++ [Name], Fun} || Fun = {letfun, _, {id, _, Name}, _Args, _Type, _GuardedBodies} <- Defs ],
     Deps      = maps:from_list([{Name, UsedNames(Def)} || {Name, Def} <- Funs]),
     case maps:get(Init, Deps, false) of
-        false -> ok;    %% No init, so nothing to check
+        false -> get_option(no_code, false) orelse check_state_init(Env);
         _     ->
             [ type_error({init_depends_on_state, state, Chain})
               || Chain <- get_call_chains(Deps, Init, GetState) ],
@@ -3504,6 +3518,10 @@ mk_error({parameterized_state, Ann}) ->
 mk_error({parameterized_event, Ann}) ->
     Msg = "The event type cannot be parameterized",
     mk_t_err(pos(Ann), Msg);
+mk_error({missing_init_function, Con}) ->
+    Msg = io_lib:format("Missing `init` function for the contract `~s`.", [name(Con)]),
+    Cxt = "The `init` function can only be omitted if the state type is `unit`",
+    mk_t_err(pos(Con), Msg, Cxt);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),
     mk_t_err(pos(0, 0), Msg).

@@ -1035,6 +1035,11 @@ failing_contracts() ->
                   [<<?Pos(3,12)
                      "The event type cannot be parameterized">>
                   ])
+    , ?TYPE_ERROR(missing_init_function,
+                  [<<?Pos(1,10)
+                     "Missing `init` function for the contract `MissingInitFunction`.\n"
+                     "The `init` function can only be omitted if the state type is `unit`">>
+                  ])
     ].
 
 -define(Path(File), "code_errors/" ??File).
@@ -1051,9 +1056,6 @@ failing_code_gen_contracts() ->
             "The return type\n"
             "  (int) => int\n"
             "of entrypoint 'add' is higher-order (contains function types).")
-    , ?FATE_ERR(missing_init_function, 1, 10,
-            "Missing init function for the contract 'MissingInitFunction'.\n"
-            "The 'init' function can only be omitted if the state type is 'unit'.")
     , ?FATE_ERR(polymorphic_aens_resolve, 4, 5,
             "Invalid return type of AENS.resolve:\n"
             "  'a\n"

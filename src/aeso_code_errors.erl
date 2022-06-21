@@ -14,10 +14,6 @@ format({last_declaration_must_be_main_contract, Decl = {Kind, _, {con, _, C}, _}
     Msg = io_lib:format("Expected a main contract as the last declaration instead of the ~p '~s'",
                         [Kind, C]),
     mk_err(pos(Decl), Msg);
-format({missing_init_function, Con}) ->
-    Msg = io_lib:format("Missing init function for the contract '~s'.", [pp_expr(Con)]),
-    Cxt = "The 'init' function can only be omitted if the state type is 'unit'.",
-    mk_err(pos(Con), Msg, Cxt);
 format({invalid_entrypoint, Why, Ann, {id, _, Name}, Thing}) ->
     What = case Why of higher_order -> "higher-order (contains function types)";
                        polymorphic  -> "polymorphic (contains type variables)" end,

@@ -326,7 +326,7 @@ get_option(Opt, Env, Default) ->
 %% -- Compilation ------------------------------------------------------------
 
 -spec to_fcode(env(), aeso_syntax:ast()) -> {env(), fcode()}.
-to_fcode(Env, [{Contract, Attrs, Con = {con, _, Name}, _Impls, Decls}|Rest])
+to_fcode(Env, [{Contract, Attrs, {con, _, Name}, _Impls, Decls}|Rest])
   when ?IS_CONTRACT_HEAD(Contract) ->
     case Contract =:= contract_interface of
         false ->
@@ -349,7 +349,7 @@ to_fcode(Env, [{Contract, Attrs, Con = {con, _, Name}, _Impls, Decls}|Rest])
                           event_type    => EventType,
                           payable       => Payable,
                           functions     => add_init_function(
-                                             Env1, Con, StateType,
+                                             Env1,
                                              add_event_function(Env1, EventType, Funs)) },
             case Contract of
                 contract_main -> [] = Rest, {Env1, ConFcode};
@@ -1189,11 +1189,11 @@ builtin_to_fcode(_Layout, Builtin, Args) ->
 
 %% -- Init function --
 
-add_init_function(Env, Main, StateType, Funs0) ->
+add_init_function(Env, Funs0) ->
     case is_no_code(Env) of
         true  -> Funs0;
         false ->
-            Funs     = add_default_init_function(Env, Main, StateType, Funs0),
+            Funs     = add_default_init_function(Env, Funs0),
             InitName = {entrypoint, <<"init">>},
             InitFun  = #{ body := InitBody} = maps:get(InitName, Funs),
             Funs1 = Funs#{ InitName => InitFun#{ return => {tuple, []},
@@ -1201,16 +1201,14 @@ add_init_function(Env, Main, StateType, Funs0) ->
             Funs1
     end.
 
-add_default_init_function(_Env, Main, StateType, Funs) ->
+add_default_init_function(_Env, Funs) ->
     InitName = {entrypoint, <<"init">>},
     case maps:get(InitName, Funs, none) of
-        %% Only add default init function if state is unit.
-        none when StateType == {tuple, []} ->
+        none ->
             Funs#{ InitName => #{attrs  => [],
                                  args   => [],
                                  return => {tuple, []},
                                  body   => {tuple, []}} };
-        none -> fcode_error({missing_init_function, Main});
         _    -> Funs
     end.
 
