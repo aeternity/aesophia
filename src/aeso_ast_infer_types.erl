@@ -14,8 +14,13 @@
 
 -export([ infer/1
         , infer/2
+        , unfold_types_in_type/2
         , unfold_types_in_type/3
+        , switch_scope/2
         , pp_type/2
+        , lookup_env1/4
+	, name/1
+	, qname/1
         ]).
 
 -include("aeso_utils.hrl").
@@ -158,6 +163,10 @@
 -define(CONSTRUCTOR_MOCK_NAME, "#__constructor__#").
 
 %% -- Environment manipulation -----------------------------------------------
+
+-spec switch_scope(qname(), env()) -> env().
+switch_scope(Scope, Env) ->
+    Env#env{namespace = Scope}.
 
 -spec push_scope(namespace | contract, aeso_syntax:con(), env()) -> env().
 push_scope(Kind, Con, Env) ->
@@ -403,7 +412,7 @@ lookup_env(Env, Kind, Ann, Name) ->
             end
     end.
 
--spec lookup_env1(env(), type | term, aeso_syntax:ann(), qname()) -> false | {qname(), fun_info()}.
+-spec lookup_env1(env(), type | term, aeso_syntax:ann(), qname()) -> false | {qname(), fun_info() | type_info()}.
 lookup_env1(#env{ namespace = Current, used_namespaces = UsedNamespaces, scopes = Scopes }, Kind, Ann, QName) ->
     Qual = lists:droplast(QName),
     Name = lists:last(QName),
@@ -1586,13 +1595,13 @@ app_t(Ann, Name, Args) -> {app_t, Ann, Name, Args}.
 lookup_name(Env, As, Name) ->
     lookup_name(Env, As, Name, []).
 
-lookup_name(Env = #env{ namespace = NS, current_function = {id, _, Fun} = CurFn }, As, Id, Options) ->
+lookup_name(Env = #env{ namespace = NS, current_function = CurFn }, As, Id, Options) ->
     case lookup_env(Env, term, As, qname(Id)) of
         false ->
             type_error({unbound_variable, Id}),
             {Id, fresh_uvar(As)};
         {QId, {_, Ty}} ->
-            when_warning(warn_unused_variables, fun() -> used_variable(NS, Fun, QId) end),
+            when_warning(warn_unused_variables, fun() -> used_variable(NS, name(CurFn), QId) end),
             when_warning(warn_unused_functions,
                          fun() -> register_function_call(NS ++ qname(CurFn), QId) end),
             Freshen = proplists:get_value(freshen, Options, false),
