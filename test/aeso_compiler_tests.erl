@@ -973,7 +973,8 @@ failing_contracts() ->
                      "when checking the type of the pattern `r10 : rec_inv(Animal)` against the expected type `Main.rec_inv(Cat)`">>,
                    <<?Pos(41,13)
                      "Cannot unify `Animal` and `Cat` in a invariant context\n"
-                     "when checking the type of the pattern `r11 : rec_inv(Cat)` against the expected type `Main.rec_inv(Animal)`">>])
+                     "when checking the type of the pattern `r11 : rec_inv(Cat)` against the expected type `Main.rec_inv(Animal)`">>
+                  ])
     , ?TYPE_ERROR(polymorphism_variance_switching_oracles,
                   [<<?Pos(15,13)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
@@ -1016,13 +1017,24 @@ failing_contracts() ->
                      "when checking the type of the pattern `q14 : oracle_query(Cat, Cat)` against the expected type `oracle_query(Animal, Cat)`">>,
                    <<?Pos(44,13)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
-                     "when checking the type of the pattern `q15 : oracle_query(Cat, Cat)` against the expected type `oracle_query(Cat, Animal)`">>])
+                     "when checking the type of the pattern `q15 : oracle_query(Cat, Cat)` against the expected type `oracle_query(Cat, Animal)`">>
+                  ])
     , ?TYPE_ERROR(missing_definition,
                   [<<?Pos(2,14)
-                     "Missing definition of function `foo`">>])
+                     "Missing definition of function `foo`">>
+                  ])
     , ?TYPE_ERROR(child_with_decls,
                   [<<?Pos(2,14)
-                     "Missing definition of function `f`">>])
+                     "Missing definition of function `f`">>
+                  ])
+    , ?TYPE_ERROR(parameterised_state,
+                  [<<?Pos(3,8)
+                     "The state type cannot be parameterized">>
+                  ])
+    , ?TYPE_ERROR(parameterised_event,
+                  [<<?Pos(3,12)
+                     "The event type cannot be parameterized">>
+                  ])
     ].
 
 -define(Path(File), "code_errors/" ??File).
@@ -1042,10 +1054,6 @@ failing_code_gen_contracts() ->
     , ?FATE_ERR(missing_init_function, 1, 10,
             "Missing init function for the contract 'MissingInitFunction'.\n"
             "The 'init' function can only be omitted if the state type is 'unit'.")
-    , ?FATE_ERR(parameterised_state, 3, 8,
-            "The state type cannot be parameterized.")
-    , ?FATE_ERR(parameterised_event, 3, 12,
-            "The event type cannot be parameterized.")
     , ?FATE_ERR(polymorphic_aens_resolve, 4, 5,
             "Invalid return type of AENS.resolve:\n"
             "  'a\n"

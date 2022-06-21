@@ -1098,6 +1098,7 @@ check_typedef_sccs(Env, TypeMap, [{acyclic, Name} | SCCs], Acc) ->
     case maps:get(Name, TypeMap, undefined) of
         undefined -> check_typedef_sccs(Env, TypeMap, SCCs, Acc);    %% Builtin type
         {type_def, Ann, D, Xs, Def0} ->
+            check_parameterizable(D, Xs),
             Def  = check_event(Env, Name, Ann, check_typedef(bind_tvars(Xs, Env), Def0)),
             Acc1 = [{type_def, Ann, D, Xs, Def} | Acc],
             Env1 = bind_type(Name, Ann, {Xs, Def}, Env),
@@ -1352,6 +1353,13 @@ check_fields(Env, _TypeMap, _, []) -> Env;
 check_fields(Env, TypeMap, RecTy, [{field_t, Ann, Id, Type} | Fields]) ->
     Env1 = bind_field(name(Id), #field_info{ ann = Ann, kind = record, field_t = Type, record_t = RecTy }, Env),
     check_fields(Env1, TypeMap, RecTy, Fields).
+
+check_parameterizable({id, Ann, "event"}, [_ | _]) ->
+    type_error({parameterized_event, Ann});
+check_parameterizable({id, Ann, "state"}, [_ | _]) ->
+    type_error({parameterized_state, Ann});
+check_parameterizable(_Name, _Xs) ->
+    ok.
 
 check_event(Env, "event", Ann, Def) ->
     case Def of
@@ -3490,6 +3498,12 @@ mk_error({referencing_undefined_interface, InterfaceId}) ->
 mk_error({missing_definition, Id}) ->
     Msg = io_lib:format("Missing definition of function `~s`", [name(Id)]),
     mk_t_err(pos(Id), Msg);
+mk_error({parameterized_state, Ann}) ->
+    Msg = "The state type cannot be parameterized",
+    mk_t_err(pos(Ann), Msg);
+mk_error({parameterized_event, Ann}) ->
+    Msg = "The event type cannot be parameterized",
+    mk_t_err(pos(Ann), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),
     mk_t_err(pos(0, 0), Msg).
