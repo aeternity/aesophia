@@ -396,8 +396,7 @@ decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, Id = {id, _, Name}, Ar
     Env#{ functions := NewFuns }.
 
 -spec typedef_to_fcode(env(), aeso_syntax:id(), [aeso_syntax:tvar()], aeso_syntax:typedef()) -> env().
-typedef_to_fcode(Env, Id = {id, _, Name}, Xs, Def) ->
-    check_state_and_event_types(Env, Id, Xs),
+typedef_to_fcode(Env, {id, _, Name}, Xs, Def) ->
     Q = qname(Env, Name),
     FDef = fun(Args) when length(Args) == length(Xs) ->
                 Sub = maps:from_list(lists:zip([X || {tvar, _, X} <- Xs], Args)),
@@ -460,14 +459,6 @@ compute_state_layout(R, [H | T]) ->
     {R2, [H1 | T1]};
 compute_state_layout(R, _) ->
     {R + 1, {reg, R}}.
-
-check_state_and_event_types(#{ context := {contract_def, _} }, Id, [_ | _]) ->
-    case Id of
-        {id, _, "state"} -> fcode_error({parameterized_state, Id});
-        {id, _, "event"} -> fcode_error({parameterized_event, Id});
-        _                -> ok
-    end;
-check_state_and_event_types(_, _, _) -> ok.
 
 -spec type_to_fcode(env(), aeso_syntax:type()) -> ftype().
 type_to_fcode(Env, Type) ->
