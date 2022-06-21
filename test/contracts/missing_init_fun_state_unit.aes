@@ -1,0 +1,9 @@
+contract AliasToAliasToUnit =
+  type alias = unit
+  type state = alias
+
+contract AliasToUnit =
+  type state = unit
+
+main contract ImplicitState =
+    type sometype = int

@@ -208,6 +208,7 @@ compilable_contracts() ->
      "polymorphism_contract_interface_extensions",
      "polymorphism_contract_interface_same_decl_multi_interface",
      "polymorphism_contract_interface_same_name_same_type",
+     "missing_init_fun_state_unit",
      "test" % Custom general-purpose test file. Keep it last on the list.
     ].
 
@@ -1035,9 +1036,14 @@ failing_contracts() ->
                   [<<?Pos(3,12)
                      "The event type cannot be parameterized">>
                   ])
-    , ?TYPE_ERROR(missing_init_function,
+    , ?TYPE_ERROR(missing_init_fun_alias_to_type,
                   [<<?Pos(1,10)
-                     "Missing `init` function for the contract `MissingInitFunction`.\n"
+                     "Missing `init` function for the contract `AliasToType`.\n"
+                     "The `init` function can only be omitted if the state type is `unit`">>
+                  ])
+    , ?TYPE_ERROR(missing_init_fun_alias_to_alias_to_type,
+                  [<<?Pos(1,10)
+                     "Missing `init` function for the contract `AliasToAliasToType`.\n"
                      "The `init` function can only be omitted if the state type is `unit`">>
                   ])
     ].
