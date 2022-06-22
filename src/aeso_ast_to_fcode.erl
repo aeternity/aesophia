@@ -475,8 +475,6 @@ type_to_fcode(Env, Sub, {record_t, Fields}) ->
     type_to_fcode(Env, Sub, {tuple_t, [], lists:map(FieldType, Fields)});
 type_to_fcode(_Env, _Sub, {bytes_t, _, N}) ->
     {bytes, N};
-type_to_fcode(_Env, _Sub, {tvar, Ann, "void"}) ->
-    fcode_error({found_void, Ann});
 type_to_fcode(_Env, Sub, {tvar, _, X}) ->
     maps:get(X, Sub, {tvar, X});
 type_to_fcode(_Env, _Sub, {fun_t, Ann, _, var_args, _}) ->

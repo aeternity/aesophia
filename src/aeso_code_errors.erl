@@ -42,8 +42,6 @@ format({var_args_not_set, Expr}) ->
     mk_err( pos(Expr), "Could not deduce type of variable arguments list"
           , "When compiling " ++ pp_expr(Expr)
           );
-format({found_void, Ann}) ->
-    mk_err(pos(Ann), "Found a void-typed value.", "`void` is a restricted, uninhabited type. Did you mean `unit`?");
 
 format(Err) ->
     mk_err(aeso_errors:pos(0, 0), io_lib:format("Unknown error: ~p\n", [Err])).
