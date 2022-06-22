@@ -1032,6 +1032,8 @@ infer_contract(Env0, What, Defs0, Options) ->
     Env5 = Env4#env{ used_namespaces = OldUsedNamespaces },
     %% Check that `init` doesn't read or write the state and that `init` is not missing
     check_state(Env4, Defs1),
+    %% Check that entrypoints have first-order arg types and return types
+    check_entrypoints(Defs1),
     destroy_and_report_type_errors(Env4),
     %% Add inferred types of definitions
     {Env5, TypeDefs ++ Decls ++ Defs1}.
@@ -1622,6 +1624,27 @@ check_stateful_named_arg(#env{ stateful = false, current_function = Fun }, {id, 
         _           -> type_error({value_arg_not_allowed, Default, Fun})
     end;
 check_stateful_named_arg(_, _, _) -> ok.
+
+check_entrypoints(Defs) ->
+    [ ensure_first_order_entrypoint(LetFun)
+      || LetFun <- Defs,
+         aeso_syntax:get_ann(entrypoint, LetFun, false) ].
+
+ensure_first_order_entrypoint({letfun, Ann, Id = {id, _, Name}, Args, Ret, _}) ->
+    [ ensure_first_order(ArgType, {higher_order_entrypoint, AnnArg, Id, {argument, ArgId, ArgType}})
+      || {typed, AnnArg, ArgId, ArgType} <- Args ],
+    [ ensure_first_order(Ret, {higher_order_entrypoint, Ann, Id, {result, Ret}})
+      || Name /= "init" ],  %% init can return higher-order values, since they're written to the store
+                            %% rather than being returned.
+    ok.
+
+ensure_first_order(Type, Err) ->
+    is_first_order(Type) orelse type_error(Err).
+
+is_first_order({fun_t, _, _, _, _})    -> false;
+is_first_order(Ts) when is_list(Ts)    -> lists:all(fun is_first_order/1, Ts);
+is_first_order(Tup) when is_tuple(Tup) -> is_first_order(tuple_to_list(Tup));
+is_first_order(_)                      -> true.
 
 check_state_init(Env) ->
     Top = Env#env.namespace,
@@ -3522,6 +3545,19 @@ mk_error({missing_init_function, Con}) ->
     Msg = io_lib:format("Missing `init` function for the contract `~s`.", [name(Con)]),
     Cxt = "The `init` function can only be omitted if the state type is `unit`",
     mk_t_err(pos(Con), Msg, Cxt);
+mk_error({higher_order_entrypoint, Ann, {id, _, Name}, Thing}) ->
+    What = "higher-order (contains function types)",
+    ThingS = case Thing of
+                 {argument, X, T} -> io_lib:format("argument\n~s`\n", [pp_typed("  `", X, T)]);
+                 {result, T}      -> io_lib:format("return type\n~s`\n", [pp_type("  `", T)])
+             end,
+    Bad = case Thing of
+              {argument, _, _} -> io_lib:format("has a ~s type", [What]);
+              {result, _}      -> io_lib:format("is ~s", [What])
+          end,
+    Msg = io_lib:format("The ~sof entrypoint `~s` ~s",
+                        [ThingS, Name, Bad]),
+    mk_t_err(pos(Ann), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),
     mk_t_err(pos(0, 0), Msg).

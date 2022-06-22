@@ -10,22 +10,6 @@
 
 -export([format/1, pos/1]).
 
-format({invalid_entrypoint, Why, Ann, {id, _, Name}, Thing}) ->
-    What = case Why of higher_order -> "higher-order (contains function types)";
-                       polymorphic  -> "polymorphic (contains type variables)" end,
-    ThingS = case Thing of
-                 {argument, X, T} -> io_lib:format("argument\n~s\n", [pp_typed(X, T)]);
-                 {result, T}      -> io_lib:format("return type\n~s\n", [pp_type(2, T)])
-             end,
-    Bad = case Thing of
-              {argument, _, _} -> io_lib:format("has a ~s type", [What]);
-              {result, _}      -> io_lib:format("is ~s", [What])
-          end,
-    Msg = io_lib:format("The ~sof entrypoint '~s' ~s.",
-                        [ThingS, Name, Bad]),
-    case Why of
-        higher_order -> mk_err(pos(Ann), Msg)
-    end;
 format({invalid_aens_resolve_type, Ann, T}) ->
     Msg = io_lib:format("Invalid return type of AENS.resolve:\n"
                         "~s\n"
@@ -51,12 +35,6 @@ pos(Ann) ->
     Line = aeso_syntax:get_ann(line, Ann, 0),
     Col  = aeso_syntax:get_ann(col, Ann, 0),
     aeso_errors:pos(File, Line, Col).
-
-pp_typed(E, T) ->
-    prettypr:format(prettypr:nest(2,
-    lists:foldr(fun prettypr:beside/2, prettypr:empty(),
-                [aeso_pretty:expr(E), prettypr:text(" : "),
-                 aeso_pretty:type(T)]))).
 
 pp_expr(E) ->
     pp_expr(0, E).

@@ -378,14 +378,12 @@ decls_to_fcode(Env, Decls) ->
 decl_to_fcode(Env, {fun_decl, _, _, _})  -> Env;
 decl_to_fcode(Env, {type_def, _Ann, Name, Args, Def}) ->
     typedef_to_fcode(Env, Name, Args, Def);
-decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, Id = {id, _, Name}, Args, Ret, [{guarded, _, [], Body}]}) ->
+decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, {id, _, Name}, Args, Ret, [{guarded, _, [], Body}]}) ->
     Attrs = get_attributes(Ann),
     FName = lookup_fun(Env, qname(Env, Name)),
     FArgs = args_to_fcode(Env, Args),
     FRet  = type_to_fcode(Env, Ret),
     FBody = expr_to_fcode(Env#{ vars => [X || {X, _} <- FArgs] }, Body),
-    [ ensure_first_order_entrypoint(Ann, Id, Args, Ret, FArgs, FRet)
-      || aeso_syntax:get_ann(entrypoint, Ann, false) ],
     Def   = #{ attrs  => Attrs,
                args   => FArgs,
                return => FRet,
@@ -822,14 +820,6 @@ validate_aens_resolve_type(Ann, {app_t, _, _, [Type]}, {variant, [[], [FType]]})
         oracle_query   -> ok;
         _              -> fcode_error({invalid_aens_resolve_type, Ann, Type})
     end.
-
-ensure_first_order_entrypoint(Ann, Id = {id, _, Name}, Args, Ret, FArgs, FRet) ->
-    [ ensure_first_order(FT, {invalid_entrypoint, higher_order, Ann1, Id, {argument, X, T}})
-      || {{typed, Ann1, X, T}, {_, FT}} <- lists:zip(Args, FArgs) ],
-    [ ensure_first_order(FRet, {invalid_entrypoint, higher_order, Ann, Id, {result, Ret}})
-      || Name /= "init" ],  %% init can return higher-order values, since they're written to the store
-                            %% rather than being returned.
-    ok.
 
 ensure_monomorphic(Type, Err) ->
     case is_monomorphic(Type) of

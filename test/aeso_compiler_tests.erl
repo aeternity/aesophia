@@ -1046,6 +1046,18 @@ failing_contracts() ->
                      "Missing `init` function for the contract `AliasToAliasToType`.\n"
                      "The `init` function can only be omitted if the state type is `unit`">>
                   ])
+    , ?TYPE_ERROR(higher_order_entrypoint,
+                  [<<?Pos(2,20)
+                     "The argument\n"
+                     "  `f : (int) => int`\n"
+                     "of entrypoint `apply` has a higher-order (contains function types) type">>
+                  ])
+    , ?TYPE_ERROR(higher_order_entrypoint_return,
+                  [<<?Pos(2,3)
+                     "The return type\n"
+                     "  `(int) => int`\n"
+                     "of entrypoint `add` is higher-order (contains function types)">>
+                  ])
     ].
 
 -define(Path(File), "code_errors/" ??File).
@@ -1054,15 +1066,7 @@ failing_contracts() ->
 -define(FATE_ERR(File, Line, Col, Err), {?Path(File), ?Msg(File, Line, Col, Err)}).
 
 failing_code_gen_contracts() ->
-    [ ?FATE_ERR(higher_order_entrypoint, 2, 20,
-            "The argument\n"
-            "  f : (int) => int\n"
-            "of entrypoint 'apply' has a higher-order (contains function types) type.")
-    , ?FATE_ERR(higher_order_entrypoint_return, 2, 3,
-            "The return type\n"
-            "  (int) => int\n"
-            "of entrypoint 'add' is higher-order (contains function types).")
-    , ?FATE_ERR(polymorphic_aens_resolve, 4, 5,
+    [ ?FATE_ERR(polymorphic_aens_resolve, 4, 5,
             "Invalid return type of AENS.resolve:\n"
             "  'a\n"
             "It must be a string or a pubkey type (address, oracle, etc).")
