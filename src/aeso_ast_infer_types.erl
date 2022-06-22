@@ -87,7 +87,9 @@
 -type byte_constraint() :: {is_bytes, utype()}
                          | {add_bytes, aeso_syntax:ann(), concat | split, utype(), utype(), utype()}.
 
--type constraint() :: named_argument_constraint() | field_constraint() | byte_constraint().
+-type aens_resolve_constraint() :: {aens_resolve_type, utype()}.
+
+-type constraint() :: named_argument_constraint() | field_constraint() | byte_constraint() | aens_resolve_constraint().
 
 -record(field_info,
     { ann      :: aeso_syntax:ann()
@@ -1818,6 +1820,8 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
             ResultType = fresh_uvar(Ann),
             unify(Env, FunType, {fun_t, [], NamedArgsVar, ArgTypes, GeneralResultType}, When),
             when_warning(warn_negative_spend, fun() -> warn_potential_negative_spend(Ann, NewFun1, NewArgs) end),
+            [ add_constraint({aens_resolve_type, GeneralResultType})
+              || element(3, Fun) =:= ["AENS", "resolve"] ],
             add_constraint(
               #dependent_type_constraint{ named_args_t = NamedArgsVar,
                                           named_args   = NamedArgs1,
@@ -2338,11 +2342,15 @@ destroy_and_report_unsolved_constraints(Env) ->
                            (#named_argument_constraint{}) -> true;
                            (_)                            -> false
                         end, OtherCs2),
-    {BytesCs, []} =
+    {BytesCs, OtherCs4} =
         lists:partition(fun({is_bytes, _})              -> true;
                            ({add_bytes, _, _, _, _, _}) -> true;
                            (_)                          -> false
                         end, OtherCs3),
+    {AensResolveCs, []} =
+        lists:partition(fun({aens_resolve_type, _}) -> true;
+                           (_)                      -> false
+                        end, OtherCs4),
 
     Unsolved = [ S || S <- [ solve_constraint(Env, dereference_deep(C)) || C <- NamedArgCs ],
                       S == unsolved ],
@@ -2360,6 +2368,7 @@ destroy_and_report_unsolved_constraints(Env) ->
     check_record_create_constraints(Env, CreateCs),
     check_is_contract_constraints(Env, ContractCs),
     check_bytes_constraints(Env, BytesCs),
+    check_aens_resolve_constraints(Env, AensResolveCs),
 
     destroy_constraints().
 
@@ -2488,6 +2497,21 @@ check_bytes_constraint(Env, {add_bytes, Ann, Fun, A0, B0, C0}) ->
             ok; %% If all are solved we checked M + N == R in solve_constraint.
         _ -> type_error({unsolved_bytes_constraint, Ann, Fun, A, B, C})
     end.
+
+check_aens_resolve_constraints(_Env, []) ->
+    ok;
+check_aens_resolve_constraints(Env, [{aens_resolve_type, Type} | Rest]) ->
+    Type1 = unfold_types_in_type(Env, instantiate(Type)),
+    {app_t, _, {id, _, "option"}, [Type2]} = Type1,
+    case Type2 of
+        {id, _, "string"} -> ok;
+        {id, _, "address"} -> ok;
+        {con, _, _} -> ok;
+        {app_t, _, {id, _, "oracle"}, [_, _]} -> ok;
+        {app_t, _, {id, _, "oracle_query"}, [_, _]} -> ok;
+        _ -> type_error({invalid_aens_resolve_type, aeso_syntax:get_ann(Type), Type2})
+    end,
+    check_aens_resolve_constraints(Env, Rest).
 
 %% -- Field constraints --
 
@@ -3557,6 +3581,12 @@ mk_error({higher_order_entrypoint, Ann, {id, _, Name}, Thing}) ->
           end,
     Msg = io_lib:format("The ~sof entrypoint `~s` ~s",
                         [ThingS, Name, Bad]),
+    mk_t_err(pos(Ann), Msg);
+mk_error({invalid_aens_resolve_type, Ann, T}) ->
+    Msg = io_lib:format("Invalid return type of `AENS.resolve`:\n"
+                        "~s`\n"
+                        "It must be a `string` or a pubkey type (`address`, `oracle`, etc)",
+                        [pp_type("  `", T)]),
     mk_t_err(pos(Ann), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),

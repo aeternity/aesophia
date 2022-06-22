@@ -1058,6 +1058,18 @@ failing_contracts() ->
                      "  `(int) => int`\n"
                      "of entrypoint `add` is higher-order (contains function types)">>
                   ])
+    , ?TYPE_ERROR(polymorphic_aens_resolve,
+                  [<<?Pos(4,5)
+                     "Invalid return type of `AENS.resolve`:\n"
+                     "  `'a`\n"
+                     "It must be a `string` or a pubkey type (`address`, `oracle`, etc)">>
+                  ])
+    , ?TYPE_ERROR(bad_aens_resolve,
+                  [<<?Pos(6,5)
+                     "Invalid return type of `AENS.resolve`:\n"
+                     "  `list(int)`\n"
+                     "It must be a `string` or a pubkey type (`address`, `oracle`, etc)">>
+                  ])
     ].
 
 -define(Path(File), "code_errors/" ??File).
@@ -1066,15 +1078,7 @@ failing_contracts() ->
 -define(FATE_ERR(File, Line, Col, Err), {?Path(File), ?Msg(File, Line, Col, Err)}).
 
 failing_code_gen_contracts() ->
-    [ ?FATE_ERR(polymorphic_aens_resolve, 4, 5,
-            "Invalid return type of AENS.resolve:\n"
-            "  'a\n"
-            "It must be a string or a pubkey type (address, oracle, etc).")
-    , ?FATE_ERR(bad_aens_resolve, 6, 5,
-            "Invalid return type of AENS.resolve:\n"
-            "  list(int)\n"
-            "It must be a string or a pubkey type (address, oracle, etc).")
-    , ?FATE_ERR(polymorphic_query_type, 3, 5,
+    [ ?FATE_ERR(polymorphic_query_type, 3, 5,
             "Invalid oracle type\n"
             "  oracle('a, 'b)\n"
             "The query type must not be polymorphic (contain type variables).")

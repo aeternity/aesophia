@@ -10,12 +10,6 @@
 
 -export([format/1, pos/1]).
 
-format({invalid_aens_resolve_type, Ann, T}) ->
-    Msg = io_lib:format("Invalid return type of AENS.resolve:\n"
-                        "~s\n"
-                        "It must be a string or a pubkey type (address, oracle, etc).",
-                        [pp_type(2, T)]),
-    mk_err(pos(Ann), Msg);
 format({invalid_oracle_type, Why, What, Ann, Type}) ->
     WhyS = case Why of higher_order -> "higher-order (contain function types)";
                        polymorphic  -> "polymorphic (contain type variables)" end,

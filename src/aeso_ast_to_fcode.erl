@@ -551,7 +551,6 @@ expr_to_fcode(Env, Type, {qid, Ann, X}) ->
         {builtin_u, B = aens_resolve, Ar} ->
             {fun_t, _, _, _, ResType} = Type,
             AensType = type_to_fcode(Env, ResType),
-            validate_aens_resolve_type(Ann, ResType, AensType),
             TypeArgs = [{lit, {typerep, AensType}}],
             {builtin_u, B, Ar, TypeArgs};
         {builtin_u, B = bytes_split, Ar} ->
@@ -810,16 +809,6 @@ validate_oracle_type(Ann, Type, QType, RType) ->
     ensure_first_order(QType, {invalid_oracle_type, higher_order, query,    Ann, Type}),
     ensure_first_order(RType, {invalid_oracle_type, higher_order, response, Ann, Type}),
     ok.
-
-validate_aens_resolve_type(Ann, {app_t, _, _, [Type]}, {variant, [[], [FType]]}) ->
-    case FType of
-        string         -> ok;
-        address        -> ok;
-        contract       -> ok;
-        {oracle, _, _} -> ok;
-        oracle_query   -> ok;
-        _              -> fcode_error({invalid_aens_resolve_type, Ann, Type})
-    end.
 
 ensure_monomorphic(Type, Err) ->
     case is_monomorphic(Type) of
