@@ -1,0 +1,9 @@
+contract BadAENSresolve =
+  using AENS
+
+  type t('a) = option(list('a))
+
+  function fail() : t(int) =
+    resolve("foo.aet", "whatever")
+
+  entrypoint main_fun() = ()
