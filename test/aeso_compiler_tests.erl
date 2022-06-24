@@ -203,6 +203,17 @@ compilable_contracts() ->
      "polymorphism_contract_interface_same_decl_multi_interface",
      "polymorphism_contract_interface_same_name_same_type",
      "missing_init_fun_state_unit",
+     "complex_compare_leq",
+     "complex_compare",
+     "higher_order_compare",
+     "higher_order_map_keys",
+     "higher_order_state",
+     "polymorphic_compare",
+     "polymorphic_entrypoint",
+     "polymorphic_entrypoint_return",
+     "polymorphic_map_keys",
+     "unapplied_contract_call",
+     "unapplied_named_arg_builtin",
      "test" % Custom general-purpose test file. Keep it last on the list.
     ].
 
