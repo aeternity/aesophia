@@ -34,6 +34,7 @@
         , new/2
         , new/3
         , new/4
+        , pos/1
         , pos/2
         , pos/3
         , pp/1
@@ -52,6 +53,12 @@ new(Type, Pos, Msg) ->
 
 new(Type, Pos, Msg, Ctxt) ->
     #err{ type = Type, pos = Pos, message = Msg, context = Ctxt }.
+
+pos(Ann) ->
+    File = aeso_syntax:get_ann(file, Ann, no_file),
+    Line = aeso_syntax:get_ann(line, Ann, 0),
+    Col  = aeso_syntax:get_ann(col, Ann, 0),
+    pos(File, Line, Col).
 
 pos(Line, Col) ->
     #pos{ line = Line, col = Col }.

@@ -2019,7 +2019,9 @@ setnth(I, X, Xs) ->
 -dialyzer({nowarn_function, [fcode_error/1, internal_error/1]}).
 
 fcode_error(Error) ->
-    aeso_errors:throw(aeso_code_errors:format(Error)).
+    Pos = aeso_errors:pos(0, 0),
+    Msg = lists:flatten(io_lib:format("Unknown error: ~p\n", [Error])),
+    aeso_errors:throw(aeso_errors:new(code_error, Pos, Msg)).
 
 internal_error(Error) ->
     Msg = lists:flatten(io_lib:format("~p\n", [Error])),

@@ -349,7 +349,7 @@ get_decode_type(FunName, [{Contract, Ann, _, _, Defs}]) when ?IS_CONTRACT_HEAD(C
                 "init" -> {ok, [], {tuple_t, [], []}};
                  _ ->
                     Msg = io_lib:format("Function '~s' is missing in contract", [FunName]),
-                    Pos = aeso_code_errors:pos(Ann),
+                    Pos = aeso_errors:pos(Ann),
                     aeso_errors:throw(aeso_errors:new(data_error, Pos, Msg))
             end
     end;

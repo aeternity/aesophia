@@ -64,7 +64,9 @@ debug(Tag, Options, Fun) ->
 
 -dialyzer({nowarn_function, [code_error/1]}).
 code_error(Err) ->
-    aeso_errors:throw(aeso_code_errors:format(Err)).
+    Pos = aeso_errors:pos(0, 0),
+    Msg = lists:flatten(io_lib:format("Unknown error: ~p\n", [Err])),
+    aeso_errors:throw(aeso_errors:new(code_error, Pos, Msg)).
 
 %% -- Main -------------------------------------------------------------------
 
