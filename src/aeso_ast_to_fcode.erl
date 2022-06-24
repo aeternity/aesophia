@@ -534,7 +534,7 @@ expr_to_fcode(_Env, _Type, {bytes,           _, B}) -> {lit, {bytes, B}};
 
 %% Variables
 expr_to_fcode(Env, _Type, {id, _, X})  -> resolve_var(Env, [X]);
-expr_to_fcode(Env, Type, {qid, Ann, X}) ->
+expr_to_fcode(Env, Type, {qid, _, X}) ->
     case resolve_var(Env, X) of
         {builtin_u, B, Ar} when B =:= oracle_query;
                                 B =:= oracle_get_question;
@@ -545,7 +545,6 @@ expr_to_fcode(Env, Type, {qid, Ann, X}) ->
                                 B =:= oracle_check_query ->
             OType = get_oracle_type(B, Type),
             {oracle, QType, RType} = type_to_fcode(Env, OType),
-            validate_oracle_type(Ann, OType, QType, RType),
             TypeArgs = [{lit, {typerep, QType}}, {lit, {typerep, RType}}],
             {builtin_u, B, Ar, TypeArgs};
         {builtin_u, B = aens_resolve, Ar} ->
@@ -802,35 +801,6 @@ get_oracle_type(oracle_get_answer,   {fun_t, _, _, [OType | _], _}) -> OType;
 get_oracle_type(oracle_check,        {fun_t, _, _, [OType | _], _}) -> OType;
 get_oracle_type(oracle_check_query,  {fun_t, _, _, [OType | _], _}) -> OType;
 get_oracle_type(oracle_respond,      {fun_t, _, _, [OType | _], _}) -> OType.
-
-validate_oracle_type(Ann, Type, QType, RType) ->
-    ensure_monomorphic(QType, {invalid_oracle_type, polymorphic,  query,    Ann, Type}),
-    ensure_monomorphic(RType, {invalid_oracle_type, polymorphic,  response, Ann, Type}),
-    ensure_first_order(QType, {invalid_oracle_type, higher_order, query,    Ann, Type}),
-    ensure_first_order(RType, {invalid_oracle_type, higher_order, response, Ann, Type}),
-    ok.
-
-ensure_monomorphic(Type, Err) ->
-    case is_monomorphic(Type) of
-        true  -> ok;
-        false -> fcode_error(Err)
-    end.
-
-ensure_first_order(Type, Err) ->
-    case is_first_order(Type) of
-        true  -> ok;
-        false -> fcode_error(Err)
-    end.
-
-is_monomorphic({tvar, _})              -> false;
-is_monomorphic(Ts) when is_list(Ts)    -> lists:all(fun is_monomorphic/1, Ts);
-is_monomorphic(Tup) when is_tuple(Tup) -> is_monomorphic(tuple_to_list(Tup));
-is_monomorphic(_)                      -> true.
-
-is_first_order({function, _, _})       -> false;
-is_first_order(Ts) when is_list(Ts)    -> lists:all(fun is_first_order/1, Ts);
-is_first_order(Tup) when is_tuple(Tup) -> is_first_order(tuple_to_list(Tup));
-is_first_order(_)                      -> true.
 
 %% -- Pattern matching --
 

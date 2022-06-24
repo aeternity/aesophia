@@ -10,12 +10,6 @@
 
 -export([format/1, pos/1]).
 
-format({invalid_oracle_type, Why, What, Ann, Type}) ->
-    WhyS = case Why of higher_order -> "higher-order (contain function types)";
-                       polymorphic  -> "polymorphic (contain type variables)" end,
-    Msg = io_lib:format("Invalid oracle type\n~s", [pp_type(2, Type)]),
-    Cxt = io_lib:format("The ~s type must not be ~s.", [What, WhyS]),
-    mk_err(pos(Ann), Msg, Cxt);
 format({var_args_not_set, Expr}) ->
     mk_err( pos(Expr), "Could not deduce type of variable arguments list"
           , "When compiling " ++ pp_expr(Expr)
@@ -35,9 +29,6 @@ pp_expr(E) ->
 
 pp_expr(N, E) ->
     prettypr:format(prettypr:nest(N, aeso_pretty:expr(E))).
-
-pp_type(N, T) ->
-    prettypr:format(prettypr:nest(N, aeso_pretty:type(T))).
 
 mk_err(Pos, Msg) ->
     aeso_errors:new(code_error, Pos, lists:flatten(Msg)).

@@ -88,8 +88,10 @@
                          | {add_bytes, aeso_syntax:ann(), concat | split, utype(), utype(), utype()}.
 
 -type aens_resolve_constraint() :: {aens_resolve_type, utype()}.
+-type oracle_type_constraint() :: {oracle_type, aeso_syntax:ann(), utype()}.
 
--type constraint() :: named_argument_constraint() | field_constraint() | byte_constraint() | aens_resolve_constraint().
+-type constraint() :: named_argument_constraint() | field_constraint() | byte_constraint()
+                    | aens_resolve_constraint() | oracle_type_constraint().
 
 -record(field_info,
     { ann      :: aeso_syntax:ann()
@@ -1648,6 +1650,14 @@ is_first_order(Ts) when is_list(Ts)    -> lists:all(fun is_first_order/1, Ts);
 is_first_order(Tup) when is_tuple(Tup) -> is_first_order(tuple_to_list(Tup));
 is_first_order(_)                      -> true.
 
+ensure_monomorphic(Type, Err) ->
+    is_monomorphic(Type) orelse type_error(Err).
+
+is_monomorphic({tvar, _, _})           -> false;
+is_monomorphic(Ts) when is_list(Ts)    -> lists:all(fun is_monomorphic/1, Ts);
+is_monomorphic(Tup) when is_tuple(Tup) -> is_monomorphic(tuple_to_list(Tup));
+is_monomorphic(_)                      -> true.
+
 check_state_init(Env) ->
     Top = Env#env.namespace,
     StateType = lookup_type(Env, {id, [{origin, system}], "state"}),
@@ -1822,6 +1832,9 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
             when_warning(warn_negative_spend, fun() -> warn_potential_negative_spend(Ann, NewFun1, NewArgs) end),
             [ add_constraint({aens_resolve_type, GeneralResultType})
               || element(3, FunName) =:= ["AENS", "resolve"] ],
+            [ add_constraint({oracle_type, Ann, OType})
+              || OType <- [get_oracle_type(FunName, ArgTypes, GeneralResultType)],
+                 OType =/= false ],
             add_constraint(
               #dependent_type_constraint{ named_args_t = NamedArgsVar,
                                           named_args   = NamedArgs1,
@@ -2347,10 +2360,14 @@ destroy_and_report_unsolved_constraints(Env) ->
                            ({add_bytes, _, _, _, _, _}) -> true;
                            (_)                          -> false
                         end, OtherCs3),
-    {AensResolveCs, []} =
+    {AensResolveCs, OtherCs5} =
         lists:partition(fun({aens_resolve_type, _}) -> true;
                            (_)                      -> false
                         end, OtherCs4),
+    {OracleTypeCs, []} =
+        lists:partition(fun({oracle_type, _, _}) -> true;
+                           (_)                   -> false
+                        end, OtherCs5),
 
     Unsolved = [ S || S <- [ solve_constraint(Env, dereference_deep(C)) || C <- NamedArgCs ],
                       S == unsolved ],
@@ -2369,8 +2386,18 @@ destroy_and_report_unsolved_constraints(Env) ->
     check_is_contract_constraints(Env, ContractCs),
     check_bytes_constraints(Env, BytesCs),
     check_aens_resolve_constraints(Env, AensResolveCs),
+    check_oracle_type_constraints(Env, OracleTypeCs),
 
     destroy_constraints().
+
+get_oracle_type({qid, _, ["Oracle", "register"]},      _        , OType) -> OType;
+get_oracle_type({qid, _, ["Oracle", "query"]},        [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "get_question"]}, [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "get_answer"]},   [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "check"]},        [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "check_query"]},  [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "respond"]},      [OType| _], _    ) -> OType;
+get_oracle_type(_Fun, _Args, _Ret) -> false.
 
 %% -- Named argument constraints --
 
@@ -2512,6 +2539,17 @@ check_aens_resolve_constraints(Env, [{aens_resolve_type, Type} | Rest]) ->
         _ -> type_error({invalid_aens_resolve_type, aeso_syntax:get_ann(Type), Type2})
     end,
     check_aens_resolve_constraints(Env, Rest).
+
+check_oracle_type_constraints(_Env, []) ->
+    ok;
+check_oracle_type_constraints(Env, [{oracle_type, Ann, OType} | Rest]) ->
+    Type = unfold_types_in_type(Env, instantiate(OType)),
+    {app_t, _, {id, _, "oracle"}, [QType, RType]} = Type,
+    ensure_monomorphic(QType, {invalid_oracle_type, polymorphic,  query,    Ann, Type}),
+    ensure_monomorphic(RType, {invalid_oracle_type, polymorphic,  response, Ann, Type}),
+    ensure_first_order(QType, {invalid_oracle_type, higher_order, query,    Ann, Type}),
+    ensure_first_order(RType, {invalid_oracle_type, higher_order, response, Ann, Type}),
+    check_oracle_type_constraints(Env, Rest).
 
 %% -- Field constraints --
 
@@ -3588,6 +3626,12 @@ mk_error({invalid_aens_resolve_type, Ann, T}) ->
                         "It must be a `string` or a pubkey type (`address`, `oracle`, etc)",
                         [pp_type("  `", T)]),
     mk_t_err(pos(Ann), Msg);
+mk_error({invalid_oracle_type, Why, What, Ann, Type}) ->
+    WhyS = case Why of higher_order -> "higher-order (contain function types)";
+                       polymorphic  -> "polymorphic (contain type variables)" end,
+    Msg = io_lib:format("Invalid oracle type\n~s`", [pp_type("  `", Type)]),
+    Cxt = io_lib:format("The ~s type must not be ~s", [What, WhyS]),
+    mk_t_err(pos(Ann), Msg, Cxt);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),
     mk_t_err(pos(0, 0), Msg).

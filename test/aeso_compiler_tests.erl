@@ -45,12 +45,6 @@ simple_compile_test_() ->
            check_errors(ExpectedErrors, Errors)
        end} ||
            {ContractName, ExpectedErrors} <- failing_contracts() ] ++
-    [ {"Testing code generation error messages of " ++ ContractName,
-       fun() ->
-               Errors = compile(ContractName),
-               check_errors([ExpectedError], Errors)
-       end} ||
-           {ContractName, ExpectedError} <- failing_code_gen_contracts()] ++
     [ {"Testing include with explicit files",
        fun() ->
            FileSystem = maps:from_list(
@@ -1076,30 +1070,34 @@ failing_contracts() ->
                      "  `list(int)`\n"
                      "It must be a `string` or a pubkey type (`address`, `oracle`, etc)">>
                   ])
-    ].
-
--define(Path(File), "code_errors/" ??File).
--define(Msg(File, Line, Col, Err), <<?Pos("Code generation", ?Path(File), Line, Col) Err>>).
-
--define(FATE_ERR(File, Line, Col, Err), {?Path(File), ?Msg(File, Line, Col, Err)}).
-
-failing_code_gen_contracts() ->
-    [ ?FATE_ERR(polymorphic_query_type, 3, 5,
-            "Invalid oracle type\n"
-            "  oracle('a, 'b)\n"
-            "The query type must not be polymorphic (contain type variables).")
-    , ?FATE_ERR(polymorphic_response_type, 3, 5,
-            "Invalid oracle type\n"
-            "  oracle(string, 'r)\n"
-            "The response type must not be polymorphic (contain type variables).")
-    , ?FATE_ERR(higher_order_query_type, 3, 5,
-            "Invalid oracle type\n"
-            "  oracle((int) => int, string)\n"
-            "The query type must not be higher-order (contain function types).")
-    , ?FATE_ERR(higher_order_response_type, 3, 5,
-            "Invalid oracle type\n"
-            "  oracle(string, (int) => int)\n"
-            "The response type must not be higher-order (contain function types).")
+    , ?TYPE_ERROR(polymorphic_query_type,
+                  [<<?Pos(3,5)
+                     "Invalid oracle type\n"
+                     "  `oracle('a, 'b)`\n"
+                     "The query type must not be polymorphic (contain type variables)">>,
+                   <<?Pos(3,5)
+                     "Invalid oracle type\n"
+                     "  `oracle('a, 'b)`\n"
+                     "The response type must not be polymorphic (contain type variables)">>
+                  ])
+    , ?TYPE_ERROR(polymorphic_response_type,
+                  [<<?Pos(3,5)
+                     "Invalid oracle type\n"
+                     "  `oracle(string, 'r)`\n"
+                     "The response type must not be polymorphic (contain type variables)">>
+                  ])
+    , ?TYPE_ERROR(higher_order_query_type,
+                  [<<?Pos(3,5)
+                     "Invalid oracle type\n"
+                     "  `oracle((int) => int, string)`\n"
+                     "The query type must not be higher-order (contain function types)">>
+                  ])
+    , ?TYPE_ERROR(higher_order_response_type,
+                  [<<?Pos(3,5)
+                     "Invalid oracle type\n"
+                     "  `oracle(string, (int) => int)`\n"
+                     "The response type must not be higher-order (contain function types)">>
+                  ])
     ].
 
 validation_test_() ->
