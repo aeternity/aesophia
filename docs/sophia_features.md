@@ -134,6 +134,63 @@ main contract IntHolderFactory =
 In case of a presence of child contracts (`IntHolder` in this case), the main
 contract must be pointed out with the `main` keyword as shown in the example.
 
+### Contract interfaces and polymorphism
+
+Contracts can implement one or multiple interfaces, the contract has to define
+every entrypoint from the implemented interface and the entrypoints in both
+the contract and implemented interface should have the exact same type.
+
+```
+contract interface Animal =
+  entrypoint sound : () => string
+
+ contract Cat : Animal =
+  entrypoint sound() = "Cat sound"
+```
+
+Contract interfaces can extend other interfaces, the extended interface has to
+declare all the entrypoints from the parent interface, and it can have
+additional entrypoints added to it. All the declarations in the extended
+interface must match (have the same type) with the declarations from the parent
+interface.
+
+```
+contract interface II =
+  entrypoint f : () => unit
+
+contract interface I : II =
+  entrypoint f : () => unit
+  entrypoint g : () => unit
+
+contract C : I =
+  entrypoint f() = ()
+  entrypoint g() = ()
+```
+
+It is only possible to implement (or extend) an interface that has been already
+defined earlier in the file (or in an included file), and therefore recursive
+interface implementation is not allowed in Sophia.
+
+```
+// The following code would show an error
+
+contract interface X : Z =
+     entrypoint x : () => int
+
+ contract interface Y : X =
+     entrypoint x : () => int
+     entrypoint y : () => int
+
+ contract interface Z : Y =
+     entrypoint x : () => int
+     entrypoint y : () => int
+     entrypoint z : () => int
+
+ contract C : Z =
+     entrypoint x() = 1
+     entrypoint y() = 1
+     entrypoint z() = 1
+```
 
 ## Mutable state
 
