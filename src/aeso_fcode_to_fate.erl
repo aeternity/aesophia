@@ -507,6 +507,8 @@ builtin_to_scode(Env, bytes_split, [_, _] = Args) ->
     call_to_scode(Env, aeb_fate_ops:bytes_split(?a, ?a, ?a), Args);
 builtin_to_scode(Env, abort, [_] = Args) ->
     call_to_scode(Env, aeb_fate_ops:abort(?a), Args);
+builtin_to_scode(Env, exit, [_] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:exit(?a), Args);
 builtin_to_scode(Env, chain_spend, [_, _] = Args) ->
     call_to_scode(Env, [aeb_fate_ops:spend(?a, ?a),
                         tuple(0)], Args);
@@ -1486,6 +1488,7 @@ r_write_to_dead_var({i, Ann, I}, Code) ->
 r_write_to_dead_var(_, _) -> false.
 
 op_view({'ABORT', R}) -> {'ABORT', none, [R]};
+op_view({'EXIT', R}) -> {'EXIT', none, [R]};
 op_view(T) when is_tuple(T) ->
     [Op, R | As] = tuple_to_list(T),
     CheckReads = fun(Rs, X) -> case [] == Rs -- [dst, src] of true -> X; false -> false end end,

@@ -242,7 +242,7 @@ builtins() ->
     MkName = fun(NS, Fun) ->
                 list_to_atom(string:to_lower(string:join(NS ++ [Fun], "_")))
              end,
-    Scopes = [{[],           [{"abort", 1}, {"require", 2}]},
+    Scopes = [{[],           [{"abort", 1}, {"require", 2}, {"exit", 1}]},
               {["Chain"],    [{"spend", 2}, {"balance", 1}, {"block_hash", 1}, {"coinbase", none},
                               {"timestamp", none}, {"block_height", none}, {"difficulty", none},
                               {"gas_limit", none}, {"bytecode_hash", 1}, {"create", variable}, {"clone", variable}]},
