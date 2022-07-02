@@ -663,10 +663,12 @@ expr_to_fcode(Env, _Type, {app, _, {'..', _}, [A, B]}) ->
     Init = {tuple, [nil, {var, AV}]},
     WithA(WithB(
             {loop, Init, St,
-             {'let', It, {proj, {var, St}, 2},
+             {'let', It, {proj, {var, St}, 1},
               make_if({op, '=<', [{var, It}, {var, BV}]},
-                      {continue, {tuple, [{op, '::', [{var, It}, {proj, {var, St}, 1}]}]}},
-                      {break, {proj, {var, St}, 2}}
+                      {continue, {tuple, [{op, '::', [{var, It}, {proj, {var, St}, 0}]},
+                                          {op, '+', [{var, It}, {lit, {int, 1}}]}
+                                         ]}},
+                      {break, {proj, {var, St}, 0}}
                      )}}));
 expr_to_fcode(Env, _Type, {list_comp, _, Yield, []}) ->
     {op, '::', [expr_to_fcode(Env, Yield), nil]};
