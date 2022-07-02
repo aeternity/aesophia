@@ -1,12 +1,5 @@
 // This is a custom test file if you need to run a compiler without
 // changing aeso_compiler_tests.erl
 
-include "List.aes"
-
-contract IntegerHolder =
-  type state = int
-  entrypoint init(x) = x
-  entrypoint get() = state
-
-main contract Test =
-  stateful entrypoint f(c) = Chain.clone(ref=c, 123)
+contract C =
+  entrypoint test() = [1..5]

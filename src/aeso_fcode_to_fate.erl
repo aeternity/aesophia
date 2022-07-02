@@ -45,7 +45,7 @@
 -define(s(N), {store, N}).
 -define(void, {var, 9999}).
 
--record(env, { contract, vars = [], locals = [], current_function, tailpos = true, child_contracts = #{}, options = []}).
+-record(env, { contract, vars = [], locals = [], break_ref = none, cont_ref = none, loop_it = none, current_function, tailpos = true, child_contracts = #{}, options = []}).
 
 %% -- Debugging --------------------------------------------------------------
 
@@ -77,6 +77,7 @@ compile(ChildContracts, FCode, Options) ->
     SFuns  = functions_to_scode(ChildContracts, ContractName, Functions, Options),
     SFuns1 = optimize_scode(SFuns, Options),
     FateCode = to_basic_blocks(SFuns1),
+    io:format("FINAL:\~p\n\n", [FateCode]),
     ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
     FateCode.
 
@@ -158,6 +159,9 @@ init_env(ChildContracts, ContractName, FunNames, Name, Args, Options) ->
 
 next_var(#env{ vars = Vars }) ->
     1 + lists:max([-1 | [J || {_, {var, J}} <- Vars]]).
+
+bind_loop(ContRef, BreakRef, It, Env) ->
+    Env#env{break_ref = BreakRef, cont_ref = ContRef, loop_it = It}.
 
 bind_var(Name, Var, Env = #env{ vars = Vars }) ->
     Env#env{ vars = [{Name, Var} | Vars] }.
@@ -368,7 +372,19 @@ to_scode1(Env, {set_state, Reg, Val}) ->
 
 to_scode1(Env, {closure, Fun, FVs}) ->
     to_scode(Env, {tuple, [{lit, {string, make_function_id(Fun)}}, FVs]});
-
+to_scode1(Env, {loop, Init, It, Expr}) ->
+    ContRef = make_ref(),
+    BreakRef = make_ref(),
+    InitS = to_scode(Env, Init) ++ [{jump, ContRef}],
+    {ItV, Env1} = bind_local(It, Env),
+    ExprS = to_scode(bind_loop(ContRef, BreakRef, ItV, Env1), Expr) ++ [{jumpif, ?a, ContRef}, {jump, BreakRef}],
+    [{loop, InitS, It, ExprS, ContRef, BreakRef}];
+to_scode1(Env = #env{cont_ref = ContRef, loop_it = It}, {continue, Expr}) ->
+    ExprS = to_scode1(Env, Expr),
+    ExprS ++ [{'POP', It}, push(?i(1))];
+to_scode1(Env = #env{break_ref = BreakRef}, {break, Expr}) ->
+    ExprS = to_scode1(Env, Expr),
+    ExprS ++ [push(?i(0))];
 to_scode1(Env, {switch, Case}) ->
     split_to_scode(Env, Case).
 
@@ -712,6 +728,8 @@ flatten(Code)    -> lists:map(fun flatten_s/1, lists:flatten(Code)).
 
 flatten_s({switch, Arg, Type, Alts, Catch}) ->
     {switch, Arg, Type, [flatten(Alt) || Alt <- Alts], flatten(Catch)};
+flatten_s({loop, Init, It, Body, BRef, CRef}) ->
+    {loop, flatten(Init), It, flatten(Body), BRef, CRef};
 flatten_s(I) -> I.
 
 -define(MAX_SIMPL_ITERATIONS, 10).
@@ -808,6 +826,11 @@ ann_live1(LiveTop, {switch, Arg, Type, Alts, Def}, LiveOut) ->
     {Def1,  LiveDef}  = ann_live(LiveTop, Def, LiveOut),
     LiveIn = ordsets:union([Read, LiveDef | LiveAlts]),
     {{switch, Arg, Type, Alts1, Def1}, LiveIn};
+ann_live1(LiveTop, {loop, Init, It, Body, BRef, CRef}, LiveOut) ->
+    {Init1, LiveInit} = ann_live(LiveTop, Init, LiveOut),
+    {Body1, LiveBody} = ann_live(LiveTop, Body, LiveOut),
+    LiveIn = ordsets:union([It, LiveInit, LiveBody]), % TODO not sure about this
+    {{loop, Init1, It, Body1, BRef, CRef}, LiveIn};
 ann_live1(_LiveTop, I, LiveOut) ->
     #{ read := Reads0, write := W } = attributes(I),
     Reads   = lists:filter(fun is_reg/1, Reads0),
@@ -843,7 +866,9 @@ attributes(I) ->
         {'CALL_T', A}                         -> Impure(pc, [A]);
         {'CALL_VALUE', A}                     -> Pure(A, []);
         {'JUMP', _}                           -> Impure(pc, []);
+        {jump, _}                           -> Impure(pc, []);
         {'JUMPIF', A, _}                      -> Impure(pc, A);
+        {jumpif, A, _}                      -> Impure(pc, A);
         {'SWITCH_V2', A, _, _}                -> Impure(pc, A);
         {'SWITCH_V3', A, _, _, _}             -> Impure(pc, A);
         {'SWITCH_VN', A, _}                   -> Impure(pc, A);
@@ -1023,6 +1048,7 @@ var_writes(I) ->
 -spec independent(sinstr_a(), sinstr_a()) -> boolean().
 %% independent({switch, _, _, _, _}, _) -> false;       %% Commented due to Dialyzer whinging
 independent(_, {switch, _, _, _, _}) -> false;
+independent(_, {loop, _, _, _, _, _}) -> false;
 independent({i, _, I}, {i, _, J}) ->
     #{ write := WI, read := RI, pure := PureI } = attributes(I),
     #{ write := WJ, read := RJ, pure := PureJ } = attributes(J),
@@ -1505,6 +1531,8 @@ from_op_view(Op, R, As) -> list_to_tuple([Op, R | As]).
                 (missing)    -> missing.
 unannotate({switch, Arg, Type, Alts, Def}) ->
     [{switch, Arg, Type, [unannotate(A) || A <- Alts], unannotate(Def)}];
+unannotate({loop, Init, It, Body, BRef, CRef}) ->
+    [{loop, unannotate(Init), It, unannotate(Body), BRef, CRef}];
 unannotate(missing) -> missing;
 unannotate(Code) when is_list(Code) ->
     lists:flatmap(fun unannotate/1, Code);
@@ -1547,6 +1575,7 @@ to_basic_blocks([], Acc) ->
     Acc.
 
 bb(_Name, Code) ->
+    io:format("FUN: ~p\nCODE:\n~p\n\n", [_Name, Code]),
     Blocks0 = blocks(Code),
     Blocks1 = optimize_blocks(Blocks0),
     Blocks  = lists:flatmap(fun split_calls/1, Blocks1),
@@ -1567,7 +1596,7 @@ bb(_Name, Code) ->
 -type bb()     :: {bbref(), bcode()}.
 -type bcode()  :: [binstr()].
 -type binstr() :: {jump, bbref()}
-                | {jumpif, bbref()}
+                | {jumpif, term(), bbref()}
                 | tuple().   %% FATE instruction
 
 -spec blocks(scode()) -> [bb()].
@@ -1581,27 +1610,37 @@ blocks([], Acc) ->
 blocks([Blk | Blocks], Acc) ->
     block(Blk, [], Blocks, Acc).
 
+fresh_block(C, Ca) ->
+    R = make_ref(),
+    {R, [#blk{ref = R, code = C, catchall = Ca}]}.
+
 -spec block(#blk{}, bcode(), [#blk{}], [bb()]) -> [bb()].
 block(#blk{ref = Ref, code = []}, CodeAcc, Blocks, BlockAcc) ->
     blocks(Blocks, [{Ref, lists:reverse(CodeAcc)} | BlockAcc]);
+block(Blk = #blk{code = [{loop, Init, _, Expr, ContRef, BreakRef} | Code], catchall = Catchall}, Acc, Blocks, BlockAcc) ->
+    LoopBlock = #blk{ref = ContRef, code = Expr, catchall = BreakRef},
+    BreakBlock = #blk{ref = BreakRef, code = Code, catchall = Catchall},
+
+    io:format("INIT: ~p\n\nLOOP: ~p\n\nBREAK: ~p\n\n", [Init, Expr, Code]),
+
+    block(Blk#blk{code = Init}, Acc, [LoopBlock, BreakBlock | Blocks], BlockAcc);
 block(Blk = #blk{code = [switch_body | Code]}, Acc, Blocks, BlockAcc) ->
     %% Reached the body of a switch. Clear catchall ref.
     block(Blk#blk{code = Code, catchall = none}, Acc, Blocks, BlockAcc);
 block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
                  catchall = Catchall}, Acc, Blocks, BlockAcc) ->
-    FreshBlk = fun(C, Ca) ->
-                   R = make_ref(),
-                   {R, [#blk{ref = R, code = C, catchall = Ca}]}
-               end,
-    {RestRef, RestBlk} = FreshBlk(Code, Catchall),
+    {RestRef, RestBlk} = fresh_block(Code, Catchall),
     {DefRef, DefBlk} =
         case Default of
             missing when Catchall == none ->
-                FreshBlk([aeb_fate_ops:abort(?i(<<"Incomplete patterns">>))], none);
+                fresh_block([aeb_fate_ops:abort(?i(<<"Incomplete patterns">>))], none);
             missing -> {Catchall, []};
-            _       -> FreshBlk(Default ++ [{jump, RestRef}], Catchall)
+            _       -> fresh_block(Default ++ [{jump, RestRef}], Catchall)
                        %% ^ fall-through to the outer catchall
         end,
+
+    io:format("RestRef: ~p, DefRef: ~p\n\n", [RestRef, DefRef]),
+
     %% If we don't generate a switch, we need to pop the argument if on the stack.
     Pop = [{'POP', ?void} || Arg == ?a],
     {Blk1, Code1, AltBlks} =
@@ -1611,7 +1650,7 @@ block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
                 {ThenRef, ThenBlk} =
                     case TrueCode of
                         missing -> {DefRef, []};
-                        _       -> FreshBlk(TrueCode ++ [{jump, RestRef}], DefRef)
+                        _       -> fresh_block(TrueCode ++ [{jump, RestRef}], DefRef)
                     end,
                 ElseCode =
                     case FalseCode of
@@ -1646,7 +1685,7 @@ block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
                     true  -> {Blk#blk{code = Pop ++ [{jump, DefRef}]}, [], []};
                     false ->
                         MkBlk = fun(missing) -> {DefRef, []};
-                                   (ACode)   -> FreshBlk(ACode ++ [{jump, RestRef}], DefRef)
+                                   (ACode)   -> fresh_block(ACode ++ [{jump, RestRef}], DefRef)
                                 end,
                         {AltRefs, AltBs} = lists:unzip(lists:map(MkBlk, Alts)),
                         {Blk#blk{code = []}, [{switch, Arg, AltRefs}], lists:append(AltBs)}
@@ -1664,6 +1703,7 @@ optimize_blocks(Blocks) ->
     Rev       = fun(Bs) -> [ {Ref, lists:reverse(Code)} || {Ref, Code} <- Bs ] end,
     RBlocks   = Rev(Blocks),
     RBlockMap = maps:from_list(RBlocks),
+    io:format("REORDERING ~p\n\n", [RBlocks]),
     RBlocks1  = reorder_blocks(RBlocks, []),
     RBlocks2  = [ {Ref, inline_block(RBlockMap, Ref, Code)} || {Ref, Code} <- RBlocks1 ],
     RBlocks3  = shortcut_jump_chains(RBlocks2),
@@ -1686,6 +1726,7 @@ reorder_blocks(Ref, Code, Blocks, Acc) ->
         [{'EXIT', _}|_]       -> reorder_blocks(Blocks, Acc1);
         [{'ABORT', _}|_]      -> reorder_blocks(Blocks, Acc1);
         [{switch, _, _}|_]    -> reorder_blocks(Blocks, Acc1);
+        [{jumpif, _, _}|_] -> reorder_blocks(Blocks, Acc1);
         [{jump, L}|_]         ->
             NotL = fun({L1, _}) -> L1 /= L end,
             case lists:splitwith(NotL, Blocks) of
