@@ -661,9 +661,9 @@ expr_to_fcode(Env, _Type, {app, _, {'..', _}, [A, B]}) ->
     Init = {tuple, [nil, expr_to_fcode(Env, B)]},
     Loop = {loop, Init, St,
             make_if(
-              {op, '=<', [ItProj, {var, AV}]},
+              {op, '>=', [ItProj, {var, AV}]},
               {continue, {tuple, [{op, '::', [ItProj, AcProj]},
-                                  {op, '+', [ItProj, {lit, {int, 1}}]}
+                                  {op, '-', [ItProj, {lit, {int, 1}}]}
                                  ]}},
               {break, AcProj}
              )},
