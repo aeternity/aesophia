@@ -819,9 +819,6 @@ ann_live(LiveTop, [I | Is], LiveOut) ->
 ann_live1(_LiveTop, switch_body, LiveOut) ->
     Ann = #{ live_in => LiveOut, live_out => LiveOut },
     {{i, Ann, switch_body}, LiveOut};
-ann_live1(LiveTop, {jump, Ref}, _LiveOut) ->
-    Ann = #{ live_in => LiveTop, live_out => [] },
-    {{i, Ann, {jump, Ref}}, LiveTop};
 ann_live1(LiveTop, loop, _LiveOut) ->
     Ann = #{ live_in => LiveTop, live_out => [] },
     {{i, Ann, loop}, LiveTop};
