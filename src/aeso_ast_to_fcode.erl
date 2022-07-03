@@ -652,15 +652,6 @@ expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Rec, Fields}) ->
 expr_to_fcode(Env, _Type, {list, _, Es}) ->
     lists:foldr(fun(E, L) -> {op, '::', [expr_to_fcode(Env, E), L]} end,
                 nil, Es);
-
-expr_to_fcode(Env, _Type, {app, _, {'..', _}, [A, B]}) ->
-    St = fresh_name(),
-    Init = expr_to_fcode(Env, A),
-    Loop = {loop, Init, St, make_if({op, '<', [{var, St}, expr_to_fcode(Env, B)]},
-                                    {continue, {op, '+', [{var, St}, {lit, {int, 1}}]}},
-                                    {break, nil}
-                                   )},
-    Loop;
 expr_to_fcode(Env, _Type, {app, _, {'..', _}, [A, B]}) ->
     BV = fresh_name(), % var to keep B
     WithB = fun(X) -> {'let', BV, expr_to_fcode(Env, B), X} end,
