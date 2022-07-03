@@ -1620,7 +1620,7 @@ fresh_block(C, Ca) ->
 block(#blk{ref = Ref, code = []}, CodeAcc, Blocks, BlockAcc) ->
     blocks(Blocks, [{Ref, lists:reverse(CodeAcc)} | BlockAcc]);
 block(Blk = #blk{code = [{loop, Init, _, Expr, ContRef, BreakRef} | Code], catchall = Catchall}, Acc, Blocks, BlockAcc) ->
-    LoopBlock = #blk{ref = ContRef, code = Expr, catchall = BreakRef},
+    LoopBlock = #blk{ref = ContRef, code = Expr, catchall = none},
     BreakBlock = #blk{ref = BreakRef, code = Code, catchall = Catchall},
 
     io:format("INIT: ~p\n\nLOOP: ~p\n\nBREAK: ~p\n\n", [Init, Expr, Code]),
