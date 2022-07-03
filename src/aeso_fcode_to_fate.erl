@@ -1703,11 +1703,10 @@ block(Blk = #blk{code = [I | Code]}, Acc, Blocks, BlockAcc) ->
 optimize_blocks(Blocks) ->
     %% We need to look at the last instruction a lot, so reverse all blocks.
     Rev       = fun(Bs) -> [ {Ref, lists:reverse(Code)} || {Ref, Code} <- Bs ] end,
-    RBlocks   = Rev(Blocks),
+    RBlocks   =  [{Ref, crop_jumps(Code)} || {Ref, Code} <- Blocks],
     RBlockMap = maps:from_list(RBlocks),
     io:format("REORDERING ~p\n\n", [RBlocks]),
-    RBlocks0  = [{Ref, crop_jumps(Code)} || {Ref, Code} <- RBlocks],
-    RBlocks1  = reorder_blocks(RBlocks0, []),
+    RBlocks1  = reorder_blocks(RBlocks, []),
     RBlocks2  = [ {Ref, inline_block(RBlockMap, Ref, Code)} || {Ref, Code} <- RBlocks1 ],
     RBlocks3  = shortcut_jump_chains(RBlocks2),
     RBlocks4  = remove_dead_blocks(RBlocks3),
@@ -1787,9 +1786,9 @@ tweak_returns(['RETURN' | Code = [{'EXIT', _} | _]])   -> Code;
 tweak_returns(['RETURN' | Code = [loop | _]])          -> Code;
 tweak_returns(Code) -> Code.
 
-%% Remove instructions that appear after jumps
+%% Remove instructions that appear after jumps. Returns reversed code.
 crop_jumps(Code) ->
-    crop_jumps(Code, []).
+    crop_jumps(lists:reverse(Code), []).
 crop_jumps([], Acc) ->
     lists:reverse(Acc);
 crop_jumps([I = {jump, _}|_], Acc) ->
