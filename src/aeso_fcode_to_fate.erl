@@ -1788,7 +1788,7 @@ tweak_returns(Code) -> Code.
 
 %% Remove instructions that appear after jumps. Returns reversed code.
 crop_jumps(Code) ->
-    crop_jumps(lists:reverse(Code), []).
+    crop_jumps(Code, []).
 crop_jumps([], Acc) ->
     lists:reverse(Acc);
 crop_jumps([I = {jump, _}|_], Acc) ->
