@@ -1790,9 +1790,9 @@ tweak_returns(Code) -> Code.
 crop_jumps(Code) ->
     crop_jumps(Code, []).
 crop_jumps([], Acc) ->
-    lists:reverse(Acc);
+    Acc;
 crop_jumps([I = {jump, _}|_], Acc) ->
-    lists:reverse([I|Acc]);
+    [I|Acc];
 crop_jumps([I|Code], Acc) ->
     crop_jumps(Code, [I|Acc]).
 
