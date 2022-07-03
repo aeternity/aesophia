@@ -376,14 +376,15 @@ to_scode1(Env, {loop, Init, It, Expr}) ->
     ContRef = make_ref(),
     BreakRef = make_ref(),
     {ItV, Env1} = bind_local(It, Env),
-    InitS = to_scode(notail(Env), Init) ++ [{jump, ContRef}],
+    InitS = [to_scode(notail(Env), Init),
+             {jump, ContRef}],
     ExprS = [aeb_fate_ops:store({var, ItV}, {stack, 0}),
              to_scode(bind_loop(ContRef, BreakRef, ItV, Env1), Expr),
              {jump, BreakRef}],
     [{loop, InitS, It, ExprS, ContRef, BreakRef}];
 to_scode1(Env = #env{cont_ref = ContRef}, {continue, Expr}) ->
-    ExprS = to_scode1(notail(Env), Expr),
-    ExprS ++ [{jump, ContRef}];
+    [to_scode1(notail(Env), Expr),
+     {jump, ContRef}];
 to_scode1(Env, {break, Expr}) ->
     to_scode1(Env, Expr);
 to_scode1(Env, {switch, Case}) ->
@@ -1727,7 +1728,6 @@ reorder_blocks(Ref, Code, Blocks, Acc) ->
         [{'EXIT', _}|_]       -> reorder_blocks(Blocks, Acc1);
         [{'ABORT', _}|_]      -> reorder_blocks(Blocks, Acc1);
         [{switch, _, _}|_]    -> reorder_blocks(Blocks, Acc1);
-        [{jumpif, _, _}|_] -> reorder_blocks(Blocks, Acc1);
         [{jump, L}|_]         ->
             NotL = fun({L1, _}) -> L1 /= L end,
             case lists:splitwith(NotL, Blocks) of
@@ -1783,6 +1783,7 @@ tweak_returns(['RETURN', {'PUSH', A} | Code])          -> [{'RETURNR', A} | Code
 tweak_returns(['RETURN' | Code = [{'CALL_T', _} | _]]) -> Code;
 tweak_returns(['RETURN' | Code = [{'ABORT', _} | _]])  -> Code;
 tweak_returns(['RETURN' | Code = [{'EXIT', _} | _]])   -> Code;
+tweak_returns(['RETURN' | Code = [{jump, _} | _]])     -> Code;
 tweak_returns(['RETURN' | Code = [loop | _]])          -> Code;
 tweak_returns(Code) -> Code.
 
