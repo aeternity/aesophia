@@ -659,6 +659,18 @@ expr_to_fcode(Env, _Type, {app, _, {'..', _}, [A, B]}) ->
     WithA = fun(X) -> {'let', AV, expr_to_fcode(Env, A), X} end,
     WithB = fun(X) -> {'let', BV, expr_to_fcode(Env, B), X} end,
     St = fresh_name(),
+    Init = {var, AV},
+    Loop = {loop, Init, St, make_if({op, '<', [{var, St}, {var, BV}]},
+                                    {continue, {op, '+', [{var, St}, {lit, {int, 1}}]}},
+                                    {break, nil}
+                                   )},
+    WithA(WithB(Loop));
+expr_to_fcode(Env, _Type, {app, _, {'..', _}, [A, B]}) ->
+    AV = fresh_name(),
+    BV = fresh_name(),
+    WithA = fun(X) -> {'let', AV, expr_to_fcode(Env, A), X} end,
+    WithB = fun(X) -> {'let', BV, expr_to_fcode(Env, B), X} end,
+    St = fresh_name(),
     It = fresh_name(),
     Init = {tuple, [nil, {var, AV}]},
     WithA(WithB(

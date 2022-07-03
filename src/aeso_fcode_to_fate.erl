@@ -378,10 +378,10 @@ to_scode1(Env, {loop, Init, It, Expr}) ->
     InitS = to_scode(Env, Init) ++ [{jump, ContRef}],
     {ItV, Env1} = bind_local(It, Env),
     ExprS = to_scode(bind_loop(ContRef, BreakRef, ItV, Env1), Expr) ++ [{jumpif, ?a, ContRef}, {jump, BreakRef}],
-    [{loop, InitS, It, ExprS, ContRef, BreakRef}];
+    [{loop, InitS, ItV, ExprS, ContRef, BreakRef}];
 to_scode1(Env = #env{cont_ref = ContRef, loop_it = It}, {continue, Expr}) ->
     ExprS = to_scode1(Env, Expr),
-    ExprS ++ [{'POP', It}, push(?i(1))];
+    ExprS ++ [{'STORE', It, ?a}, push(?i(1))];
 to_scode1(Env = #env{break_ref = BreakRef}, {break, Expr}) ->
     ExprS = to_scode1(Env, Expr),
     ExprS ++ [push(?i(0))];
