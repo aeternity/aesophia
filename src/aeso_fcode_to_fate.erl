@@ -819,6 +819,9 @@ ann_live(LiveTop, [I | Is], LiveOut) ->
 ann_live1(_LiveTop, switch_body, LiveOut) ->
     Ann = #{ live_in => LiveOut, live_out => LiveOut },
     {{i, Ann, switch_body}, LiveOut};
+ann_live1(LiveTop, {jump, Ref}, _LiveOut) ->
+    Ann = #{ live_in => LiveTop, live_out => [] },
+    {{i, Ann, {jump, Ref}}, LiveTop};
 ann_live1(LiveTop, loop, _LiveOut) ->
     Ann = #{ live_in => LiveTop, live_out => [] },
     {{i, Ann, loop}, LiveTop};
@@ -1104,6 +1107,8 @@ simplify([I | Code], Options) ->
 
 simpl_s({switch, Arg, Type, Alts, Def}, Options) ->
     {switch, Arg, Type, [simplify(A, Options) || A <- Alts], simplify(Def, Options)};
+simpl_s({loop, Init, Var, Expr, ContRef, BreakRef}, Options) ->
+    {loop, simplify(Init, Options), Var, simplify(Expr, Options), ContRef, BreakRef};
 simpl_s(I, _) -> I.
 
 %% Safe-guard against loops in the rewriting. Shouldn't happen so throw an
@@ -1705,7 +1710,6 @@ optimize_blocks(Blocks) ->
     Rev       = fun(Bs) -> [ {Ref, lists:reverse(Code)} || {Ref, Code} <- Bs ] end,
     RBlocks   =  [{Ref, crop_jumps(Code)} || {Ref, Code} <- Blocks],
     RBlockMap = maps:from_list(RBlocks),
-    io:format("REORDERING ~p\n\n", [RBlocks]),
     RBlocks1  = reorder_blocks(RBlocks, []),
     RBlocks2  = [ {Ref, inline_block(RBlockMap, Ref, Code)} || {Ref, Code} <- RBlocks1 ],
     RBlocks3  = shortcut_jump_chains(RBlocks2),
@@ -1786,13 +1790,15 @@ tweak_returns(['RETURN' | Code = [{'EXIT', _} | _]])   -> Code;
 tweak_returns(['RETURN' | Code = [loop | _]])          -> Code;
 tweak_returns(Code) -> Code.
 
-%% Remove instructions that appear after jumps. Returns reversed code.
+%% -- Remove instructions that appear after jumps. Returns reversed code.
+%% This is useful for example when bb emitter adds continuation jumps
+%% for switch expressions, but some of the branches
 crop_jumps(Code) ->
     crop_jumps(Code, []).
 crop_jumps([], Acc) ->
     Acc;
-crop_jumps([I = {jump, _}|_], Acc) ->
-    [I|Acc];
+%% crop_jumps([I = {jump, _}|_], Acc) ->
+%%     [I|Acc];
 crop_jumps([I|Code], Acc) ->
     crop_jumps(Code, [I|Acc]).
 
