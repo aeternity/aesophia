@@ -1706,8 +1706,8 @@ optimize_blocks(Blocks) ->
     RBlocks   = Rev(Blocks),
     RBlockMap = maps:from_list(RBlocks),
     io:format("REORDERING ~p\n\n", [RBlocks]),
-    RBlocks1  = reorder_blocks(RBlocks, []),
-    io:format("REORDERED ~p\n\n", [RBlocks1]),
+    RBlocks0  = [{Ref, crop_jumps(Code)} || {Ref, Code} <- RBlocks],
+    RBlocks1  = reorder_blocks(RBlocks0, []),
     RBlocks2  = [ {Ref, inline_block(RBlockMap, Ref, Code)} || {Ref, Code} <- RBlocks1 ],
     RBlocks3  = shortcut_jump_chains(RBlocks2),
     RBlocks4  = remove_dead_blocks(RBlocks3),
@@ -1787,11 +1787,18 @@ tweak_returns(['RETURN' | Code = [{'EXIT', _} | _]])   -> Code;
 tweak_returns(['RETURN' | Code = [loop | _]])          -> Code;
 tweak_returns(Code) -> Code.
 
+%% Remove instructions that appear after jumps
+crop_jumps(Code) ->
+    crop_jumps(Code, []).
+crop_jumps([], Acc) ->
+    lists:reverse(Acc);
+crop_jumps([I = {jump, _}|_], Acc) ->
+    lists:reverse([I|Acc]);
+crop_jumps([I|Code], Acc) ->
+    crop_jumps(Code, [I|Acc]).
+
 %% -- Split basic blocks at CALL instructions --
 %%  Calls can only return to a new basic block. Also splits at JUMPIF instructions.
-
-split_calls({Ref, Code}) ->
-    split_calls(Ref, Code, [], []).
 
 split_calls(Ref, [], Acc, Blocks) ->
     lists:reverse([{Ref, lists:reverse(Acc)} | Blocks]);
