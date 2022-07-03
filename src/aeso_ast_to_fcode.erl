@@ -662,22 +662,21 @@ expr_to_fcode(Env, _Type, {app, _, {'..', _}, [A, B]}) ->
                                    )},
     Loop;
 expr_to_fcode(Env, _Type, {app, _, {'..', _}, [A, B]}) ->
-    AV = fresh_name(),
-    BV = fresh_name(),
-    WithA = fun(X) -> {'let', AV, expr_to_fcode(Env, A), X} end,
+    BV = fresh_name(), % var to keep B
     WithB = fun(X) -> {'let', BV, expr_to_fcode(Env, B), X} end,
-    St = fresh_name(),
-    It = fresh_name(),
-    Init = {tuple, [nil, {var, AV}]},
-    WithA(WithB(
-            {loop, Init, St,
-             {'let', It, {proj, {var, St}, 1},
-              make_if({op, '=<', [{var, It}, {var, BV}]},
-                      {continue, {tuple, [{op, '::', [{var, It}, {proj, {var, St}, 0}]},
-                                          {op, '+', [{var, It}, {lit, {int, 1}}]}
-                                         ]}},
-                      {break, {proj, {var, St}, 0}}
-                     )}}));
+    St = fresh_name(), % loop state
+    ItProj = {proj, {var, St}, 1},
+    AcProj = {proj, {var, St}, 0},
+    Init = {tuple, [nil, expr_to_fcode(Env, A)]},
+    Loop = {loop, Init, St,
+            make_if(
+              {op, '=<', [ItProj, {var, BV}]},
+              {continue, {tuple, [{op, '::', [ItProj, AcProj]},
+                                  {op, '+', [ItProj, {lit, {int, 1}}]}
+                                 ]}},
+              {break, AcProj}
+             )},
+    WithB(Loop);
 expr_to_fcode(Env, _Type, {list_comp, _, Yield, []}) ->
     {op, '::', [expr_to_fcode(Env, Yield), nil]};
 expr_to_fcode(Env, _Type, {list_comp, As, Yield, [{comprehension_bind, Pat = {typed, _, _, PatType}, BindExpr}|Rest]}) ->
