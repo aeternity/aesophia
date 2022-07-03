@@ -656,7 +656,7 @@ expr_to_fcode(Env, _Type, {list, _, Es}) ->
 expr_to_fcode(Env, _Type, {app, _, {'..', _}, [A, B]}) ->
     St = fresh_name(),
     Init = expr_to_fcode(Env, A),
-    Loop = {loop, {}, St, make_if({op, '<', [{var, St}, expr_to_fcode(Env, B)]},
+    Loop = {loop, Init, St, make_if({op, '<', [{var, St}, expr_to_fcode(Env, B)]},
                                     {continue, {op, '+', [{var, St}, {lit, {int, 1}}]}},
                                     {break, nil}
                                    )},
