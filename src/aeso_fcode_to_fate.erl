@@ -375,14 +375,14 @@ to_scode1(Env, {closure, Fun, FVs}) ->
 to_scode1(Env, {loop, Init, It, Expr}) ->
     ContRef = make_ref(),
     BreakRef = make_ref(),
-    InitS = to_scode(Env, Init) ++ [{jump, ContRef}],
     {ItV, Env1} = bind_local(It, Env),
+    InitS = to_scode(Env, Init) ++ [aeb_fate_ops:store({var, ItV}, {stack, 0}), {jump, ContRef}],
     ExprS = to_scode(bind_loop(ContRef, BreakRef, ItV, Env1), Expr) ++ [{jumpif, ?a, ContRef}, {jump, BreakRef}],
     [{loop, InitS, It, ExprS, ContRef, BreakRef}];
-to_scode1(Env = #env{cont_ref = ContRef, loop_it = It}, {continue, Expr}) ->
+to_scode1(Env = #env{loop_it = It}, {continue, Expr}) ->
     ExprS = to_scode1(Env, Expr),
-    ExprS ++ [{'STORE', It, ?a}, push(?i(1))];
-to_scode1(Env = #env{break_ref = BreakRef}, {break, Expr}) ->
+    ExprS ++ [aeb_fate_ops:store({var, It}, {stack, 0}), push(?i(1))];
+to_scode1(Env, {break, Expr}) ->
     ExprS = to_scode1(Env, Expr),
     ExprS ++ [push(?i(0))];
 to_scode1(Env, {switch, Case}) ->
