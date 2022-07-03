@@ -381,10 +381,10 @@ to_scode1(Env, {loop, Init, It, Expr}) ->
     [{loop, InitS, It, ExprS, ContRef, BreakRef}];
 to_scode1(Env = #env{loop_it = It}, {continue, Expr}) ->
     ExprS = to_scode1(Env, Expr),
-    ExprS ++ [aeb_fate_ops:store({var, It}, {stack, 0}), push(?i(1))];
+    ExprS ++ [aeb_fate_ops:store({var, It}, {stack, 0}), push(?i(true))];
 to_scode1(Env, {break, Expr}) ->
     ExprS = to_scode1(Env, Expr),
-    ExprS ++ [push(?i(0))];
+    ExprS ++ [push(?i(false))];
 to_scode1(Env, {switch, Case}) ->
     split_to_scode(Env, Case).
 
