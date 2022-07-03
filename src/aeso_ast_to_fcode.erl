@@ -654,7 +654,7 @@ expr_to_fcode(Env, _Type, {list, _, Es}) ->
                 nil, Es);
 expr_to_fcode(Env, _Type, {app, _, {'..', _}, [A, B]}) ->
     AV = fresh_name(), % var to keep B
-    WithA = fun(X) -> {'let', AV, expr_to_fcode(Env, B), X} end,
+    WithA = fun(X) -> {'let', AV, expr_to_fcode(Env, A), X} end,
     St = fresh_name(), % loop state
     ItProj = {proj, {var, St}, 1},
     AcProj = {proj, {var, St}, 0},
