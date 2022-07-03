@@ -19,6 +19,7 @@
 
 -type scode()  :: [sinstr()].
 -type sinstr() :: {switch, arg(), stype(), [maybe_scode()], maybe_scode()}  %% last arg is catch-all
+                | {loop, scode(), var(), scode(), reference(), reference()}
                 | switch_body
                 | loop
                 | tuple() | atom().    %% FATE instruction
