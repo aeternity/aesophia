@@ -77,7 +77,6 @@ compile(ChildContracts, FCode, Options) ->
     SFuns  = functions_to_scode(ChildContracts, ContractName, Functions, Options),
     SFuns1 = optimize_scode(SFuns, Options),
     FateCode = to_basic_blocks(SFuns1),
-    io:format("FINAL:\~p\n\n", [FateCode]),
     ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
     FateCode.
 
@@ -862,6 +861,7 @@ attributes(I) ->
     case I of
         loop                                  -> Impure(pc, []);
         switch_body                           -> Pure(none, []);
+        {jump, _}                             -> Impure(pc, []);
         'RETURN'                              -> Impure(pc, []);
         {'RETURNR', A}                        -> Impure(pc, A);
         {'CALL', A}                           -> Impure(?a, [A]);
@@ -871,9 +871,7 @@ attributes(I) ->
         {'CALL_T', A}                         -> Impure(pc, [A]);
         {'CALL_VALUE', A}                     -> Pure(A, []);
         {'JUMP', _}                           -> Impure(pc, []);
-        {jump, _}                           -> Impure(pc, []);
         {'JUMPIF', A, _}                      -> Impure(pc, A);
-        {jumpif, A, _}                      -> Impure(pc, A);
         {'SWITCH_V2', A, _, _}                -> Impure(pc, A);
         {'SWITCH_V3', A, _, _, _}             -> Impure(pc, A);
         {'SWITCH_VN', A, _}                   -> Impure(pc, A);
@@ -1588,7 +1586,6 @@ to_basic_blocks([], Acc) ->
     Acc.
 
 bb(_Name, Code) ->
-    io:format("FUN: ~p\nCODE:\n~p\n\n", [_Name, Code]),
     Blocks0 = blocks(Code),
     Blocks1 = optimize_blocks(Blocks0),
     Blocks  = lists:flatmap(fun split_calls/1, Blocks1),
@@ -1633,9 +1630,6 @@ block(#blk{ref = Ref, code = []}, CodeAcc, Blocks, BlockAcc) ->
 block(Blk = #blk{code = [{loop, Init, _, Expr, ContRef, BreakRef} | Code], catchall = Catchall}, Acc, Blocks, BlockAcc) ->
     LoopBlock = #blk{ref = ContRef, code = Expr, catchall = none},
     BreakBlock = #blk{ref = BreakRef, code = Code, catchall = Catchall},
-
-    io:format("INIT: ~p\n\nLOOP: ~p\n\nBREAK: ~p\n\n", [Init, Expr, Code]),
-
     block(Blk#blk{code = Init}, Acc, [LoopBlock, BreakBlock | Blocks], BlockAcc);
 block(Blk = #blk{code = [switch_body | Code]}, Acc, Blocks, BlockAcc) ->
     %% Reached the body of a switch. Clear catchall ref.
@@ -1651,9 +1645,6 @@ block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
             _       -> fresh_block(Default ++ [{jump, RestRef}], Catchall)
                        %% ^ fall-through to the outer catchall
         end,
-
-    io:format("RestRef: ~p, DefRef: ~p\n\n", [RestRef, DefRef]),
-
     %% If we don't generate a switch, we need to pop the argument if on the stack.
     Pop = [{'POP', ?void} || Arg == ?a],
     {Blk1, Code1, AltBlks} =
@@ -1803,8 +1794,8 @@ crop_jumps(Code) ->
     crop_jumps(Code, []).
 crop_jumps([], Acc) ->
     Acc;
-%% crop_jumps([I = {jump, _}|_], Acc) ->
-%%     [I|Acc];
+crop_jumps([I = {jump, _}|_], Acc) ->
+    [I|Acc];
 crop_jumps([I|Code], Acc) ->
     crop_jumps(Code, [I|Acc]).
 
