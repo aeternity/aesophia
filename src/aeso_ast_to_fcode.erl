@@ -653,21 +653,21 @@ expr_to_fcode(Env, _Type, {list, _, Es}) ->
     lists:foldr(fun(E, L) -> {op, '::', [expr_to_fcode(Env, E), L]} end,
                 nil, Es);
 expr_to_fcode(Env, _Type, {app, _, {'..', _}, [A, B]}) ->
-    BV = fresh_name(), % var to keep B
-    WithB = fun(X) -> {'let', BV, expr_to_fcode(Env, B), X} end,
+    AV = fresh_name(), % var to keep B
+    WithA = fun(X) -> {'let', AV, expr_to_fcode(Env, B), X} end,
     St = fresh_name(), % loop state
     ItProj = {proj, {var, St}, 1},
     AcProj = {proj, {var, St}, 0},
-    Init = {tuple, [nil, expr_to_fcode(Env, A)]},
+    Init = {tuple, [nil, expr_to_fcode(Env, B)]},
     Loop = {loop, Init, St,
             make_if(
-              {op, '=<', [ItProj, {var, BV}]},
+              {op, '=<', [ItProj, {var, AV}]},
               {continue, {tuple, [{op, '::', [ItProj, AcProj]},
                                   {op, '+', [ItProj, {lit, {int, 1}}]}
                                  ]}},
               {break, AcProj}
              )},
-    WithB(Loop);
+    WithA(Loop);
 expr_to_fcode(Env, _Type, {list_comp, _, Yield, []}) ->
     {op, '::', [expr_to_fcode(Env, Yield), nil]};
 expr_to_fcode(Env, _Type, {list_comp, As, Yield, [{comprehension_bind, Pat = {typed, _, _, PatType}, BindExpr}|Rest]}) ->
