@@ -1092,6 +1092,8 @@ live_in(R, {i, Ann, _}) -> live_in(R, Ann);
 live_in(R, [I = {i, _, _} | _]) -> live_in(R, I);
 live_in(R, [{switch, A, _, Alts, Def} | _]) ->
     R == A orelse lists:any(fun(Code) -> live_in(R, Code) end, [Def | Alts]);
+live_in(R, [{loop, Init, Var, Expr, _, _}]) ->
+    live_in(Var, Init) orelse (R /= Var andalso live_in(R, Expr));
 live_in(_, missing) -> false;
 live_in(_, []) -> false.
 
@@ -1411,6 +1413,8 @@ does_abort({i, _, {'EXIT', _}}) -> true;
 does_abort(missing) -> true;
 does_abort({switch, _, _, Alts, Def}) ->
     lists:all(fun does_abort/1, [Def | Alts]);
+does_abort({loop, Init, _, Expr, _, _}) ->
+    does_abort(Init) orelse does_abort(Expr);
 does_abort(_) -> false.
 
 %% STORE R A, SWITCH R --> SWITCH A
@@ -1556,6 +1560,8 @@ desugar({'STORE', ?a, A})       -> [aeb_fate_ops:push(desugar_arg(A))];
 desugar({'STORE', R, ?a})       -> [aeb_fate_ops:pop(desugar_arg(R))];
 desugar({switch, Arg, Type, Alts, Def}) ->
     [{switch, desugar_arg(Arg), Type, [desugar(A) || A <- Alts], desugar(Def)}];
+desugar({loop, Init, Var, Expr, ContRef, BreakRef}) ->
+    [{loop, desugar(Init), Var, desugar(Expr), ContRef, BreakRef}];
 desugar(missing) -> missing;
 desugar(Code) when is_list(Code) ->
     lists:flatmap(fun desugar/1, Code);
