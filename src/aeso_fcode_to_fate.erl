@@ -1707,6 +1707,7 @@ optimize_blocks(Blocks) ->
     RBlockMap = maps:from_list(RBlocks),
     io:format("REORDERING ~p\n\n", [RBlocks]),
     RBlocks1  = reorder_blocks(RBlocks, []),
+    io:format("REORDERED ~p\n\n", [RBlocks1]),
     RBlocks2  = [ {Ref, inline_block(RBlockMap, Ref, Code)} || {Ref, Code} <- RBlocks1 ],
     RBlocks3  = shortcut_jump_chains(RBlocks2),
     RBlocks4  = remove_dead_blocks(RBlocks3),
@@ -1783,7 +1784,6 @@ tweak_returns(['RETURN', {'PUSH', A} | Code])          -> [{'RETURNR', A} | Code
 tweak_returns(['RETURN' | Code = [{'CALL_T', _} | _]]) -> Code;
 tweak_returns(['RETURN' | Code = [{'ABORT', _} | _]])  -> Code;
 tweak_returns(['RETURN' | Code = [{'EXIT', _} | _]])   -> Code;
-tweak_returns(['RETURN' | Code = [{jump, _} | _]])     -> Code;
 tweak_returns(['RETURN' | Code = [loop | _]])          -> Code;
 tweak_returns(Code) -> Code.
 
