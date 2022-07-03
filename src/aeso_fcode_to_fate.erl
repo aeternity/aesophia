@@ -1800,6 +1800,9 @@ crop_jumps([I|Code], Acc) ->
 %% -- Split basic blocks at CALL instructions --
 %%  Calls can only return to a new basic block. Also splits at JUMPIF instructions.
 
+split_calls({Ref, Code}) ->
+    split_calls(Ref, Code, [], []).
+
 split_calls(Ref, [], Acc, Blocks) ->
     lists:reverse([{Ref, lists:reverse(Acc)} | Blocks]);
 split_calls(Ref, [I | Code], Acc, Blocks) when element(1, I) == 'CALL';
