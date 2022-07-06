@@ -10,7 +10,7 @@
       
       
       <link rel="icon" href="../favicon.png">
-      <meta name="generator" content="mkdocs-1.2.4, mkdocs-material-7.1.9">
+      <meta name="generator" content="mkdocs-1.2.4, mkdocs-material-7.3.6">
     
     
       
@@ -18,10 +18,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ca7ac06f.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.a57b2b03.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.f1a3b89f.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.3f5d1f46.min.css">
         
       
     
@@ -74,7 +74,9 @@
       
     </div>
     
-      <header class="md-header" data-md-component="header">
+      
+
+<header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href=".." title="æternity Sophia Language" class="md-header__button md-logo" aria-label="æternity Sophia Language" data-md-component="logo">
       
@@ -134,14 +136,24 @@
   <label class="md-search__overlay" for="__search"></label>
   <div class="md-search__inner" role="search">
     <form class="md-search__form" name="search">
-      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" data-md-state="active" required>
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
       <label class="md-search__icon md-icon" for="__search">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
       </label>
-      <button type="reset" class="md-search__icon md-icon" aria-label="Clear" tabindex="-1">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>
-      </button>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91 1.61 0 2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08z"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" aria-label="Clear" tabindex="-1">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
     </form>
     <div class="md-search__output">
       <div class="md-search__scrollwrap" data-md-scrollfix>
@@ -171,11 +183,14 @@
       </div>
     
   </nav>
+  
 </header>
     
     <div class="md-container" data-md-component="container">
       
       
+        
+          
         
       
       <main class="md-main" data-md-component="main">
@@ -317,6 +332,8 @@
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
                     
+
+
 <nav class="md-nav md-nav--secondary" aria-label="Table of contents">
   
   
@@ -394,80 +411,81 @@
 Sophia contracts and a suitable JSON encoding of contract
 interface. As yet the interface is very basic.</p>
 <p>Encoding this contract:</p>
-<p>```
-contract Answers =
+<div class="highlight"><pre><span></span><code>contract Answers =
   record state = { a : answers }
-  type answers() = map(string, int)</p>
-<p>stateful function init() = { a = {} }
+  type answers() = map(string, int)
+
+  stateful function init() = { a = {} }
   private function the_answer() = 42
   function new_answer(q : string, a : int) : answers() = { [q] = a }
-```</p>
+</code></pre></div>
 <p>generates the following JSON structure representing the contract interface:</p>
-<p><code>json
-{
-  "contract": {
-    "functions": [
-      {
-        "arguments": [],
-        "name": "init",
-        "returns": "Answers.state",
-        "stateful": true
-      },
-      {
-        "arguments": [
-          {
-            "name": "q",
-            "type": "string"
-          },
-          {
-            "name": "a",
-            "type": "int"
-          }
-        ],
-        "name": "new_answer",
-        "returns": {
-          "map": [
-            "string",
-            "int"
-          ]
-        },
-        "stateful": false
-      }
-    ],
-    "name": "Answers",
-    "state": {
-      "record": [
-        {
-          "name": "a",
-          "type": "Answers.answers"
-        }
-      ]
-    },
-    "type_defs": [
-      {
-        "name": "answers",
-        "typedef": {
-          "map": [
-            "string",
-            "int"
-          ]
-        },
-        "vars": []
-      }
-    ]
-  }
-}</code></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">&quot;contract&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">&quot;functions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;arguments&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;init&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;returns&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Answers.state&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;stateful&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="w"></span>
+<span class="w">      </span><span class="p">},</span><span class="w"></span>
+<span class="w">      </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;arguments&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">          </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;q&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span><span class="w"></span>
+<span class="w">          </span><span class="p">},</span><span class="w"></span>
+<span class="w">          </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;a&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;int&quot;</span><span class="w"></span>
+<span class="w">          </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="p">],</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;new_answer&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;returns&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="nt">&quot;map&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">            </span><span class="s2">&quot;string&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="s2">&quot;int&quot;</span><span class="w"></span>
+<span class="w">          </span><span class="p">]</span><span class="w"></span>
+<span class="w">        </span><span class="p">},</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;stateful&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">],</span><span class="w"></span>
+<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Answers&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">&quot;state&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">&quot;record&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">        </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;a&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Answers.answers&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="nt">&quot;type_defs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;answers&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;typedef&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="nt">&quot;map&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">            </span><span class="s2">&quot;string&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="s2">&quot;int&quot;</span><span class="w"></span>
+<span class="w">          </span><span class="p">]</span><span class="w"></span>
+<span class="w">        </span><span class="p">},</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;vars&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
 <p>When that encoding is decoded the following include definition is generated:</p>
-<p><code>contract Answers =
+<div class="highlight"><pre><span></span><code>contract Answers =
   record state = {a : Answers.answers}
   type answers = map(string, int)
   function init : () =&gt; Answers.state
-  function new_answer : (string, int) =&gt; map(string, int)</code></p>
+  function new_answer : (string, int) =&gt; map(string, int)
+</code></pre></div>
 <h3 id="types">Types</h3>
-<p><code>erlang
--type aci_type()  :: json | string.
--type json()      :: jsx:json_term().
--type json_text() :: binary().</code></p>
+<div class="highlight"><pre><span></span><code><span class="p">-</span><span class="ni">type</span><span class="w"> </span><span class="n">aci_type</span><span class="p">()</span><span class="w">  </span><span class="p">::</span><span class="w"> </span><span class="n">json</span><span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="n">string</span><span class="p">.</span><span class="w"></span>
+<span class="p">-</span><span class="ni">type</span><span class="w"> </span><span class="n">json</span><span class="p">()</span><span class="w">      </span><span class="p">::</span><span class="w"> </span><span class="nn">jsx</span><span class="p">:</span><span class="nf">json_term</span><span class="p">().</span><span class="w"></span>
+<span class="p">-</span><span class="ni">type</span><span class="w"> </span><span class="n">json_text</span><span class="p">()</span><span class="w"> </span><span class="p">::</span><span class="w"> </span><span class="n">binary</span><span class="p">().</span><span class="w"></span>
+</code></pre></div>
 <h3 id="exports">Exports</h3>
 <h4 id="contract_interfaceaci_type-string-ok-json-string-error-term">contract_interface(aci_type(), string()) -&gt; {ok, json() | string()} | {error, term()}</h4>
 <p>Generate the JSON encoding of the interface to a contract. The type definitions
@@ -481,36 +499,36 @@ called <code>aci_test.aes</code> contains the contract in the description from w
 want to generate files <code>aci_test.json</code> which is the JSON encoding of the
 contract interface and <code>aci_test.include</code> which is the contract definition to
 be included inside another contract.</p>
-<p><code>erlang
-1&gt; {ok,Contract} = file:read_file("aci_test.aes").
-{ok,&lt;&lt;"contract Answers =\n  record state = { a : answers }\n  type answers() = map(string, int)\n\n  stateful function"...&gt;&gt;}
-2&gt; {ok,JsonACI} = aeso_aci:contract_interface(json, Contract).
-{ok,[#{contract =&gt;
-           #{functions =&gt;
-                 [#{arguments =&gt; [],name =&gt; &lt;&lt;"init"&gt;&gt;,
-                    returns =&gt; &lt;&lt;"Answers.state"&gt;&gt;,stateful =&gt; true},
-                  #{arguments =&gt;
-                        [#{name =&gt; &lt;&lt;"q"&gt;&gt;,type =&gt; &lt;&lt;"string"&gt;&gt;},
-                         #{name =&gt; &lt;&lt;"a"&gt;&gt;,type =&gt; &lt;&lt;"int"&gt;&gt;}],
-                    name =&gt; &lt;&lt;"new_answer"&gt;&gt;,
-                    returns =&gt; #{&lt;&lt;"map"&gt;&gt; =&gt; [&lt;&lt;"string"&gt;&gt;,&lt;&lt;"int"&gt;&gt;]},
-                    stateful =&gt; false}],
-             name =&gt; &lt;&lt;"Answers"&gt;&gt;,
-             state =&gt;
-                 #{record =&gt;
-                       [#{name =&gt; &lt;&lt;"a"&gt;&gt;,type =&gt; &lt;&lt;"Answers.answers"&gt;&gt;}]},
-             type_defs =&gt;
-                 [#{name =&gt; &lt;&lt;"answers"&gt;&gt;,
-                    typedef =&gt; #{&lt;&lt;"map"&gt;&gt; =&gt; [&lt;&lt;"string"&gt;&gt;,&lt;&lt;"int"&gt;&gt;]},
-                    vars =&gt; []}]}}]}
-3&gt; file:write_file("aci_test.aci", jsx:encode(JsonACI)).
-ok
-4&gt; {ok,InterfaceStub} = aeso_aci:render_aci_json(JsonACI).
-{ok,&lt;&lt;"contract Answers =\n  record state = {a : Answers.answers}\n  type answers = map(string, int)\n  function init "...&gt;&gt;}
-5&gt; file:write_file("aci_test.include", InterfaceStub).
-ok
-6&gt; jsx:prettify(jsx:encode(JsonACI)).
-&lt;&lt;"[\n  {\n    \"contract\": {\n      \"functions\": [\n        {\n          \"arguments\": [],\n          \"name\": \"init\",\n        "...&gt;&gt;</code></p>
+<div class="highlight"><pre><span></span><code><span class="mi">1</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span><span class="n">ok</span><span class="p">,</span><span class="nv">Contract</span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nn">file</span><span class="p">:</span><span class="nf">read_file</span><span class="p">(</span><span class="s">&quot;aci_test.aes&quot;</span><span class="p">).</span><span class="w"></span>
+<span class="p">{</span><span class="n">ok</span><span class="p">,</span><span class="o">&lt;&lt;</span><span class="s">&quot;contract Answers =</span><span class="se">\n</span><span class="s">  record state = { a : answers }</span><span class="se">\n</span><span class="s">  type answers() = map(string, int)</span><span class="se">\n\n</span><span class="s">  stateful function&quot;</span><span class="p">...</span><span class="o">&gt;&gt;</span><span class="p">}</span><span class="w"></span>
+<span class="mi">2</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span><span class="n">ok</span><span class="p">,</span><span class="nv">JsonACI</span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nn">aeso_aci</span><span class="p">:</span><span class="nf">contract_interface</span><span class="p">(</span><span class="n">json</span><span class="p">,</span><span class="w"> </span><span class="nv">Contract</span><span class="p">).</span><span class="w"></span>
+<span class="p">{</span><span class="n">ok</span><span class="p">,[#{</span><span class="n">contract</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"></span>
+<span class="w">           </span><span class="p">#{</span><span class="n">functions</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"></span>
+<span class="w">                 </span><span class="p">[#{</span><span class="n">arguments</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">[],</span><span class="n">name</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="s">&quot;init&quot;</span><span class="o">&gt;&gt;</span><span class="p">,</span><span class="w"></span>
+<span class="w">                    </span><span class="n">returns</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="s">&quot;Answers.state&quot;</span><span class="o">&gt;&gt;</span><span class="p">,</span><span class="n">stateful</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">true</span><span class="p">},</span><span class="w"></span>
+<span class="w">                  </span><span class="p">#{</span><span class="n">arguments</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"></span>
+<span class="w">                        </span><span class="p">[#{</span><span class="n">name</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="s">&quot;q&quot;</span><span class="o">&gt;&gt;</span><span class="p">,</span><span class="n">type</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="s">&quot;string&quot;</span><span class="o">&gt;&gt;</span><span class="p">},</span><span class="w"></span>
+<span class="w">                         </span><span class="p">#{</span><span class="n">name</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="s">&quot;a&quot;</span><span class="o">&gt;&gt;</span><span class="p">,</span><span class="n">type</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="s">&quot;int&quot;</span><span class="o">&gt;&gt;</span><span class="p">}],</span><span class="w"></span>
+<span class="w">                    </span><span class="n">name</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="s">&quot;new_answer&quot;</span><span class="o">&gt;&gt;</span><span class="p">,</span><span class="w"></span>
+<span class="w">                    </span><span class="n">returns</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">#{</span><span class="o">&lt;&lt;</span><span class="s">&quot;map&quot;</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">[</span><span class="o">&lt;&lt;</span><span class="s">&quot;string&quot;</span><span class="o">&gt;&gt;</span><span class="p">,</span><span class="o">&lt;&lt;</span><span class="s">&quot;int&quot;</span><span class="o">&gt;&gt;</span><span class="p">]},</span><span class="w"></span>
+<span class="w">                    </span><span class="n">stateful</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">false</span><span class="p">}],</span><span class="w"></span>
+<span class="w">             </span><span class="n">name</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="s">&quot;Answers&quot;</span><span class="o">&gt;&gt;</span><span class="p">,</span><span class="w"></span>
+<span class="w">             </span><span class="n">state</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"></span>
+<span class="w">                 </span><span class="p">#{</span><span class="n">record</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"></span>
+<span class="w">                       </span><span class="p">[#{</span><span class="n">name</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="s">&quot;a&quot;</span><span class="o">&gt;&gt;</span><span class="p">,</span><span class="n">type</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="s">&quot;Answers.answers&quot;</span><span class="o">&gt;&gt;</span><span class="p">}]},</span><span class="w"></span>
+<span class="w">             </span><span class="n">type_defs</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"></span>
+<span class="w">                 </span><span class="p">[#{</span><span class="n">name</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="s">&quot;answers&quot;</span><span class="o">&gt;&gt;</span><span class="p">,</span><span class="w"></span>
+<span class="w">                    </span><span class="n">typedef</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">#{</span><span class="o">&lt;&lt;</span><span class="s">&quot;map&quot;</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">[</span><span class="o">&lt;&lt;</span><span class="s">&quot;string&quot;</span><span class="o">&gt;&gt;</span><span class="p">,</span><span class="o">&lt;&lt;</span><span class="s">&quot;int&quot;</span><span class="o">&gt;&gt;</span><span class="p">]},</span><span class="w"></span>
+<span class="w">                    </span><span class="n">vars</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">[]}]}}]}</span><span class="w"></span>
+<span class="mi">3</span><span class="o">&gt;</span><span class="w"> </span><span class="nn">file</span><span class="p">:</span><span class="nf">write_file</span><span class="p">(</span><span class="s">&quot;aci_test.aci&quot;</span><span class="p">,</span><span class="w"> </span><span class="nn">jsx</span><span class="p">:</span><span class="nf">encode</span><span class="p">(</span><span class="nv">JsonACI</span><span class="p">)).</span><span class="w"></span>
+<span class="n">ok</span><span class="w"></span>
+<span class="mi">4</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span><span class="n">ok</span><span class="p">,</span><span class="nv">InterfaceStub</span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nn">aeso_aci</span><span class="p">:</span><span class="nf">render_aci_json</span><span class="p">(</span><span class="nv">JsonACI</span><span class="p">).</span><span class="w"></span>
+<span class="p">{</span><span class="n">ok</span><span class="p">,</span><span class="o">&lt;&lt;</span><span class="s">&quot;contract Answers =</span><span class="se">\n</span><span class="s">  record state = {a : Answers.answers}</span><span class="se">\n</span><span class="s">  type answers = map(string, int)</span><span class="se">\n</span><span class="s">  function init &quot;</span><span class="p">...</span><span class="o">&gt;&gt;</span><span class="p">}</span><span class="w"></span>
+<span class="mi">5</span><span class="o">&gt;</span><span class="w"> </span><span class="nn">file</span><span class="p">:</span><span class="nf">write_file</span><span class="p">(</span><span class="s">&quot;aci_test.include&quot;</span><span class="p">,</span><span class="w"> </span><span class="nv">InterfaceStub</span><span class="p">).</span><span class="w"></span>
+<span class="n">ok</span><span class="w"></span>
+<span class="mi">6</span><span class="o">&gt;</span><span class="w"> </span><span class="nn">jsx</span><span class="p">:</span><span class="nf">prettify</span><span class="p">(</span><span class="nn">jsx</span><span class="p">:</span><span class="nf">encode</span><span class="p">(</span><span class="nv">JsonACI</span><span class="p">)).</span><span class="w"></span>
+<span class="o">&lt;&lt;</span><span class="s">&quot;[</span><span class="se">\n</span><span class="s">  {</span><span class="se">\n</span><span class="s">    </span><span class="se">\&quot;</span><span class="s">contract</span><span class="se">\&quot;</span><span class="s">: {</span><span class="se">\n</span><span class="s">      </span><span class="se">\&quot;</span><span class="s">functions</span><span class="se">\&quot;</span><span class="s">: [</span><span class="se">\n</span><span class="s">        {</span><span class="se">\n</span><span class="s">          </span><span class="se">\&quot;</span><span class="s">arguments</span><span class="se">\&quot;</span><span class="s">: [],</span><span class="se">\n</span><span class="s">          </span><span class="se">\&quot;</span><span class="s">name</span><span class="se">\&quot;</span><span class="s">: </span><span class="se">\&quot;</span><span class="s">init</span><span class="se">\&quot;</span><span class="s">,</span><span class="se">\n</span><span class="s">        &quot;</span><span class="p">...</span><span class="o">&gt;&gt;</span><span class="w"></span>
+</code></pre></div>
 <p>The final call to <code>jsx:prettify(jsx:encode(JsonACI))</code> returns the encoding in a
 more easily readable form. This is what is shown in the description above.</p>
                 
@@ -533,10 +551,12 @@ more easily readable form. This is what is shown in the description above.</p>
     <div class="md-footer-meta__inner md-grid">
       <div class="md-footer-copyright">
         
-        Made with
-        <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
-          Material for MkDocs
-        </a>
+        
+          Made with
+          <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+            Material for MkDocs
+          </a>
+        
         
       </div>
       
@@ -548,10 +568,10 @@ more easily readable form. This is what is shown in the description above.</p>
     <div class="md-dialog" data-md-component="dialog">
       <div class="md-dialog__inner md-typeset"></div>
     </div>
-    <script id="__config" type="application/json">{"base": "..", "features": ["content.tabs.link", "search.highlight", "search.share", "search.suggest"], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "../assets/javascripts/workers/search.477d984a.min.js", "version": {"provider": "mike"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": ["content.tabs.link", "search.highlight", "search.share", "search.suggest"], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "../assets/javascripts/workers/search.fcfe8b6d.min.js", "version": {"provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.82b56eb2.min.js"></script>
+      <script src="../assets/javascripts/bundle.b1047164.min.js"></script>
       
     
   </body>
