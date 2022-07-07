@@ -148,10 +148,9 @@ contract interface Animal =
   entrypoint sound() = "Cat sound"
 ```
 
-Contract interfaces can extend other interfaces, the extended interface has to
-declare all the entrypoints from the parent interface, and it can have
-additional entrypoints added to it. All the declarations in the extended
-interface must match (have the same type) with the declarations from the parent
+Contract interfaces can extend other interfaces. An extended interface has to
+declare all entrypoints from every parent interface. All the declarations in the extended
+interface must have the same type as the declarations from the parent
 interface.
 
 ```
