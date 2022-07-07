@@ -168,7 +168,7 @@ contract C : I =
 ```
 
 It is only possible to implement (or extend) an interface that has been already
-defined earlier in the file (or in an included file), and therefore recursive
+defined earlier in the file (or in an included file). Therefore recursive
 interface implementation is not allowed in Sophia.
 
 ```
