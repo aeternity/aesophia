@@ -539,8 +539,9 @@ global_env() ->
                      %% TTL constructors
                      {"RelativeTTL", Fun1(Int, TTL)},
                      {"FixedTTL",    Fun1(Int, TTL)},
-                     %% Abort
+                     %% Abort/exit
                      {"abort", Fun1(String, A)},
+                     {"exit", Fun1(String, A)},
                      {"require", Fun([Bool, String], Unit)}])
         , types = MkDefs(
                     [{"int", 0}, {"bool", 0}, {"char", 0}, {"string", 0}, {"address", 0},

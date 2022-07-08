@@ -80,3 +80,4 @@ contract AllSyntax =
      let sh : shakespeare(shakespeare(int)) =
        {wolfgang = state}
      sh{wolfgang.wolfgang = sh.wolfgang} // comment
+     exit("hope you had fun reading this")

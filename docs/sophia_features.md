@@ -862,6 +862,16 @@ function require(b : bool, err : string) =
     if(!b) abort(err)
 ```
 
+Aside from that, there is an almost equivalent function `exit`
+
+```sophia
+exit(reason : string) : 'a
+```
+
+Just like `abort`, it breaks the execution with the given reason. The difference
+however is in the gas consumption — while `abort` returns unused gas, a call to
+`exit` burns it all.
+
 ## Delegation signature
 
 Some chain operations (`Oracle.<operation>` and `AENS.<operation>`) have an
