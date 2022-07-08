@@ -1846,6 +1846,12 @@ consumes all available gas.</p>
 <div class="highlight"><pre><span></span><code><span class="k">function</span><span class="w"> </span><span class="nb">require</span><span class="p">(</span><span class="n">b</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="kt">bool</span><span class="p">,</span><span class="w"> </span><span class="n">err</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="ow">=</span><span class="w"></span>
 <span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="ow">!</span><span class="n">b</span><span class="p">)</span><span class="w"> </span><span class="nb">abort</span><span class="p">(</span><span class="n">err</span><span class="p">)</span><span class="w"></span>
 </code></pre></div>
+<p>Aside from that, there is an almost equivalent function <code>exit</code></p>
+<div class="highlight"><pre><span></span><code><span class="n">exit</span><span class="p">(</span><span class="n">reason</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="nv">&#39;a</span><span class="w"></span>
+</code></pre></div>
+<p>Just like <code>abort</code>, it breaks the execution with the given reason. The difference
+however is in the gas consumption — while <code>abort</code> returns unused gas, a call to
+<code>exit</code> burns it all.</p>
 <h2 id="delegation-signature">Delegation signature</h2>
 <p>Some chain operations (<code>Oracle.&lt;operation&gt;</code> and <code>AENS.&lt;operation&gt;</code>) have an
 optional delegation signature. This is typically used when a user/accounts

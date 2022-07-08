@@ -1324,6 +1324,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="unreleased"><a href="https://github.com/aeternity/aesophia/compare/v6.1.0...HEAD">Unreleased</a></h2>
 <h3 id="added">Added</h3>
 <ul>
+<li>Added support for <code>EXIT</code> opcode via <code>exit : (string) =&gt; 'a</code> function (behaves same as <code>ABORT</code>, but consumes all gas).</li>
 <li>Compiler warnings for the follwing: shadowing, negative spends, division by zero, unused functions, unused includes, unused stateful annotations, unused variables, unused parameters, unused user-defined type, dead return value.</li>
 <li>The pipe operator |&gt;
   <div class="highlight"><pre><span></span><code>[1, 2, 3] |&gt; List.first |&gt; Option.is_some  // Option.is_some(List.first([1, 2, 3]))
