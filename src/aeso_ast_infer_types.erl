@@ -1664,7 +1664,7 @@ check_state_init(Env) ->
     case unfold_types_in_type(Env, StateType) of
         false  ->
             ok;
-        {_, {_, {_, {alias_t, {tuple_t, _, []}}}}} ->
+        {_, {_, {_, {alias_t, {tuple_t, _, []}}}}} ->  %% type state = ()
             ok;
         _ ->
             #scope{ ann = AnnCon } = get_scope(Env, Top),
