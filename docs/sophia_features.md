@@ -138,7 +138,7 @@ contract must be pointed out with the `main` keyword as shown in the example.
 
 Contracts can implement one or multiple interfaces, the contract has to define
 every entrypoint from the implemented interface and the entrypoints in both
-the contract and implemented interface should have the exact same type.
+the contract and implemented interface should have compatible types.
 
 ```
 contract interface Animal =
