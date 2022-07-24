@@ -150,7 +150,7 @@ contract interface Animal =
 
 Contract interfaces can extend other interfaces. An extended interface has to
 declare all entrypoints from every parent interface. All the declarations in the extended
-interface must have the same type as the declarations from the parent
+interface must have types compatible with the declarations from the parent
 interface.
 
 ```
