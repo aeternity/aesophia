@@ -191,7 +191,15 @@ contract interface X : Z =
      entrypoint z() = 1
 ```
 
-The following subtyping rules apply:
+#### Subtyping
+
+The subtyping rules below, mention the variance of a type, which is defined in [Wikipedia](https://en.wikipedia.org/wiki/Covariance_and_contravariance_(computer_science)) as follows:
+
+>Variance refers to how subtyping between more complex types relates to subtyping between their components.
+
+You can refer to the Wikipedia page for further understanding of type variance.
+
+In Sophia, the following subtyping rules apply:
 
 - A function type `(Args1) => Ret1` is a subtype of `(Args2) => Ret2` when `Ret1`
 is a subtype of `Ret2` and each argument type from `Args2` is a subtype of its
