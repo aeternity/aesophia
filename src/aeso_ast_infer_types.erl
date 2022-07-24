@@ -19,8 +19,8 @@
         , switch_scope/2
         , pp_type/2
         , lookup_env1/4
-	, name/1
-	, qname/1
+        , name/1
+        , qname/1
         ]).
 
 -include("aeso_utils.hrl").
