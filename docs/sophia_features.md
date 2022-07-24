@@ -191,36 +191,38 @@ contract interface X : Z =
      entrypoint z() = 1
 ```
 
-A function type `(Args1) => Ret1` is a subtype of `(Args2) => Ret2` when `Ret1`
+The following subtyping rules apply:
+
+- A function type `(Args1) => Ret1` is a subtype of `(Args2) => Ret2` when `Ret1`
 is a subtype of `Ret2` and each argument type from `Args2` is a subtype of its
 counterpart in `Args1`.
 
-A list type `list(A)` is a subtype of `list(B)` if `A` is a subtype of `B`.
+- A list type `list(A)` is a subtype of `list(B)` if `A` is a subtype of `B`.
 
-An option type `option(A)` is a subtype of `option(B)` if `A` is a subtype of `B`.
+- An option type `option(A)` is a subtype of `option(B)` if `A` is a subtype of `B`.
 
-A map type `map(A1, A2)` is a subtype of `map(B1, B2)` if `A1` is a subtype
+- A map type `map(A1, A2)` is a subtype of `map(B1, B2)` if `A1` is a subtype
 of `B1`, and `A2` is a subtype of `B2`.
 
-An oracle type `oracle(A1, A2)` is a subtype of `oracle(B1, B2)` if `B1` is
+- An oracle type `oracle(A1, A2)` is a subtype of `oracle(B1, B2)` if `B1` is
 a subtype of `A1`, and `A2` is a subtype of `B2`.
 
-An oracle_query type `oracle_query(A1, A2)` is a subtype of `oracle_query(B1, B2)`
+- An oracle_query type `oracle_query(A1, A2)` is a subtype of `oracle_query(B1, B2)`
 if `A1` is a subtype of `B1`, and `A2` is a subtype of `B2`.
 
-A user-defined datatype `t(Args1)` is a subtype of `t(Args2)`
+- A user-defined datatype `t(Args1)` is a subtype of `t(Args2)`
 
-When a user-defined type `t('a)` is covariant in `'a`, then `t(A)` is a
+- When a user-defined type `t('a)` is covariant in `'a`, then `t(A)` is a
 subtype of `t(B)` when `A` is a subtype of `B`.
 
-When a user-defined type `t('a)` is contravariant in `'a`, then `t(A)` is a
+- When a user-defined type `t('a)` is contravariant in `'a`, then `t(A)` is a
 subtype of `t(B)` when `B` is a subtype of `A`.
 
-When a user-defined type `t('a)` is binvariant in `'a`, then `t(A)` is a
+- When a user-defined type `t('a)` is binvariant in `'a`, then `t(A)` is a
 subtype of `t(B)` when either `A` is a subtype of `B` or when `B` is a subtype
 of `A`.
 
-When a user-defined type `t('a)` is invariant in `'a`, then `t(A)` can never be
+- When a user-defined type `t('a)` is invariant in `'a`, then `t(A)` can never be
 a subtype of `t(B)`.
 
 ## Mutable state
