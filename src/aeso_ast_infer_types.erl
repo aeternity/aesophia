@@ -1642,7 +1642,8 @@ check_stateful_named_arg(_, _, _) -> ok.
 check_entrypoints(Defs) ->
     [ ensure_first_order_entrypoint(LetFun)
       || LetFun <- Defs,
-         aeso_syntax:get_ann(entrypoint, LetFun, false) ].
+         aeso_syntax:get_ann(entrypoint, LetFun, false),
+         get_option(allow_higher_order_entrypoints, false) =:= false ].
 
 ensure_first_order_entrypoint({letfun, Ann, Id = {id, _, Name}, Args, Ret, _}) ->
     [ ensure_first_order(ArgType, {higher_order_entrypoint, AnnArg, Id, {argument, ArgId, ArgType}})
