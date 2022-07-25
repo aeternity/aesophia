@@ -331,6 +331,13 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#contract-interfaces-and-polymorphism" class="md-nav__link">
+    Contract interfaces and polymorphism
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -722,6 +729,13 @@
           <li class="md-nav__item">
   <a href="#contract-factories-and-child-contracts" class="md-nav__link">
     Contract factories and child contracts
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#contract-interfaces-and-polymorphism" class="md-nav__link">
+    Contract interfaces and polymorphism
   </a>
   
 </li>
@@ -1129,6 +1143,145 @@ to-create contract defined by the standard <code>contract</code> syntax, for exa
 </code></pre></div>
 <p>In case of a presence of child contracts (<code>IntHolder</code> in this case), the main
 contract must be pointed out with the <code>main</code> keyword as shown in the example.</p>
+<h3 id="contract-interfaces-and-polymorphism">Contract interfaces and polymorphism</h3>
+<p>Contracts can implement one or multiple interfaces, the contract has to define
+every entrypoint from the implemented interface and the entrypoints in both
+the contract and implemented interface should have compatible types.</p>
+<div class="highlight"><pre><span></span><code>contract interface Animal =
+  entrypoint sound : () =&gt; string
+
+ contract Cat : Animal =
+  entrypoint sound() = &quot;Cat sound&quot;
+</code></pre></div>
+<p>Contract interfaces can extend other interfaces. An extended interface has to
+declare all entrypoints from every parent interface. All the declarations in the extended
+interface must have types compatible with the declarations from the parent
+interface.</p>
+<div class="highlight"><pre><span></span><code>contract interface II =
+  entrypoint f : () =&gt; unit
+
+contract interface I : II =
+  entrypoint f : () =&gt; unit
+  entrypoint g : () =&gt; unit
+
+contract C : I =
+  entrypoint f() = ()
+  entrypoint g() = ()
+</code></pre></div>
+<p>It is only possible to implement (or extend) an interface that has been already
+defined earlier in the file (or in an included file). Therefore recursive
+interface implementation is not allowed in Sophia.</p>
+<div class="highlight"><pre><span></span><code>// The following code would show an error
+
+contract interface X : Z =
+     entrypoint x : () =&gt; int
+
+ contract interface Y : X =
+     entrypoint x : () =&gt; int
+     entrypoint y : () =&gt; int
+
+ contract interface Z : Y =
+     entrypoint x : () =&gt; int
+     entrypoint y : () =&gt; int
+     entrypoint z : () =&gt; int
+
+ contract C : Z =
+     entrypoint x() = 1
+     entrypoint y() = 1
+     entrypoint z() = 1
+</code></pre></div>
+<h4 id="subtyping-and-variance">Subtyping and variance</h4>
+<p>Subtyping in Sophia follows common rules that take type variance into account. As described by <a href="https://en.wikipedia.org/wiki/Covariance_and_contravariance_(computer_science)">Wikipedia</a>, </p>
+<blockquote>
+<p>Variance refers to how subtyping between more complex types relates to subtyping between their components.</p>
+</blockquote>
+<p>This concept plays an important role in complex types such as tuples, <code>datatype</code>s and functions. Depending on the context, it can apply to positions in the structure of a type, or type parameters of generic types. There are four kinds of variances:</p>
+<ul>
+<li>covariant</li>
+<li>contravariant</li>
+<li>invariant</li>
+<li>bivariant</li>
+</ul>
+<p>A type is said to be on a "covariant" position when it describes output or a result of some computation. Analogously, position is "contravariant" when it is an input, or a parameter. Intuitively, when a part of the type is produced by values of it, it is covariant. When it is consumed, it is contravariant. When a type appears to be simultaneously input and output, it is described as invariant. If a type is neither of those (that is, it's unused) it's bivariant. Furthermore, whenever a complex type appears on a contravariant position, all its covariant components become contravariant and vice versa.</p>
+<p>Variance influences how subtyping is applied. Types on covariant positions are subtyped normally, while contravariant the opposite way. Invariant types have to be exactly the same in order for subtyping to work. Bivariant types are always compatible.</p>
+<p>A good example of where it matters can be pictured by subtyping of function types. Let us assume there is a contract interface <code>Animal</code> and two contracts that implement it: <code>Dog</code> and <code>Cat</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="k">contract</span><span class="w"> </span><span class="k">interface</span><span class="w"> </span><span class="nf">Animal</span><span class="w"> </span><span class="ow">=</span><span class="w"></span>
+<span class="w">  </span><span class="k">entrypoint</span><span class="w"> </span><span class="n">age</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="ow">=&gt;</span><span class="w"> </span><span class="kt">int</span><span class="w"></span>
+
+<span class="k">contract</span><span class="w"> </span><span class="nf">Dog</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="nf">Animal</span><span class="w"> </span><span class="ow">=</span><span class="w"></span>
+<span class="w">  </span><span class="k">entrypoint</span><span class="w"> </span><span class="n">age</span><span class="p">()</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="c1">// ...</span>
+<span class="w">  </span><span class="k">entrypoint</span><span class="w"> </span><span class="n">woof</span><span class="p">()</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="s2">&quot;woof&quot;</span><span class="w"></span>
+
+<span class="k">contract</span><span class="w"> </span><span class="nf">Cat</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="nf">Animal</span><span class="w"> </span><span class="ow">=</span><span class="w"></span>
+<span class="w">  </span><span class="k">entrypoint</span><span class="w"> </span><span class="n">age</span><span class="p">()</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="c1">// ...</span>
+<span class="w">  </span><span class="k">entrypoint</span><span class="w"> </span><span class="n">meow</span><span class="p">()</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="s2">&quot;meow&quot;</span><span class="w"></span>
+</code></pre></div>
+<p>The assumption of this exercise is that cats do not bark (because <code>Cat</code> does not define the <code>woof</code> entrypoint). If subtyping rules were applied naively, that is if we let <code>Dog =&gt; Dog</code> be a subtype of <code>Animal =&gt; Animal</code>, the following code would break:</p>
+<div class="highlight"><pre><span></span><code><span class="k">let</span><span class="w"> </span><span class="n">f</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="p">(</span><span class="nf">Dog</span><span class="p">)</span><span class="w"> </span><span class="ow">=&gt;</span><span class="w"> </span><span class="kt">string</span><span class="w">  </span><span class="ow">=</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="ow">=&gt;</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">woof</span><span class="p">()</span><span class="w"></span>
+<span class="k">let</span><span class="w"> </span><span class="n">g</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="p">(</span><span class="nf">Animal</span><span class="p">)</span><span class="w"> </span><span class="ow">=&gt;</span><span class="w"> </span><span class="kt">string</span><span class="w">  </span><span class="ow">=</span><span class="w"> </span><span class="n">f</span><span class="w"></span>
+<span class="k">let</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="nf">Cat</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="nc">Chain</span><span class="p">.</span><span class="n">create</span><span class="p">()</span><span class="w"></span>
+<span class="n">g</span><span class="p">(</span><span class="n">c</span><span class="p">)</span><span class="w">  </span><span class="c1">// Cat barking!</span>
+</code></pre></div>
+<p>That is because arguments of functions are contravariant, as opposed to return the type which is covariant. Because of that, the assignment of <code>f</code> to <code>g</code> is invalid - while <code>Dog</code> is a subtype of <code>Animal</code>, <code>Dog =&gt; string</code> is <strong>not</strong> a subtype of <code>Animal =&gt; string</code>. However, <code>Animal =&gt; string</code> <strong>is</strong> a subtype of <code>Dog =&gt; string</code>. More than that, <code>(Dog =&gt; Animal) =&gt; Dog</code> is a subtype of <code>(Animal =&gt; Dog) =&gt; Animal</code>.</p>
+<p>This has consequences on how user-defined generic types work. A type variable gains its variance from its role in the type definition as shown in the example:</p>
+<div class="highlight"><pre><span></span><code><span class="k">datatype</span><span class="w"> </span><span class="n">co</span><span class="p">(</span><span class="nv">&#39;a</span><span class="p">)</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="nf">Co</span><span class="p">(</span><span class="nv">&#39;a</span><span class="p">)</span><span class="w"> </span><span class="c1">// co is covariant on &#39;a</span>
+<span class="k">datatype</span><span class="w"> </span><span class="n">ct</span><span class="p">(</span><span class="nv">&#39;a</span><span class="p">)</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="nf">Ct</span><span class="p">(</span><span class="nv">&#39;a</span><span class="w"> </span><span class="ow">=&gt;</span><span class="w"> </span><span class="kt">unit</span><span class="p">)</span><span class="w"> </span><span class="c1">// ct is contravariant on &#39;a</span>
+<span class="k">datatype</span><span class="w"> </span><span class="n">in</span><span class="p">(</span><span class="nv">&#39;a</span><span class="p">)</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="nf">In</span><span class="p">(</span><span class="nv">&#39;a</span><span class="w"> </span><span class="ow">=&gt;</span><span class="w"> </span><span class="nv">&#39;a</span><span class="p">)</span><span class="w"> </span><span class="c1">// in is invariant on &#39;a</span>
+<span class="k">datatype</span><span class="w"> </span><span class="n">bi</span><span class="p">(</span><span class="nv">&#39;a</span><span class="p">)</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="nf">Bi</span><span class="w"> </span><span class="c1">// bi is bivariant on &#39;a</span>
+</code></pre></div>
+<p>The following facts apply here:</p>
+<ul>
+<li><code>co('a)</code> is a subtype of <code>co('b) when</code>'a<code>is a subtype of</code>'b`</li>
+<li><code>ct('a)</code> is a subtype of <code>ct('b) when</code>'b<code>is a subtype of</code>'a`</li>
+<li><code>in('a)</code> is a subtype of <code>in('b) when</code>'a<code>is equal to</code>'b`</li>
+<li><code>bi('a)</code> is a subtype of `bi('b) always</li>
+</ul>
+<p>That altogether induce the following rules of subtyping in Sophia:</p>
+<ul>
+<li>
+<p>A function type <code>(Args1) =&gt; Ret1</code> is a subtype of <code>(Args2) =&gt; Ret2</code> when <code>Ret1</code>
+is a subtype of <code>Ret2</code> and each argument type from <code>Args2</code> is a subtype of its
+counterpart in <code>Args1</code>.</p>
+</li>
+<li>
+<p>A list type <code>list(A)</code> is a subtype of <code>list(B)</code> if <code>A</code> is a subtype of <code>B</code>.</p>
+</li>
+<li>
+<p>An option type <code>option(A)</code> is a subtype of <code>option(B)</code> if <code>A</code> is a subtype of <code>B</code>.</p>
+</li>
+<li>
+<p>A map type <code>map(A1, A2)</code> is a subtype of <code>map(B1, B2)</code> if <code>A1</code> is a subtype
+of <code>B1</code>, and <code>A2</code> is a subtype of <code>B2</code>.</p>
+</li>
+<li>
+<p>An oracle type <code>oracle(A1, A2)</code> is a subtype of <code>oracle(B1, B2)</code> if <code>B1</code> is
+a subtype of <code>A1</code>, and <code>A2</code> is a subtype of <code>B2</code>.</p>
+</li>
+<li>
+<p>An oracle_query type <code>oracle_query(A1, A2)</code> is a subtype of <code>oracle_query(B1, B2)</code>
+if <code>A1</code> is a subtype of <code>B1</code>, and <code>A2</code> is a subtype of <code>B2</code>.</p>
+</li>
+<li>
+<p>A user-defined datatype <code>t(Args1)</code> is a subtype of <code>t(Args2)</code></p>
+</li>
+<li>
+<p>When a user-defined type <code>t('a)</code> is covariant in <code>'a</code>, then <code>t(A)</code> is a
+subtype of <code>t(B)</code> when <code>A</code> is a subtype of <code>B</code>.</p>
+</li>
+<li>
+<p>When a user-defined type <code>t('a)</code> is contravariant in <code>'a</code>, then <code>t(A)</code> is a
+subtype of <code>t(B)</code> when <code>B</code> is a subtype of <code>A</code>.</p>
+</li>
+<li>
+<p>When a user-defined type <code>t('a)</code> is binvariant in <code>'a</code>, then <code>t(A)</code> is a
+subtype of <code>t(B)</code> when either <code>A</code> is a subtype of <code>B</code> or when <code>B</code> is a subtype
+of <code>A</code>.</p>
+</li>
+<li>
+<p>When a user-defined type <code>t('a)</code> is invariant in <code>'a</code>, then <code>t(A)</code> can never be
+a subtype of <code>t(B)</code>.</p>
+</li>
+</ul>
 <h2 id="mutable-state">Mutable state</h2>
 <p>Sophia does not have arbitrary mutable state, but only a limited form of state
 associated with each contract instance.</p>
