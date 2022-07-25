@@ -134,6 +134,155 @@ main contract IntHolderFactory =
 In case of a presence of child contracts (`IntHolder` in this case), the main
 contract must be pointed out with the `main` keyword as shown in the example.
 
+### Contract interfaces and polymorphism
+
+Contracts can implement one or multiple interfaces, the contract has to define
+every entrypoint from the implemented interface and the entrypoints in both
+the contract and implemented interface should have compatible types.
+
+```
+contract interface Animal =
+  entrypoint sound : () => string
+
+ contract Cat : Animal =
+  entrypoint sound() = "Cat sound"
+```
+
+Contract interfaces can extend other interfaces. An extended interface has to
+declare all entrypoints from every parent interface. All the declarations in the extended
+interface must have types compatible with the declarations from the parent
+interface.
+
+```
+contract interface II =
+  entrypoint f : () => unit
+
+contract interface I : II =
+  entrypoint f : () => unit
+  entrypoint g : () => unit
+
+contract C : I =
+  entrypoint f() = ()
+  entrypoint g() = ()
+```
+
+It is only possible to implement (or extend) an interface that has been already
+defined earlier in the file (or in an included file). Therefore recursive
+interface implementation is not allowed in Sophia.
+
+```
+// The following code would show an error
+
+contract interface X : Z =
+     entrypoint x : () => int
+
+ contract interface Y : X =
+     entrypoint x : () => int
+     entrypoint y : () => int
+
+ contract interface Z : Y =
+     entrypoint x : () => int
+     entrypoint y : () => int
+     entrypoint z : () => int
+
+ contract C : Z =
+     entrypoint x() = 1
+     entrypoint y() = 1
+     entrypoint z() = 1
+```
+
+#### Subtyping and variance
+
+Subtyping in Sophia follows common rules that take type variance into account. As described by [Wikipedia](https://en.wikipedia.org/wiki/Covariance_and_contravariance_(computer_science)), 
+
+>Variance refers to how subtyping between more complex types relates to subtyping between their components.
+
+This concept plays an important role in complex types such as tuples, `datatype`s and functions. Depending on the context, it can apply to positions in the structure of a type, or type parameters of generic types. There are four kinds of variances:
+
+- covariant
+- contravariant
+- invariant
+- bivariant
+
+A type is said to be on a "covariant" position when it describes output or a result of some computation. Analogously, position is "contravariant" when it is an input, or a parameter. Intuitively, when a part of the type is produced by values of it, it is covariant. When it is consumed, it is contravariant. When a type appears to be simultaneously input and output, it is described as invariant. If a type is neither of those (that is, it's unused) it's bivariant. Furthermore, whenever a complex type appears on a contravariant position, all its covariant components become contravariant and vice versa.
+
+Variance influences how subtyping is applied. Types on covariant positions are subtyped normally, while contravariant the opposite way. Invariant types have to be exactly the same in order for subtyping to work. Bivariant types are always compatible.
+
+A good example of where it matters can be pictured by subtyping of function types. Let us assume there is a contract interface `Animal` and two contracts that implement it: `Dog` and `Cat`.
+
+```sophia
+contract interface Animal =
+  entrypoint age : () => int
+  
+contract Dog : Animal =
+  entrypoint age() = // ...
+  entrypoint woof() = "woof"
+  
+contract Cat : Animal =
+  entrypoint age() = // ...
+  entrypoint meow() = "meow"
+```
+
+The assumption of this exercise is that cats do not bark (because `Cat` does not define the `woof` entrypoint). If subtyping rules were applied naively, that is if we let `Dog => Dog` be a subtype of `Animal => Animal`, the following code would break:
+
+```sophia
+let f : (Dog) => string  = d => d.woof()
+let g : (Animal) => string  = f
+let c : Cat = Chain.create()
+g(c)  // Cat barking!
+```
+
+That is because arguments of functions are contravariant, as opposed to return the type which is covariant. Because of that, the assignment of `f` to `g` is invalid - while `Dog` is a subtype of `Animal`, `Dog => string` is **not** a subtype of `Animal => string`. However, `Animal => string` **is** a subtype of `Dog => string`. More than that, `(Dog => Animal) => Dog` is a subtype of `(Animal => Dog) => Animal`.
+
+This has consequences on how user-defined generic types work. A type variable gains its variance from its role in the type definition as shown in the example:
+
+```sophia
+datatype co('a) = Co('a) // co is covariant on 'a
+datatype ct('a) = Ct('a => unit) // ct is contravariant on 'a
+datatype in('a) = In('a => 'a) // in is invariant on 'a
+datatype bi('a) = Bi // bi is bivariant on 'a
+```
+
+The following facts apply here:
+
+- `co('a)` is a subtype of `co('b) when `'a` is a subtype of `'b`
+- `ct('a)` is a subtype of `ct('b) when `'b` is a subtype of `'a`
+- `in('a)` is a subtype of `in('b) when `'a` is equal to `'b`
+- `bi('a)` is a subtype of `bi('b) always
+
+That altogether induce the following rules of subtyping in Sophia:
+
+- A function type `(Args1) => Ret1` is a subtype of `(Args2) => Ret2` when `Ret1`
+is a subtype of `Ret2` and each argument type from `Args2` is a subtype of its
+counterpart in `Args1`.
+
+- A list type `list(A)` is a subtype of `list(B)` if `A` is a subtype of `B`.
+
+- An option type `option(A)` is a subtype of `option(B)` if `A` is a subtype of `B`.
+
+- A map type `map(A1, A2)` is a subtype of `map(B1, B2)` if `A1` is a subtype
+of `B1`, and `A2` is a subtype of `B2`.
+
+- An oracle type `oracle(A1, A2)` is a subtype of `oracle(B1, B2)` if `B1` is
+a subtype of `A1`, and `A2` is a subtype of `B2`.
+
+- An oracle_query type `oracle_query(A1, A2)` is a subtype of `oracle_query(B1, B2)`
+if `A1` is a subtype of `B1`, and `A2` is a subtype of `B2`.
+
+- A user-defined datatype `t(Args1)` is a subtype of `t(Args2)`
+
+- When a user-defined type `t('a)` is covariant in `'a`, then `t(A)` is a
+subtype of `t(B)` when `A` is a subtype of `B`.
+
+- When a user-defined type `t('a)` is contravariant in `'a`, then `t(A)` is a
+subtype of `t(B)` when `B` is a subtype of `A`.
+
+- When a user-defined type `t('a)` is binvariant in `'a`, then `t(A)` is a
+subtype of `t(B)` when either `A` is a subtype of `B` or when `B` is a subtype
+of `A`.
+
+- When a user-defined type `t('a)` is invariant in `'a`, then `t(A)` can never be
+a subtype of `t(B)`.
 
 ## Mutable state
 
