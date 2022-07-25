@@ -1,0 +1,3 @@
+contract AliasToAliasToType =
+  type alias = int * int
+  type state = alias

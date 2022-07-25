@@ -1,11 +1,4 @@
-
 contract NameClash =
-
-  entrypoint double_proto : () => int
-  entrypoint double_proto : () => int
-
-  entrypoint proto_and_def : int => int
-  entrypoint proto_and_def(n) = n + 1
 
   entrypoint double_def(x) = x
   entrypoint double_def(y) = 0

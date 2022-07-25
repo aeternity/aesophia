@@ -45,12 +45,6 @@ simple_compile_test_() ->
            check_errors(ExpectedErrors, Errors)
        end} ||
            {ContractName, ExpectedErrors} <- failing_contracts() ] ++
-    [ {"Testing code generation error messages of " ++ ContractName,
-       fun() ->
-               Errors = compile(ContractName),
-               check_errors([ExpectedError], Errors)
-       end} ||
-           {ContractName, ExpectedError} <- failing_code_gen_contracts()] ++
     [ {"Testing include with explicit files",
        fun() ->
            FileSystem = maps:from_list(
@@ -208,6 +202,18 @@ compilable_contracts() ->
      "polymorphism_contract_interface_extensions",
      "polymorphism_contract_interface_same_decl_multi_interface",
      "polymorphism_contract_interface_same_name_same_type",
+     "missing_init_fun_state_unit",
+     "complex_compare_leq",
+     "complex_compare",
+     "higher_order_compare",
+     "higher_order_map_keys",
+     "higher_order_state",
+     "polymorphic_compare",
+     "polymorphic_entrypoint",
+     "polymorphic_entrypoint_return",
+     "polymorphic_map_keys",
+     "unapplied_contract_call",
+     "unapplied_named_arg_builtin",
      "test" % Custom general-purpose test file. Keep it last on the list.
     ].
 
@@ -289,34 +295,26 @@ failing_contracts() ->
 
     %% Type errors
     , ?TYPE_ERROR(name_clash,
-       [<<?Pos(14, 3)
+       [<<?Pos(4, 3)
+          "Duplicate definitions of `double_def` at\n"
+          "  - line 3, column 3\n"
+          "  - line 4, column 3">>,
+        <<?Pos(7, 3)
           "Duplicate definitions of `abort` at\n"
           "  - (builtin location)\n"
-          "  - line 14, column 3">>,
-        <<?Pos(15, 3)
+          "  - line 7, column 3">>,
+        <<?Pos(8, 3)
           "Duplicate definitions of `require` at\n"
           "  - (builtin location)\n"
-          "  - line 15, column 3">>,
-        <<?Pos(11, 3)
-          "Duplicate definitions of `double_def` at\n"
-          "  - line 10, column 3\n"
-          "  - line 11, column 3">>,
-        <<?Pos(5, 3)
-          "Duplicate definitions of `double_proto` at\n"
-          "  - line 4, column 3\n"
-          "  - line 5, column 3">>,
-        <<?Pos(8, 3)
-          "Duplicate definitions of `proto_and_def` at\n"
-          "  - line 7, column 3\n"
           "  - line 8, column 3">>,
-        <<?Pos(16, 3)
+        <<?Pos(9, 3)
           "Duplicate definitions of `put` at\n"
           "  - (builtin location)\n"
-          "  - line 16, column 3">>,
-        <<?Pos(17, 3)
+          "  - line 9, column 3">>,
+        <<?Pos(10, 3)
           "Duplicate definitions of `state` at\n"
           "  - (builtin location)\n"
-          "  - line 17, column 3">>])
+          "  - line 10, column 3">>])
     , ?TYPE_ERROR(type_errors,
        [<<?Pos(17, 23)
           "Unbound variable `zz`">>,
@@ -981,7 +979,8 @@ failing_contracts() ->
                      "when checking the type of the pattern `r10 : rec_inv(Animal)` against the expected type `Main.rec_inv(Cat)`">>,
                    <<?Pos(41,13)
                      "Cannot unify `Animal` and `Cat` in a invariant context\n"
-                     "when checking the type of the pattern `r11 : rec_inv(Cat)` against the expected type `Main.rec_inv(Animal)`">>])
+                     "when checking the type of the pattern `r11 : rec_inv(Cat)` against the expected type `Main.rec_inv(Animal)`">>
+                  ])
     , ?TYPE_ERROR(polymorphism_variance_switching_oracles,
                   [<<?Pos(15,13)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
@@ -1024,58 +1023,92 @@ failing_contracts() ->
                      "when checking the type of the pattern `q14 : oracle_query(Cat, Cat)` against the expected type `oracle_query(Animal, Cat)`">>,
                    <<?Pos(44,13)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
-                     "when checking the type of the pattern `q15 : oracle_query(Cat, Cat)` against the expected type `oracle_query(Cat, Animal)`">>])
-    ].
-
--define(Path(File), "code_errors/" ??File).
--define(Msg(File, Line, Col, Err), <<?Pos("Code generation", ?Path(File), Line, Col) Err>>).
-
--define(FATE_ERR(File, Line, Col, Err), {?Path(File), ?Msg(File, Line, Col, Err)}).
-
-failing_code_gen_contracts() ->
-    [ ?FATE_ERR(missing_definition, 2, 14,
-            "Missing definition of function 'foo'.")
-    , ?FATE_ERR(higher_order_entrypoint, 2, 20,
-            "The argument\n"
-            "  f : (int) => int\n"
-            "of entrypoint 'apply' has a higher-order (contains function types) type.")
-    , ?FATE_ERR(higher_order_entrypoint_return, 2, 3,
-            "The return type\n"
-            "  (int) => int\n"
-            "of entrypoint 'add' is higher-order (contains function types).")
-    , ?FATE_ERR(missing_init_function, 1, 10,
-            "Missing init function for the contract 'MissingInitFunction'.\n"
-            "The 'init' function can only be omitted if the state type is 'unit'.")
-    , ?FATE_ERR(parameterised_state, 3, 8,
-            "The state type cannot be parameterized.")
-    , ?FATE_ERR(parameterised_event, 3, 12,
-            "The event type cannot be parameterized.")
-    , ?FATE_ERR(polymorphic_aens_resolve, 4, 5,
-            "Invalid return type of AENS.resolve:\n"
-            "  'a\n"
-            "It must be a string or a pubkey type (address, oracle, etc).")
-    , ?FATE_ERR(bad_aens_resolve, 6, 5,
-            "Invalid return type of AENS.resolve:\n"
-            "  list(int)\n"
-            "It must be a string or a pubkey type (address, oracle, etc).")
-    , ?FATE_ERR(polymorphic_query_type, 3, 5,
-            "Invalid oracle type\n"
-            "  oracle('a, 'b)\n"
-            "The query type must not be polymorphic (contain type variables).")
-    , ?FATE_ERR(polymorphic_response_type, 3, 5,
-            "Invalid oracle type\n"
-            "  oracle(string, 'r)\n"
-            "The response type must not be polymorphic (contain type variables).")
-    , ?FATE_ERR(higher_order_query_type, 3, 5,
-            "Invalid oracle type\n"
-            "  oracle((int) => int, string)\n"
-            "The query type must not be higher-order (contain function types).")
-    , ?FATE_ERR(higher_order_response_type, 3, 5,
-            "Invalid oracle type\n"
-            "  oracle(string, (int) => int)\n"
-            "The response type must not be higher-order (contain function types).")
-    , ?FATE_ERR(child_with_decls, 2, 14,
-            "Missing definition of function 'f'.")
+                     "when checking the type of the pattern `q15 : oracle_query(Cat, Cat)` against the expected type `oracle_query(Cat, Animal)`">>
+                  ])
+    , ?TYPE_ERROR(missing_definition,
+                  [<<?Pos(2,14)
+                     "Missing definition of function `foo`">>
+                  ])
+    , ?TYPE_ERROR(child_with_decls,
+                  [<<?Pos(2,14)
+                     "Missing definition of function `f`">>
+                  ])
+    , ?TYPE_ERROR(parameterised_state,
+                  [<<?Pos(3,8)
+                     "The state type cannot be parameterized">>
+                  ])
+    , ?TYPE_ERROR(parameterised_event,
+                  [<<?Pos(3,12)
+                     "The event type cannot be parameterized">>
+                  ])
+    , ?TYPE_ERROR(missing_init_fun_alias_to_type,
+                  [<<?Pos(1,10)
+                     "Missing `init` function for the contract `AliasToType`.\n"
+                     "The `init` function can only be omitted if the state type is `unit`">>
+                  ])
+    , ?TYPE_ERROR(missing_init_fun_alias_to_alias_to_type,
+                  [<<?Pos(1,10)
+                     "Missing `init` function for the contract `AliasToAliasToType`.\n"
+                     "The `init` function can only be omitted if the state type is `unit`">>
+                  ])
+    , ?TYPE_ERROR(higher_order_entrypoint,
+                  [<<?Pos(2,20)
+                     "The argument\n"
+                     "  `f : (int) => int`\n"
+                     "of entrypoint `apply` has a higher-order (contains function types) type">>
+                  ])
+    , ?TYPE_ERROR(higher_order_entrypoint_return,
+                  [<<?Pos(2,3)
+                     "The return type\n"
+                     "  `(int) => int`\n"
+                     "of entrypoint `add` is higher-order (contains function types)">>
+                  ])
+    , ?TYPE_ERROR(polymorphic_aens_resolve,
+                  [<<?Pos(4,5)
+                     "Invalid return type of `AENS.resolve`:\n"
+                     "  `'a`\n"
+                     "It must be a `string` or a pubkey type (`address`, `oracle`, etc)">>
+                  ])
+    , ?TYPE_ERROR(bad_aens_resolve,
+                  [<<?Pos(6,5)
+                     "Invalid return type of `AENS.resolve`:\n"
+                     "  `list(int)`\n"
+                     "It must be a `string` or a pubkey type (`address`, `oracle`, etc)">>
+                  ])
+    , ?TYPE_ERROR(bad_aens_resolve_using,
+                  [<<?Pos(7,5)
+                     "Invalid return type of `AENS.resolve`:\n"
+                     "  `list(int)`\n"
+                     "It must be a `string` or a pubkey type (`address`, `oracle`, etc)">>
+                  ])
+    , ?TYPE_ERROR(polymorphic_query_type,
+                  [<<?Pos(3,5)
+                     "Invalid oracle type\n"
+                     "  `oracle('a, 'b)`\n"
+                     "The query type must not be polymorphic (contain type variables)">>,
+                   <<?Pos(3,5)
+                     "Invalid oracle type\n"
+                     "  `oracle('a, 'b)`\n"
+                     "The response type must not be polymorphic (contain type variables)">>
+                  ])
+    , ?TYPE_ERROR(polymorphic_response_type,
+                  [<<?Pos(3,5)
+                     "Invalid oracle type\n"
+                     "  `oracle(string, 'r)`\n"
+                     "The response type must not be polymorphic (contain type variables)">>
+                  ])
+    , ?TYPE_ERROR(higher_order_query_type,
+                  [<<?Pos(3,5)
+                     "Invalid oracle type\n"
+                     "  `oracle((int) => int, string)`\n"
+                     "The query type must not be higher-order (contain function types)">>
+                  ])
+    , ?TYPE_ERROR(higher_order_response_type,
+                  [<<?Pos(3,5)
+                     "Invalid oracle type\n"
+                     "  `oracle(string, (int) => int)`\n"
+                     "The response type must not be higher-order (contain function types)">>
+                  ])
     ].
 
 validation_test_() ->

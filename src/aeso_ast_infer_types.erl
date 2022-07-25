@@ -87,7 +87,11 @@
 -type byte_constraint() :: {is_bytes, utype()}
                          | {add_bytes, aeso_syntax:ann(), concat | split, utype(), utype(), utype()}.
 
--type constraint() :: named_argument_constraint() | field_constraint() | byte_constraint().
+-type aens_resolve_constraint() :: {aens_resolve_type, utype()}.
+-type oracle_type_constraint() :: {oracle_type, aeso_syntax:ann(), utype()}.
+
+-type constraint() :: named_argument_constraint() | field_constraint() | byte_constraint()
+                    | aens_resolve_constraint() | oracle_type_constraint().
 
 -record(field_info,
     { ann      :: aeso_syntax:ann()
@@ -1014,6 +1018,9 @@ infer_contract(Env0, What, Defs0, Options) ->
             contract           -> bind_state(Env1)   %% bind state and put
         end,
     {ProtoSigs, Decls} = lists:unzip([ check_fundecl(Env1, Decl) || Decl <- Get(prototype, Defs) ]),
+    [ type_error({missing_definition, Id}) || {fun_decl, _, Id, _} <- Decls,
+                                              What =:= contract,
+                                              get_option(no_code, false) =:= false ],
     Env3      = bind_funs(ProtoSigs, Env2),
     Functions = Get(function, Defs),
     %% Check for duplicates in Functions (we turn it into a map below)
@@ -1028,8 +1035,10 @@ infer_contract(Env0, What, Defs0, Options) ->
     {Env4, Defs1} = check_sccs(Env3, FunMap, SCCs, []),
     %% Remove namespaces used in the current namespace
     Env5 = Env4#env{ used_namespaces = OldUsedNamespaces },
-    %% Check that `init` doesn't read or write the state
-    check_state_dependencies(Env4, Defs1),
+    %% Check that `init` doesn't read or write the state and that `init` is not missing
+    check_state(Env4, Defs1),
+    %% Check that entrypoints have first-order arg types and return types
+    check_entrypoints(Defs1),
     destroy_and_report_type_errors(Env4),
     %% Add inferred types of definitions
     {Env5, TypeDefs ++ Decls ++ Defs1}.
@@ -1096,6 +1105,7 @@ check_typedef_sccs(Env, TypeMap, [{acyclic, Name} | SCCs], Acc) ->
     case maps:get(Name, TypeMap, undefined) of
         undefined -> check_typedef_sccs(Env, TypeMap, SCCs, Acc);    %% Builtin type
         {type_def, Ann, D, Xs, Def0} ->
+            check_parameterizable(D, Xs),
             Def  = check_event(Env, Name, Ann, check_typedef(bind_tvars(Xs, Env), Def0)),
             Acc1 = [{type_def, Ann, D, Xs, Def} | Acc],
             Env1 = bind_type(Name, Ann, {Xs, Def}, Env),
@@ -1350,6 +1360,13 @@ check_fields(Env, _TypeMap, _, []) -> Env;
 check_fields(Env, TypeMap, RecTy, [{field_t, Ann, Id, Type} | Fields]) ->
     Env1 = bind_field(name(Id), #field_info{ ann = Ann, kind = record, field_t = Type, record_t = RecTy }, Env),
     check_fields(Env1, TypeMap, RecTy, Fields).
+
+check_parameterizable({id, Ann, "event"}, [_ | _]) ->
+    type_error({parameterized_event, Ann});
+check_parameterizable({id, Ann, "state"}, [_ | _]) ->
+    type_error({parameterized_state, Ann});
+check_parameterizable(_Name, _Xs) ->
+    ok.
 
 check_event(Env, "event", Ann, Def) ->
     case Def of
@@ -1613,8 +1630,51 @@ check_stateful_named_arg(#env{ stateful = false, current_function = Fun }, {id, 
     end;
 check_stateful_named_arg(_, _, _) -> ok.
 
-%% Check that `init` doesn't read or write the state
-check_state_dependencies(Env, Defs) ->
+check_entrypoints(Defs) ->
+    [ ensure_first_order_entrypoint(LetFun)
+      || LetFun <- Defs,
+         aeso_syntax:get_ann(entrypoint, LetFun, false) ].
+
+ensure_first_order_entrypoint({letfun, Ann, Id = {id, _, Name}, Args, Ret, _}) ->
+    [ ensure_first_order(ArgType, {higher_order_entrypoint, AnnArg, Id, {argument, ArgId, ArgType}})
+      || {typed, AnnArg, ArgId, ArgType} <- Args ],
+    [ ensure_first_order(Ret, {higher_order_entrypoint, Ann, Id, {result, Ret}})
+      || Name /= "init" ],  %% init can return higher-order values, since they're written to the store
+                            %% rather than being returned.
+    ok.
+
+ensure_first_order(Type, Err) ->
+    is_first_order(Type) orelse type_error(Err).
+
+is_first_order({fun_t, _, _, _, _})    -> false;
+is_first_order(Ts) when is_list(Ts)    -> lists:all(fun is_first_order/1, Ts);
+is_first_order(Tup) when is_tuple(Tup) -> is_first_order(tuple_to_list(Tup));
+is_first_order(_)                      -> true.
+
+ensure_monomorphic(Type, Err) ->
+    is_monomorphic(Type) orelse type_error(Err).
+
+is_monomorphic({tvar, _, _})           -> false;
+is_monomorphic(Ts) when is_list(Ts)    -> lists:all(fun is_monomorphic/1, Ts);
+is_monomorphic(Tup) when is_tuple(Tup) -> is_monomorphic(tuple_to_list(Tup));
+is_monomorphic(_)                      -> true.
+
+check_state_init(Env) ->
+    Top = Env#env.namespace,
+    StateType = lookup_type(Env, {id, [{origin, system}], "state"}),
+    case unfold_types_in_type(Env, StateType) of
+        false  ->
+            ok;
+        {_, {_, {_, {alias_t, {tuple_t, _, []}}}}} ->  %% type state = ()
+            ok;
+        _ ->
+            #scope{ ann = AnnCon } = get_scope(Env, Top),
+            type_error({missing_init_function, {con, AnnCon, lists:last(Top)}})
+    end.
+
+%% Check that `init` doesn't read or write the state and that `init` is defined
+%% when the state type is not unit
+check_state(Env, Defs) ->
     Top       = Env#env.namespace,
     GetState  = Top ++ ["state"],
     SetState  = Top ++ ["put"],
@@ -1623,7 +1683,7 @@ check_state_dependencies(Env, Defs) ->
     Funs      = [ {Top ++ [Name], Fun} || Fun = {letfun, _, {id, _, Name}, _Args, _Type, _GuardedBodies} <- Defs ],
     Deps      = maps:from_list([{Name, UsedNames(Def)} || {Name, Def} <- Funs]),
     case maps:get(Init, Deps, false) of
-        false -> ok;    %% No init, so nothing to check
+        false -> get_option(no_code, false) orelse check_state_init(Env);
         _     ->
             [ type_error({init_depends_on_state, state, Chain})
               || Chain <- get_call_chains(Deps, Init, GetState) ],
@@ -1765,12 +1825,17 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
             NewFun0 = infer_expr(Env, Fun),
             NewArgs = [infer_expr(Env, A) || A <- Args],
             ArgTypes = [T || {typed, _, _, T} <- NewArgs],
-            NewFun1 = {typed, _, _, FunType} = infer_var_args_fun(Env, NewFun0, NamedArgs1, ArgTypes),
+            NewFun1 = {typed, _, FunName, FunType} = infer_var_args_fun(Env, NewFun0, NamedArgs1, ArgTypes),
             When = {infer_app, Fun, NamedArgs1, Args, FunType, ArgTypes},
             GeneralResultType = fresh_uvar(Ann),
             ResultType = fresh_uvar(Ann),
             unify(Env, FunType, {fun_t, [], NamedArgsVar, ArgTypes, GeneralResultType}, When),
             when_warning(warn_negative_spend, fun() -> warn_potential_negative_spend(Ann, NewFun1, NewArgs) end),
+            [ add_constraint({aens_resolve_type, GeneralResultType})
+              || element(3, FunName) =:= ["AENS", "resolve"] ],
+            [ add_constraint({oracle_type, Ann, OType})
+              || OType <- [get_oracle_type(FunName, ArgTypes, GeneralResultType)],
+                 OType =/= false ],
             add_constraint(
               #dependent_type_constraint{ named_args_t = NamedArgsVar,
                                           named_args   = NamedArgs1,
@@ -2291,11 +2356,19 @@ destroy_and_report_unsolved_constraints(Env) ->
                            (#named_argument_constraint{}) -> true;
                            (_)                            -> false
                         end, OtherCs2),
-    {BytesCs, []} =
+    {BytesCs, OtherCs4} =
         lists:partition(fun({is_bytes, _})              -> true;
                            ({add_bytes, _, _, _, _, _}) -> true;
                            (_)                          -> false
                         end, OtherCs3),
+    {AensResolveCs, OtherCs5} =
+        lists:partition(fun({aens_resolve_type, _}) -> true;
+                           (_)                      -> false
+                        end, OtherCs4),
+    {OracleTypeCs, []} =
+        lists:partition(fun({oracle_type, _, _}) -> true;
+                           (_)                   -> false
+                        end, OtherCs5),
 
     Unsolved = [ S || S <- [ solve_constraint(Env, dereference_deep(C)) || C <- NamedArgCs ],
                       S == unsolved ],
@@ -2313,8 +2386,19 @@ destroy_and_report_unsolved_constraints(Env) ->
     check_record_create_constraints(Env, CreateCs),
     check_is_contract_constraints(Env, ContractCs),
     check_bytes_constraints(Env, BytesCs),
+    check_aens_resolve_constraints(Env, AensResolveCs),
+    check_oracle_type_constraints(Env, OracleTypeCs),
 
     destroy_constraints().
+
+get_oracle_type({qid, _, ["Oracle", "register"]},      _        , OType) -> OType;
+get_oracle_type({qid, _, ["Oracle", "query"]},        [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "get_question"]}, [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "get_answer"]},   [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "check"]},        [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "check_query"]},  [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "respond"]},      [OType| _], _    ) -> OType;
+get_oracle_type(_Fun, _Args, _Ret) -> false.
 
 %% -- Named argument constraints --
 
@@ -2441,6 +2525,32 @@ check_bytes_constraint(Env, {add_bytes, Ann, Fun, A0, B0, C0}) ->
             ok; %% If all are solved we checked M + N == R in solve_constraint.
         _ -> type_error({unsolved_bytes_constraint, Ann, Fun, A, B, C})
     end.
+
+check_aens_resolve_constraints(_Env, []) ->
+    ok;
+check_aens_resolve_constraints(Env, [{aens_resolve_type, Type} | Rest]) ->
+    Type1 = unfold_types_in_type(Env, instantiate(Type)),
+    {app_t, _, {id, _, "option"}, [Type2]} = Type1,
+    case Type2 of
+        {id, _, "string"} -> ok;
+        {id, _, "address"} -> ok;
+        {con, _, _} -> ok;
+        {app_t, _, {id, _, "oracle"}, [_, _]} -> ok;
+        {app_t, _, {id, _, "oracle_query"}, [_, _]} -> ok;
+        _ -> type_error({invalid_aens_resolve_type, aeso_syntax:get_ann(Type), Type2})
+    end,
+    check_aens_resolve_constraints(Env, Rest).
+
+check_oracle_type_constraints(_Env, []) ->
+    ok;
+check_oracle_type_constraints(Env, [{oracle_type, Ann, OType} | Rest]) ->
+    Type = unfold_types_in_type(Env, instantiate(OType)),
+    {app_t, _, {id, _, "oracle"}, [QType, RType]} = Type,
+    ensure_monomorphic(QType, {invalid_oracle_type, polymorphic,  query,    Ann, Type}),
+    ensure_monomorphic(RType, {invalid_oracle_type, polymorphic,  response, Ann, Type}),
+    ensure_first_order(QType, {invalid_oracle_type, higher_order, query,    Ann, Type}),
+    ensure_first_order(RType, {invalid_oracle_type, higher_order, response, Ann, Type}),
+    check_oracle_type_constraints(Env, Rest).
 
 %% -- Field constraints --
 
@@ -3485,6 +3595,44 @@ mk_error({unimplemented_interface_function, ConId, InterfaceName, FunName}) ->
 mk_error({referencing_undefined_interface, InterfaceId}) ->
     Msg = io_lib:format("Trying to implement or extend an undefined interface `~s`", [pp(InterfaceId)]),
     mk_t_err(pos(InterfaceId), Msg);
+mk_error({missing_definition, Id}) ->
+    Msg = io_lib:format("Missing definition of function `~s`", [name(Id)]),
+    mk_t_err(pos(Id), Msg);
+mk_error({parameterized_state, Ann}) ->
+    Msg = "The state type cannot be parameterized",
+    mk_t_err(pos(Ann), Msg);
+mk_error({parameterized_event, Ann}) ->
+    Msg = "The event type cannot be parameterized",
+    mk_t_err(pos(Ann), Msg);
+mk_error({missing_init_function, Con}) ->
+    Msg = io_lib:format("Missing `init` function for the contract `~s`.", [name(Con)]),
+    Cxt = "The `init` function can only be omitted if the state type is `unit`",
+    mk_t_err(pos(Con), Msg, Cxt);
+mk_error({higher_order_entrypoint, Ann, {id, _, Name}, Thing}) ->
+    What = "higher-order (contains function types)",
+    ThingS = case Thing of
+                 {argument, X, T} -> io_lib:format("argument\n~s`\n", [pp_typed("  `", X, T)]);
+                 {result, T}      -> io_lib:format("return type\n~s`\n", [pp_type("  `", T)])
+             end,
+    Bad = case Thing of
+              {argument, _, _} -> io_lib:format("has a ~s type", [What]);
+              {result, _}      -> io_lib:format("is ~s", [What])
+          end,
+    Msg = io_lib:format("The ~sof entrypoint `~s` ~s",
+                        [ThingS, Name, Bad]),
+    mk_t_err(pos(Ann), Msg);
+mk_error({invalid_aens_resolve_type, Ann, T}) ->
+    Msg = io_lib:format("Invalid return type of `AENS.resolve`:\n"
+                        "~s`\n"
+                        "It must be a `string` or a pubkey type (`address`, `oracle`, etc)",
+                        [pp_type("  `", T)]),
+    mk_t_err(pos(Ann), Msg);
+mk_error({invalid_oracle_type, Why, What, Ann, Type}) ->
+    WhyS = case Why of higher_order -> "higher-order (contain function types)";
+                       polymorphic  -> "polymorphic (contain type variables)" end,
+    Msg = io_lib:format("Invalid oracle type\n~s`", [pp_type("  `", Type)]),
+    Cxt = io_lib:format("The ~s type must not be ~s", [What, WhyS]),
+    mk_t_err(pos(Ann), Msg, Cxt);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),
     mk_t_err(pos(0, 0), Msg).

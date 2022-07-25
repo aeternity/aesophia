@@ -127,7 +127,7 @@ check_stub(Stub, Options) ->
         Ast ->
             try
                 %% io:format("AST: ~120p\n", [Ast]),
-                aeso_ast_infer_types:infer(Ast, [])
+                aeso_ast_infer_types:infer(Ast, [no_code])
             catch throw:{type_errors, TE} ->
                 io:format("Type error:\n~s\n", [TE]),
                 error(TE);

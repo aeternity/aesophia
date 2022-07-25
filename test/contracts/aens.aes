@@ -1,5 +1,7 @@
+contract C = entrypoint init() = ()
+
 // AENS tests
-contract AENSTest =
+main contract AENSTest =
 
   // Name resolution
 
@@ -9,10 +11,19 @@ contract AENSTest =
   stateful entrypoint resolve_string(name : string, key : string) : option(string) =
     AENS.resolve(name, key)
 
+  stateful entrypoint resolve_contract(name : string, key : string) : option(C) =
+    AENS.resolve(name, key)
+
+  stateful entrypoint resolve_oracle(name : string, key : string) : option(oracle(int, int)) =
+    AENS.resolve(name, key)
+
+  stateful entrypoint resolve_oracle_query(name : string, key : string) : option(oracle_query(int, int)) =
+    AENS.resolve(name, key)
+
   // Transactions
 
   stateful entrypoint preclaim(addr  : address,     // Claim on behalf of this account (can be Contract.address)
-                             chash : hash) : unit = // Commitment hash
+                               chash : hash) : unit = // Commitment hash
     AENS.preclaim(addr, chash)
 
   stateful entrypoint signedPreclaim(addr  : address, // Claim on behalf of this account (can be Contract.address)

@@ -326,7 +326,7 @@ get_option(Opt, Env, Default) ->
 %% -- Compilation ------------------------------------------------------------
 
 -spec to_fcode(env(), aeso_syntax:ast()) -> {env(), fcode()}.
-to_fcode(Env, [{Contract, Attrs, Con = {con, _, Name}, _Impls, Decls}|Rest])
+to_fcode(Env, [{Contract, Attrs, {con, _, Name}, _Impls, Decls}|Rest])
   when ?IS_CONTRACT_HEAD(Contract) ->
     case Contract =:= contract_interface of
         false ->
@@ -349,7 +349,7 @@ to_fcode(Env, [{Contract, Attrs, Con = {con, _, Name}, _Impls, Decls}|Rest])
                           event_type    => EventType,
                           payable       => Payable,
                           functions     => add_init_function(
-                                             Env1, Con, StateType,
+                                             Env1,
                                              add_event_function(Env1, EventType, Funs)) },
             case Contract of
                 contract_main -> [] = Rest, {Env1, ConFcode};
@@ -362,8 +362,6 @@ to_fcode(Env, [{Contract, Attrs, Con = {con, _, Name}, _Impls, Decls}|Rest])
             Env1 = decls_to_fcode(Env#{ context => {abstract_contract, Name} }, Decls),
             to_fcode(Env1, Rest)
     end;
-to_fcode(_Env, [NotMain = {NotMainHead, _ ,_ , _}]) when NotMainHead =/= contract_def ->
-    fcode_error({last_declaration_must_be_main_contract, NotMain});
 to_fcode(Env, [{namespace, _, {con, _, Con}, Decls} | Code]) ->
     Env1 = decls_to_fcode(Env#{ context => {namespace, Con} }, Decls),
     to_fcode(Env1, Code).
@@ -377,22 +375,15 @@ decls_to_fcode(Env, Decls) ->
                 end, Env1, Decls).
 
 -spec decl_to_fcode(env(), aeso_syntax:decl()) -> env().
-decl_to_fcode(Env = #{context := {contract_def, _}}, {fun_decl, _, Id, _}) ->
-    case is_no_code(Env) of
-        false -> fcode_error({missing_definition, Id});
-        true  -> Env
-    end;
 decl_to_fcode(Env, {fun_decl, _, _, _})  -> Env;
 decl_to_fcode(Env, {type_def, _Ann, Name, Args, Def}) ->
     typedef_to_fcode(Env, Name, Args, Def);
-decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, Id = {id, _, Name}, Args, Ret, [{guarded, _, [], Body}]}) ->
+decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, {id, _, Name}, Args, Ret, [{guarded, _, [], Body}]}) ->
     Attrs = get_attributes(Ann),
     FName = lookup_fun(Env, qname(Env, Name)),
     FArgs = args_to_fcode(Env, Args),
     FRet  = type_to_fcode(Env, Ret),
     FBody = expr_to_fcode(Env#{ vars => [X || {X, _} <- FArgs] }, Body),
-    [ ensure_first_order_entrypoint(Ann, Id, Args, Ret, FArgs, FRet)
-      || aeso_syntax:get_ann(entrypoint, Ann, false) ],
     Def   = #{ attrs  => Attrs,
                args   => FArgs,
                return => FRet,
@@ -401,8 +392,7 @@ decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, Id = {id, _, Name}, Ar
     Env#{ functions := NewFuns }.
 
 -spec typedef_to_fcode(env(), aeso_syntax:id(), [aeso_syntax:tvar()], aeso_syntax:typedef()) -> env().
-typedef_to_fcode(Env, Id = {id, _, Name}, Xs, Def) ->
-    check_state_and_event_types(Env, Id, Xs),
+typedef_to_fcode(Env, {id, _, Name}, Xs, Def) ->
     Q = qname(Env, Name),
     FDef = fun(Args) when length(Args) == length(Xs) ->
                 Sub = maps:from_list(lists:zip([X || {tvar, _, X} <- Xs], Args)),
@@ -466,14 +456,6 @@ compute_state_layout(R, [H | T]) ->
 compute_state_layout(R, _) ->
     {R + 1, {reg, R}}.
 
-check_state_and_event_types(#{ context := {contract_def, _} }, Id, [_ | _]) ->
-    case Id of
-        {id, _, "state"} -> fcode_error({parameterized_state, Id});
-        {id, _, "event"} -> fcode_error({parameterized_event, Id});
-        _                -> ok
-    end;
-check_state_and_event_types(_, _, _) -> ok.
-
 -spec type_to_fcode(env(), aeso_syntax:type()) -> ftype().
 type_to_fcode(Env, Type) ->
     type_to_fcode(Env, #{}, Type).
@@ -491,8 +473,6 @@ type_to_fcode(Env, Sub, {record_t, Fields}) ->
     type_to_fcode(Env, Sub, {tuple_t, [], lists:map(FieldType, Fields)});
 type_to_fcode(_Env, _Sub, {bytes_t, _, N}) ->
     {bytes, N};
-type_to_fcode(_Env, _Sub, {tvar, Ann, "void"}) ->
-    fcode_error({found_void, Ann});
 type_to_fcode(_Env, Sub, {tvar, _, X}) ->
     maps:get(X, Sub, {tvar, X});
 type_to_fcode(_Env, _Sub, {fun_t, Ann, _, var_args, _}) ->
@@ -554,7 +534,7 @@ expr_to_fcode(_Env, _Type, {bytes,           _, B}) -> {lit, {bytes, B}};
 
 %% Variables
 expr_to_fcode(Env, _Type, {id, _, X})  -> resolve_var(Env, [X]);
-expr_to_fcode(Env, Type, {qid, Ann, X}) ->
+expr_to_fcode(Env, Type, {qid, _, X}) ->
     case resolve_var(Env, X) of
         {builtin_u, B, Ar} when B =:= oracle_query;
                                 B =:= oracle_get_question;
@@ -565,13 +545,11 @@ expr_to_fcode(Env, Type, {qid, Ann, X}) ->
                                 B =:= oracle_check_query ->
             OType = get_oracle_type(B, Type),
             {oracle, QType, RType} = type_to_fcode(Env, OType),
-            validate_oracle_type(Ann, OType, QType, RType),
             TypeArgs = [{lit, {typerep, QType}}, {lit, {typerep, RType}}],
             {builtin_u, B, Ar, TypeArgs};
         {builtin_u, B = aens_resolve, Ar} ->
             {fun_t, _, _, _, ResType} = Type,
             AensType = type_to_fcode(Env, ResType),
-            validate_aens_resolve_type(Ann, ResType, AensType),
             TypeArgs = [{lit, {typerep, AensType}}],
             {builtin_u, B, Ar, TypeArgs};
         {builtin_u, B = bytes_split, Ar} ->
@@ -823,53 +801,6 @@ get_oracle_type(oracle_get_answer,   {fun_t, _, _, [OType | _], _}) -> OType;
 get_oracle_type(oracle_check,        {fun_t, _, _, [OType | _], _}) -> OType;
 get_oracle_type(oracle_check_query,  {fun_t, _, _, [OType | _], _}) -> OType;
 get_oracle_type(oracle_respond,      {fun_t, _, _, [OType | _], _}) -> OType.
-
-validate_oracle_type(Ann, Type, QType, RType) ->
-    ensure_monomorphic(QType, {invalid_oracle_type, polymorphic,  query,    Ann, Type}),
-    ensure_monomorphic(RType, {invalid_oracle_type, polymorphic,  response, Ann, Type}),
-    ensure_first_order(QType, {invalid_oracle_type, higher_order, query,    Ann, Type}),
-    ensure_first_order(RType, {invalid_oracle_type, higher_order, response, Ann, Type}),
-    ok.
-
-validate_aens_resolve_type(Ann, {app_t, _, _, [Type]}, {variant, [[], [FType]]}) ->
-    case FType of
-        string         -> ok;
-        address        -> ok;
-        contract       -> ok;
-        {oracle, _, _} -> ok;
-        oracle_query   -> ok;
-        _              -> fcode_error({invalid_aens_resolve_type, Ann, Type})
-    end.
-
-ensure_first_order_entrypoint(Ann, Id = {id, _, Name}, Args, Ret, FArgs, FRet) ->
-    [ ensure_first_order(FT, {invalid_entrypoint, higher_order, Ann1, Id, {argument, X, T}})
-      || {{typed, Ann1, X, T}, {_, FT}} <- lists:zip(Args, FArgs) ],
-    [ ensure_first_order(FRet, {invalid_entrypoint, higher_order, Ann, Id, {result, Ret}})
-      || Name /= "init" ],  %% init can return higher-order values, since they're written to the store
-                            %% rather than being returned.
-    ok.
-
-ensure_monomorphic(Type, Err) ->
-    case is_monomorphic(Type) of
-        true  -> ok;
-        false -> fcode_error(Err)
-    end.
-
-ensure_first_order(Type, Err) ->
-    case is_first_order(Type) of
-        true  -> ok;
-        false -> fcode_error(Err)
-    end.
-
-is_monomorphic({tvar, _})              -> false;
-is_monomorphic(Ts) when is_list(Ts)    -> lists:all(fun is_monomorphic/1, Ts);
-is_monomorphic(Tup) when is_tuple(Tup) -> is_monomorphic(tuple_to_list(Tup));
-is_monomorphic(_)                      -> true.
-
-is_first_order({function, _, _})       -> false;
-is_first_order(Ts) when is_list(Ts)    -> lists:all(fun is_first_order/1, Ts);
-is_first_order(Tup) when is_tuple(Tup) -> is_first_order(tuple_to_list(Tup));
-is_first_order(_)                      -> true.
 
 %% -- Pattern matching --
 
@@ -1203,11 +1134,11 @@ builtin_to_fcode(_Layout, Builtin, Args) ->
 
 %% -- Init function --
 
-add_init_function(Env, Main, StateType, Funs0) ->
+add_init_function(Env, Funs0) ->
     case is_no_code(Env) of
         true  -> Funs0;
         false ->
-            Funs     = add_default_init_function(Env, Main, StateType, Funs0),
+            Funs     = add_default_init_function(Env, Funs0),
             InitName = {entrypoint, <<"init">>},
             InitFun  = #{ body := InitBody} = maps:get(InitName, Funs),
             Funs1 = Funs#{ InitName => InitFun#{ return => {tuple, []},
@@ -1215,16 +1146,14 @@ add_init_function(Env, Main, StateType, Funs0) ->
             Funs1
     end.
 
-add_default_init_function(_Env, Main, StateType, Funs) ->
+add_default_init_function(_Env, Funs) ->
     InitName = {entrypoint, <<"init">>},
     case maps:get(InitName, Funs, none) of
-        %% Only add default init function if state is unit.
-        none when StateType == {tuple, []} ->
+        none ->
             Funs#{ InitName => #{attrs  => [],
                                  args   => [],
                                  return => {tuple, []},
                                  body   => {tuple, []}} };
-        none -> fcode_error({missing_init_function, Main});
         _    -> Funs
     end.
 
@@ -2090,7 +2019,9 @@ setnth(I, X, Xs) ->
 -dialyzer({nowarn_function, [fcode_error/1, internal_error/1]}).
 
 fcode_error(Error) ->
-    aeso_errors:throw(aeso_code_errors:format(Error)).
+    Pos = aeso_errors:pos(0, 0),
+    Msg = lists:flatten(io_lib:format("Unknown error: ~p\n", [Error])),
+    aeso_errors:throw(aeso_errors:new(code_error, Pos, Msg)).
 
 internal_error(Error) ->
     Msg = lists:flatten(io_lib:format("~p\n", [Error])),
