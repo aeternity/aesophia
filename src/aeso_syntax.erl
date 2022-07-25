@@ -26,7 +26,7 @@
 -type ann_format() :: '?:' | hex | infix | prefix | elif.
 
 -type ann() :: [ {line, ann_line()} | {col, ann_col()} | {format, ann_format()} | {origin, ann_origin()}
-               | stateful | private | payable | main | interface].
+               | stateful | private | payable | main | interface | entrypoint].
 
 -type name() :: string().
 -type id()   :: {id,   ann(), name()}.
@@ -42,6 +42,7 @@
               | {contract_child, ann(), con(), [con()], [decl()]}
               | {contract_interface, ann(), con(), [con()], [decl()]}
               | {namespace, ann(), con(), [decl()]}
+              | {include, ann(), {string, ann(), string()}}
               | {pragma, ann(), pragma()}
               | {type_decl, ann(), id(), [tvar()]} % Only for error msgs
               | {type_def, ann(), id(), [tvar()], typedef()}
