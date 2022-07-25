@@ -191,15 +191,66 @@ contract interface X : Z =
      entrypoint z() = 1
 ```
 
-#### Subtyping
+#### Subtyping and variance
 
-The subtyping rules below, mention the variance of a type, which is defined in [Wikipedia](https://en.wikipedia.org/wiki/Covariance_and_contravariance_(computer_science)) as follows:
+Subtyping in Sophia follows common rules that take type variance into account. As described by [Wikipedia](https://en.wikipedia.org/wiki/Covariance_and_contravariance_(computer_science)), 
 
 >Variance refers to how subtyping between more complex types relates to subtyping between their components.
 
-You can refer to the Wikipedia page for further understanding of type variance.
+This concept plays an important role in complex types such as tuples, `datatype`s and functions. Depending on the context, it can apply to positions in the structure of a type, or type parameters of generic types. There are four kinds of variances:
 
-In Sophia, the following subtyping rules apply:
+- covariant
+- contravariant
+- invariant
+- bivariant
+
+A type is said to be on a "covariant" position when it describes output or a result of some computation. Analogously, position is "contravariant" when it is an input, or a parameter. Intuitively, when a part of the type is produced by values of it, it is covariant. When it is consumed, it is contravariant. When a type appears to be simultaneously input and output, it is described as invariant. If a type is neither of those (that is, it's unused) it's bivariant. Furthermore, whenever a complex type appears on a contravariant position, all its covariant components become contravariant and vice versa.
+
+Variance influences how subtyping is applied. Types on covariant positions are subtyped normally, while contravariant the opposite way. Invariant types have to be exactly the same in order for subtyping to work. Bivariant types are always compatible.
+
+A good example of where it matters can be pictured by subtyping of function types. Let us assume there is a contract interface `Animal` and two contracts that implement it: `Dog` and `Cat`.
+
+```sophia
+contract interface Animal =
+  entrypoint age : () => int
+  
+contract Dog : Animal =
+  entrypoint age() = // ...
+  entrypoint woof() = "woof"
+  
+contract Cat : Animal =
+  entrypoint age() = // ...
+  entrypoint meow() = "meow"
+```
+
+The assumption of this exercise is that cats do not bark (because `Cat` does not define the `woof` entrypoint). If subtyping rules were applied naively, that is if we let `Dog => Dog` be a subtype of `Animal => Animal`, the following code would break:
+
+```sophia
+let f : (Dog) => string  = d => d.woof()
+let g : (Animal) => string  = f
+let c : Cat = Chain.create()
+g(c)  // Cat barking!
+```
+
+That is because arguments of functions are contravariant, as opposed to return the type which is covariant. Because of that, the assignment of `f` to `g` is invalid - while `Dog` is a subtype of `Animal`, `Dog => string` is **not** a subtype of `Animal => string`. However, `Animal => string` **is** a subtype of `Dog => string`. More than that, `(Dog => Animal) => Dog` is a subtype of `(Animal => Dog) => Animal`.
+
+This has consequences on how user-defined generic types work. A type variable gains its variance from its role in the type definition as shown in the example:
+
+```sophia
+datatype co('a) = Co('a) // co is covariant on 'a
+datatype ct('a) = Ct('a => unit) // ct is contravariant on 'a
+datatype in('a) = In('a => 'a) // in is invariant on 'a
+datatype bi('a) = Bi // bi is bivariant on 'a
+```
+
+The following facts apply here:
+
+- `co('a)` is a subtype of `co('b) when `'a` is a subtype of `'b`
+- `ct('a)` is a subtype of `ct('b) when `'b` is a subtype of `'a`
+- `in('a)` is a subtype of `in('b) when `'a` is equal to `'b`
+- `bi('a)` is a subtype of `bi('b) always
+
+That altogether induce the following rules of subtyping in Sophia:
 
 - A function type `(Args1) => Ret1` is a subtype of `(Args2) => Ret2` when `Ret1`
 is a subtype of `Ret2` and each argument type from `Args2` is a subtype of its
