@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [7.0.0]
 ### Added
 - Added support for `EXIT` opcode via `exit : (string) => 'a` function (behaves same as `ABORT`, but consumes all gas).
-- Compiler warnings for the follwing: shadowing, negative spends, division by zero, unused functions, unused includes, unused stateful annotations, unused variables, unused parameters, unused user-defined type, dead return value.
+- Compiler warnings for the following: shadowing, negative spends, division by zero, unused functions, unused includes, unused stateful annotations, unused variables, unused parameters, unused user-defined type, dead return value.
 - The pipe operator |>
   ```
   [1, 2, 3] |> List.first |> Option.is_some  // Option.is_some(List.first([1, 2, 3]))
