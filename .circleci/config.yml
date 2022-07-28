@@ -3,7 +3,7 @@ version: 2.1
 executors:
   aebuilder:
     docker:
-      - image: aeternity/builder:xenial-otp21
+      - image: aeternity/builder:bionic-otp24
         user: builder
     working_directory: ~/aesophia
 

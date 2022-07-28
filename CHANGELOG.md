@@ -6,8 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+### Changed
+### Removed
+
+## [7.0.0]
+### Added
 - Added support for `EXIT` opcode via `exit : (string) => 'a` function (behaves same as `ABORT`, but consumes all gas).
-- Compiler warnings for the follwing: shadowing, negative spends, division by zero, unused functions, unused includes, unused stateful annotations, unused variables, unused parameters, unused user-defined type, dead return value.
+- Compiler warnings for the following: shadowing, negative spends, division by zero, unused functions, unused includes, unused stateful annotations, unused variables, unused parameters, unused user-defined type, dead return value.
 - The pipe operator |>
   ```
   [1, 2, 3] |> List.first |> Option.is_some  // Option.is_some(List.first([1, 2, 3]))
@@ -347,7 +352,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v6.1.0...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v7.0.0...HEAD
+[7.0.0]: https://github.com/aeternity/aesophia/compare/v6.1.0...v7.0.0
 [6.1.0]: https://github.com/aeternity/aesophia/compare/v6.0.2...v6.1.0
 [6.0.2]: https://github.com/aeternity/aesophia/compare/v6.0.1...v6.0.2
 [6.0.1]: https://github.com/aeternity/aesophia/compare/v6.0.0...v6.0.1
