@@ -182,6 +182,10 @@ LetDef ::= Id Args [':' Type] '=' Block(Stmt)   // Function definition
          | Pattern '=' Block(Stmt)              // Value definition
 
 Case    ::= Pattern '=>' Block(Stmt)
+          | Pattern Block(GuardedCase)
+
+GuardedCase ::= '|' Sep1(Expr, ',') '=>' Block(Stmt)
+
 Pattern ::= Expr
 ```
 
