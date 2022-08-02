@@ -91,7 +91,8 @@ A Sophia file consists of a sequence of *declarations* in a layout block.
 ```c
 File ::= Block(TopDecl)
 
-TopDecl ::= ['payable'] 'contract' Con '=' Block(Decl)
+TopDecl ::= ['payable'] ['main'] 'contract' Con '=' Block(Decl)
+       | 'contract' 'interface' Con '=' Block(Decl)
        | 'namespace' Con '=' Block(Decl)
        | '@compiler' PragmaOp Version
        | 'include' String
@@ -103,6 +104,9 @@ Decl ::= 'type'     Id ['(' TVar* ')'] '=' TypeAlias
 
 FunDecl ::= Id ':' Type                             // Type signature
           | Id Args [':' Type] '=' Block(Stmt)      // Definition
+          | Id Args [':' Type] Block(GuardedDef)    // Guarded definitions
+
+GuardedDef = '|' Sep(Expr, ',') '=' Block(Stmt)
 
 PragmaOp ::= '<' | '=<' | '==' | '>=' | '>'
 Version  ::= Sep1(Int, '.')
