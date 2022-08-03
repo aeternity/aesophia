@@ -1,4 +1,4 @@
-# Contributing to æSophia
+# Contributing to Sophia
 
 ## Checklist For Creating New Pull Requests
 
