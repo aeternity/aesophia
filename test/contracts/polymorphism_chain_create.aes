@@ -1,0 +1,23 @@
+contract interface I =
+    entrypoint f : () => int
+
+contract C1 : I =
+    entrypoint f() = 123
+
+contract C2 : I =
+    entrypoint f() = 888
+
+namespace Make =
+    stateful function new1() : I = Chain.create() : C1
+    stateful function new2() : I = Chain.create() : C2
+
+    stateful function new(c : I) : int = c.f()
+
+main contract Main =
+    stateful entrypoint test1() =
+        let c = Make.new1()
+        Make.new(c)
+
+    stateful entrypoint test2() =
+        let c = Make.new2()
+        Make.new(c)

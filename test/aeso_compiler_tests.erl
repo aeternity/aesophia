@@ -202,6 +202,7 @@ compilable_contracts() ->
      "polymorphism_contract_interface_extensions",
      "polymorphism_contract_interface_same_decl_multi_interface",
      "polymorphism_contract_interface_same_name_same_type",
+     "polymorphism_chain_create",
      "missing_init_fun_state_unit",
      "complex_compare_leq",
      "complex_compare",
