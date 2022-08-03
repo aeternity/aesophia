@@ -230,6 +230,7 @@ Expr ::= '(' LamArgs ')' '=>' Block(Stmt)   // Anonymous function    (x) => x + 
        | '[' Expr '..' Expr ']'             // List range            [1..n]
        | '{' Sep(FieldUpdate, ',') '}'      // Record or map value   {x = 0, y = 1}, {[key] = val}
        | '(' Expr ')'                       // Parens                (1 + 2) * 3
+       | '(' Expr '=' Expr ')'              // Assign pattern        (y = x::_)
        | Id | Con | QId | QCon              // Identifiers           x, None, Map.member, AELib.Token
        | Int | Bytes | String | Char        // Literals              123, 0xff, #00abc123, "foo", '%'
        | AccountAddress | ContractAddress   // Chain identifiers
