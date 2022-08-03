@@ -21,3 +21,12 @@ main contract Main =
     stateful entrypoint test2() =
         let c = Make.new2()
         Make.new(c)
+
+    stateful entrypoint test3() =
+        let c1 : I  = Chain.create()       // fails
+        let c2 : C1 = Chain.create() : I   // fails
+        let c3      = Chain.create() : I   // fails
+        let c4      = Chain.create() : C1  // succeeds
+        let c5 : I  = Chain.create() : C1  // succeeds
+        let c6 : C1 = Chain.create()       // succeeds
+        ()
