@@ -96,17 +96,23 @@ TopDecl ::= ['payable'] ['main'] 'contract' Con '=' Block(Decl)
        | 'namespace' Con '=' Block(Decl)
        | '@compiler' PragmaOp Version
        | 'include' String
+       | Using
 
 Decl ::= 'type'     Id ['(' TVar* ')'] '=' TypeAlias
        | 'record'   Id ['(' TVar* ')'] '=' RecordType
        | 'datatype' Id ['(' TVar* ')'] '=' DataType
        | (EModifier* 'entrypoint' | FModifier* 'function') Block(FunDecl)
+       | Using
 
 FunDecl ::= Id ':' Type                             // Type signature
           | Id Args [':' Type] '=' Block(Stmt)      // Definition
           | Id Args [':' Type] Block(GuardedDef)    // Guarded definitions
 
 GuardedDef ::= '|' Sep1(Expr, ',') '=' Block(Stmt)
+
+Using ::= 'using' Con ['as' Con] [UsingParts]
+UsingParts ::= 'for' '[' Sep1(Id, ',') ']'
+             | 'hiding' '[' Sep1(Id, ',') ']'
 
 PragmaOp ::= '<' | '=<' | '==' | '>=' | '>'
 Version  ::= Sep1(Int, '.')
@@ -176,6 +182,7 @@ Stmt ::= 'switch' '(' Expr ')' Block(Case)
        | 'elif' '(' Expr ')' Block(Stmt)
        | 'else' Block(Stmt)
        | 'let' LetDef
+       | Using
        | Expr
 
 LetDef ::= Id Args [':' Type] '=' Block(Stmt)   // Function definition
