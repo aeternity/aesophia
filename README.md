@@ -14,6 +14,7 @@ The compiler is currently being used three places
 * [Features](docs/sophia_features.md)
 * [Standard library](docs/sophia_stdlib.md)
 * [Contract examples](docs/sophia_examples.md)
+* [Contributing](CONTRIBUTING.md)
 
 Additionally you can check out the [contracts section](https://github.com/aeternity/protocol/blob/master/contracts/contracts.md) of the æternity blockchain specification.
 
