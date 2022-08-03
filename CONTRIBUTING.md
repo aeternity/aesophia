@@ -15,3 +15,9 @@ The following points should be considered before creating a new PR to the Sophia
 
 - If a PR introduces new syntax (e.g. changes in [aeso_syntax.erl](src/aeso_syntax.erl), [aeso_scan.erl](src/aeso_scan.erl), or [aeso_parser.erl](src/aeso_parser.erl)), the contract [all_syntax.aes](test/contracts/all_syntax.aes) should be updated to include the new syntax.
 - If a PR fixes a bug, the code that replicates the bug should be added as a new passing test contract.
+
+### Source Code
+
+- If a PR introduces new syntax (e.g. changes in [aeso_syntax.erl](src/aeso_syntax.erl), [aeso_scan.erl](src/aeso_scan.erl), or [aeso_parser.erl](src/aeso_parser.erl)), the following code should be updated to handle the new syntax:
+    - The function `aeso_syntax_utils:fold/4` in the file [aeso_syntax_utils.erl](src/aeso_syntax_utils.erl).
+    - Any related pretty printing function in the file [aeso_pretty.erl](src/aeso_pretty.erl), depending on the type of the newly added syntax.
