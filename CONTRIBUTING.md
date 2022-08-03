@@ -15,6 +15,7 @@ The following points should be considered before creating a new PR to the Sophia
 
 - If a PR introduces new syntax (e.g. changes in [aeso_syntax.erl](src/aeso_syntax.erl), [aeso_scan.erl](src/aeso_scan.erl), or [aeso_parser.erl](src/aeso_parser.erl)), the contract [all_syntax.aes](test/contracts/all_syntax.aes) should be updated to include the new syntax.
 - If a PR fixes a bug, the code that replicates the bug should be added as a new passing test contract.
+- If a PR introduces a new feature, add tests for both successful and failing usage of that feature. In order to run the entire compilation pipeline and to avoid erroring during intermediate steps, failing tests should not be mixed with the successful ones.
 
 ### Source Code
 
