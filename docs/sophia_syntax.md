@@ -106,7 +106,7 @@ FunDecl ::= Id ':' Type                             // Type signature
           | Id Args [':' Type] '=' Block(Stmt)      // Definition
           | Id Args [':' Type] Block(GuardedDef)    // Guarded definitions
 
-GuardedDef = '|' Sep1(Expr, ',') '=' Block(Stmt)
+GuardedDef ::= '|' Sep1(Expr, ',') '=' Block(Stmt)
 
 PragmaOp ::= '<' | '=<' | '==' | '>=' | '>'
 Version  ::= Sep1(Int, '.')
