@@ -91,18 +91,30 @@ A Sophia file consists of a sequence of *declarations* in a layout block.
 ```c
 File ::= Block(TopDecl)
 
-TopDecl ::= ['payable'] 'contract' Con '=' Block(Decl)
-       | 'namespace' Con '=' Block(Decl)
-       | '@compiler' PragmaOp Version
-       | 'include' String
+TopDecl ::= ['payable'] ['main'] 'contract' Con [Implement] '=' Block(Decl)
+          | 'contract' 'interface' Con [Implement] '=' Block(Decl)
+          | 'namespace' Con '=' Block(Decl)
+          | '@compiler' PragmaOp Version
+          | 'include' String
+          | Using
+
+Implement ::= ':' Sep1(Con, ',')
 
 Decl ::= 'type'     Id ['(' TVar* ')'] '=' TypeAlias
        | 'record'   Id ['(' TVar* ')'] '=' RecordType
        | 'datatype' Id ['(' TVar* ')'] '=' DataType
        | (EModifier* 'entrypoint' | FModifier* 'function') Block(FunDecl)
+       | Using
 
 FunDecl ::= Id ':' Type                             // Type signature
           | Id Args [':' Type] '=' Block(Stmt)      // Definition
+          | Id Args [':' Type] Block(GuardedDef)    // Guarded definitions
+
+GuardedDef ::= '|' Sep1(Expr, ',') '=' Block(Stmt)
+
+Using ::= 'using' Con ['as' Con] [UsingParts]
+UsingParts ::= 'for' '[' Sep1(Id, ',') ']'
+             | 'hiding' '[' Sep1(Id, ',') ']'
 
 PragmaOp ::= '<' | '=<' | '==' | '>=' | '>'
 Version  ::= Sep1(Int, '.')
@@ -172,12 +184,17 @@ Stmt ::= 'switch' '(' Expr ')' Block(Case)
        | 'elif' '(' Expr ')' Block(Stmt)
        | 'else' Block(Stmt)
        | 'let' LetDef
+       | Using
        | Expr
 
 LetDef ::= Id Args [':' Type] '=' Block(Stmt)   // Function definition
          | Pattern '=' Block(Stmt)              // Value definition
 
 Case    ::= Pattern '=>' Block(Stmt)
+          | Pattern Block(GuardedCase)
+
+GuardedCase ::= '|' Sep1(Expr, ',') '=>' Block(Stmt)
+
 Pattern ::= Expr
 ```
 
@@ -215,6 +232,7 @@ Expr ::= '(' LamArgs ')' '=>' Block(Stmt)   // Anonymous function    (x) => x + 
        | '[' Expr '..' Expr ']'             // List range            [1..n]
        | '{' Sep(FieldUpdate, ',') '}'      // Record or map value   {x = 0, y = 1}, {[key] = val}
        | '(' Expr ')'                       // Parens                (1 + 2) * 3
+       | '(' Expr '=' Expr ')'              // Assign pattern        (y = x::_)
        | Id | Con | QId | QCon              // Identifiers           x, None, Map.member, AELib.Token
        | Int | Bytes | String | Char        // Literals              123, 0xff, #00abc123, "foo", '%'
        | AccountAddress | ContractAddress   // Chain identifiers
@@ -244,12 +262,12 @@ UnOp  ::= '-' | '!'
 | Operators | Type
 | --- | ---
 | `-` `+` `*` `/` `mod` `^` | arithmetic operators
-| `!` `&&` `\|\|` | logical operators
+| `!` `&&` `||` | logical operators
 | `==` `!=` `<` `>` `=<` `>=` | comparison operators
 | `::` `++` | list operators
-| `\|>` | functional operators
+| `|>` | functional operators
 
-## Operator precendences
+## Operator precedence
 
 In order of highest to lowest precedence.
 
@@ -263,5 +281,5 @@ In order of highest to lowest precedence.
 | `::` `++` | right
 | `<` `>` `=<` `>=` `==` `!=` | none
 | `&&` | right
-| `\|\|` | right
-| `\|>` | left
+| `||` | right
+| `|>` | left
