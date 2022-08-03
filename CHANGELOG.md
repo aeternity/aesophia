@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 ### Changed
 ### Removed
+### Fixed
+- [404](https://github.com/aeternity/aesophia/issues/404) Contract polymorphism crashes on non-obvious child contract typing.
 
 ## [7.0.0]
 ### Added

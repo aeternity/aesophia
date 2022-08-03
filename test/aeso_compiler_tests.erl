@@ -202,6 +202,7 @@ compilable_contracts() ->
      "polymorphism_contract_interface_extensions",
      "polymorphism_contract_interface_same_decl_multi_interface",
      "polymorphism_contract_interface_same_name_same_type",
+     "polymorphism_variance_switching_chain_create",
      "missing_init_fun_state_unit",
      "complex_compare_leq",
      "complex_compare",
@@ -1024,6 +1025,20 @@ failing_contracts() ->
                    <<?Pos(44,13)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
                      "when checking the type of the pattern `q15 : oracle_query(Cat, Cat)` against the expected type `oracle_query(Cat, Animal)`">>
+                  ])
+    , ?TYPE_ERROR(polymorphism_variance_switching_chain_create_fail,
+                  [<<?Pos(9,22)
+                     "I is not implemented.\n"
+                     "when resolving arguments of variadic function `Chain.create`">>,
+                   <<?Pos(10,13)
+                     "Cannot unify `I` and `C` in a covariant context\n"
+                     "when checking the type of the pattern `c2 : C` against the expected type `I`">>,
+                   <<?Pos(10,22)
+                     "I is not implemented.\n"
+                     "when resolving arguments of variadic function `Chain.create`">>,
+                   <<?Pos(11,22)
+                     "I is not implemented.\n"
+                     "when resolving arguments of variadic function `Chain.create`">>
                   ])
     , ?TYPE_ERROR(missing_definition,
                   [<<?Pos(2,14)

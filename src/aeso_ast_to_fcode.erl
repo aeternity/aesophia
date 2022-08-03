@@ -693,7 +693,7 @@ expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
     end;
 
 %% Function calls
-expr_to_fcode(Env, Type, {app, _, Fun = {typed, _, FunE, {fun_t, _, NamedArgsT, ArgsT, _}}, Args}) ->
+expr_to_fcode(Env, _, {app, _, Fun = {typed, _, FunE, {fun_t, _, NamedArgsT, ArgsT, Type}}, Args}) ->
     Args1 = get_named_args(NamedArgsT, Args),
     FArgs = [expr_to_fcode(Env, Arg) || Arg <- Args1],
     case expr_to_fcode(Env, Fun) of
