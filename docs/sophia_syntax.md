@@ -91,12 +91,14 @@ A Sophia file consists of a sequence of *declarations* in a layout block.
 ```c
 File ::= Block(TopDecl)
 
-TopDecl ::= ['payable'] ['main'] 'contract' Con '=' Block(Decl)
-       | 'contract' 'interface' Con '=' Block(Decl)
-       | 'namespace' Con '=' Block(Decl)
-       | '@compiler' PragmaOp Version
-       | 'include' String
-       | Using
+TopDecl ::= ['payable'] ['main'] 'contract' Con [Implement] '=' Block(Decl)
+          | 'contract' 'interface' Con [Implement] '=' Block(Decl)
+          | 'namespace' Con '=' Block(Decl)
+          | '@compiler' PragmaOp Version
+          | 'include' String
+          | Using
+
+Implement ::= ':' Sep1(Con, ',')
 
 Decl ::= 'type'     Id ['(' TVar* ')'] '=' TypeAlias
        | 'record'   Id ['(' TVar* ')'] '=' RecordType
