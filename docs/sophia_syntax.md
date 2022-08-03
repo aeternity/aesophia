@@ -260,12 +260,12 @@ UnOp  ::= '-' | '!'
 | Operators | Type
 | --- | ---
 | `-` `+` `*` `/` `mod` `^` | arithmetic operators
-| `!` `&&` `\|\|` | logical operators
+| `!` `&&` `||` | logical operators
 | `==` `!=` `<` `>` `=<` `>=` | comparison operators
 | `::` `++` | list operators
-| `\|>` | functional operators
+| `|>` | functional operators
 
-## Operator precendences
+## Operator precedence
 
 In order of highest to lowest precedence.
 
@@ -279,5 +279,5 @@ In order of highest to lowest precedence.
 | `::` `++` | right
 | `<` `>` `=<` `>=` `==` `!=` | none
 | `&&` | right
-| `\|\|` | right
-| `\|>` | left
+| `||` | right
+| `|>` | left
