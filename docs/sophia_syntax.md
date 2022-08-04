@@ -10,8 +10,9 @@ and `*/` and can be nested.
 ### Keywords
 
 ```
-contract elif else entrypoint false function if import include let mod namespace
-private payable stateful switch true type record datatype main interface
+contract include let switch type record datatype if elif else function
+stateful payable true false mod public entrypoint private indexed namespace
+interface main using as for hiding
 ```
 
 ### Tokens
