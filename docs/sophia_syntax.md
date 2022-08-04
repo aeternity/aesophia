@@ -11,7 +11,7 @@ and `*/` and can be nested.
 
 ```
 contract elif else entrypoint false function if import include let mod namespace
-private payable stateful switch true type record datatype main interface
+private payable stateful switch true type record datatype main interface using
 ```
 
 ### Tokens
