@@ -30,7 +30,7 @@ The following points should be considered before creating a new PR to the Sophia
 - In the [Changelog](CHANGELOG.md):
     - Update the `Unreleased` changes to be under the new version.
     - Update the version at the bottom of the file.
-- Commit and the changes and create a new PR (check the commit of [v6.1.0](5ad5270e381f6e810d7b8b5cdc168d283e7a90bb) for reference).
+- Commit and the changes and create a new PR (check the commit of [v6.1.0](https://github.com/aeternity/aesophia/commit/5ad5270e381f6e810d7b8b5cdc168d283e7a90bb) for reference).
 - Create a release after merging the new PR to `master` branch.
 - After releasing `aesophia`, refer to each of the following repositories and create new releases as well, using the new `aesophia` release:
     - [aesophia_cli](https://github.com/aeternity/aesophia_cli)
