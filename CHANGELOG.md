@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 ### Removed
 ### Fixed
+
+## [7.0.1]
+### Added
+- Add CONTRIBUTING.md file.
+### Changed
+- Update Sophia syntax docs to include missing information about existing syntax.
+### Fixed
 - [404](https://github.com/aeternity/aesophia/issues/404) Contract polymorphism crashes on non-obvious child contract typing.
 
 ## [7.0.0]
@@ -354,7 +361,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v7.0.0...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v7.0.1...HEAD
+[7.0.1]: https://github.com/aeternity/aesophia/compare/v7.0.0...v7.0.1
 [7.0.0]: https://github.com/aeternity/aesophia/compare/v6.1.0...v7.0.0
 [6.1.0]: https://github.com/aeternity/aesophia/compare/v6.0.2...v6.1.0
 [6.0.2]: https://github.com/aeternity/aesophia/compare/v6.0.1...v6.0.2
