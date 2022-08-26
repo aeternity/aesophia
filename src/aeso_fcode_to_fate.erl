@@ -77,7 +77,7 @@ compile(ChildContracts, FCode, Options) ->
     #{ contract_name := ContractName,
        functions     := Functions } = FCode,
     SFuns  = functions_to_scode(ChildContracts, ContractName, Functions, Options),
-    SFuns1 = proplists:get_value(optimize_scode, Options, true) andalso optimize_scode(SFuns, Options),
+    SFuns1 = optimize_scode(SFuns, Options),
     FateCode = to_basic_blocks(SFuns1),
     ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
     FateCode.
@@ -708,6 +708,8 @@ tuple(N) -> aeb_fate_ops:tuple(?a, N).
 %%  Optimize
 
 optimize_scode(Funs, Options) ->
+    All = proplists:get_value(optimize_all, Options, true),
+    OptimizeScode = proplists:get_value(optimize_scode, Options, All),
     maps:map(fun(Name, Def) -> optimize_fun(Funs, Name, Def, Options) end,
              Funs).
 
