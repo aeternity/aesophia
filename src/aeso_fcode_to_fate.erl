@@ -709,9 +709,13 @@ tuple(N) -> aeb_fate_ops:tuple(?a, N).
 
 optimize_scode(Funs, Options) ->
     All = proplists:get_value(optimize_all, Options, true),
-    OptimizeScode = proplists:get_value(optimize_scode, Options, All),
-    maps:map(fun(Name, Def) -> optimize_fun(Funs, Name, Def, Options) end,
-             Funs).
+    case proplists:get_value(optimize_scode, Options, All) of
+        true ->
+            maps:map(fun(Name, Def) -> optimize_fun(Funs, Name, Def, Options) end,
+                    Funs);
+        false ->
+            Funs
+    end.
 
 flatten(missing) -> missing;
 flatten(Code)    -> lists:map(fun flatten_s/1, lists:flatten(Code)).
