@@ -1294,14 +1294,12 @@ optimize_fcode(Code = #{ functions := Funs }, Options) ->
 
 -spec optimize_fun(fcode(), fun_name(), fun_def(), [option()]) -> fun_def().
 optimize_fun(Fcode, Fun, Def = #{ body := Body0 }, Options) ->
-    All = proplists:get_value(optimize_all, Options, true),
-
-    Inliner              = proplists:get_value(optimize_inliner,                Options, All),
-    InlineLocalFunctions = proplists:get_value(optimize_inline_local_functions, Options, All),
-    BindSubexpressions   = proplists:get_value(optimize_bind_subexpressions,    Options, All),
-    LetFloating          = proplists:get_value(optimize_let_floating,           Options, All),
-    Simplifier           = proplists:get_value(optimize_simplifier,             Options, All),
-    DropUnusedLets       = proplists:get_value(optimize_drop_unused_lets,       Options, All),
+    Inliner              = proplists:get_value(optimize_inliner,                Options, true),
+    InlineLocalFunctions = proplists:get_value(optimize_inline_local_functions, Options, true),
+    BindSubexpressions   = proplists:get_value(optimize_bind_subexpressions,    Options, true),
+    LetFloating          = proplists:get_value(optimize_let_floating,           Options, true),
+    Simplifier           = proplists:get_value(optimize_simplifier,             Options, true),
+    DropUnusedLets       = proplists:get_value(optimize_drop_unused_lets,       Options, true),
 
     Body1 = if Inliner              -> inliner   (Fcode, Fun, Body0); true -> Body0 end,
     Body2 = if InlineLocalFunctions -> inline_local_functions(Body1); true -> Body1 end,
