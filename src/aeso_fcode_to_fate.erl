@@ -708,13 +708,8 @@ tuple(N) -> aeb_fate_ops:tuple(?a, N).
 %%  Optimize
 
 optimize_scode(Funs, Options) ->
-    case proplists:get_value(optimize_scode, Options, true) of
-        true ->
-            maps:map(fun(Name, Def) -> optimize_fun(Funs, Name, Def, Options) end,
-                    Funs);
-        false ->
-            Funs
-    end.
+    maps:map(fun(Name, Def) -> optimize_fun(Funs, Name, Def, Options) end,
+            Funs).
 
 flatten(missing) -> missing;
 flatten(Code)    -> lists:map(fun flatten_s/1, lists:flatten(Code)).
@@ -1094,10 +1089,14 @@ simpl_s(I, _) -> I.
 simpl_top(I, Code, Options) ->
     simpl_top(?SIMPL_FUEL, I, Code, Options).
 
+%% Change r_rule to optimize_rule (e.g. change r_push_consume to optimize_push_consume)
+-define(RULE_OPTIMIZATION(Rule), list_to_atom("optimize" ++ lists:nthtail(1, atom_to_list(Rule)))).
+
 simpl_top(0, I, Code, _Options) ->
     code_error({optimizer_out_of_fuel, I, Code});
 simpl_top(Fuel, I, Code, Options) ->
-    apply_rules(Fuel, rules(), I, Code, Options).
+    Rules = [R || R = {Rule, _} <- rules(), proplists:get_value(?RULE_OPTIMIZATION(Rule), Options, true)],
+    apply_rules(Fuel, Rules, I, Code, Options).
 
 apply_rules(Fuel, Rules, I, Code, Options) ->
     Cons = fun(X, Xs) -> simpl_top(Fuel - 1, X, Xs, Options) end,
