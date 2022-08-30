@@ -184,7 +184,7 @@ ast_to_fcode(Code, Options) ->
 optimize(FCode1, Options) ->
     Verbose = lists:member(pp_fcode, Options),
     [io:format("-- Before lambda lifting --\n~s\n\n", [format_fcode(FCode1)]) || Verbose],
-    FCode2 = optimize_fcode(FCode1),
+    FCode2 = optimize_fcode(FCode1, Options),
     [ io:format("-- After optimization --\n~s\n\n", [format_fcode(FCode2)]) || Verbose, FCode2 /= FCode1 ],
     FCode3 = lambda_lift(FCode2),
     [ io:format("-- After lambda lifting --\n~s\n\n", [format_fcode(FCode3)]) || Verbose, FCode3 /= FCode2 ],
@@ -1287,20 +1287,28 @@ lambda_lift_exprs(Layout, As) -> [lambda_lift_expr(Layout, A) || A <- As].
 %% - Constant propagation
 %% - Inlining
 
--spec optimize_fcode(fcode()) -> fcode().
-optimize_fcode(Code = #{ functions := Funs }) ->
-    Code1 = Code#{ functions := maps:map(fun(Name, Def) -> optimize_fun(Code, Name, Def) end, Funs) },
+-spec optimize_fcode(fcode(), [option()]) -> fcode().
+optimize_fcode(Code = #{ functions := Funs }, Options) ->
+    Code1 = Code#{ functions := maps:map(fun(Name, Def) -> optimize_fun(Code, Name, Def, Options) end, Funs) },
     eliminate_dead_code(Code1).
 
--spec optimize_fun(fcode(), fun_name(), fun_def()) -> fun_def().
-optimize_fun(Fcode, Fun, Def = #{ body := Body }) ->
-    %% io:format("Optimizing ~p =\n~s\n", [_Fun, prettypr:format(pp_fexpr(_Body))]),
-    Def#{ body := drop_unused_lets(
-                  simplifier(
-                  let_floating(
-                  bind_subexpressions(
-                  inline_local_functions(
-                  inliner(Fcode, Fun, Body)))))) }.
+-spec optimize_fun(fcode(), fun_name(), fun_def(), [option()]) -> fun_def().
+optimize_fun(Fcode, Fun, Def = #{ body := Body0 }, Options) ->
+    Inliner              = proplists:get_value(optimize_inliner,                Options, true),
+    InlineLocalFunctions = proplists:get_value(optimize_inline_local_functions, Options, true),
+    BindSubexpressions   = proplists:get_value(optimize_bind_subexpressions,    Options, true),
+    LetFloating          = proplists:get_value(optimize_let_floating,           Options, true),
+    Simplifier           = proplists:get_value(optimize_simplifier,             Options, true),
+    DropUnusedLets       = proplists:get_value(optimize_drop_unused_lets,       Options, true),
+
+    Body1 = if Inliner              -> inliner   (Fcode, Fun, Body0); true -> Body0 end,
+    Body2 = if InlineLocalFunctions -> inline_local_functions(Body1); true -> Body1 end,
+    Body3 = if BindSubexpressions   -> bind_subexpressions   (Body2); true -> Body2 end,
+    Body4 = if LetFloating          -> let_floating          (Body3); true -> Body3 end,
+    Body5 = if Simplifier           -> simplifier            (Body4); true -> Body4 end,
+    Body6 = if DropUnusedLets       -> drop_unused_lets      (Body5); true -> Body5 end,
+
+    Def#{ body := Body6 }.
 
 %% --- Inlining ---
 
