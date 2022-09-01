@@ -76,13 +76,18 @@ compile(FCode, Options) ->
 compile(ChildContracts, FCode, Options) ->
     #{ contract_name := ContractName,
        functions     := Functions } = FCode,
-    SFuns  = functions_to_scode(ChildContracts, ContractName, Functions, Options),
-    SFuns1 = optimize_scode(SFuns, Options),
-    FateCode = to_basic_blocks(SFuns1),
-    ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
-    case proplists:get_value(include_child_contract_symbols, Options, false) of
-        false -> FateCode;
-        true -> add_child_symbols(ChildContracts, FateCode)
+    try
+        SFuns  = functions_to_scode(ChildContracts, ContractName, Functions, Options),
+        SFuns1 = optimize_scode(SFuns, Options),
+        FateCode = to_basic_blocks(SFuns1),
+        ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
+        FateCode1 = case proplists:get_value(include_child_contract_symbols, Options, false) of
+                        false -> FateCode;
+                        true -> add_child_symbols(ChildContracts, FateCode)
+                    end,
+        {FateCode1, get_variables_registers()}
+    after
+        put(variables_registers, undefined)
     end.
 
 make_function_id(X) ->
@@ -110,8 +115,20 @@ function_to_scode(ChildContracts, ContractName, Functions, Name, Attrs0, Args, B
     {ArgTypes, ResType1} = typesig_to_scode(Args, ResType),
     Attrs = Attrs0 -- [stateful], %% Only track private and payable from here.
     Env = init_env(ChildContracts, ContractName, Functions, Name, Args, Options),
+    [ add_variables_register(Env, Arg, Register) || {Arg, Register} <- Env#env.vars ],
     SCode = to_scode(Env, Body),
     {Attrs, {ArgTypes, ResType1}, SCode}.
+
+get_variables_registers() ->
+    case get(variables_registers) of
+        undefined -> [];
+        Vs        -> Vs
+    end.
+
+add_variables_register(Env, Name, Register) ->
+    Olds = get_variables_registers(),
+    New = {Env#env.contract, Env#env.current_function, Name, Register},
+    put(variables_registers, [New | Olds]).
 
 -define(tvars, '$tvars').
 
@@ -170,6 +187,7 @@ next_var(#env{ vars = Vars }) ->
     1 + lists:max([-1 | [J || {_, {var, J}} <- Vars]]).
 
 bind_var(Name, Var, Env = #env{ vars = Vars }) ->
+    add_variables_register(Env, Name, Var),
     Env#env{ vars = [{Name, Var} | Vars] }.
 
 bind_local(Name, Env) ->
