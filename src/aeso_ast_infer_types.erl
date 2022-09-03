@@ -942,7 +942,7 @@ match_impls(_, [], _, _, Impls) ->
 match_impls(Env, [{fun_decl, _, {id, _, FunName}, FunType = {fun_t, _, _, ArgsTypes, RetDecl}} | Decls], ConId, IName, Impls) ->
     Match = fun({letfun, _, {id, _, FName}, Args, RetFun, _}) when FName == FunName ->
                     length(ArgsTypes) == length(Args) andalso
-                    unify(Env#env{unify_throws = false}, RetDecl, RetFun, unknown) andalso
+                    unify(Env#env{unify_throws = false}, RetFun, RetDecl, unknown) andalso
                     lists:all(fun({T1, {typed, _, _, T2}}) -> unify(Env#env{unify_throws = false}, T1, T2, unknown) end,
                               lists:zip(ArgsTypes, Args));
                ({fun_decl, _, {id, _, FName}, FunT}) when FName == FunName ->
@@ -2827,6 +2827,12 @@ unify1(Env, [A|B], [C|D], [V|Variances], When) ->
 unify1(Env, [A|B], [C|D], Variance, When) ->
     unify0(Env, A, C, Variance, When) andalso unify0(Env, B, D, Variance, When);
 unify1(_Env, X, X, _Variance, _When) ->
+    true;
+unify1(_Env, _A, {id, _, "void"}, Variance, _When)
+  when Variance == covariant orelse Variance == bivariant ->
+    true;
+unify1(_Env, {id, _, "void"}, _B, Variance, _When)
+  when Variance == contravariant orelse Variance == bivariant ->
     true;
 unify1(_Env, {id, _, Name}, {id, _, Name}, _Variance, _When) ->
     true;
