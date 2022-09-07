@@ -837,6 +837,7 @@ infer(Contracts, Options) ->
         ets_new(type_vars, [set]),
         ets_new(warnings, [bag]),
         ets_new(type_vars_variance, [set]),
+        ets_new(functions_to_implement, [set]),
         %% Set the variance for builtin types
         ets_insert(type_vars_variance, {"list", [covariant]}),
         ets_insert(type_vars_variance, {"option", [covariant]}),
@@ -887,9 +888,10 @@ infer1(Env0, [{Contract, Ann, ConName, Impls, Code} | Rest], Acc, Options)
         contract -> ets_insert(defined_contracts, {qname(ConName)});
         contract_interface -> ok
     end,
+    populate_functions_to_implement(Env, ConName, Impls, Acc),
     {Env1, Code1} = infer_contract_top(push_scope(contract, ConName, Env), What, Code, Options),
+    report_unimplemented_functions(Env, ConName),
     Contract1 = {Contract, Ann, ConName, Impls, Code1},
-    check_implemented_interfaces(Env1, Contract1, Acc),
     Env2 = pop_scope(Env1),
     Env3 = bind_contract(Contract1, Env2),
     infer1(Env3, Rest, [Contract1 | Acc], Options);
@@ -909,54 +911,52 @@ infer1(Env, [{pragma, _, _} | Rest], Acc, Options) ->
     %% Pragmas are checked in check_modifiers
     infer1(Env, Rest, Acc, Options).
 
-check_implemented_interfaces(Env, {_Contract, _Ann, ConName, Impls, Code}, DefinedContracts) ->
+%% Report all functions that were not implemented by the contract ContractName.
+-spec report_unimplemented_functions(env(), ContractName) -> ok | no_return() when
+      ContractName :: aeso_syntax:con().
+report_unimplemented_functions(Env, ContractName) ->
     create_type_errors(),
-    AllInterfaces = [{name(IName), I} || I = {contract_interface, _, IName, _, _} <- DefinedContracts],
-    ImplsNames = lists:map(fun name/1, Impls),
-
-    %% All implemented intrefaces should already be defined
-    lists:foreach(fun(Impl) -> case proplists:get_value(name(Impl), AllInterfaces) of
-                                   undefined -> type_error({referencing_undefined_interface, Impl});
-                                   _         -> ok
-                               end
-                  end, Impls),
-
-    ImplementedInterfaces = [I || I <- [proplists:get_value(Name, AllInterfaces) || Name <- ImplsNames],
-                                    I /= undefined],
-    Funs = [ Fun || Fun <- Code,
-                    element(1, Fun) == letfun orelse element(1, Fun) == fun_decl ],
-    check_implemented_interfaces1(Env, ImplementedInterfaces, ConName, Funs, AllInterfaces),
+    [ type_error({unimplemented_interface_function, ContractName, name(I), FunName})
+      || {FunName, I, _} <- ets_tab2list(functions_to_implement) ],
     destroy_and_report_type_errors(Env).
 
-%% Recursively check that all directly and indirectly referenced interfaces are implemented
-check_implemented_interfaces1(_, [], _, _, _) ->
-    ok;
-check_implemented_interfaces1(Env, [{contract_interface, _, IName, _, Decls} | Interfaces],
-                              ConId, Impls, AllInterfaces) ->
-    Unmatched = match_impls(Env, Decls, ConId, name(IName), Impls),
-    check_implemented_interfaces1(Env, Interfaces, ConId, Unmatched, AllInterfaces).
+%% Return a list of all function declarations to be implemented, given the list
+%% of interfaces to be implemented Impls and all the previously defined
+%% contracts DefinedContracts>
+-spec functions_to_implement(Impls, DefinedContracts) -> [{InterfaceCon, FunDecl}] when
+      Impls :: [aeso_syntax:con()],
+      DefinedContracts :: [aeso_syntax:decl()],
+      InterfaceCon :: aeso_syntax:con(),
+      FunDecl :: aeso_syntax:fundecl().
+functions_to_implement(Impls, DefinedContracts) ->
+    ImplsNames = [ name(I) || I <- Impls ],
+    Interfaces = [ I || I = {contract_interface, _, Con, _, _} <- DefinedContracts,
+                        lists:member(name(Con), ImplsNames) ],
 
-%% Match the functions of the contract with the interfaces functions, and return unmatched functions
-match_impls(_, [], _, _, Impls) ->
-    Impls;
-match_impls(Env, [{fun_decl, _, {id, _, FunName}, FunType = {fun_t, _, _, ArgsTypes, RetDecl}} | Decls], ConId, IName, Impls) ->
-    Match = fun({letfun, _, {id, _, FName}, Args, RetFun, _}) when FName == FunName ->
-                    length(ArgsTypes) == length(Args) andalso
-                    unify(Env#env{unify_throws = false}, RetFun, RetDecl, unknown) andalso
-                    lists:all(fun({T1, {typed, _, _, T2}}) -> unify(Env#env{unify_throws = false}, T1, T2, unknown) end,
-                              lists:zip(ArgsTypes, Args));
-               ({fun_decl, _, {id, _, FName}, FunT}) when FName == FunName ->
-                    unify(Env#env{unify_throws = false}, FunT, FunType, unknown);
-               (_) -> false
-            end,
-    UnmatchedImpls = case lists:search(Match, Impls) of
-                         {value, V} ->
-                             lists:delete(V, Impls);
-                         false ->
-                             type_error({unimplemented_interface_function, ConId, IName, FunName}),
-                             Impls
-                     end,
-    match_impls(Env, Decls, ConId, IName, UnmatchedImpls).
+    %% All implemented intrefaces should already be defined
+    InterfacesNames = [name(element(3, I)) || I <- Interfaces],
+    [ begin
+        Found = lists:member(name(Impl), InterfacesNames),
+        Found orelse type_error({referencing_undefined_interface, Impl})
+      end || Impl <- Impls
+    ],
+
+    lists:flatten([ [ {Con, Decl} || Decl <- Decls] || {contract_interface, _, Con, _, Decls} <- Interfaces ]).
+
+%% Fill the ets table functions_to_implement with functions from the implemented
+%% interfaces Impls.
+-spec populate_functions_to_implement(env(), ContractName, Impls, DefinedContracts) -> ok | no_return() when
+      ContractName :: aeso_syntax:con(),
+      Impls :: [aeso_syntax:con()],
+      DefinedContracts :: [aeso_syntax:decl()].
+populate_functions_to_implement(Env, ContractName, Impls, DefinedContracts) ->
+    create_type_errors(),
+    [ begin
+        Inserted = ets_insert_new(functions_to_implement, {name(Id), I, Decl}),
+        [{_, I2, _}] = ets_lookup(functions_to_implement, name(Id)),
+        Inserted orelse type_error({interface_implementation_conflict, ContractName, I, I2, Id})
+      end || {I, Decl = {fun_decl, _, Id, _}} <- functions_to_implement(Impls, DefinedContracts) ],
+    destroy_and_report_type_errors(Env).
 
 %% Asserts that the main contract is somehow defined.
 identify_main_contract(Contracts, Options) ->
@@ -1466,15 +1466,34 @@ check_reserved_entrypoints(Funs) ->
 -spec check_fundecl(env(), aeso_syntax:decl()) -> {{name(), typesig()}, aeso_syntax:decl()}.
 check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type = {fun_t, _, _, _, _}}) ->
     Type1 = {fun_t, _, Named, Args, Ret} = check_type(Env, Type),
-    {{Name, {type_sig, Ann, none, Named, Args, Ret}}, {fun_decl, Ann, Id, Type1}};
+    TypeSig = {type_sig, Ann, none, Named, Args, Ret},
+    delete_if_implementation(Env, Name, TypeSig),
+    {{Name, TypeSig}, {fun_decl, Ann, Id, Type1}};
 check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type}) ->
     type_error({fundecl_must_have_funtype, Ann, Id, Type}),
     {{Name, {type_sig, Ann, none, [], [], Type}}, check_type(Env, Type)}.
 
+%% Delete the function FunName with the signature FunSig from of functions
+%% to be implemented if it is included there, or return ok otherwise.
+-spec delete_if_implementation(env(), FunName, FunSig) -> true when
+      FunName :: string(),
+      FunSig :: typesig().
+delete_if_implementation(Env, Name, Sig) ->
+    case ets_lookup(functions_to_implement, Name) of
+        [{Name, _, {fun_decl, _, _, DeclType}}] ->
+            case unify(Env#env{unify_throws = false}, typesig_to_fun_t(Sig), DeclType, unknown) of
+                true  -> ets_delete(functions_to_implement, Name);
+                false -> true
+            end;
+        [] -> true;
+        _ -> error("Ets set has multiple keys")
+    end.
+
 infer_nonrec(Env, LetFun) ->
     create_constraints(),
-    NewLetFun = infer_letfun(Env, LetFun),
+    NewLetFun = {{FunName, FunSig}, _} = infer_letfun(Env, LetFun),
     check_special_funs(Env, NewLetFun),
+    delete_if_implementation(Env, FunName, FunSig),
     solve_then_destroy_and_report_unsolved_constraints(Env),
     Result = {TypeSig, _} = instantiate(NewLetFun),
     print_typesig(TypeSig),
@@ -1504,6 +1523,7 @@ infer_letrec(Env, Defs) ->
     Inferred =
         [ begin
             Res    = {{Name, TypeSig}, _} = infer_letfun(ExtendEnv, LF),
+            delete_if_implementation(Env, Name, TypeSig),
             Got    = proplists:get_value(Name, Funs),
             Expect = typesig_to_fun_t(TypeSig),
             unify(Env, Got, Expect, {check_typesig, Name, Got, Expect}),
@@ -2204,7 +2224,7 @@ next_count() ->
 ets_tables() ->
     [options, type_vars, constraints, freshen_tvars, type_errors,
      defined_contracts, warnings, function_calls, all_functions,
-     type_vars_variance].
+     type_vars_variance, functions_to_implement].
 
 clean_up_ets() ->
     [ catch ets_delete(Tab) || Tab <- ets_tables() ],
@@ -2240,9 +2260,17 @@ ets_delete(Name) ->
     put(aeso_ast_infer_types, maps:remove(Name, Tabs)),
     ets:delete(TabId).
 
+ets_delete(Name, Key) ->
+    TabId = ets_tabid(Name),
+    ets:delete(TabId, Key).
+
 ets_insert(Name, Object) ->
     TabId = ets_tabid(Name),
     ets:insert(TabId, Object).
+
+ets_insert_new(Name, Object) ->
+    TabId = ets_tabid(Name),
+    ets:insert_new(TabId, Object).
 
 ets_lookup(Name, Key) ->
     TabId = ets_tabid(Name),
@@ -3649,6 +3677,11 @@ mk_error({invalid_oracle_type, Why, What, Ann, Type}) ->
     Msg = io_lib:format("Invalid oracle type\n~s`", [pp_type("  `", Type)]),
     Cxt = io_lib:format("The ~s type must not be ~s", [What, WhyS]),
     mk_t_err(pos(Ann), Msg, Cxt);
+mk_error({interface_implementation_conflict, Contract, I1, I2, Fun}) ->
+    Msg = io_lib:format("Both interfaces `~s` and `~s` implemented by "
+                        "the contract `~s` have a function called `~s`",
+                        [name(I1), name(I2), name(Contract), name(Fun)]),
+    mk_t_err(pos(Contract), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),
     mk_t_err(pos(0, 0), Msg).
