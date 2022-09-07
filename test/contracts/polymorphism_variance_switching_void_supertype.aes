@@ -1,0 +1,5 @@
+payable contract interface SalesOffer =
+    entrypoint init : (address, address, int, int) => void
+
+payable contract Test : SalesOffer =
+    entrypoint init(_ : address, _ : address, _ : int, _ : int) = ()
