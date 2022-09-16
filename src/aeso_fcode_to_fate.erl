@@ -70,6 +70,8 @@ code_error(Err) ->
 
 %% -- Main -------------------------------------------------------------------
 
+-define(funids, '$funids').
+
 %% @doc Main entry point.
 compile(FCode, Options) ->
     compile(#{}, FCode, Options).
@@ -80,10 +82,15 @@ compile(ChildContracts, FCode, Options) ->
     SFuns1 = optimize_scode(SFuns, Options),
     FateCode = to_basic_blocks(SFuns1),
     ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
+    setelement(2, FateCode, get(?funids)),
+    erase(?funids),
     FateCode.
 
 make_function_id(X) ->
-    aeb_fate_code:symbol_identifier(make_function_name(X)).
+    FunIds = case get(?funids) of undefined -> #{}; FI -> FI end,
+    Id = aeb_fate_code:symbol_identifier(make_function_name(X)),
+    put(?funids, maps:put(X, Id, FunIds)),
+    Id.
 
 make_function_name(event)              -> <<"Chain.event">>;
 make_function_name({entrypoint, Name}) -> Name;
