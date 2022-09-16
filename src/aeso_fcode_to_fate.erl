@@ -70,8 +70,6 @@ code_error(Err) ->
 
 %% -- Main -------------------------------------------------------------------
 
--define(funids, '$funids').
-
 %% @doc Main entry point.
 compile(FCode, Options) ->
     compile(#{}, FCode, Options).
@@ -81,16 +79,22 @@ compile(ChildContracts, FCode, Options) ->
     SFuns  = functions_to_scode(ChildContracts, ContractName, Functions, Options),
     SFuns1 = optimize_scode(SFuns, Options),
     FateCode = to_basic_blocks(SFuns1),
+    Symbols = element(3, FateCode),
+    ChildSymbols = maps:from_list(
+                     [ {make_function_id(FName), make_function_name(FName)}
+                       || {_, #{functions := ChildFuns}} <- maps:to_list(ChildContracts),
+                          FName <- maps:keys(ChildFuns)
+                     ]),
+    io:format("C ~p\n\n", [maps:merge(Symbols, ChildSymbols)]),
+    io:format("B ~p\n\n", [Symbols]),
+    io:format("A ~p\n\n", [ChildSymbols]),
+    io:format("KURWA ~p\n\n", [FateCode]),
+    FateCode1 = setelement(3, FateCode, maps:merge(Symbols, ChildSymbols)),
     ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
-    setelement(2, FateCode, get(?funids)),
-    erase(?funids),
-    FateCode.
+    FateCode1.
 
 make_function_id(X) ->
-    FunIds = case get(?funids) of undefined -> #{}; FI -> FI end,
-    Id = aeb_fate_code:symbol_identifier(make_function_name(X)),
-    put(?funids, maps:put(X, Id, FunIds)),
-    Id.
+    aeb_fate_code:symbol_identifier(make_function_name(X)).
 
 make_function_name(event)              -> <<"Chain.event">>;
 make_function_name({entrypoint, Name}) -> Name;
