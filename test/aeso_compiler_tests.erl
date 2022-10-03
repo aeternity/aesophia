@@ -849,8 +849,10 @@ failing_contracts() ->
                      "Trying to implement or extend an undefined interface `Z`">>
                   ])
     , ?TYPE_ERROR(polymorphism_contract_interface_same_name_different_type,
-                  [<<?Pos(4,20)
-                     "Unimplemented function `f` from the interface `I1` in the contract `I2`">>])
+                  [<<?Pos(9,5)
+                     "Duplicate definitions of `f` at\n"
+                     "  - line 8, column 5\n"
+                     "  - line 9, column 5">>])
     , ?TYPE_ERROR(polymorphism_contract_missing_implementation,
                   [<<?Pos(4,20)
                      "Unimplemented function `f` from the interface `I1` in the contract `I2`">>

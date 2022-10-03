@@ -1467,33 +1467,31 @@ check_reserved_entrypoints(Funs) ->
 check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type = {fun_t, _, _, _, _}}) ->
     Type1 = {fun_t, _, Named, Args, Ret} = check_type(Env, Type),
     TypeSig = {type_sig, Ann, none, Named, Args, Ret},
-    register_implementation(Env, Name, TypeSig),
+    register_implementation(Env, Name),
     {{Name, TypeSig}, {fun_decl, Ann, Id, Type1}};
 check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type}) ->
     type_error({fundecl_must_have_funtype, Ann, Id, Type}),
     {{Name, {type_sig, Ann, none, [], [], Type}}, check_type(Env, Type)}.
 
-%% Register the function FunName with the signature FunSig by deleting it from
-%% the functions to be implemented if it is included there, or return ok otherwise.
--spec register_implementation(env(), FunName, FunSig) -> true when
-      FunName :: string(),
-      FunSig :: typesig().
-register_implementation(Env, Name, Sig) ->
+%% Register the function FunName as implemented by deleting it from the functions
+%% to be implemented table if it is included there, or return true otherwise.
+-spec register_implementation(env(), FunName) -> true | no_return() when
+      FunName :: string().
+register_implementation(Env, Name) ->
     case ets_lookup(functions_to_implement, Name) of
         [{Name, _, {fun_decl, _, _, DeclType}}] ->
-            case unify(Env#env{unify_throws = false}, typesig_to_fun_t(Sig), DeclType, unknown) of
-                true  -> ets_delete(functions_to_implement, Name);
-                false -> true
-            end;
-        [] -> true;
-        _ -> error("Ets set has multiple keys")
+            ets_delete(functions_to_implement, Name);
+        [] ->
+            true;
+        _ ->
+            error("Ets set has multiple keys")
     end.
 
 infer_nonrec(Env, LetFun) ->
     create_constraints(),
     NewLetFun = {{FunName, FunSig}, _} = infer_letfun(Env, LetFun),
     check_special_funs(Env, NewLetFun),
-    register_implementation(Env, FunName, FunSig),
+    register_implementation(Env, FunName),
     solve_then_destroy_and_report_unsolved_constraints(Env),
     Result = {TypeSig, _} = instantiate(NewLetFun),
     print_typesig(TypeSig),
@@ -1523,7 +1521,7 @@ infer_letrec(Env, Defs) ->
     Inferred =
         [ begin
             Res    = {{Name, TypeSig}, _} = infer_letfun(ExtendEnv, LF),
-            register_implementation(Env, Name, TypeSig),
+            register_implementation(Env, Name),
             Got    = proplists:get_value(Name, Funs),
             Expect = typesig_to_fun_t(TypeSig),
             unify(Env, Got, Expect, {check_typesig, Name, Got, Expect}),
