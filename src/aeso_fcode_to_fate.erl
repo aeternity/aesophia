@@ -1089,13 +1089,10 @@ simpl_s(I, _) -> I.
 simpl_top(I, Code, Options) ->
     simpl_top(?SIMPL_FUEL, I, Code, Options).
 
-%% Change r_rule to optimize_rule (e.g. change r_push_consume to optimize_push_consume)
--define(RULE_OPTIMIZATION(Rule), list_to_atom("optimize" ++ lists:nthtail(1, atom_to_list(Rule)))).
-
 simpl_top(0, I, Code, _Options) ->
     code_error({optimizer_out_of_fuel, I, Code});
 simpl_top(Fuel, I, Code, Options) ->
-    Rules = [R || R = {Rule, _} <- rules(), proplists:get_value(?RULE_OPTIMIZATION(Rule), Options, true)],
+    Rules = [R || R = {Rule, _} <- rules(), proplists:get_value(Rule, Options, true)],
     apply_rules(Fuel, Rules, I, Code, Options).
 
 apply_rules(Fuel, Rules, I, Code, Options) ->
@@ -1123,29 +1120,29 @@ apply_rules_once([{RName, Rule} | Rules], I, Code) ->
 -define(RULE(Name), {Name, fun Name/2}).
 
 merge_rules() ->
-    [?RULE(r_push_consume),
-     ?RULE(r_one_shot_var),
-     ?RULE(r_write_to_dead_var),
-     ?RULE(r_inline_switch_target)
+    [?RULE(optimize_push_consume),
+     ?RULE(optimize_one_shot_var),
+     ?RULE(optimize_write_to_dead_var),
+     ?RULE(optimize_inline_switch_target)
     ].
 
 rules() ->
     merge_rules() ++
-    [?RULE(r_swap_push),
-     ?RULE(r_swap_pop),
-     ?RULE(r_swap_write),
-     ?RULE(r_constant_propagation),
-     ?RULE(r_prune_impossible_branches),
-     ?RULE(r_single_successful_branch),
-     ?RULE(r_inline_store),
-     ?RULE(r_float_switch_body)
+    [?RULE(optimize_swap_push),
+     ?RULE(optimize_swap_pop),
+     ?RULE(optimize_swap_write),
+     ?RULE(optimize_constant_propagation),
+     ?RULE(optimize_prune_impossible_branches),
+     ?RULE(optimize_single_successful_branch),
+     ?RULE(optimize_inline_store),
+     ?RULE(optimize_float_switch_body)
     ].
 
 %% Removing pushes that are immediately consumed.
-r_push_consume({i, Ann1, {'STORE', ?a, A}}, Code) ->
+optimize_push_consume({i, Ann1, {'STORE', ?a, A}}, Code) ->
     inline_push(Ann1, A, 0, Code, []);
 %% Writing directly to memory instead of going through the accumulator.
-r_push_consume({i, Ann1, I}, [{i, Ann2, {'STORE', R, ?a}} | Code]) ->
+optimize_push_consume({i, Ann1, I}, [{i, Ann2, {'STORE', R, ?a}} | Code]) ->
     IsPush =
         case op_view(I) of
             {_, ?a, _} -> true;
@@ -1157,7 +1154,7 @@ r_push_consume({i, Ann1, I}, [{i, Ann2, {'STORE', R, ?a}} | Code]) ->
         end,
     if IsPush -> {[{i, merge_ann(Ann1, Ann2), setelement(2, I, R)}], Code};
        true   -> false end;
-r_push_consume(_, _) -> false.
+optimize_push_consume(_, _) -> false.
 
 inline_push(Ann, Arg, Stack, [{i, _, switch_body} = AI | Code], Acc) ->
     {AI1, {i, Ann1, _}} = swap_instrs({i, Ann, {'STORE', ?a, Arg}}, AI),
@@ -1190,7 +1187,7 @@ split_stack_arg(N, [A | As], Acc) ->
     split_stack_arg(N1, As, [A | Acc]).
 
 %% Move PUSHes past non-stack instructions.
-r_swap_push(Push = {i, _, PushI}, [I | Code]) ->
+optimize_swap_push(Push = {i, _, PushI}, [I | Code]) ->
     case op_view(PushI) of
         {_, ?a, _} ->
             case independent(Push, I) of
@@ -1201,10 +1198,10 @@ r_swap_push(Push = {i, _, PushI}, [I | Code]) ->
             end;
         _ -> false
     end;
-r_swap_push(_, _) -> false.
+optimize_swap_push(_, _) -> false.
 
 %% Move non-stack instruction past POPs.
-r_swap_pop(IA = {i, _, I}, [JA = {i, _, J} | Code]) ->
+optimize_swap_pop(IA = {i, _, I}, [JA = {i, _, J} | Code]) ->
     case independent(IA, JA) of
         true ->
             case {op_view(I), op_view(J)} of
@@ -1212,7 +1209,7 @@ r_swap_pop(IA = {i, _, I}, [JA = {i, _, J} | Code]) ->
                 {_, false} -> false;
                 {{_, IR, IAs}, {_, RJ, JAs}} ->
                     NonStackI = not lists:member(?a, [IR | IAs]),
-                    %% RJ /= ?a to not conflict with r_swap_push
+                    %% RJ /= ?a to not conflict with optimize_swap_push
                     PopJ      = RJ /= ?a andalso lists:member(?a, JAs),
                     case NonStackI andalso PopJ of
                         false -> false;
@@ -1223,22 +1220,22 @@ r_swap_pop(IA = {i, _, I}, [JA = {i, _, J} | Code]) ->
             end;
         false -> false
     end;
-r_swap_pop(_, _) -> false.
+optimize_swap_pop(_, _) -> false.
 
 %% Match up writes to variables with instructions further down.
-r_swap_write(I = {i, _, _}, [J | Code]) ->
+optimize_swap_write(I = {i, _, _}, [J | Code]) ->
     case {var_writes(I), independent(I, J)} of
         {[_], true} ->
             {J1, I1} = swap_instrs(I, J),
-            r_swap_write([J1], I1, Code);
+            optimize_swap_write([J1], I1, Code);
         _ -> false
     end;
-r_swap_write(_, _) -> false.
+optimize_swap_write(_, _) -> false.
 
-r_swap_write(Pre, I, [{i, _, switch_body} = J | Code]) ->
+optimize_swap_write(Pre, I, [{i, _, switch_body} = J | Code]) ->
     {J1, I1} = swap_instrs(I, J),
-    r_swap_write([J1 | Pre], I1, Code);
-r_swap_write(Pre, I, Code0 = [J | Code]) ->
+    optimize_swap_write([J1 | Pre], I1, Code);
+optimize_swap_write(Pre, I, Code0 = [J | Code]) ->
     case apply_rules_once(merge_rules(), I, Code0) of
         {_Rule, New, Rest} ->
             {lists:reverse(Pre) ++ New, Rest};
@@ -1247,27 +1244,27 @@ r_swap_write(Pre, I, Code0 = [J | Code]) ->
                 false -> false;
                 true  ->
                     {J1, I1} = swap_instrs(I, J),
-                    r_swap_write([J1 | Pre], I1, Code)
+                    optimize_swap_write([J1 | Pre], I1, Code)
             end
     end;
-r_swap_write(_, _, _) -> false.
+optimize_swap_write(_, _, _) -> false.
 
 %% Precompute instructions with known values
-r_constant_propagation(Cons = {i, Ann1, {'CONS', R, X, Xs}}, [{i, Ann, {'IS_NIL', S, R}} | Code]) ->
+optimize_constant_propagation(Cons = {i, Ann1, {'CONS', R, X, Xs}}, [{i, Ann, {'IS_NIL', S, R}} | Code]) ->
     Store = {i, Ann, {'STORE', S, ?i(false)}},
     Cons1 = case R of
                 ?a -> {i, Ann1, {'CONS', ?void, X, Xs}};
                 _  -> Cons
             end,
     {[Cons1, Store], Code};
-r_constant_propagation(Nil = {i, Ann1, {'NIL', R}}, [{i, Ann, {'IS_NIL', S, R}} | Code]) ->
+optimize_constant_propagation(Nil = {i, Ann1, {'NIL', R}}, [{i, Ann, {'IS_NIL', S, R}} | Code]) ->
     Store = {i, Ann, {'STORE', S, ?i(true)}},
     Nil1 = case R of
                ?a -> {i, Ann1, {'NIL', ?void}};
                _  -> Nil
            end,
     {[Nil1, Store], Code};
-r_constant_propagation({i, Ann, I}, Code) ->
+optimize_constant_propagation({i, Ann, I}, Code) ->
     case op_view(I) of
         false -> false;
         {Op, R, As} ->
@@ -1281,7 +1278,7 @@ r_constant_propagation({i, Ann, I}, Code) ->
                     end
             end
     end;
-r_constant_propagation(_, _) -> false.
+optimize_constant_propagation(_, _) -> false.
 
 eval_op('ADD', [X, Y]) when is_integer(X), is_integer(Y) -> X + Y;
 eval_op('SUB', [X, Y]) when is_integer(X), is_integer(Y) -> X - Y;
@@ -1300,12 +1297,12 @@ eval_op('NOT', [false]) -> true;
 eval_op(_, _)           -> no_eval.   %% TODO: bits?
 
 %% Prune impossible branches from switches
-r_prune_impossible_branches({switch, ?i(V), Type, Alts, missing}, Code) ->
+optimize_prune_impossible_branches({switch, ?i(V), Type, Alts, missing}, Code) ->
     case pick_branch(Type, V, Alts) of
         false -> false;
         Alt   -> {Alt, Code}
     end;
-r_prune_impossible_branches({switch, ?i(V), boolean, [False, True] = Alts, Def}, Code) when V == true; V == false ->
+optimize_prune_impossible_branches({switch, ?i(V), boolean, [False, True] = Alts, Def}, Code) when V == true; V == false ->
     Alts1 = [if V -> missing; true -> False   end,
              if V -> True;    true -> missing end],
     case Alts == Alts1 of
@@ -1316,7 +1313,7 @@ r_prune_impossible_branches({switch, ?i(V), boolean, [False, True] = Alts, Def},
                 _                  -> {[{switch, ?i(V), boolean, Alts1, Def}], Code}
             end
     end;
-r_prune_impossible_branches(Variant = {i, _, {'VARIANT', R, ?i(_), ?i(Tag), ?i(_)}},
+optimize_prune_impossible_branches(Variant = {i, _, {'VARIANT', R, ?i(_), ?i(Tag), ?i(_)}},
                             [{switch, R, Type = {variant, _}, Alts, missing} | Code]) when is_integer(Tag) ->
     case {R, lists:nth(Tag + 1, Alts)} of
         {_, missing} ->
@@ -1332,7 +1329,7 @@ r_prune_impossible_branches(Variant = {i, _, {'VARIANT', R, ?i(_), ?i(Tag), ?i(_
                 false -> {Alt, Code}
             end
     end;
-r_prune_impossible_branches(_, _) -> false.
+optimize_prune_impossible_branches(_, _) -> false.
 
 pick_branch(boolean, V, [False, True]) when V == true; V == false ->
     Alt = if V -> True; true -> False end,
@@ -1345,7 +1342,7 @@ pick_branch(_Type, _V, _Alts) ->
 
 %% If there's a single branch that doesn't abort we can push the code for that
 %% out of the switch.
-r_single_successful_branch({switch, R, Type, Alts, Def}, Code) ->
+optimize_single_successful_branch({switch, R, Type, Alts, Def}, Code) ->
     case push_code_out_of_switch([Def | Alts]) of
         {_, none} -> false;
         {_, many} -> false;
@@ -1353,7 +1350,7 @@ r_single_successful_branch({switch, R, Type, Alts, Def}, Code) ->
         {[Def1 | Alts1], PushedOut} ->
             {[{switch, R, Type, Alts1, Def1} | PushedOut], Code}
     end;
-r_single_successful_branch(_, _) -> false.
+optimize_single_successful_branch(_, _) -> false.
 
 push_code_out_of_switch([]) -> {[], none};
 push_code_out_of_switch([Alt | Alts]) ->
@@ -1389,7 +1386,7 @@ does_abort({switch, _, _, Alts, Def}) ->
 does_abort(_) -> false.
 
 %% STORE R A, SWITCH R --> SWITCH A
-r_inline_switch_target({i, Ann, {'STORE', R, A}}, [{switch, R, Type, Alts, Def} | Code]) ->
+optimize_inline_switch_target({i, Ann, {'STORE', R, A}}, [{switch, R, Type, Alts, Def} | Code]) ->
     Ann1   =
         case is_reg(A) of
             true  -> Ann#{ live_out := ordsets:add_element(A, maps:get(live_out, Ann)) };
@@ -1408,18 +1405,18 @@ r_inline_switch_target({i, Ann, {'STORE', R, A}}, [{switch, R, Type, Alts, Def} 
             end;
         _        -> false %% impossible
     end;
-r_inline_switch_target(_, _) -> false.
+optimize_inline_switch_target(_, _) -> false.
 
 %% Float switch-body to closest switch
-r_float_switch_body(I = {i, _, _}, [J = {i, _, switch_body} | Code]) ->
+optimize_float_switch_body(I = {i, _, _}, [J = {i, _, switch_body} | Code]) ->
     {J1, I1} = swap_instrs(I, J),
     {[], [J1, I1 | Code]};
-r_float_switch_body(_, _) -> false.
+optimize_float_switch_body(_, _) -> false.
 
 %% Inline stores
-r_inline_store({i, _, {'STORE', R, R}}, Code) ->
+optimize_inline_store({i, _, {'STORE', R, R}}, Code) ->
     {[], Code};
-r_inline_store(I = {i, _, {'STORE', R = {var, _}, A}}, Code) ->
+optimize_inline_store(I = {i, _, {'STORE', R = {var, _}, A}}, Code) ->
     %% Not when A is var unless updating the annotations properly.
     Inline = case A of
                  {arg, _}   -> true;
@@ -1427,13 +1424,13 @@ r_inline_store(I = {i, _, {'STORE', R = {var, _}, A}}, Code) ->
                  {store, _} -> true;
                  _          -> false
              end,
-    if Inline -> r_inline_store([I], false, R, A, Code);
+    if Inline -> optimize_inline_store([I], false, R, A, Code);
        true   -> false end;
-r_inline_store(_, _) -> false.
+optimize_inline_store(_, _) -> false.
 
-r_inline_store(Acc, Progress, R, A, [I = {i, _, switch_body} | Code]) ->
-    r_inline_store([I | Acc], Progress, R, A, Code);
-r_inline_store(Acc, Progress, R, A, [{i, Ann, I} | Code]) ->
+optimize_inline_store(Acc, Progress, R, A, [I = {i, _, switch_body} | Code]) ->
+    optimize_inline_store([I | Acc], Progress, R, A, Code);
+optimize_inline_store(Acc, Progress, R, A, [{i, Ann, I} | Code]) ->
     #{ write := W } = attributes(I),
     Inl = fun(X) when X == R -> A; (X) -> X end,
     case live_in(R, Ann) of
@@ -1453,14 +1450,14 @@ r_inline_store(Acc, Progress, R, A, [{i, Ann, I} | Code]) ->
             case lists:member(W, [R, A]) of
                 true when Progress1 -> {lists:reverse(Acc1), Code};
                 true                -> false;
-                false               -> r_inline_store(Acc1, Progress1, R, A, Code)
+                false               -> optimize_inline_store(Acc1, Progress1, R, A, Code)
             end
     end;
-r_inline_store(Acc, true, _, _, Code) -> {lists:reverse(Acc), Code};
-r_inline_store(_, false, _, _, _) -> false.
+optimize_inline_store(Acc, true, _, _, Code) -> {lists:reverse(Acc), Code};
+optimize_inline_store(_, false, _, _, _) -> false.
 
 %% Shortcut write followed by final read
-r_one_shot_var({i, Ann1, I}, [{i, Ann2, J} | Code]) ->
+optimize_one_shot_var({i, Ann1, I}, [{i, Ann2, J} | Code]) ->
     case op_view(I) of
         {Op, R = {var, _}, As} ->
             Copy = case J of
@@ -1474,11 +1471,11 @@ r_one_shot_var({i, Ann1, I}, [{i, Ann2, J} | Code]) ->
             end;
         _ -> false
     end;
-r_one_shot_var(_, _) -> false.
+optimize_one_shot_var(_, _) -> false.
 
 %% Remove writes to dead variables
-r_write_to_dead_var({i, _, {'STORE', ?void, ?a}}, _) -> false; %% Avoid looping
-r_write_to_dead_var({i, Ann, I}, Code) ->
+optimize_write_to_dead_var({i, _, {'STORE', ?void, ?a}}, _) -> false; %% Avoid looping
+optimize_write_to_dead_var({i, Ann, I}, Code) ->
     #{ pure := Pure } = attributes(I),
     case op_view(I) of
         {_Op, R, As} when R /= ?a, Pure ->
@@ -1491,7 +1488,7 @@ r_write_to_dead_var({i, Ann, I}, Code) ->
             end;
         _ -> false
     end;
-r_write_to_dead_var(_, _) -> false.
+optimize_write_to_dead_var(_, _) -> false.
 
 op_view({'ABORT', R}) -> {'ABORT', none, [R]};
 op_view({'EXIT', R}) -> {'EXIT', none, [R]};
