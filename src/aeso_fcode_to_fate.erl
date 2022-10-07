@@ -79,12 +79,7 @@ compile(ChildContracts, FCode, Options) ->
     SFuns  = functions_to_scode(ChildContracts, ContractName, Functions, Options),
     SFuns1 = optimize_scode(SFuns, Options),
     FateCode = to_basic_blocks(SFuns1),
-    ChildSymbols = maps:from_list(
-                     [ {make_function_id(FName), make_function_name(FName)}
-                       || {_, #{functions := ChildFuns}} <- maps:to_list(ChildContracts),
-                          FName <- maps:keys(ChildFuns)
-                     ]),
-    FateCode1 = aeb_fate_code:update_symbols(FateCode, ChildSymbols),
+    FateCode1 = add_child_symbols(ChildContracts, FateCode),
     ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
     FateCode1.
 
@@ -94,6 +89,11 @@ make_function_id(X) ->
 make_function_name(event)              -> <<"Chain.event">>;
 make_function_name({entrypoint, Name}) -> Name;
 make_function_name({local_fun, Xs})    -> list_to_binary("." ++ string:join(Xs, ".")).
+
+add_child_symbols(ChildContracts, FateCode) ->
+    Funs = lists:flatten([ maps:keys(ChildFuns) || {_, #{functions := ChildFuns}} <- maps:to_list(ChildContracts) ]),
+    Symbols = maps:from_list([ {make_function_id(FName), make_function_name(FName)} || FName <- Funs ]),
+    aeb_fate_code:update_symbols(FateCode, Symbols).
 
 functions_to_scode(ChildContracts, ContractName, Functions, Options) ->
     FunNames = maps:keys(Functions),
