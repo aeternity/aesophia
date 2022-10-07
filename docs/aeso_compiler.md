@@ -51,6 +51,8 @@ The **pp_** options all print to standard output the following:
 
 `pp_assembler` - print the generated assembler code
 
+The option `include_child_contract_symbols` includes the symbols of child contracts functions in the generated fate code. It is turned off by default to avoid making contracts bigger on chain.
+
 #### check_call(ContractString, Options) -> CheckRet
 
 Types
