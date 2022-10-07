@@ -203,6 +203,8 @@ compilable_contracts() ->
      "polymorphism_contract_interface_same_decl_multi_interface",
      "polymorphism_contract_interface_same_name_same_type",
      "polymorphism_variance_switching_chain_create",
+     "polymorphism_variance_switching_void_supertype",
+     "polymorphism_variance_switching_unify_with_interface_decls",
      "missing_init_fun_state_unit",
      "complex_compare_leq",
      "complex_compare",
@@ -847,25 +849,25 @@ failing_contracts() ->
                      "Trying to implement or extend an undefined interface `Z`">>
                   ])
     , ?TYPE_ERROR(polymorphism_contract_interface_same_name_different_type,
-                  [<<?Pos(4,20)
-                     "Unimplemented function `f` from the interface `I1` in the contract `I2`">>])
+                  [<<?Pos(9,5)
+                     "Duplicate definitions of `f` at\n"
+                     "  - line 8, column 5\n"
+                     "  - line 9, column 5">>])
     , ?TYPE_ERROR(polymorphism_contract_missing_implementation,
                   [<<?Pos(4,20)
                      "Unimplemented function `f` from the interface `I1` in the contract `I2`">>
                   ])
     , ?TYPE_ERROR(polymorphism_contract_same_decl_multi_interface,
                   [<<?Pos(7,10)
-                     "Unimplemented function `f` from the interface `J` in the contract `C`">>
+                     "Both interfaces `I` and `J` implemented by the contract `C` have a function called `f`">>
                   ])
     , ?TYPE_ERROR(polymorphism_contract_undefined_interface,
                   [<<?Pos(1,14)
                      "Trying to implement or extend an undefined interface `I`">>
                   ])
     , ?TYPE_ERROR(polymorphism_contract_same_name_different_type_multi_interface,
-                  [<<?Pos(9,5)
-                     "Duplicate definitions of `f` at\n"
-                     "  - line 8, column 5\n"
-                     "  - line 9, column 5">>
+                  [<<?Pos(7,10)
+                     "Both interfaces `I` and `J` implemented by the contract `C` have a function called `f`">>
                   ])
     , ?TYPE_ERROR(polymorphism_contract_interface_undefined_interface,
                   [<<?Pos(1,24)

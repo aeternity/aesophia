@@ -53,6 +53,32 @@ The **pp_** options all print to standard output the following:
 
 The option `include_child_contract_symbols` includes the symbols of child contracts functions in the generated fate code. It is turned off by default to avoid making contracts bigger on chain.
 
+#### Options to control which compiler optimizations should run:
+
+By default all optimizations are turned on, to disable an optimization, it should be
+explicitly set to false and passed as a compiler option.
+
+List of optimizations:
+
+- optimize_inliner
+- optimize_inline_local_functions
+- optimize_bind_subexpressions
+- optimize_let_floating
+- optimize_simplifier
+- optimize_drop_unused_lets
+- optimize_push_consume
+- optimize_one_shot_var
+- optimize_write_to_dead_var
+- optimize_inline_switch_target
+- optimize_swap_push
+- optimize_swap_pop
+- optimize_swap_write
+- optimize_constant_propagation
+- optimize_prune_impossible_branches
+- optimize_single_successful_branch
+- optimize_inline_store
+- optimize_float_switch_bod
+
 #### check_call(ContractString, Options) -> CheckRet
 
 Types
