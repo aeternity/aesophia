@@ -19,6 +19,7 @@
 
 -type scode()  :: [sinstr()].
 -type sinstr() :: {switch, arg(), stype(), [maybe_scode()], maybe_scode()}  %% last arg is catch-all
+                | {loop, scode(), var(), scode(), reference(), reference()}
                 | switch_body
                 | loop
                 | tuple() | atom().    %% FATE instruction
@@ -45,7 +46,7 @@
 -define(s(N), {store, N}).
 -define(void, {var, 9999}).
 
--record(env, { contract, vars = [], locals = [], current_function, tailpos = true, child_contracts = #{}, options = []}).
+-record(env, { contract, vars = [], locals = [], break_ref = none, cont_ref = none, loop_it = none, current_function, tailpos = true, child_contracts = #{}, options = []}).
 
 %% -- Debugging --------------------------------------------------------------
 
@@ -168,6 +169,9 @@ init_env(ChildContracts, ContractName, FunNames, Name, Args, Options) ->
 
 next_var(#env{ vars = Vars }) ->
     1 + lists:max([-1 | [J || {_, {var, J}} <- Vars]]).
+
+bind_loop(ContRef, BreakRef, It, Env) ->
+    Env#env{break_ref = BreakRef, cont_ref = ContRef, loop_it = It}.
 
 bind_var(Name, Var, Env = #env{ vars = Vars }) ->
     Env#env{ vars = [{Name, Var} | Vars] }.
@@ -378,7 +382,21 @@ to_scode1(Env, {set_state, Reg, Val}) ->
 
 to_scode1(Env, {closure, Fun, FVs}) ->
     to_scode(Env, {tuple, [{lit, {string, make_function_id(Fun)}}, FVs]});
-
+to_scode1(Env, {loop, Init, It, Expr}) ->
+    ContRef = make_ref(),
+    BreakRef = make_ref(),
+    {ItV, Env1} = bind_local(It, Env),
+    InitS = [to_scode(notail(Env), Init),
+             {jump, ContRef}],
+    ExprS = [aeb_fate_ops:store({var, ItV}, {stack, 0}),
+             to_scode(bind_loop(ContRef, BreakRef, ItV, Env1), Expr),
+             {jump, BreakRef}],
+    [{loop, InitS, It, ExprS, ContRef, BreakRef}];
+to_scode1(Env = #env{cont_ref = ContRef}, {continue, Expr}) ->
+    [to_scode1(notail(Env), Expr),
+     {jump, ContRef}];
+to_scode1(Env, {break, Expr}) ->
+    to_scode1(Env, Expr);
 to_scode1(Env, {switch, Case}) ->
     split_to_scode(Env, Case).
 
@@ -724,6 +742,8 @@ flatten(Code)    -> lists:map(fun flatten_s/1, lists:flatten(Code)).
 
 flatten_s({switch, Arg, Type, Alts, Catch}) ->
     {switch, Arg, Type, [flatten(Alt) || Alt <- Alts], flatten(Catch)};
+flatten_s({loop, Init, It, Body, BRef, CRef}) ->
+    {loop, flatten(Init), It, flatten(Body), BRef, CRef};
 flatten_s(I) -> I.
 
 -define(MAX_SIMPL_ITERATIONS, 10).
@@ -820,6 +840,11 @@ ann_live1(LiveTop, {switch, Arg, Type, Alts, Def}, LiveOut) ->
     {Def1,  LiveDef}  = ann_live(LiveTop, Def, LiveOut),
     LiveIn = ordsets:union([Read, LiveDef | LiveAlts]),
     {{switch, Arg, Type, Alts1, Def1}, LiveIn};
+ann_live1(LiveTop, {loop, Init, It, Body, BRef, CRef}, LiveOut) ->
+    {Init1, LiveInit} = ann_live(LiveTop, Init, LiveOut),
+    {Body1, LiveBody} = ann_live(LiveTop, Body, LiveOut),
+    LiveIn = ordsets:union([It, LiveInit, LiveBody]), % TODO not sure about this
+    {{loop, Init1, It, Body1, BRef, CRef}, LiveIn};
 ann_live1(_LiveTop, I, LiveOut) ->
     #{ read := Reads0, write := W } = attributes(I),
     Reads   = lists:filter(fun is_reg/1, Reads0),
@@ -846,6 +871,7 @@ attributes(I) ->
     case I of
         loop                                  -> Impure(pc, []);
         switch_body                           -> Pure(none, []);
+        {jump, _}                             -> Impure(pc, []);
         'RETURN'                              -> Impure(pc, []);
         {'RETURNR', A}                        -> Impure(pc, A);
         {'CALL', A}                           -> Impure(?a, [A]);
@@ -1035,6 +1061,7 @@ var_writes(I) ->
 -spec independent(sinstr_a(), sinstr_a()) -> boolean().
 %% independent({switch, _, _, _, _}, _) -> false;       %% Commented due to Dialyzer whinging
 independent(_, {switch, _, _, _, _}) -> false;
+independent(_, {loop, _, _, _, _, _}) -> false;
 independent({i, _, I}, {i, _, J}) ->
     #{ write := WI, read := RI, pure := PureI } = attributes(I),
     #{ write := WJ, read := RJ, pure := PureJ } = attributes(J),
@@ -1073,6 +1100,8 @@ live_in(R, {i, Ann, _}) -> live_in(R, Ann);
 live_in(R, [I = {i, _, _} | _]) -> live_in(R, I);
 live_in(R, [{switch, A, _, Alts, Def} | _]) ->
     R == A orelse lists:any(fun(Code) -> live_in(R, Code) end, [Def | Alts]);
+live_in(R, [{loop, Init, Var, Expr, _, _}]) ->
+    live_in(Var, Init) orelse (R /= Var andalso live_in(R, Expr));
 live_in(_, missing) -> false;
 live_in(_, []) -> false.
 
@@ -1088,6 +1117,8 @@ simplify([I | Code], Options) ->
 
 simpl_s({switch, Arg, Type, Alts, Def}, Options) ->
     {switch, Arg, Type, [simplify(A, Options) || A <- Alts], simplify(Def, Options)};
+simpl_s({loop, Init, Var, Expr, ContRef, BreakRef}, Options) ->
+    {loop, simplify(Init, Options), Var, simplify(Expr, Options), ContRef, BreakRef};
 simpl_s(I, _) -> I.
 
 %% Safe-guard against loops in the rewriting. Shouldn't happen so throw an
@@ -1391,6 +1422,8 @@ does_abort({i, _, {'EXIT', _}}) -> true;
 does_abort(missing) -> true;
 does_abort({switch, _, _, Alts, Def}) ->
     lists:all(fun does_abort/1, [Def | Alts]);
+does_abort({loop, Init, _, Expr, _, _}) ->
+    does_abort(Init) orelse does_abort(Expr);
 does_abort(_) -> false.
 
 %% STORE R A, SWITCH R --> SWITCH A
@@ -1519,6 +1552,8 @@ from_op_view(Op, R, As) -> list_to_tuple([Op, R | As]).
                 (missing)    -> missing.
 unannotate({switch, Arg, Type, Alts, Def}) ->
     [{switch, Arg, Type, [unannotate(A) || A <- Alts], unannotate(Def)}];
+unannotate({loop, Init, It, Body, BRef, CRef}) ->
+    [{loop, unannotate(Init), It, unannotate(Body), BRef, CRef}];
 unannotate(missing) -> missing;
 unannotate(Code) when is_list(Code) ->
     lists:flatmap(fun unannotate/1, Code);
@@ -1535,6 +1570,8 @@ desugar({'STORE', ?a, A})       -> [aeb_fate_ops:push(desugar_arg(A))];
 desugar({'STORE', R, ?a})       -> [aeb_fate_ops:pop(desugar_arg(R))];
 desugar({switch, Arg, Type, Alts, Def}) ->
     [{switch, desugar_arg(Arg), Type, [desugar(A) || A <- Alts], desugar(Def)}];
+desugar({loop, Init, Var, Expr, ContRef, BreakRef}) ->
+    [{loop, desugar(Init), Var, desugar(Expr), ContRef, BreakRef}];
 desugar(missing) -> missing;
 desugar(Code) when is_list(Code) ->
     lists:flatmap(fun desugar/1, Code);
@@ -1581,7 +1618,7 @@ bb(_Name, Code) ->
 -type bb()     :: {bbref(), bcode()}.
 -type bcode()  :: [binstr()].
 -type binstr() :: {jump, bbref()}
-                | {jumpif, bbref()}
+                | {jumpif, term(), bbref()}
                 | tuple().   %% FATE instruction
 
 -spec blocks(scode()) -> [bb()].
@@ -1595,25 +1632,29 @@ blocks([], Acc) ->
 blocks([Blk | Blocks], Acc) ->
     block(Blk, [], Blocks, Acc).
 
+fresh_block(C, Ca) ->
+    R = make_ref(),
+    {R, [#blk{ref = R, code = C, catchall = Ca}]}.
+
 -spec block(#blk{}, bcode(), [#blk{}], [bb()]) -> [bb()].
 block(#blk{ref = Ref, code = []}, CodeAcc, Blocks, BlockAcc) ->
     blocks(Blocks, [{Ref, lists:reverse(CodeAcc)} | BlockAcc]);
+block(Blk = #blk{code = [{loop, Init, _, Expr, ContRef, BreakRef} | Code], catchall = Catchall}, Acc, Blocks, BlockAcc) ->
+    LoopBlock = #blk{ref = ContRef, code = Expr, catchall = none},
+    BreakBlock = #blk{ref = BreakRef, code = Code, catchall = Catchall},
+    block(Blk#blk{code = Init}, Acc, [LoopBlock, BreakBlock | Blocks], BlockAcc);
 block(Blk = #blk{code = [switch_body | Code]}, Acc, Blocks, BlockAcc) ->
     %% Reached the body of a switch. Clear catchall ref.
     block(Blk#blk{code = Code, catchall = none}, Acc, Blocks, BlockAcc);
 block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
                  catchall = Catchall}, Acc, Blocks, BlockAcc) ->
-    FreshBlk = fun(C, Ca) ->
-                   R = make_ref(),
-                   {R, [#blk{ref = R, code = C, catchall = Ca}]}
-               end,
-    {RestRef, RestBlk} = FreshBlk(Code, Catchall),
+    {RestRef, RestBlk} = fresh_block(Code, Catchall),
     {DefRef, DefBlk} =
         case Default of
             missing when Catchall == none ->
-                FreshBlk([aeb_fate_ops:abort(?i(<<"Incomplete patterns">>))], none);
+                fresh_block([aeb_fate_ops:abort(?i(<<"Incomplete patterns">>))], none);
             missing -> {Catchall, []};
-            _       -> FreshBlk(Default ++ [{jump, RestRef}], Catchall)
+            _       -> fresh_block(Default ++ [{jump, RestRef}], Catchall)
                        %% ^ fall-through to the outer catchall
         end,
     %% If we don't generate a switch, we need to pop the argument if on the stack.
@@ -1625,7 +1666,7 @@ block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
                 {ThenRef, ThenBlk} =
                     case TrueCode of
                         missing -> {DefRef, []};
-                        _       -> FreshBlk(TrueCode ++ [{jump, RestRef}], DefRef)
+                        _       -> fresh_block(TrueCode ++ [{jump, RestRef}], DefRef)
                     end,
                 ElseCode =
                     case FalseCode of
@@ -1660,7 +1701,7 @@ block(Blk = #blk{code     = [{switch, Arg, Type, Alts, Default} | Code],
                     true  -> {Blk#blk{code = Pop ++ [{jump, DefRef}]}, [], []};
                     false ->
                         MkBlk = fun(missing) -> {DefRef, []};
-                                   (ACode)   -> FreshBlk(ACode ++ [{jump, RestRef}], DefRef)
+                                   (ACode)   -> fresh_block(ACode ++ [{jump, RestRef}], DefRef)
                                 end,
                         {AltRefs, AltBs} = lists:unzip(lists:map(MkBlk, Alts)),
                         {Blk#blk{code = []}, [{switch, Arg, AltRefs}], lists:append(AltBs)}
@@ -1676,7 +1717,7 @@ block(Blk = #blk{code = [I | Code]}, Acc, Blocks, BlockAcc) ->
 optimize_blocks(Blocks) ->
     %% We need to look at the last instruction a lot, so reverse all blocks.
     Rev       = fun(Bs) -> [ {Ref, lists:reverse(Code)} || {Ref, Code} <- Bs ] end,
-    RBlocks   = Rev(Blocks),
+    RBlocks   =  [{Ref, crop_jumps(Code)} || {Ref, Code} <- Blocks],
     RBlockMap = maps:from_list(RBlocks),
     RBlocks1  = reorder_blocks(RBlocks, []),
     RBlocks2  = [ {Ref, inline_block(RBlockMap, Ref, Code)} || {Ref, Code} <- RBlocks1 ],
@@ -1757,6 +1798,18 @@ tweak_returns(['RETURN' | Code = [{'ABORT', _} | _]])  -> Code;
 tweak_returns(['RETURN' | Code = [{'EXIT', _} | _]])   -> Code;
 tweak_returns(['RETURN' | Code = [loop | _]])          -> Code;
 tweak_returns(Code) -> Code.
+
+%% -- Remove instructions that appear after jumps. Returns reversed code.
+%% This is useful for example when bb emitter adds continuation jumps
+%% for switch expressions, but some of the branches
+crop_jumps(Code) ->
+    crop_jumps(Code, []).
+crop_jumps([], Acc) ->
+    Acc;
+crop_jumps([I = {jump, _}|_], Acc) ->
+    [I|Acc];
+crop_jumps([I|Code], Acc) ->
+    crop_jumps(Code, [I|Acc]).
 
 %% -- Split basic blocks at CALL instructions --
 %%  Calls can only return to a new basic block. Also splits at JUMPIF instructions.
