@@ -1487,7 +1487,7 @@ check_reserved_entrypoints(Funs) ->
 check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type = {fun_t, _, _, _, _}}) ->
     Type1 = {fun_t, _, Named, Args, Ret} = check_type(Env, Type),
     TypeSig = {type_sig, Ann, none, Named, Args, Ret},
-    register_implementation(Env, Name),
+    register_implementation(Name),
     {{Name, TypeSig}, {fun_decl, Ann, Id, Type1}};
 check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type}) ->
     type_error({fundecl_must_have_funtype, Ann, Id, Type}),
@@ -1495,11 +1495,11 @@ check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type}) ->
 
 %% Register the function FunName as implemented by deleting it from the functions
 %% to be implemented table if it is included there, or return true otherwise.
--spec register_implementation(env(), FunName) -> true | no_return() when
+-spec register_implementation(FunName) -> true | no_return() when
       FunName :: string().
-register_implementation(Env, Name) ->
+register_implementation(Name) ->
     case ets_lookup(functions_to_implement, Name) of
-        [{Name, _, {fun_decl, _, _, DeclType}}] ->
+        [{Name, _, {fun_decl, _, _, _}}] ->
             ets_delete(functions_to_implement, Name);
         [] ->
             true;
@@ -1509,9 +1509,9 @@ register_implementation(Env, Name) ->
 
 infer_nonrec(Env, LetFun) ->
     create_constraints(),
-    NewLetFun = {{FunName, FunSig}, _} = infer_letfun(Env, LetFun),
+    NewLetFun = {{FunName, _}, _} = infer_letfun(Env, LetFun),
     check_special_funs(Env, NewLetFun),
-    register_implementation(Env, FunName),
+    register_implementation(FunName),
     solve_then_destroy_and_report_unsolved_constraints(Env),
     Result = {TypeSig, _} = instantiate(NewLetFun),
     print_typesig(TypeSig),
@@ -1541,7 +1541,7 @@ infer_letrec(Env, Defs) ->
     Inferred =
         [ begin
             Res    = {{Name, TypeSig}, _} = infer_letfun(ExtendEnv, LF),
-            register_implementation(Env, Name),
+            register_implementation(Name),
             Got    = proplists:get_value(Name, Funs),
             Expect = typesig_to_fun_t(TypeSig),
             unify(Env, Got, Expect, {check_typesig, Name, Got, Expect}),
