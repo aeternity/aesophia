@@ -45,7 +45,14 @@
 -define(s(N), {store, N}).
 -define(void, {var, 9999}).
 
--record(env, { contract, vars = [], locals = [], current_function, tailpos = true, child_contracts = #{}, options = []}).
+-record(env, { contract,
+               vars = [],
+               locals = [],
+               current_function,
+               tailpos = true,
+               child_contracts = #{},
+               saved_fresh_names = #{},
+               options = [] }).
 
 %% -- Debugging --------------------------------------------------------------
 
@@ -74,10 +81,11 @@ code_error(Err) ->
 compile(FCode, Options) ->
     compile(#{}, FCode, Options).
 compile(ChildContracts, FCode, Options) ->
-    #{ contract_name := ContractName,
-       functions     := Functions } = FCode,
+    #{ contract_name     := ContractName,
+       functions         := Functions,
+       saved_fresh_names := SavedFreshNames } = FCode,
     try
-        SFuns  = functions_to_scode(ChildContracts, ContractName, Functions, Options),
+        SFuns  = functions_to_scode(ChildContracts, ContractName, Functions, SavedFreshNames, Options),
         SFuns1 = optimize_scode(SFuns, Options),
         FateCode = to_basic_blocks(SFuns1),
         ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
@@ -102,33 +110,34 @@ add_child_symbols(ChildContracts, FateCode) ->
     Symbols = maps:from_list([ {make_function_id(FName), make_function_name(FName)} || FName <- Funs ]),
     aeb_fate_code:update_symbols(FateCode, Symbols).
 
-functions_to_scode(ChildContracts, ContractName, Functions, Options) ->
+functions_to_scode(ChildContracts, ContractName, Functions, SavedFreshNames, Options) ->
     FunNames = maps:keys(Functions),
     maps:from_list(
-        [ {make_function_name(Name), function_to_scode(ChildContracts, ContractName, FunNames, Name, Attrs, Args, Body, Type, Options)}
+        [ {make_function_name(Name), function_to_scode(ChildContracts, ContractName, FunNames, Name, Attrs, Args, Body, Type, SavedFreshNames, Options)}
         || {Name, #{args   := Args,
                     body   := Body,
                     attrs  := Attrs,
                     return := Type}} <- maps:to_list(Functions)]).
 
-function_to_scode(ChildContracts, ContractName, Functions, Name, Attrs0, Args, Body, ResType, Options) ->
+function_to_scode(ChildContracts, ContractName, Functions, Name, Attrs0, Args, Body, ResType, SavedFreshNames, Options) ->
     {ArgTypes, ResType1} = typesig_to_scode(Args, ResType),
     Attrs = Attrs0 -- [stateful], %% Only track private and payable from here.
-    Env = init_env(ChildContracts, ContractName, Functions, Name, Args, Options),
+    Env = init_env(ChildContracts, ContractName, Functions, Name, Args, SavedFreshNames, Options),
     [ add_variables_register(Env, Arg, Register) || {Arg, Register} <- Env#env.vars ],
     SCode = to_scode(Env, Body),
     {Attrs, {ArgTypes, ResType1}, SCode}.
 
 get_variables_registers() ->
     case get(variables_registers) of
-        undefined -> [];
+        undefined -> #{};
         Vs        -> Vs
     end.
 
-add_variables_register(Env, Name, Register) ->
+add_variables_register(Env = #env{saved_fresh_names = SavedFreshNames}, Name, Register) ->
     Olds = get_variables_registers(),
-    New = {Env#env.contract, Env#env.current_function, Name, Register},
-    put(variables_registers, [New | Olds]).
+    RealName = maps:get(Name, SavedFreshNames, Name),
+    New = {Env#env.contract, Env#env.current_function, RealName},
+    put(variables_registers, Olds#{New => Register}).
 
 -define(tvars, '$tvars').
 
@@ -174,14 +183,15 @@ types_to_scode(Ts) -> lists:map(fun type_to_scode/1, Ts).
 
 %% -- Environment functions --
 
-init_env(ChildContracts, ContractName, FunNames, Name, Args, Options) ->
+init_env(ChildContracts, ContractName, FunNames, Name, Args, SavedFreshNames, Options) ->
     #env{ vars      = [ {X, {arg, I}} || {I, {X, _}} <- with_ixs(Args) ],
           contract  = ContractName,
           child_contracts = ChildContracts,
           locals    = FunNames,
           current_function = Name,
           options = Options,
-          tailpos   = true }.
+          tailpos   = true,
+          saved_fresh_names = SavedFreshNames }.
 
 next_var(#env{ vars = Vars }) ->
     1 + lists:max([-1 | [J || {_, {var, J}} <- Vars]]).

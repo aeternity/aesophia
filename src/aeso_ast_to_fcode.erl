@@ -122,12 +122,13 @@
                       return := ftype(),
                       body   := fexpr() }.
 
--type fcode() :: #{ contract_name := string(),
-                    state_type    := ftype(),
-                    state_layout  := state_layout(),
-                    event_type    := ftype() | none,
-                    functions     := #{ fun_name() => fun_def() },
-                    payable       := boolean() }.
+-type fcode() :: #{ contract_name     := string(),
+                    state_type        := ftype(),
+                    state_layout      := state_layout(),
+                    event_type        := ftype() | none,
+                    functions         := #{ fun_name() => fun_def() },
+                    payable           := boolean(),
+                    saved_fresh_names := #{ var_name() => var_name() } }.
 
 -type type_def() :: fun(([ftype()]) -> ftype()).
 
@@ -171,6 +172,7 @@
 -spec ast_to_fcode(aeso_syntax:ast(), [option()]) -> {env(), fcode()}.
 ast_to_fcode(Code, Options) ->
     init_fresh_names(),
+    init_saved_fresh_names(),
     {Env1, FCode1} = to_fcode(init_env(Options), Code),
     FCode2 = optimize(FCode1, Options),
     Env2 = Env1#{ child_con_env :=
@@ -178,8 +180,10 @@ ast_to_fcode(Code, Options) ->
                         fun (_, FC) -> optimize(FC, Options) end,
                         maps:get(child_con_env, Env1)
                        )},
+    FCode3 = FCode2#{saved_fresh_names => get(saved_fresh_names)},
     clear_fresh_names(),
-    {Env2, FCode2}.
+    clear_saved_fresh_names(),
+    {Env2, FCode3}.
 
 optimize(FCode1, Options) ->
     Verbose = lists:member(pp_fcode, Options),
@@ -1734,6 +1738,19 @@ init_fresh_names() ->
 clear_fresh_names() ->
     erase('%fresh').
 
+init_saved_fresh_names() ->
+    put(saved_fresh_names, #{}).
+
+clear_saved_fresh_names() ->
+    erase(saved_fresh_names).
+
+-spec fresh_name_save(string()) -> var_name().
+fresh_name_save(Name) ->
+    Fresh = fresh_name(),
+    Old = get(saved_fresh_names),
+    New = put(saved_fresh_names, Old#{Fresh => Name}),
+    Fresh.
+
 -spec fresh_name() -> var_name().
 fresh_name() -> fresh_name("%").
 
@@ -1862,7 +1879,7 @@ bottom_up(F, Env, Expr) ->
                                (_)            -> true end,
             case ShouldFreshen(X) of
                 true ->
-                    Z = fresh_name(),
+                    Z = fresh_name_save(X),
                     Env1 = Env#{ Z => E1 },
                     {'let', Z, E1, bottom_up(F, Env1, rename([{X, Z}], Body))};
                 false ->
