@@ -270,15 +270,24 @@ bind_state(Env) ->
         false  -> Env1
     end.
 
--spec bind_field(name(), field_info(), env()) -> env().
-bind_field(X, Info, Env = #env{ fields = Fields }) ->
+-spec bind_field_append(name(), field_info(), env()) -> env().
+bind_field_append(X, Info, Env = #env{ fields = Fields }) ->
     Fields1 = maps:update_with(X, fun(Infos) -> [Info | Infos] end, [Info], Fields),
     Env#env{ fields = Fields1 }.
 
--spec bind_fields([{name(), field_info()}], env()) -> env().
-bind_fields([], Env) -> Env;
-bind_fields([{Id, Info} | Rest], Env) ->
-    bind_fields(Rest, bind_field(Id, Info, Env)).
+-spec bind_field_update(name(), field_info(), env()) -> env().
+bind_field_update(X, Info, Env = #env{ fields = Fields }) ->
+    Fields1 = maps:update_with(X, fun([_ | Infos]) -> [Info | Infos]; ([]) -> [Info] end, [Info], Fields),
+    Env#env{ fields = Fields1 }.
+
+-spec bind_fields([{name(), field_info()}], typed | untyped, env()) -> env().
+bind_fields([], _Typing, Env) -> Env;
+bind_fields([{Id, Info} | Rest], Typing, Env) ->
+    NewEnv = case Typing of
+                 untyped -> bind_field_append(Id, Info, Env);
+                 typed   -> bind_field_update(Id, Info, Env)
+             end,
+    bind_fields(Rest, Typing, NewEnv).
 
 %% Contract entrypoints take three named arguments
 %%  gas       : int  = Call.gas_left()
@@ -296,26 +305,27 @@ contract_call_type({fun_t, Ann, [], Args, Ret}) ->
                   Named("protected", Typed({bool, Ann, false}, Id("bool")))],
      Args, {if_t, Ann, Id("protected"), {app_t, Ann, {id, Ann, "option"}, [Ret]}, Ret}}.
 
--spec bind_contract(aeso_syntax:decl(), env()) -> env().
-bind_contract({Contract, Ann, Id, _Impls, Contents}, Env)
+-spec bind_contract(typed | untyped, aeso_syntax:decl(), env()) -> env().
+bind_contract(Typing, {Contract, Ann, Id, _Impls, Contents}, Env)
   when ?IS_CONTRACT_HEAD(Contract) ->
-    Key    = name(Id),
-    Sys    = [{origin, system}],
-    Fields =
+    Key         = name(Id),
+    Sys         = [{origin, system}],
+    TypeOrFresh = fun({typed, _, _, Type}) -> Type; (_) -> fresh_uvar(Sys) end,
+    Fields      =
         [ {field_t, AnnF, Entrypoint, contract_call_type(Type)}
-          || {fun_decl, AnnF, Entrypoint, Type} <- Contents ] ++
+          || {fun_decl, AnnF, Entrypoint, Type = {fun_t, _, _, _, _}} <- Contents ] ++
         [ {field_t, AnnF, Entrypoint,
            contract_call_type(
-             {fun_t, AnnF, [], [ArgT || {typed, _, _, ArgT} <- Args], RetT})
+             {fun_t, AnnF, [], [TypeOrFresh(Arg) || Arg <- Args], TypeOrFresh(Ret)})
           }
-          || {letfun, AnnF, Entrypoint = {id, _, Name}, Args, _Type, [{guarded, _, [], {typed, _, _, RetT}}]} <- Contents,
+          || {letfun, AnnF, Entrypoint = {id, _, Name}, Args, _Type, [{guarded, _, [], Ret}]} <- Contents,
              Name =/= "init"
         ] ++
         %% Predefined fields
         [ {field_t, Sys, {id, Sys, "address"}, {id, Sys, "address"}} ] ++
         [ {field_t, Sys, {id, Sys, ?CONSTRUCTOR_MOCK_NAME},
            contract_call_type(
-             case [ [ArgT || {typed, _, _, ArgT} <- Args]
+             case [ [TypeOrFresh(Arg) || Arg <- Args]
                     || {letfun, AnnF, {id, _, "init"}, Args, _, _} <- Contents,
                        aeso_syntax:get_ann(entrypoint, AnnF, false)]
                  ++ [ Args
@@ -337,7 +347,7 @@ bind_contract({Contract, Ann, Id, _Impls, Contents}, Env)
                                             record_t = Id }}
                 || {field_t, _, {id, FieldAnn, Entrypoint}, Type} <- Fields ],
     bind_type(Key, Ann, {[], {contract_t, Fields}},
-        bind_fields(FieldInfo, Env)).
+        bind_fields(FieldInfo, Typing, Env)).
 
 %% What scopes could a given name come from?
 -spec possible_scopes(env(), qname()) -> [qname()].
@@ -447,6 +457,9 @@ lookup_env1(#env{ namespace = Current, used_namespaces = UsedNamespaces, scopes 
             end
     end.
 
+fun_arity({fun_t, _, _, Args, _}) -> length(Args);
+fun_arity(_)                      -> none.
+
 -spec lookup_record_field(env(), name()) -> [field_info()].
 lookup_record_field(Env, FieldName) ->
     maps:get(FieldName, Env#env.fields, []).
@@ -456,6 +469,11 @@ lookup_record_field(Env, FieldName) ->
 lookup_record_field(Env, FieldName, Kind) ->
     [ Fld || Fld = #field_info{ kind = K } <- lookup_record_field(Env, FieldName),
              Kind == project orelse K /= contract ].
+
+lookup_record_field_arity(Env, FieldName, Arity, Kind) ->
+    Fields = lookup_record_field(Env, FieldName, Kind),
+    [ Fld || Fld = #field_info{ field_t = FldType } <- Fields,
+             fun_arity(dereference_deep(FldType)) == Arity ].
 
 %% -- Name manipulation ------------------------------------------------------
 
@@ -872,7 +890,7 @@ infer(Contracts, Options) ->
 -spec infer1(env(), [aeso_syntax:decl()], [aeso_syntax:decl()], list(option())) ->
     {env(), [aeso_syntax:decl()]}.
 infer1(Env, [], Acc, _Options) -> {Env, lists:reverse(Acc)};
-infer1(Env0, [{Contract, Ann, ConName, Impls, Code} | Rest], Acc, Options)
+infer1(Env0, [Contract0 = {Contract, Ann, ConName, Impls, Code} | Rest], Acc, Options)
   when ?IS_CONTRACT_HEAD(Contract) ->
     %% do type inference on each contract independently.
     Env = Env0#env{ contract_parents = maps:put(name(ConName),
@@ -889,12 +907,14 @@ infer1(Env0, [{Contract, Ann, ConName, Impls, Code} | Rest], Acc, Options)
         contract_interface -> ok
     end,
     populate_functions_to_implement(Env, ConName, Impls, Acc),
-    {Env1, Code1} = infer_contract_top(push_scope(contract, ConName, Env), What, Code, Options),
-    report_unimplemented_functions(Env, ConName),
+    Env1 = bind_contract(untyped, Contract0, Env),
+    {Env2, Code1} = infer_contract_top(push_scope(contract, ConName, Env1), What, Code, Options),
+    report_unimplemented_functions(Env1, ConName),
     Contract1 = {Contract, Ann, ConName, Impls, Code1},
-    Env2 = pop_scope(Env1),
-    Env3 = bind_contract(Contract1, Env2),
-    infer1(Env3, Rest, [Contract1 | Acc], Options);
+    Env3 = pop_scope(Env2),
+    %% Rebinding because the qualifications of types are added during type inference. Could we do better?
+    Env4 = bind_contract(typed, Contract1, Env3),
+    infer1(Env4, Rest, [Contract1 | Acc], Options);
 infer1(Env, [{namespace, Ann, Name, Code} | Rest], Acc, Options) ->
     when_warning(warn_unused_includes,
                  fun() ->
@@ -1367,7 +1387,7 @@ check_named_arg(Env, {named_arg_t, Ann, Id, Type, Default}) ->
 -spec check_fields(env(), #{ name() => aeso_syntax:decl() }, type(), [aeso_syntax:field_t()]) -> env().
 check_fields(Env, _TypeMap, _, []) -> Env;
 check_fields(Env, TypeMap, RecTy, [{field_t, Ann, Id, Type} | Fields]) ->
-    Env1 = bind_field(name(Id), #field_info{ ann = Ann, kind = record, field_t = Type, record_t = RecTy }, Env),
+    Env1 = bind_field_append(name(Id), #field_info{ ann = Ann, kind = record, field_t = Type, record_t = RecTy }, Env),
     check_fields(Env1, TypeMap, RecTy, Fields).
 
 check_parameterizable({id, Ann, "event"}, [_ | _]) ->
@@ -2336,7 +2356,12 @@ solve_constraints(Env) ->
                field_t  = FieldType,
                kind     = Kind,
                context  = When }) ->
-                case lookup_record_field(Env, FieldName, Kind) of
+                Arity = fun_arity(dereference_deep(FieldType)),
+                FieldInfos = case Arity of
+                                 none -> lookup_record_field(Env, FieldName, Kind);
+                                 _    -> lookup_record_field_arity(Env, FieldName, Arity, Kind)
+                             end,
+                case FieldInfos of
                     [] ->
                         type_error({undefined_field, Field}),
                         false;

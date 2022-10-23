@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Options to enable/disable certain optimizations.
+- The ability to call a different instance of the current contract
+  ```
+  contract Main =
+    entrypoint spend(x : int) : int = x
+    entrypoint f(c : Main) : int = c.spend(10)
+  ```
 ### Changed
 ### Removed
 ### Fixed

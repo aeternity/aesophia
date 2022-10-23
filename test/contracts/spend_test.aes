@@ -1,7 +1,4 @@
 
-contract interface SpendContract =
-  entrypoint withdraw : (int) => int
-
 contract SpendTest =
 
   stateful entrypoint spend(to, amount) =

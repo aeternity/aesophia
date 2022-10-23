@@ -1,16 +1,7 @@
 
-contract interface Remote =
-  entrypoint up_to       : (int)               => list(int)
-  entrypoint sum         : (list(int))         => int
-  entrypoint some_string : ()                  => string
-  entrypoint pair        : (int, string)       => int * string
-  entrypoint squares     : (int)               => list(int * int)
-  entrypoint filter_some : (list(option(int))) => list(int)
-  entrypoint all_some    : (list(option(int))) => option(list(int))
-
 contract ComplexTypes =
 
-  record state = { worker : Remote }
+  record state = { worker : ComplexTypes }
 
   entrypoint init(worker) = {worker = worker}
 
