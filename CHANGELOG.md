@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     entrypoint spend(x : int) : int = x
     entrypoint f(c : Main) : int = c.spend(10)
   ```
+- Return a mapping from variables to FATE registers in the compilation output.
 ### Changed
 ### Removed
 ### Fixed
