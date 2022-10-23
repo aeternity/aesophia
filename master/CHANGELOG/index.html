@@ -1475,6 +1475,11 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h3 id="added">Added</h3>
 <ul>
 <li>Options to enable/disable certain optimizations.</li>
+<li>The ability to call a different instance of the current contract
+  <div class="highlight"><pre><span></span><code>contract Main =
+  entrypoint spend(x : int) : int = x
+  entrypoint f(c : Main) : int = c.spend(10)
+</code></pre></div></li>
 </ul>
 <h3 id="changed">Changed</h3>
 <h3 id="removed">Removed</h3>
