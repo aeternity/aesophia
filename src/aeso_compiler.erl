@@ -112,10 +112,10 @@ from_string(ContractString, Options) ->
 
 from_string1(ContractString, Options) ->
     #{ fcode := FCode
-     , fcode_env := #{child_con_env := ChildContracts}
+     , fcode_env := #{child_con_env := ChildContracts, saved_fresh_names := SavedFreshNames}
      , folded_typed_ast := FoldedTypedAst
      , warnings := Warnings } = string_to_code(ContractString, Options),
-    {FateCode, VarsRegs} = aeso_fcode_to_fate:compile(ChildContracts, FCode, Options),
+    {FateCode, VarsRegs} = aeso_fcode_to_fate:compile(ChildContracts, FCode, SavedFreshNames, Options),
     pp_assembler(FateCode, Options),
     ByteCode = aeb_fate_code:serialize(FateCode, []),
     {ok, Version} = version(),
@@ -184,9 +184,9 @@ check_call1(ContractString0, FunName, Args, Options) ->
     try
         %% First check the contract without the __call function
         #{fcode := OrgFcode
-        , fcode_env := #{child_con_env := ChildContracts}
+        , fcode_env := #{child_con_env := ChildContracts, saved_fresh_names := SavedFreshNames}
         , ast := Ast} = string_to_code(ContractString0, Options),
-        {FateCode, _VarsRegs} = aeso_fcode_to_fate:compile(ChildContracts, OrgFcode, []),
+        {FateCode, _VarsRegs} = aeso_fcode_to_fate:compile(ChildContracts, OrgFcode, SavedFreshNames, []),
         %% collect all hashes and compute the first name without hash collision to
         SymbolHashes = maps:keys(aeb_fate_code:symbols(FateCode)),
         CallName = first_none_match(?CALL_NAME, SymbolHashes,

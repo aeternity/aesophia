@@ -9,7 +9,7 @@
 %%%-------------------------------------------------------------------
 -module(aeso_fcode_to_fate).
 
--export([compile/2, compile/3, term_to_fate/1, term_to_fate/2]).
+-export([compile/3, compile/4, term_to_fate/1, term_to_fate/2]).
 
 -ifdef(TEST).
 -export([optimize_fun/4, to_basic_blocks/1]).
@@ -78,25 +78,27 @@ code_error(Err) ->
 %% -- Main -------------------------------------------------------------------
 
 %% @doc Main entry point.
-compile(FCode, Options) ->
-    compile(#{}, FCode, Options).
-compile(ChildContracts, FCode, Options) ->
-    #{ contract_name     := ContractName,
-       functions         := Functions,
-       saved_fresh_names := SavedFreshNames } = FCode,
+compile(FCode, SavedFreshNames, Options) ->
+    compile(#{}, FCode, SavedFreshNames, Options).
+compile(ChildContracts, FCode, SavedFreshNames, Options) ->
     try
-        SFuns  = functions_to_scode(ChildContracts, ContractName, Functions, SavedFreshNames, Options),
-        SFuns1 = optimize_scode(SFuns, Options),
-        FateCode = to_basic_blocks(SFuns1),
-        ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
-        FateCode1 = case proplists:get_value(include_child_contract_symbols, Options, false) of
-                        false -> FateCode;
-                        true -> add_child_symbols(ChildContracts, FateCode)
-                    end,
-        {FateCode1, get_variables_registers()}
+        compile1(ChildContracts, FCode, SavedFreshNames, Options)
     after
         put(variables_registers, undefined)
     end.
+
+compile1(ChildContracts, FCode, SavedFreshNames, Options) ->
+    #{ contract_name := ContractName,
+       functions     := Functions } = FCode,
+    SFuns  = functions_to_scode(ChildContracts, ContractName, Functions, SavedFreshNames, Options),
+    SFuns1 = optimize_scode(SFuns, Options),
+    FateCode = to_basic_blocks(SFuns1),
+    ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
+    FateCode1 = case proplists:get_value(include_child_contract_symbols, Options, false) of
+                    false -> FateCode;
+                    true -> add_child_symbols(ChildContracts, FateCode)
+                end,
+    {FateCode1, get_variables_registers()}.
 
 make_function_id(X) ->
     aeb_fate_code:symbol_identifier(make_function_name(X)).
@@ -221,9 +223,10 @@ serialize_contract_code(Env, C) ->
             end,
     case maps:get(C, Cache, none) of
         none ->
-            Options  = Env#env.options,
-            FCode    = maps:get(C, Env#env.child_contracts),
-            {FateCode, _} = compile(Env#env.child_contracts, FCode, Options),
+            Options = Env#env.options,
+            SavedFreshNames = Env#env.saved_fresh_names,
+            FCode = maps:get(C, Env#env.child_contracts),
+            {FateCode, _} = compile1(Env#env.child_contracts, FCode, SavedFreshNames, Options),
             ByteCode = aeb_fate_code:serialize(FateCode, []),
             {ok, Version} = aeso_compiler:version(),
             OriginalSourceCode = proplists:get_value(original_src, Options, ""),

@@ -127,8 +127,7 @@
                     state_layout      := state_layout(),
                     event_type        := ftype() | none,
                     functions         := #{ fun_name() => fun_def() },
-                    payable           := boolean(),
-                    saved_fresh_names := #{ var_name() => var_name() } }.
+                    payable           := boolean() }.
 
 -type type_def() :: fun(([ftype()]) -> ftype()).
 
@@ -150,17 +149,18 @@
 
 -type state_layout() :: {tuple, [state_layout()]} | {reg, state_reg()}.
 
--type env() :: #{ type_env      := type_env(),
-                  fun_env       := fun_env(),
-                  con_env       := con_env(),
-                  child_con_env := child_con_env(),
-                  event_type    => aeso_syntax:typedef(),
-                  builtins      := builtins(),
-                  options       := [option()],
-                  state_layout  => state_layout(),
-                  context       => context(),
-                  vars          => [var_name()],
-                  functions     := #{ fun_name() => fun_def() }
+-type env() :: #{ type_env          := type_env(),
+                  fun_env           := fun_env(),
+                  con_env           := con_env(),
+                  child_con_env     := child_con_env(),
+                  event_type        => aeso_syntax:typedef(),
+                  builtins          := builtins(),
+                  options           := [option()],
+                  state_layout      => state_layout(),
+                  context           => context(),
+                  vars              => [var_name()],
+                  functions         := #{ fun_name() => fun_def() },
+                  saved_fresh_names := #{ var_name() => var_name() }
                }.
 
 -define(HASH_BYTES, 32).
@@ -180,10 +180,10 @@ ast_to_fcode(Code, Options) ->
                         fun (_, FC) -> optimize(FC, Options) end,
                         maps:get(child_con_env, Env1)
                        )},
-    FCode3 = FCode2#{saved_fresh_names => get(saved_fresh_names)},
+    Env3 = Env2#{ saved_fresh_names => get(saved_fresh_names) },
     clear_fresh_names(),
     clear_saved_fresh_names(),
-    {Env2, FCode3}.
+    {Env3, FCode2}.
 
 optimize(FCode1, Options) ->
     Verbose = lists:member(pp_fcode, Options),
@@ -1748,7 +1748,7 @@ clear_saved_fresh_names() ->
 fresh_name_save(Name) ->
     Fresh = fresh_name(),
     Old = get(saved_fresh_names),
-    New = put(saved_fresh_names, Old#{Fresh => Name}),
+    put(saved_fresh_names, Old#{Fresh => Name}),
     Fresh.
 
 -spec fresh_name() -> var_name().
