@@ -180,7 +180,7 @@ ast_to_fcode(Code, Options) ->
                         fun (_, FC) -> optimize(FC, Options) end,
                         maps:get(child_con_env, Env1)
                        )},
-    Env3 = Env2#{ saved_fresh_names => get(saved_fresh_names) },
+    Env3 = Env2#{ saved_fresh_names := get(saved_fresh_names) },
     clear_fresh_names(),
     clear_saved_fresh_names(),
     {Env3, FCode2}.
@@ -237,8 +237,9 @@ init_env(Options) ->
                       ["Chain", "ContractCallTx"]         => #con_tag{ tag = 20, arities = ChainTxArities },
                       ["Chain", "GAAttachTx"]             => #con_tag{ tag = 21, arities = ChainTxArities }
                      },
-       options   => Options,
-       functions => #{}
+       options           => Options,
+       functions         => #{},
+       saved_fresh_names => #{}
     }.
 
 -spec builtins() -> builtins().
