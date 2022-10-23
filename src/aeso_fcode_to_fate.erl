@@ -138,7 +138,12 @@ get_variables_registers() ->
 add_variables_register(Env = #env{saved_fresh_names = SavedFreshNames}, Name, Register) ->
     Olds = get_variables_registers(),
     RealName = maps:get(Name, SavedFreshNames, Name),
-    FunName = binary_to_list(make_function_name(Env#env.current_function)),
+    FunName =
+        case Env#env.current_function of
+            event -> "Chain.event";
+            {entrypoint, BinName} -> binary_to_list(BinName);
+            {local_fun, QualName} -> lists:last(QualName)
+        end,
     New = {Env#env.contract, FunName, RealName},
     put(variables_registers, Olds#{New => Register}).
 
