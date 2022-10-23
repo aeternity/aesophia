@@ -46,13 +46,13 @@
 -define(void, {var, 9999}).
 
 -record(env, { contract,
-               vars = [],
-               locals = [],
+               vars              = [],
+               locals            = [],
                current_function,
-               tailpos = true,
-               child_contracts = #{},
+               tailpos           = true,
+               child_contracts   = #{},
                saved_fresh_names = #{},
-               options = [] }).
+               options           = [] }).
 
 %% -- Debugging --------------------------------------------------------------
 
