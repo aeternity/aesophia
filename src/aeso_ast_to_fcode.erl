@@ -122,12 +122,12 @@
                       return := ftype(),
                       body   := fexpr() }.
 
--type fcode() :: #{ contract_name     := string(),
-                    state_type        := ftype(),
-                    state_layout      := state_layout(),
-                    event_type        := ftype() | none,
-                    functions         := #{ fun_name() => fun_def() },
-                    payable           := boolean() }.
+-type fcode() :: #{ contract_name := string(),
+                    state_type    := ftype(),
+                    state_layout  := state_layout(),
+                    event_type    := ftype() | none,
+                    functions     := #{ fun_name() => fun_def() },
+                    payable       := boolean() }.
 
 -type type_def() :: fun(([ftype()]) -> ftype()).
 
