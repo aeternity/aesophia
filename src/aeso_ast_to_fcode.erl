@@ -160,7 +160,7 @@
                   context           => context(),
                   vars              => [var_name()],
                   functions         := #{ fun_name() => fun_def() },
-                  saved_fresh_names := #{ var_name() => var_name() }
+                  saved_fresh_names => #{ var_name() => var_name() }
                }.
 
 -define(HASH_BYTES, 32).
@@ -171,8 +171,7 @@
 %% and produces Fate intermediate code.
 -spec ast_to_fcode(aeso_syntax:ast(), [option()]) -> {env(), fcode()}.
 ast_to_fcode(Code, Options) ->
-    init_fresh_names(),
-    init_saved_fresh_names(),
+    init_fresh_names(Options),
     {Env1, FCode1} = to_fcode(init_env(Options), Code),
     FCode2 = optimize(FCode1, Options),
     Env2 = Env1#{ child_con_env :=
@@ -180,9 +179,12 @@ ast_to_fcode(Code, Options) ->
                         fun (_, FC) -> optimize(FC, Options) end,
                         maps:get(child_con_env, Env1)
                        )},
-    Env3 = Env2#{ saved_fresh_names := get(saved_fresh_names) },
-    clear_fresh_names(),
-    clear_saved_fresh_names(),
+    Env3 =
+        case proplists:get_value(debug_info, Options, false) of
+            true  -> Env2#{ saved_fresh_names => get(saved_fresh_names) };
+            false -> Env2
+        end,
+    clear_fresh_names(Options),
     {Env3, FCode2}.
 
 optimize(FCode1, Options) ->
@@ -1733,10 +1735,12 @@ resolve_fun(#{ fun_env := Funs, builtins := Builtin } = Env, Q) ->
         {{Fun, Ar}, _}         -> {def_u, Fun, Ar}
     end.
 
-init_fresh_names() ->
+init_fresh_names(Options) ->
+    proplists:get_value(debug_info, Options, false) andalso init_saved_fresh_names(),
     put('%fresh', 0).
 
-clear_fresh_names() ->
+clear_fresh_names(Options) ->
+    proplists:get_value(debug_info, Options, false) andalso clear_saved_fresh_names(),
     erase('%fresh').
 
 init_saved_fresh_names() ->
@@ -1748,8 +1752,10 @@ clear_saved_fresh_names() ->
 -spec fresh_name_save(string()) -> var_name().
 fresh_name_save(Name) ->
     Fresh = fresh_name(),
-    Old = get(saved_fresh_names),
-    put(saved_fresh_names, Old#{Fresh => Name}),
+    case get(saved_fresh_names) of
+        undefined -> ok;
+        Old       -> put(saved_fresh_names, Old#{Fresh => Name})
+    end,
     Fresh.
 
 -spec fresh_name() -> var_name().

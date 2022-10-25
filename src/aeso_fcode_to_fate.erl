@@ -125,7 +125,9 @@ function_to_scode(ChildContracts, ContractName, Functions, Name, Attrs0, Args, B
     {ArgTypes, ResType1} = typesig_to_scode(Args, ResType),
     Attrs = Attrs0 -- [stateful], %% Only track private and payable from here.
     Env = init_env(ChildContracts, ContractName, Functions, Name, Args, SavedFreshNames, Options),
-    [ add_variables_register(Env, Arg, Register) || {Arg, Register} <- Env#env.vars ],
+    [ add_variables_register(Env, Arg, Register) ||
+        proplists:get_value(debug_info, Options, false),
+        {Arg, Register} <- Env#env.vars ],
     SCode = to_scode(Env, Body),
     {Attrs, {ArgTypes, ResType1}, SCode}.
 
@@ -205,7 +207,7 @@ next_var(#env{ vars = Vars }) ->
     1 + lists:max([-1 | [J || {_, {var, J}} <- Vars]]).
 
 bind_var(Name, Var, Env = #env{ vars = Vars }) ->
-    add_variables_register(Env, Name, Var),
+    proplists:get_value(debug_info, Env#env.options, false) andalso add_variables_register(Env, Name, Var),
     Env#env{ vars = [{Name, Var} | Vars] }.
 
 bind_local(Name, Env) ->
