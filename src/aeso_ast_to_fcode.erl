@@ -239,9 +239,8 @@ init_env(Options) ->
                       ["Chain", "ContractCallTx"]         => #con_tag{ tag = 20, arities = ChainTxArities },
                       ["Chain", "GAAttachTx"]             => #con_tag{ tag = 21, arities = ChainTxArities }
                      },
-       options           => Options,
-       functions         => #{},
-       saved_fresh_names => #{}
+       options   => Options,
+       functions => #{}
     }.
 
 -spec builtins() -> builtins().
