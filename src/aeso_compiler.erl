@@ -112,10 +112,12 @@ from_string(ContractString, Options) ->
 
 from_string1(ContractString, Options) ->
     #{ fcode := FCode
-     , fcode_env := #{child_con_env := ChildContracts}
+     , fcode_env := FCodeEnv
      , folded_typed_ast := FoldedTypedAst
      , warnings := Warnings } = string_to_code(ContractString, Options),
-    FateCode = aeso_fcode_to_fate:compile(ChildContracts, FCode, Options),
+    #{ child_con_env := ChildContracts } = FCodeEnv,
+    SavedFreshNames = maps:get(saved_fresh_names, FCodeEnv, #{}),
+    {FateCode, VarsRegs} = aeso_fcode_to_fate:compile(ChildContracts, FCode, SavedFreshNames, Options),
     pp_assembler(FateCode, Options),
     ByteCode = aeb_fate_code:serialize(FateCode, []),
     {ok, Version} = version(),
@@ -128,7 +130,13 @@ from_string1(ContractString, Options) ->
             payable => maps:get(payable, FCode),
             warnings => Warnings
            },
-    {ok, maybe_generate_aci(Res, FoldedTypedAst, Options)}.
+    ResDbg = Res#{variables_registers => VarsRegs},
+    FinalRes =
+        case proplists:get_value(debug_info, Options, false) of
+            true  -> ResDbg;
+            false -> Res
+        end,
+    {ok, maybe_generate_aci(FinalRes, FoldedTypedAst, Options)}.
 
 maybe_generate_aci(Result, FoldedTypedAst, Options) ->
     case proplists:get_value(aci, Options) of
@@ -185,7 +193,7 @@ check_call1(ContractString0, FunName, Args, Options) ->
         #{fcode := OrgFcode
         , fcode_env := #{child_con_env := ChildContracts}
         , ast := Ast} = string_to_code(ContractString0, Options),
-        FateCode = aeso_fcode_to_fate:compile(ChildContracts, OrgFcode, []),
+        {FateCode, _} = aeso_fcode_to_fate:compile(ChildContracts, OrgFcode, #{}, []),
         %% collect all hashes and compute the first name without hash collision to
         SymbolHashes = maps:keys(aeb_fate_code:symbols(FateCode)),
         CallName = first_none_match(?CALL_NAME, SymbolHashes,

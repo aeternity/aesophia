@@ -9,7 +9,7 @@
 %%%-------------------------------------------------------------------
 -module(aeso_fcode_to_fate).
 
--export([compile/2, compile/3, term_to_fate/1, term_to_fate/2]).
+-export([compile/3, compile/4, term_to_fate/1, term_to_fate/2]).
 
 -ifdef(TEST).
 -export([optimize_fun/4, to_basic_blocks/1]).
@@ -45,7 +45,14 @@
 -define(s(N), {store, N}).
 -define(void, {var, 9999}).
 
--record(env, { contract, vars = [], locals = [], current_function, tailpos = true, child_contracts = #{}, options = []}).
+-record(env, { contract,
+               vars              = [],
+               locals            = [],
+               current_function,
+               tailpos           = true,
+               child_contracts   = #{},
+               saved_fresh_names = #{},
+               options           = [] }).
 
 %% -- Debugging --------------------------------------------------------------
 
@@ -71,19 +78,27 @@ code_error(Err) ->
 %% -- Main -------------------------------------------------------------------
 
 %% @doc Main entry point.
-compile(FCode, Options) ->
-    compile(#{}, FCode, Options).
-compile(ChildContracts, FCode, Options) ->
+compile(FCode, SavedFreshNames, Options) ->
+    compile(#{}, FCode, SavedFreshNames, Options).
+compile(ChildContracts, FCode, SavedFreshNames, Options) ->
+    try
+        compile1(ChildContracts, FCode, SavedFreshNames, Options)
+    after
+        put(variables_registers, undefined)
+    end.
+
+compile1(ChildContracts, FCode, SavedFreshNames, Options) ->
     #{ contract_name := ContractName,
        functions     := Functions } = FCode,
-    SFuns  = functions_to_scode(ChildContracts, ContractName, Functions, Options),
+    SFuns  = functions_to_scode(ChildContracts, ContractName, Functions, SavedFreshNames, Options),
     SFuns1 = optimize_scode(SFuns, Options),
     FateCode = to_basic_blocks(SFuns1),
     ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
-    case proplists:get_value(include_child_contract_symbols, Options, false) of
-        false -> FateCode;
-        true -> add_child_symbols(ChildContracts, FateCode)
-    end.
+    FateCode1 = case proplists:get_value(include_child_contract_symbols, Options, false) of
+                    false -> FateCode;
+                    true -> add_child_symbols(ChildContracts, FateCode)
+                end,
+    {FateCode1, get_variables_registers()}.
 
 make_function_id(X) ->
     aeb_fate_code:symbol_identifier(make_function_name(X)).
@@ -97,21 +112,42 @@ add_child_symbols(ChildContracts, FateCode) ->
     Symbols = maps:from_list([ {make_function_id(FName), make_function_name(FName)} || FName <- Funs ]),
     aeb_fate_code:update_symbols(FateCode, Symbols).
 
-functions_to_scode(ChildContracts, ContractName, Functions, Options) ->
+functions_to_scode(ChildContracts, ContractName, Functions, SavedFreshNames, Options) ->
     FunNames = maps:keys(Functions),
     maps:from_list(
-        [ {make_function_name(Name), function_to_scode(ChildContracts, ContractName, FunNames, Name, Attrs, Args, Body, Type, Options)}
+        [ {make_function_name(Name), function_to_scode(ChildContracts, ContractName, FunNames, Name, Attrs, Args, Body, Type, SavedFreshNames, Options)}
         || {Name, #{args   := Args,
                     body   := Body,
                     attrs  := Attrs,
                     return := Type}} <- maps:to_list(Functions)]).
 
-function_to_scode(ChildContracts, ContractName, Functions, Name, Attrs0, Args, Body, ResType, Options) ->
+function_to_scode(ChildContracts, ContractName, Functions, Name, Attrs0, Args, Body, ResType, SavedFreshNames, Options) ->
     {ArgTypes, ResType1} = typesig_to_scode(Args, ResType),
     Attrs = Attrs0 -- [stateful], %% Only track private and payable from here.
-    Env = init_env(ChildContracts, ContractName, Functions, Name, Args, Options),
+    Env = init_env(ChildContracts, ContractName, Functions, Name, Args, SavedFreshNames, Options),
+    [ add_variables_register(Env, Arg, Register) ||
+        proplists:get_value(debug_info, Options, false),
+        {Arg, Register} <- Env#env.vars ],
     SCode = to_scode(Env, Body),
     {Attrs, {ArgTypes, ResType1}, SCode}.
+
+get_variables_registers() ->
+    case get(variables_registers) of
+        undefined -> #{};
+        Vs        -> Vs
+    end.
+
+add_variables_register(Env = #env{saved_fresh_names = SavedFreshNames}, Name, Register) ->
+    Olds = get_variables_registers(),
+    RealName = maps:get(Name, SavedFreshNames, Name),
+    FunName =
+        case Env#env.current_function of
+            event -> "Chain.event";
+            {entrypoint, BinName} -> binary_to_list(BinName);
+            {local_fun, QualName} -> lists:last(QualName)
+        end,
+    New = {Env#env.contract, FunName, RealName},
+    put(variables_registers, Olds#{New => Register}).
 
 -define(tvars, '$tvars').
 
@@ -157,19 +193,21 @@ types_to_scode(Ts) -> lists:map(fun type_to_scode/1, Ts).
 
 %% -- Environment functions --
 
-init_env(ChildContracts, ContractName, FunNames, Name, Args, Options) ->
+init_env(ChildContracts, ContractName, FunNames, Name, Args, SavedFreshNames, Options) ->
     #env{ vars      = [ {X, {arg, I}} || {I, {X, _}} <- with_ixs(Args) ],
           contract  = ContractName,
           child_contracts = ChildContracts,
           locals    = FunNames,
           current_function = Name,
           options = Options,
-          tailpos   = true }.
+          tailpos   = true,
+          saved_fresh_names = SavedFreshNames }.
 
 next_var(#env{ vars = Vars }) ->
     1 + lists:max([-1 | [J || {_, {var, J}} <- Vars]]).
 
 bind_var(Name, Var, Env = #env{ vars = Vars }) ->
+    proplists:get_value(debug_info, Env#env.options, false) andalso add_variables_register(Env, Name, Var),
     Env#env{ vars = [{Name, Var} | Vars] }.
 
 bind_local(Name, Env) ->
@@ -193,9 +231,10 @@ serialize_contract_code(Env, C) ->
             end,
     case maps:get(C, Cache, none) of
         none ->
-            Options  = Env#env.options,
-            FCode    = maps:get(C, Env#env.child_contracts),
-            FateCode = compile(Env#env.child_contracts, FCode, Options),
+            Options = Env#env.options,
+            SavedFreshNames = Env#env.saved_fresh_names,
+            FCode = maps:get(C, Env#env.child_contracts),
+            {FateCode, _} = compile1(Env#env.child_contracts, FCode, SavedFreshNames, Options),
             ByteCode = aeb_fate_code:serialize(FateCode, []),
             {ok, Version} = aeso_compiler:version(),
             OriginalSourceCode = proplists:get_value(original_src, Options, ""),
