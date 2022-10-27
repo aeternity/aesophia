@@ -21,7 +21,7 @@ test_cases(1) ->
 		 "  payable stateful entrypoint a(i : int) = i+1\n">>,
     MapACI = #{contract =>
 		   #{name => <<"C">>,
-		     type_defs => [],
+		     typedefs => [],
          payable => true,
          kind => contract_main,
 		     functions =>
@@ -43,7 +43,7 @@ test_cases(2) ->
     MapACI = #{contract =>
                    #{name => <<"C">>, payable => false,
                      kind => contract_main,
-                     type_defs =>
+                     typedefs =>
                          [#{name => <<"allan">>,
                             typedef => <<"int">>,
                             vars => []}],
@@ -76,7 +76,7 @@ test_cases(3) ->
 		     name => <<"C">>, payable => false, kind => contract_main,
          event => #{variant => [#{<<"SingleEventDefined">> => []}]},
          state => <<"unit">>,
-		     type_defs =>
+		     typedefs =>
              [#{name => <<"bert">>,
                 typedef =>
                     #{variant =>

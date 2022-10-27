@@ -67,7 +67,7 @@ generates the following JSON structure representing the contract interface:
         }
       ]
     },
-    "type_defs": [
+    "typedefs": [
       {
         "name": "answers",
         "typedef": {
@@ -138,7 +138,7 @@ be included inside another contract.
              state =>
                  #{record =>
                        [#{name => <<"a">>,type => <<"Answers.answers">>}]},
-             type_defs =>
+             typedefs =>
                  [#{name => <<"answers">>,
                     typedef => #{<<"map">> => [<<"string">>,<<"int">>]},
                     vars => []}]}}]}
