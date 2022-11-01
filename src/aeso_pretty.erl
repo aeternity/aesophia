@@ -286,11 +286,11 @@ type({named_arg_t, _, Name, Type, _Default}) ->
     typed(name(Name), Type);
 
 type(R = {record_t, _}) -> typedef(R);
-type(T = {id, _, _})    -> name(T);
-type(T = {qid, _, _})   -> name(T);
-type(T = {con, _, _})   -> name(T);
-type(T = {qcon, _, _})  -> name(T);
-type(T = {tvar, _, _})  -> name(T);
+type(T = {id, _, _})   -> name(T);
+type(T = {qid, _, _})  -> name(T);
+type(T = {con, _, _})  -> name(T);
+type(T = {qcon, _, _}) -> name(T);
+type(T = {tvar, _, _}) -> name(T);
 
 type(var_args) -> text("var_args").
 
