@@ -1139,6 +1139,19 @@ failing_contracts() ->
                      "  `oracle(string, (int) => int)`\n"
                      "The response type must not be higher-order (contain function types)">>
                   ])
+    , ?TYPE_ERROR(var_args_unify_let,
+                  [<<?Pos(3,9)
+                     "Cannot unify variable argument list.\n"
+                     "when checking the type of the pattern `x : 'a` against the expected type `(gas : int, value : int, protected : bool, ref : 'b, var_args) => 'b`">>
+                  ])
+    , ?TYPE_ERROR(var_args_unify_fun_call,
+                  [<<?Pos(6,5)
+                     "Cannot unify variable argument list.\n"
+                     "when checking the application of\n"
+                     "  `g : (() => 'a) => 'a`\n"
+                     "to arguments\n"
+                     "  `Chain.create : (value : int, var_args) => 'b`">>
+                  ])
     ].
 
 validation_test_() ->

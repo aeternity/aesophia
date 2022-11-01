@@ -2856,6 +2856,8 @@ unify0(Env, A, B, Variance, When) ->
 
 unify1(_Env, {uvar, _, R}, {uvar, _, R}, _Variance, _When) ->
     true;
+unify1(_Env, {uvar, _, _}, {fun_t, _, _, var_args, _}, _Variance, When) ->
+    type_error({unify_varargs, When});
 unify1(Env, {uvar, A, R}, T, _Variance, When) ->
     case occurs_check(R, T) of
         true ->

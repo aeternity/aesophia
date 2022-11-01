@@ -1,0 +1,7 @@
+contract C =
+  stateful function g(h) =
+    h()
+
+  stateful entrypoint f() =
+    g(Chain.create)
+    123
