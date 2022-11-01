@@ -64,7 +64,7 @@
                | nil
                | {var, var_name()}
                | {def, fun_name(), [fexpr()]}
-               | {remote, [ftype()], ftype(), fexpr(), fun_name(), [fexpr()]}
+               | {remote, fann(), [ftype()], ftype(), fexpr(), fun_name(), [fexpr()]}
                | {builtin, builtin(), [fexpr()]}
                | {con, arities(), tag(), [fexpr()]}
                | {tuple, [fexpr()]}
@@ -738,7 +738,7 @@ expr_to_fcode(Env, _, {app, _, Fun = {typed, Ann, FunE, {fun_t, _, NamedArgsT, A
             end;
         {builtin_u, B, _Ar}               -> builtin_to_fcode(state_layout(Env), B, FArgs);
         {def_u, F, _Ar}                   -> {def, F, FArgs};
-        {remote_u, Ann, RArgsT, RRetT, Ct, RFun} -> {remote, RArgsT, RRetT, Ct, RFun, FArgs};
+        {remote_u, Ann, RArgsT, RRetT, Ct, RFun} -> {remote, Ann, RArgsT, RRetT, Ct, RFun, FArgs};
         FFun ->
             %% FFun is a closure, with first component the function name and
             %% second component the environment
@@ -1267,13 +1267,13 @@ lambda_lift_expr(Layout, UExpr) when element(1, UExpr) == def_u; element(1, UExp
                def_u     -> {def, F, Args}
            end,
     make_closure([], Xs, Body);
-lambda_lift_expr(Layout, {remote_u, _, ArgsT, RetT, Ct, F}) ->
+lambda_lift_expr(Layout, {remote_u, Ann, ArgsT, RetT, Ct, F}) ->
     FVs  = free_vars(Ct),
     Ct1  = lambda_lift_expr(Layout, Ct),
     NamedArgCount = 3,
     Xs   = [ lists:concat(["arg", I]) || I <- lists:seq(1, length(ArgsT) + NamedArgCount) ],
     Args = [{var, X} || X <- Xs],
-    make_closure(FVs, Xs, {remote, ArgsT, RetT, Ct1, F, Args});
+    make_closure(FVs, Xs, {remote, Ann, ArgsT, RetT, Ct1, F, Args});
 lambda_lift_expr(Layout, Expr) ->
     case Expr of
         {lit, _}               -> Expr;
@@ -1282,7 +1282,7 @@ lambda_lift_expr(Layout, Expr) ->
         {closure, _, _, _}     -> Expr;
         {def, D, As}           -> {def, D, lambda_lift_exprs(Layout, As)};
         {builtin, B, As}       -> {builtin, B, lambda_lift_exprs(Layout, As)};
-        {remote, ArgsT, RetT, Ct, F, As} -> {remote, ArgsT, RetT, lambda_lift_expr(Layout, Ct), F, lambda_lift_exprs(Layout, As)};
+        {remote, Ann, ArgsT, RetT, Ct, F, As} -> {remote, Ann, ArgsT, RetT, lambda_lift_expr(Layout, Ct), F, lambda_lift_exprs(Layout, As)};
         {con, Ar, C, As}       -> {con, Ar, C, lambda_lift_exprs(Layout, As)};
         {tuple, As}            -> {tuple, lambda_lift_exprs(Layout, As)};
         {proj, A, I}           -> {proj, lambda_lift_expr(Layout, A), I};
@@ -1589,32 +1589,32 @@ safe_to_duplicate({tuple, []}) -> true;
 safe_to_duplicate(_)           -> false.
 
 -spec read_only(fexpr() | fsplit() | fcase() | [fexpr()] | [fcase()]) -> boolean().
-read_only({lit, _})                  -> true;
-read_only({var, _})                  -> true;
-read_only(nil)                       -> true;
-read_only({con, _, _, Es})           -> read_only(Es);
-read_only({tuple, Es})               -> read_only(Es);
-read_only({proj, E, _})              -> read_only(E);
-read_only({set_proj, A, _, B})       -> read_only([A, B]);
-read_only({op, _, Es})               -> read_only(Es);
-read_only({get_state, _})            -> true;
-read_only({set_state, _, _, _})      -> false;
-read_only({def_u, _, _})             -> true;
-read_only({remote_u, _, _, _, _, _}) -> true;
-read_only({builtin_u, _, _})         -> true;
-read_only({builtin_u, _, _, _})      -> true;
-read_only({lam, _, _})               -> true;
-read_only({def, _, _})               -> false; %% TODO: purity analysis
-read_only({remote, _, _, _, _, _})   -> false;
-read_only({builtin, _, _})           -> false; %% TODO: some builtins are
-read_only({switch, Split})           -> read_only(Split);
-read_only({split, _, _, Cases})      -> read_only(Cases);
-read_only({nosplit, E})              -> read_only(E);
-read_only({'case', _, Split})        -> read_only(Split);
-read_only({'let', _, A, B})          -> read_only([A, B]);
-read_only({funcall, _, _, _})        -> false;
-read_only({closure, _, _, _})        -> internal_error(no_closures_here);
-read_only(Es) when is_list(Es)       -> lists:all(fun read_only/1, Es).
+read_only({lit, _})                   -> true;
+read_only({var, _})                   -> true;
+read_only(nil)                        -> true;
+read_only({con, _, _, Es})            -> read_only(Es);
+read_only({tuple, Es})                -> read_only(Es);
+read_only({proj, E, _})               -> read_only(E);
+read_only({set_proj, A, _, B})        -> read_only([A, B]);
+read_only({op, _, Es})                -> read_only(Es);
+read_only({get_state, _})             -> true;
+read_only({set_state, _, _, _})       -> false;
+read_only({def_u, _, _})              -> true;
+read_only({remote_u, _, _, _, _, _})  -> true;
+read_only({builtin_u, _, _})          -> true;
+read_only({builtin_u, _, _, _})       -> true;
+read_only({lam, _, _})                -> true;
+read_only({def, _, _})                -> false; %% TODO: purity analysis
+read_only({remote, _, _, _, _, _, _}) -> false;
+read_only({builtin, _, _})            -> false; %% TODO: some builtins are
+read_only({switch, Split})            -> read_only(Split);
+read_only({split, _, _, Cases})       -> read_only(Cases);
+read_only({nosplit, E})               -> read_only(E);
+read_only({'case', _, Split})         -> read_only(Split);
+read_only({'let', _, A, B})           -> read_only([A, B]);
+read_only({funcall, _, _, _})         -> false;
+read_only({closure, _, _, _})         -> internal_error(no_closures_here);
+read_only(Es) when is_list(Es)        -> lists:all(fun read_only/1, Es).
 
 %% --- Deadcode elimination ---
 
@@ -1829,8 +1829,8 @@ free_vars(Expr) ->
         nil                  -> [];
         {def, _, As}         -> free_vars(As);
         {def_u, _, _}        -> [];
-        {remote, _, _, Ct, _, As}  -> free_vars([Ct | As]);
-        {remote_u, _, _, _, Ct, _} -> free_vars(Ct);
+        {remote, _, _, _, Ct, _, As} -> free_vars([Ct | As]);
+        {remote_u, _, _, _, Ct, _}   -> free_vars(Ct);
         {builtin, _, As}     -> free_vars(As);
         {builtin_u, _, _}    -> [];
         {builtin_u, _, _, _} -> [];     %% Typereps are always literals
@@ -1860,8 +1860,8 @@ used_defs(Expr) ->
         nil                  -> [];
         {def, F, As}         -> lists:umerge([F], used_defs(As));
         {def_u, F, _}        -> [F];
-        {remote, _, _, Ct, _, As}  -> used_defs([Ct | As]);
-        {remote_u, _, _, _, Ct, _} -> used_defs(Ct);
+        {remote, _, _, _, Ct, _, As} -> used_defs([Ct | As]);
+        {remote_u, _, _, _, Ct, _}   -> used_defs(Ct);
         {builtin, _, As}     -> used_defs(As);
         {builtin_u, _, _}    -> [];
         {builtin_u, _, _, _} -> [];
@@ -1894,8 +1894,8 @@ bottom_up(F, Env, Expr) ->
         {builtin, B, Es}                 -> {builtin, B, [bottom_up(F, Env, E) || E <- Es]};
         {builtin_u, _, _}                -> Expr;
         {builtin_u, _, _, _}             -> Expr;
-        {remote, ArgsT, RetT, Ct, Fun, Es}    -> {remote,        ArgsT, RetT, bottom_up(F, Env, Ct), Fun, [bottom_up(F, Env, E) || E <- Es]};
-        {remote_u, Ann, ArgsT, RetT, Ct, Fun} -> {remote_u, Ann, ArgsT, RetT, bottom_up(F, Env, Ct), Fun};
+        {remote, Ann, ArgsT, RetT, Ct, Fun, Es} -> {remote,   Ann, ArgsT, RetT, bottom_up(F, Env, Ct), Fun, [bottom_up(F, Env, E) || E <- Es]};
+        {remote_u, Ann, ArgsT, RetT, Ct, Fun}   -> {remote_u, Ann, ArgsT, RetT, bottom_up(F, Env, Ct), Fun};
         {con, Ar, I, Es}                 -> {con, Ar, I, [bottom_up(F, Env, E) || E <- Es]};
         {tuple, Es}                      -> {tuple, [bottom_up(F, Env, E) || E <- Es]};
         {proj, E, I}                     -> {proj, bottom_up(F, Env, E), I};
@@ -1952,8 +1952,8 @@ rename(Ren, Expr) ->
         {builtin, B, Es}        -> {builtin, B, [rename(Ren, E) || E <- Es]};
         {builtin_u, _, _}       -> Expr;
         {builtin_u, _, _, _}    -> Expr;
-        {remote, ArgsT, RetT, Ct, F, Es}    -> {remote,        ArgsT, RetT, rename(Ren, Ct), F, [rename(Ren, E) || E <- Es]};
-        {remote_u, Ann, ArgsT, RetT, Ct, F} -> {remote_u, Ann, ArgsT, RetT, rename(Ren, Ct), F};
+        {remote, Ann, ArgsT, RetT, Ct, F, Es} -> {remote,   Ann, ArgsT, RetT, rename(Ren, Ct), F, [rename(Ren, E) || E <- Es]};
+        {remote_u, Ann, ArgsT, RetT, Ct, F}   -> {remote_u, Ann, ArgsT, RetT, rename(Ren, Ct), F};
         {con, Ar, I, Es}        -> {con, Ar, I, [rename(Ren, E) || E <- Es]};
         {tuple, Es}             -> {tuple, [rename(Ren, E) || E <- Es]};
         {proj, E, I}            -> {proj, rename(Ren, E), I};
@@ -2203,7 +2203,7 @@ pp_fexpr({builtin, B, As}) ->
     pp_call(pp_text(B), As);
 pp_fexpr({remote_u, _, ArgsT, RetT, Ct, Fun}) ->
     pp_beside([pp_fexpr(Ct), pp_text("."), pp_fun_name(Fun), pp_text(" : "), pp_ftype({function, ArgsT, RetT})]);
-pp_fexpr({remote, ArgsT, RetT, Ct, Fun, As}) ->
+pp_fexpr({remote, _, ArgsT, RetT, Ct, Fun, As}) ->
     pp_call(pp_parens(pp_beside([pp_fexpr(Ct), pp_text("."), pp_fun_name(Fun), pp_text(" : "), pp_ftype({function, ArgsT, RetT})])), As);
 pp_fexpr({funcall, _, Fun, As}) ->
     pp_call(pp_fexpr(Fun), As);
