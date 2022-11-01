@@ -3627,7 +3627,7 @@ mk_error({multiple_main_contracts, Ann}) ->
     Msg = "Only one main contract can be defined.",
     mk_t_err(pos(Ann), Msg);
 mk_error({unify_varargs, When}) ->
-    Msg = "Cannot unify variable argument list.",
+    Msg = "Cannot infer types for variable argument list.",
     {Pos, Ctxt} = pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
 mk_error({clone_no_contract, Ann}) ->
