@@ -1148,9 +1148,9 @@ failing_contracts() ->
                   [<<?Pos(6,5)
                      "Cannot unify variable argument list.\n"
                      "when checking the application of\n"
-                     "  `g : (() => 'a) => 'a`\n"
+                     "  `g : (() => 'b) => 'b`\n"
                      "to arguments\n"
-                     "  `Chain.create : (value : int, var_args) => 'b`">>
+                     "  `Chain.create : (value : int, var_args) => 'c`">>
                   ])
     ].
 
