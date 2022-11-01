@@ -72,7 +72,7 @@
                | {set_proj, fexpr(), integer(), fexpr()}    %% tuple, field, new_value
                | {op, op(), [fexpr()]}
                | {'let', var_name(), fexpr(), fexpr()}
-               | {funcall, fexpr(), [fexpr()]}  %% Call to unknown function
+               | {funcall, fann(), fexpr(), [fexpr()]}  %% Call to unknown function
                | {closure, fun_name(), fexpr()}
                | {switch, fsplit()}
                | {set_state, state_reg(), fexpr()}
@@ -711,7 +711,7 @@ expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
     end;
 
 %% Function calls
-expr_to_fcode(Env, _, {app, _, Fun = {typed, _, FunE, {fun_t, _, NamedArgsT, ArgsT, Type}}, Args}) ->
+expr_to_fcode(Env, _, {app, _, Fun = {typed, Ann, FunE, {fun_t, _, NamedArgsT, ArgsT, Type}}, Args}) ->
     Args1 = get_named_args(NamedArgsT, Args),
     FArgs = [expr_to_fcode(Env, Arg) || Arg <- Args1],
     case expr_to_fcode(Env, Fun) of
@@ -739,7 +739,7 @@ expr_to_fcode(Env, _, {app, _, Fun = {typed, _, FunE, {fun_t, _, NamedArgsT, Arg
         FFun ->
             %% FFun is a closure, with first component the function name and
             %% second component the environment
-            Call = fun(X) -> {funcall, {proj, {var, X}, 0}, [{proj, {var, X}, 1} | FArgs]} end,
+            Call = fun(X) -> {funcall, to_fann(Ann), {proj, {var, X}, 0}, [{proj, {var, X}, 1} | FArgs]} end,
             case FFun of
                 {var, X} -> Call(X);
                 _        -> X = fresh_name(),
@@ -1286,7 +1286,7 @@ lambda_lift_expr(Layout, Expr) ->
         {set_proj, A, I, B}    -> {set_proj, lambda_lift_expr(Layout, A), I, lambda_lift_expr(Layout, B)};
         {op, Op, As}           -> {op, Op, lambda_lift_exprs(Layout, As)};
         {'let', X, A, B}       -> {'let', X, lambda_lift_expr(Layout, A), lambda_lift_expr(Layout, B)};
-        {funcall, A, Bs}       -> {funcall, lambda_lift_expr(Layout, A), lambda_lift_exprs(Layout, Bs)};
+        {funcall, Ann, A, Bs}  -> {funcall, Ann, lambda_lift_expr(Layout, A), lambda_lift_exprs(Layout, Bs)};
         {set_state, R, A}      -> {set_state, R, lambda_lift_expr(Layout, A)};
         {get_state, _}         -> Expr;
         {switch, S}            -> {switch, lambda_lift_expr(Layout, S)};
@@ -1370,7 +1370,7 @@ make_lets([E | Es], Xs, Body) ->
 inline_local_functions(Expr) ->
     bottom_up(fun inline_local_functions/2, Expr).
 
-inline_local_functions(Env, {funcall, {proj, {var, Y}, 0}, [{proj, {var, Y}, 1} | Args]} = Expr) ->
+inline_local_functions(Env, {funcall, _, {proj, {var, Y}, 0}, [{proj, {var, Y}, 1} | Args]} = Expr) ->
     %% TODO: Don't always inline local funs?
     case maps:get(Y, Env, free) of
         {lam, Xs, Body} -> let_bind(lists:zip(Xs, Args), Body);
@@ -1609,7 +1609,7 @@ read_only({split, _, _, Cases})    -> read_only(Cases);
 read_only({nosplit, E})            -> read_only(E);
 read_only({'case', _, Split})      -> read_only(Split);
 read_only({'let', _, A, B})        -> read_only([A, B]);
-read_only({funcall, _, _})         -> false;
+read_only({funcall, _, _, _})      -> false;
 read_only({closure, _, _})         -> internal_error(no_closures_here);
 read_only(Es) when is_list(Es)     -> lists:all(fun read_only/1, Es).
 
@@ -1837,7 +1837,7 @@ free_vars(Expr) ->
         {set_proj, A, _, B}  -> free_vars([A, B]);
         {op, _, As}          -> free_vars(As);
         {'let', X, A, B}     -> free_vars([A, {lam, [X], B}]);
-        {funcall, A, Bs}     -> free_vars([A | Bs]);
+        {funcall, _, A, Bs}  -> free_vars([A | Bs]);
         {set_state, _, A}    -> free_vars(A);
         {get_state, _}       -> [];
         {lam, Xs, B}         -> free_vars(B) -- lists:sort(Xs);
@@ -1868,7 +1868,7 @@ used_defs(Expr) ->
         {set_proj, A, _, B}  -> used_defs([A, B]);
         {op, _, As}          -> used_defs(As);
         {'let', _, A, B}     -> used_defs([A, B]);
-        {funcall, A, Bs}     -> used_defs([A | Bs]);
+        {funcall, _, A, Bs}  -> used_defs([A | Bs]);
         {set_state, _, A}    -> used_defs(A);
         {get_state, _}       -> [];
         {lam, _, B}          -> used_defs(B);
@@ -1898,7 +1898,7 @@ bottom_up(F, Env, Expr) ->
         {proj, E, I}                     -> {proj, bottom_up(F, Env, E), I};
         {set_proj, R, I, E}              -> {set_proj, bottom_up(F, Env, R), I, bottom_up(F, Env, E)};
         {op, Op, Es}                     -> {op, Op, [bottom_up(F, Env, E) || E <- Es]};
-        {funcall, Fun, Es}               -> {funcall, bottom_up(F, Env, Fun), [bottom_up(F, Env, E) || E <- Es]};
+        {funcall, Ann, Fun, Es}          -> {funcall, Ann, bottom_up(F, Env, Fun), [bottom_up(F, Env, E) || E <- Es]};
         {set_state, R, E}                -> {set_state, R, bottom_up(F, Env, E)};
         {get_state, _}                   -> Expr;
         {closure, F, CEnv}               -> {closure, F, bottom_up(F, Env, CEnv)};
@@ -1941,26 +1941,26 @@ get_named_arg({named_arg_t, _, {id, _, Name}, _, Default}, Args) ->
 -spec rename([{var_name(), var_name()}], fexpr()) -> fexpr().
 rename(Ren, Expr) ->
     case Expr of
-        {lit, _}              -> Expr;
-        nil                   -> nil;
-        {var, X}              -> {var, rename_var(Ren, X)};
-        {def, D, Es}          -> {def, D, [rename(Ren, E) || E <- Es]};
-        {def_u, _, _}         -> Expr;
-        {builtin, B, Es}      -> {builtin, B, [rename(Ren, E) || E <- Es]};
-        {builtin_u, _, _}     -> Expr;
-        {builtin_u, _, _, _}  -> Expr;
+        {lit, _}                -> Expr;
+        nil                     -> nil;
+        {var, X}                -> {var, rename_var(Ren, X)};
+        {def, D, Es}            -> {def, D, [rename(Ren, E) || E <- Es]};
+        {def_u, _, _}           -> Expr;
+        {builtin, B, Es}        -> {builtin, B, [rename(Ren, E) || E <- Es]};
+        {builtin_u, _, _}       -> Expr;
+        {builtin_u, _, _, _}    -> Expr;
         {remote, ArgsT, RetT, Ct, F, Es} -> {remote,   ArgsT, RetT, rename(Ren, Ct), F, [rename(Ren, E) || E <- Es]};
         {remote_u, ArgsT, RetT, Ct, F}   -> {remote_u, ArgsT, RetT, rename(Ren, Ct), F};
-        {con, Ar, I, Es}      -> {con, Ar, I, [rename(Ren, E) || E <- Es]};
-        {tuple, Es}           -> {tuple, [rename(Ren, E) || E <- Es]};
-        {proj, E, I}          -> {proj, rename(Ren, E), I};
-        {set_proj, R, I, E}   -> {set_proj, rename(Ren, R), I, rename(Ren, E)};
-        {op, Op, Es}          -> {op, Op, [rename(Ren, E) || E <- Es]};
-        {funcall, Fun, Es}    -> {funcall, rename(Ren, Fun), [rename(Ren, E) || E <- Es]};
-        {set_state, R, E}     -> {set_state, R, rename(Ren, E)};
-        {get_state, _}        -> Expr;
-        {closure, F, Env}     -> {closure, F, rename(Ren, Env)};
-        {switch, Split}       -> {switch, rename_split(Ren, Split)};
+        {con, Ar, I, Es}        -> {con, Ar, I, [rename(Ren, E) || E <- Es]};
+        {tuple, Es}             -> {tuple, [rename(Ren, E) || E <- Es]};
+        {proj, E, I}            -> {proj, rename(Ren, E), I};
+        {set_proj, R, I, E}     -> {set_proj, rename(Ren, R), I, rename(Ren, E)};
+        {op, Op, Es}            -> {op, Op, [rename(Ren, E) || E <- Es]};
+        {funcall, Ann, Fun, Es} -> {funcall, Ann, rename(Ren, Fun), [rename(Ren, E) || E <- Es]};
+        {set_state, R, E}       -> {set_state, R, rename(Ren, E)};
+        {get_state, _}          -> Expr;
+        {closure, F, Env}       -> {closure, F, rename(Ren, Env)};
+        {switch, Split}         -> {switch, rename_split(Ren, Split)};
         {lam, Xs, B} ->
             {Zs, Ren1} = rename_bindings(Ren, Xs),
             {lam, Zs, rename(Ren1, B)};
@@ -2202,7 +2202,7 @@ pp_fexpr({remote_u, ArgsT, RetT, Ct, Fun}) ->
     pp_beside([pp_fexpr(Ct), pp_text("."), pp_fun_name(Fun), pp_text(" : "), pp_ftype({function, ArgsT, RetT})]);
 pp_fexpr({remote, ArgsT, RetT, Ct, Fun, As}) ->
     pp_call(pp_parens(pp_beside([pp_fexpr(Ct), pp_text("."), pp_fun_name(Fun), pp_text(" : "), pp_ftype({function, ArgsT, RetT})])), As);
-pp_fexpr({funcall, Fun, As}) ->
+pp_fexpr({funcall, _, Fun, As}) ->
     pp_call(pp_fexpr(Fun), As);
 pp_fexpr({set_state, R, A}) ->
     pp_call(pp_text("set_state"), [{lit, {int, R}}, A]);
