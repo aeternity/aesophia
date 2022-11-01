@@ -2856,6 +2856,8 @@ unify0(Env, A, B, Variance, When) ->
 
 unify1(_Env, {uvar, _, R}, {uvar, _, R}, _Variance, _When) ->
     true;
+unify1(_Env, {uvar, _, _}, {fun_t, _, _, var_args, _}, _Variance, When) ->
+    type_error({unify_varargs, When});
 unify1(Env, {uvar, A, R}, T, _Variance, When) ->
     case occurs_check(R, T) of
         true ->
@@ -3625,7 +3627,7 @@ mk_error({multiple_main_contracts, Ann}) ->
     Msg = "Only one main contract can be defined.",
     mk_t_err(pos(Ann), Msg);
 mk_error({unify_varargs, When}) ->
-    Msg = "Cannot unify variable argument list.",
+    Msg = "Cannot infer types for variable argument list.",
     {Pos, Ctxt} = pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
 mk_error({clone_no_contract, Ann}) ->

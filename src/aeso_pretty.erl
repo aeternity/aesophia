@@ -261,6 +261,8 @@ type(Type, Options) ->
     with_options(Options, fun() -> type(Type) end).
 
 -spec type(aeso_syntax:type()) -> doc().
+type(F = {fun_t, _, _, var_args, _}) ->
+    type(setelement(4, F, [var_args]));
 type({fun_t, _, Named, Args, Ret}) ->
     follow(hsep(args_type(Named ++ Args), text("=>")), type(Ret));
 type({type_sig, _, Named, Args, Ret}) ->
@@ -288,7 +290,9 @@ type(T = {id, _, _})   -> name(T);
 type(T = {qid, _, _})  -> name(T);
 type(T = {con, _, _})  -> name(T);
 type(T = {qcon, _, _}) -> name(T);
-type(T = {tvar, _, _}) -> name(T).
+type(T = {tvar, _, _}) -> name(T);
+
+type(var_args) -> text("var_args").
 
 -spec args_type([aeso_syntax:type()]) -> doc().
 args_type(Args) ->
