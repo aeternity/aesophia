@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ```
 - Return a mapping from variables to FATE registers in the compilation output.
 ### Changed
+- Type definitions serialised to ACI as `typedefs` field instead of `type_defs` to increase compatibility.
 ### Removed
 ### Fixed
 

@@ -91,7 +91,7 @@ encode_contract(Contract = {Head, _, {con, _, Name}, _, _}) when ?IS_CONTRACT_HE
     {Es, Tdefs1} = lists:partition(FilterT(<<"event">>), Tdefs0),
     {Ss, Tdefs}  = lists:partition(FilterT(<<"state">>), Tdefs1),
 
-    C1 = C0#{type_defs => Tdefs},
+    C1 = C0#{typedefs => Tdefs},
 
     C2 = case Es of
              []                 -> C1;
@@ -111,7 +111,7 @@ encode_contract(Contract = {Head, _, {con, _, Name}, _, _}) when ?IS_CONTRACT_HE
 encode_contract(Namespace = {namespace, _, {con, _, Name}, _}) ->
     Tdefs = [ encode_typedef(T) || T <- sort_decls(contract_types(Namespace)) ],
     #{namespace => #{name => encode_name(Name),
-                     type_defs => Tdefs}}.
+                     typedefs => Tdefs}}.
 
 %%  Encode a function definition. Currently we are only interested in
 %%  the interface and type.
@@ -234,7 +234,7 @@ do_render_aci_json(Json) ->
 decode_contract(#{contract := #{name := Name,
                                 kind := Kind,
                                 payable := Payable,
-                                type_defs := Ts0,
+                                typedefs := Ts0,
                                 functions := Fs} = C}) ->
     MkTDef = fun(N, T) -> #{name => N, vars => [], typedef => T} end,
     Ts = [ MkTDef(<<"state">>, maps:get(state, C)) || maps:is_key(state, C) ] ++
@@ -246,7 +246,7 @@ decode_contract(#{contract := #{name := Name,
                        end,
      io_lib:format("~s", [Name])," =\n",
      decode_tdefs(Ts), decode_funcs(Fs)];
-decode_contract(#{namespace := #{name := Name, type_defs := Ts}}) when Ts /= [] ->
+decode_contract(#{namespace := #{name := Name, typedefs := Ts}}) when Ts /= [] ->
     ["namespace ", io_lib:format("~s", [Name])," =\n",
      decode_tdefs(Ts)];
 decode_contract(_) -> [].
