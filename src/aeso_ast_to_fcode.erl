@@ -73,7 +73,7 @@
                | {op, op(), [fexpr()]}
                | {'let', var_name(), fexpr(), fexpr()}
                | {funcall, fann(), fexpr(), [fexpr()]}  %% Call to unknown function
-               | {closure, fun_name(), fexpr()}
+               | {closure, fann(), fun_name(), fexpr()}
                | {switch, fsplit()}
                | {set_state, state_reg(), fexpr()}
                | {get_state, state_reg()}
@@ -379,6 +379,9 @@ to_fcode(Env, [{namespace, _, {con, _, Con}, Decls} | Code]) ->
 -spec to_fann(aeso_syntax:ann()) -> fann().
 to_fann(Ann) ->
     proplists:lookup_all(line, Ann).
+
+-spec get_fann(fexpr()) -> fann().
+get_fann(FExpr) -> element(2, FExpr).
 
 -spec decls_to_fcode(env(), [aeso_syntax:decl()]) -> env().
 decls_to_fcode(Env, Decls) ->
@@ -1246,7 +1249,7 @@ lifted_fun(FVs, Xs, Body) ->
 make_closure(FVs, Xs, Body) ->
     Fun   = add_lambda_fun(lifted_fun(FVs, Xs, Body)),
     Tup = fun([Y]) -> Y; (Ys) -> {tuple, Ys} end,
-    {closure, Fun, Tup([{var, Y} || Y <- FVs])}.
+    {closure, get_fann(Body), Fun, Tup([{var, Y} || Y <- FVs])}.
 
 lambda_lift_expr(Layout, {lam, Xs, Body}) ->
     FVs   = free_vars({lam, Xs, Body}),
@@ -1276,7 +1279,7 @@ lambda_lift_expr(Layout, Expr) ->
         {lit, _}               -> Expr;
         nil                    -> Expr;
         {var, _}               -> Expr;
-        {closure, _, _}        -> Expr;
+        {closure, _, _, _}     -> Expr;
         {def, D, As}           -> {def, D, lambda_lift_exprs(Layout, As)};
         {builtin, B, As}       -> {builtin, B, lambda_lift_exprs(Layout, As)};
         {remote, ArgsT, RetT, Ct, F, As} -> {remote, ArgsT, RetT, lambda_lift_expr(Layout, Ct), F, lambda_lift_exprs(Layout, As)};
@@ -1610,7 +1613,7 @@ read_only({nosplit, E})            -> read_only(E);
 read_only({'case', _, Split})      -> read_only(Split);
 read_only({'let', _, A, B})        -> read_only([A, B]);
 read_only({funcall, _, _, _})      -> false;
-read_only({closure, _, _})         -> internal_error(no_closures_here);
+read_only({closure, _, _, _})      -> internal_error(no_closures_here);
 read_only(Es) when is_list(Es)     -> lists:all(fun read_only/1, Es).
 
 %% --- Deadcode elimination ---
@@ -1841,7 +1844,7 @@ free_vars(Expr) ->
         {set_state, _, A}    -> free_vars(A);
         {get_state, _}       -> [];
         {lam, Xs, B}         -> free_vars(B) -- lists:sort(Xs);
-        {closure, _, A}      -> free_vars(A);
+        {closure, _, _, A}   -> free_vars(A);
         {switch, A}          -> free_vars(A);
         {split, _, X, As}    -> free_vars([{var, X} | As]);
         {nosplit, A}         -> free_vars(A);
@@ -1872,7 +1875,7 @@ used_defs(Expr) ->
         {set_state, _, A}    -> used_defs(A);
         {get_state, _}       -> [];
         {lam, _, B}          -> used_defs(B);
-        {closure, F, A}      -> lists:umerge([F], used_defs(A));
+        {closure, _, F, A}   -> lists:umerge([F], used_defs(A));
         {switch, A}          -> used_defs(A);
         {split, _, _, As}    -> used_defs(As);
         {nosplit, A}         -> used_defs(A);
@@ -1901,7 +1904,7 @@ bottom_up(F, Env, Expr) ->
         {funcall, Ann, Fun, Es}          -> {funcall, Ann, bottom_up(F, Env, Fun), [bottom_up(F, Env, E) || E <- Es]};
         {set_state, R, E}                -> {set_state, R, bottom_up(F, Env, E)};
         {get_state, _}                   -> Expr;
-        {closure, F, CEnv}               -> {closure, F, bottom_up(F, Env, CEnv)};
+        {closure, Ann, F, CEnv}          -> {closure, Ann, F, bottom_up(F, Env, CEnv)};
         {switch, Split}                  -> {switch, bottom_up(F, Env, Split)};
         {lam, Xs, B}                     -> {lam, Xs, bottom_up(F, Env, B)};
         {'let', X, E, Body}              ->
@@ -1959,7 +1962,7 @@ rename(Ren, Expr) ->
         {funcall, Ann, Fun, Es} -> {funcall, Ann, rename(Ren, Fun), [rename(Ren, E) || E <- Es]};
         {set_state, R, E}       -> {set_state, R, rename(Ren, E)};
         {get_state, _}          -> Expr;
-        {closure, F, Env}       -> {closure, F, rename(Ren, Env)};
+        {closure, Ann, F, Env}  -> {closure, Ann, F, rename(Ren, Env)};
         {switch, Split}         -> {switch, rename_split(Ren, Split)};
         {lam, Xs, B} ->
             {Zs, Ren1} = rename_bindings(Ren, Xs),
@@ -2160,7 +2163,7 @@ pp_fexpr({proj, E, I}) ->
 pp_fexpr({lam, Xs, A}) ->
     pp_par([pp_fexpr({tuple, [{var, X} || X <- Xs]}), pp_text("=>"),
             prettypr:nest(2, pp_fexpr(A))]);
-pp_fexpr({closure, Fun, ClEnv}) ->
+pp_fexpr({closure, _, Fun, ClEnv}) ->
     FVs = case ClEnv of
               {tuple, Xs} -> Xs;
               {var, _}    -> [ClEnv]
