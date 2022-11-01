@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Type definitions serialised to ACI as `typedefs` field instead of `type_defs` to increase compatibility.
 ### Removed
 ### Fixed
+- Typechecker crashes if Chain.create or Chain.clone are used without arguments.
 
 ## [7.0.1]
 ### Added
