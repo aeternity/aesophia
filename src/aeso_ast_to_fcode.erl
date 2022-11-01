@@ -58,6 +58,8 @@
               | {contract_code, string()} %% for CREATE, by name
               | {typerep, ftype()}.
 
+-type fann() :: [ {line, aeso_syntax:ann_line()} ].
+
 -type fexpr() :: {lit, flit()}
                | nil
                | {var, var_name()}
@@ -373,6 +375,10 @@ to_fcode(Env, [{Contract, Attrs, {con, _, Name}, _Impls, Decls}|Rest])
 to_fcode(Env, [{namespace, _, {con, _, Con}, Decls} | Code]) ->
     Env1 = decls_to_fcode(Env#{ context => {namespace, Con} }, Decls),
     to_fcode(Env1, Code).
+
+-spec to_fann(aeso_syntax:ann()) -> fann().
+to_fann(Ann) ->
+    proplists:lookup_all(line, Ann).
 
 -spec decls_to_fcode(env(), [aeso_syntax:decl()]) -> env().
 decls_to_fcode(Env, Decls) ->
