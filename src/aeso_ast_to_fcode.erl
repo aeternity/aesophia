@@ -68,7 +68,7 @@
                | {builtin, builtin(), [fexpr()]}
                | {con, arities(), tag(), [fexpr()]}
                | {tuple, [fexpr()]}
-               | {proj, fexpr(), integer()}
+               | {proj, fann(), fexpr(), integer()}
                | {set_proj, fexpr(), integer(), fexpr()}    %% tuple, field, new_value
                | {op, op(), [fexpr()]}
                | {'let', var_name(), fexpr(), fexpr()}
@@ -606,7 +606,7 @@ expr_to_fcode(Env, Type, {proj, Ann, Rec = {typed, _, _, RecType}, {id, _, X}}) 
                        {entrypoint, list_to_binary(X)}};
         {record_t, [_]} -> expr_to_fcode(Env, Rec); %% Singleton record
         {record_t, _} ->
-            {proj, expr_to_fcode(Env, Rec), field_index(Rec, X)}
+            {proj, to_fann(Ann), expr_to_fcode(Env, Rec), field_index(Rec, X)}
     end;
 
 expr_to_fcode(Env, {record_t, [FieldT]}, {record, _Ann, [_] = Fields}) ->
@@ -626,9 +626,9 @@ expr_to_fcode(Env, {record_t, [FieldT]}, {record, _Ann, Rec, Fields}) ->
         {set, E}    -> expr_to_fcode(Env, E);
         {upd, Z, E} -> {'let', Z, expr_to_fcode(Env, Rec), expr_to_fcode(bind_var(Env, Z), E)}
     end;
-expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Rec, Fields}) ->
+expr_to_fcode(Env, {record_t, FieldTypes}, {record, Ann, Rec, Fields}) ->
     X    = fresh_name(),
-    Proj = fun(I) -> {proj, {var, X}, I - 1} end,
+    Proj = fun(I) -> {proj, to_fann(Ann), {var, X}, I - 1} end,
     Comp = fun({I, false})       -> Proj(I);
               ({_, {set, E}})    -> expr_to_fcode(Env, E);
               ({I, {upd, Z, E}}) -> {'let', Z, Proj(I), expr_to_fcode(bind_var(Env, Z), E)}
@@ -742,7 +742,8 @@ expr_to_fcode(Env, _, {app, _, Fun = {typed, Ann, FunE, {fun_t, _, NamedArgsT, A
         FFun ->
             %% FFun is a closure, with first component the function name and
             %% second component the environment
-            Call = fun(X) -> {funcall, to_fann(Ann), {proj, {var, X}, 0}, [{proj, {var, X}, 1} | FArgs]} end,
+            FAnn = to_fann(Ann),
+            Call = fun(X) -> {funcall, FAnn, {proj, FAnn, {var, X}, 0}, [{proj, FAnn, {var, X}, 1} | FArgs]} end,
             case FFun of
                 {var, X} -> Call(X);
                 _        -> X = fresh_name(),
@@ -1119,7 +1120,7 @@ set_state({reg, R}, Val) ->
 set_state({tuple, Ls}, Val) ->
     ?make_let(X, Val,
     lists:foldr(fun({I, L}, Code) ->
-                    {'let', "_", set_state(L, {proj, X, I - 1}), Code}
+                    {'let', "_", set_state(L, {proj, get_fann(Val), X, I - 1}), Code}
                 end, {tuple, []}, indexed(Ls))).
 
 get_state({reg, R}) ->
@@ -1239,7 +1240,7 @@ lifted_fun([Z], Xs, Body) ->
        body   => Body };
 lifted_fun(FVs, Xs, Body) ->
     Z    = "%env",
-    Proj = fun({I, Y}, E) -> {'let', Y, {proj, {var, Z}, I - 1}, E} end,
+    Proj = fun({I, Y}, E) -> {'let', Y, {proj, get_fann(Body), {var, Z}, I - 1}, E} end,
     #{ attrs  => [private],
        args   => [{Z, any} | [{X, any} || X <- Xs]],
        return => any,
@@ -1285,7 +1286,7 @@ lambda_lift_expr(Layout, Expr) ->
         {remote, Ann, ArgsT, RetT, Ct, F, As} -> {remote, Ann, ArgsT, RetT, lambda_lift_expr(Layout, Ct), F, lambda_lift_exprs(Layout, As)};
         {con, Ar, C, As}       -> {con, Ar, C, lambda_lift_exprs(Layout, As)};
         {tuple, As}            -> {tuple, lambda_lift_exprs(Layout, As)};
-        {proj, A, I}           -> {proj, lambda_lift_expr(Layout, A), I};
+        {proj, Ann, A, I}      -> {proj, Ann, lambda_lift_expr(Layout, A), I};
         {set_proj, A, I, B}    -> {set_proj, lambda_lift_expr(Layout, A), I, lambda_lift_expr(Layout, B)};
         {op, Op, As}           -> {op, Op, lambda_lift_exprs(Layout, As)};
         {'let', X, A, B}       -> {'let', X, lambda_lift_expr(Layout, A), lambda_lift_expr(Layout, B)};
@@ -1373,7 +1374,7 @@ make_lets([E | Es], Xs, Body) ->
 inline_local_functions(Expr) ->
     bottom_up(fun inline_local_functions/2, Expr).
 
-inline_local_functions(Env, {funcall, _, {proj, {var, Y}, 0}, [{proj, {var, Y}, 1} | Args]} = Expr) ->
+inline_local_functions(Env, {funcall, _, {proj, _, {var, Y}, 0}, [{proj, _, {var, Y}, 1} | Args]} = Expr) ->
     %% TODO: Don't always inline local funs?
     case maps:get(Y, Env, free) of
         {lam, Xs, Body} -> let_bind(lists:zip(Xs, Args), Body);
@@ -1387,8 +1388,8 @@ let_floating(Expr) -> bottom_up(fun let_float/2, Expr).
 
 let_float(_, {'let', X, E, Body}) ->
     pull_out_let({'let', X, {here, E}, Body});
-let_float(_, {proj, E, I}) ->
-    pull_out_let({proj, {here, E}, I});
+let_float(_, {proj, Ann, E, I}) ->
+    pull_out_let({proj, Ann, {here, E}, I});
 let_float(_, {set_proj, E, I, V}) ->
     pull_out_let({set_proj, {here, E}, I, {here, V}});
 let_float(_, {op, Op, Es}) ->
@@ -1433,7 +1434,7 @@ simplifier(Expr) ->
 
 %% (e₀, .., en).i ->
 %% let _ = e₀ in .. let x = ei in .. let _ = en in x
-simplify(_Env, {proj, {tuple, Es}, I}) ->
+simplify(_Env, {proj, _, {tuple, Es}, I}) ->
     It  = lists:nth(I + 1, Es),
     X   = fresh_name(),
     Dup = safe_to_duplicate(It),
@@ -1452,7 +1453,7 @@ simplify(_Env, {proj, {tuple, Es}, I}) ->
         end, Val, indexed(Es));
 
 %% let x = e in .. x.i ..
-simplify(Env, {proj, {var, X}, I} = Expr) ->
+simplify(Env, {proj, _, {var, X}, I} = Expr) ->
     case simpl_proj(Env, I, {var, X}) of
         false -> Expr;
         E     -> E
@@ -1479,7 +1480,7 @@ simpl_proj(Env, I, Expr) ->
         {tuple, Es}           -> IfSafe(lists:nth(I + 1, Es));
         {set_proj, _, I, Val} -> IfSafe(Val);
         {set_proj, E, _, _}   -> simpl_proj(Env, I, E);
-        {proj, E, J}          -> simpl_proj(Env, I, simpl_proj(Env, J, E));
+        {proj, _, E, J}       -> simpl_proj(Env, I, simpl_proj(Env, J, E));
         _                     -> false
     end.
 
@@ -1555,7 +1556,7 @@ constructor_form(Env, Expr) ->
                 {tuple, Es} -> {tuple, setnth(I + 1, V, Es)};
                 _           -> false
             end;
-        {proj, E, I} ->
+        {proj, _, E, I} ->
             case constructor_form(Env, E) of
                 {tuple, Es} -> constructor_form(Env, lists:nth(I + 1, Es));
                 _           -> false
@@ -1594,7 +1595,7 @@ read_only({var, _})                   -> true;
 read_only(nil)                        -> true;
 read_only({con, _, _, Es})            -> read_only(Es);
 read_only({tuple, Es})                -> read_only(Es);
-read_only({proj, E, _})               -> read_only(E);
+read_only({proj, _, E, _})            -> read_only(E);
 read_only({set_proj, A, _, B})        -> read_only([A, B]);
 read_only({op, _, Es})                -> read_only(Es);
 read_only({get_state, _})             -> true;
@@ -1836,7 +1837,7 @@ free_vars(Expr) ->
         {builtin_u, _, _, _} -> [];     %% Typereps are always literals
         {con, _, _, As}      -> free_vars(As);
         {tuple, As}          -> free_vars(As);
-        {proj, A, _}         -> free_vars(A);
+        {proj, _, A, _}      -> free_vars(A);
         {set_proj, A, _, B}  -> free_vars([A, B]);
         {op, _, As}          -> free_vars(As);
         {'let', X, A, B}     -> free_vars([A, {lam, [X], B}]);
@@ -1867,7 +1868,7 @@ used_defs(Expr) ->
         {builtin_u, _, _, _} -> [];
         {con, _, _, As}      -> used_defs(As);
         {tuple, As}          -> used_defs(As);
-        {proj, A, _}         -> used_defs(A);
+        {proj, _, A, _}      -> used_defs(A);
         {set_proj, A, _, B}  -> used_defs([A, B]);
         {op, _, As}          -> used_defs(As);
         {'let', _, A, B}     -> used_defs([A, B]);
@@ -1898,7 +1899,7 @@ bottom_up(F, Env, Expr) ->
         {remote_u, Ann, ArgsT, RetT, Ct, Fun}   -> {remote_u, Ann, ArgsT, RetT, bottom_up(F, Env, Ct), Fun};
         {con, Ar, I, Es}                 -> {con, Ar, I, [bottom_up(F, Env, E) || E <- Es]};
         {tuple, Es}                      -> {tuple, [bottom_up(F, Env, E) || E <- Es]};
-        {proj, E, I}                     -> {proj, bottom_up(F, Env, E), I};
+        {proj, Ann, E, I}                -> {proj, Ann, bottom_up(F, Env, E), I};
         {set_proj, R, I, E}              -> {set_proj, bottom_up(F, Env, R), I, bottom_up(F, Env, E)};
         {op, Op, Es}                     -> {op, Op, [bottom_up(F, Env, E) || E <- Es]};
         {funcall, Ann, Fun, Es}          -> {funcall, Ann, bottom_up(F, Env, Fun), [bottom_up(F, Env, E) || E <- Es]};
@@ -1956,7 +1957,7 @@ rename(Ren, Expr) ->
         {remote_u, Ann, ArgsT, RetT, Ct, F}   -> {remote_u, Ann, ArgsT, RetT, rename(Ren, Ct), F};
         {con, Ar, I, Es}        -> {con, Ar, I, [rename(Ren, E) || E <- Es]};
         {tuple, Es}             -> {tuple, [rename(Ren, E) || E <- Es]};
-        {proj, E, I}            -> {proj, rename(Ren, E), I};
+        {proj, Ann, E, I}       -> {proj, Ann, rename(Ren, E), I};
         {set_proj, R, I, E}     -> {set_proj, rename(Ren, R), I, rename(Ren, E)};
         {op, Op, Es}            -> {op, Op, [rename(Ren, E) || E <- Es]};
         {funcall, Ann, Fun, Es} -> {funcall, Ann, rename(Ren, Fun), [rename(Ren, E) || E <- Es]};
@@ -2158,7 +2159,7 @@ pp_fexpr({con, _, I, Es}) ->
               pp_fexpr({tuple, Es}));
 pp_fexpr({tuple, Es}) ->
     pp_parens(pp_par(pp_punctuate(pp_text(","), [pp_fexpr(E) || E <- Es])));
-pp_fexpr({proj, E, I}) ->
+pp_fexpr({proj, _, E, I}) ->
     pp_beside([pp_fexpr(E), pp_text("."), pp_int(I)]);
 pp_fexpr({lam, Xs, A}) ->
     pp_par([pp_fexpr({tuple, [{var, X} || X <- Xs]}), pp_text("=>"),
