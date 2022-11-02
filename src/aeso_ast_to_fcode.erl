@@ -69,7 +69,7 @@
                | {con, arities(), tag(), [fexpr()]}
                | {tuple, [fexpr()]}
                | {proj, fann(), fexpr(), integer()}
-               | {set_proj, fexpr(), integer(), fexpr()}    %% tuple, field, new_value
+               | {set_proj, fann(), fexpr(), integer(), fexpr()}    %% tuple, field, new_value
                | {op, op(), [fexpr()]}
                | {'let', var_name(), fexpr(), fexpr()}
                | {funcall, fann(), fexpr(), [fexpr()]}  %% Call to unknown function
@@ -634,8 +634,8 @@ expr_to_fcode(Env, {record_t, FieldTypes}, {record, Ann, Rec, Fields}) ->
               ({I, {upd, Z, E}}) -> {'let', Z, Proj(I), expr_to_fcode(bind_var(Env, Z), E)}
            end,
     Set  = fun({_, false}, R)       -> R;
-              ({I, {set, E}}, R)    -> {set_proj, R, I - 1, expr_to_fcode(Env, E)};
-              ({I, {upd, Z, E}}, R) -> {set_proj, R, I - 1,
+              ({I, {set, E}}, R)    -> {set_proj, to_fann(Ann), R, I - 1, expr_to_fcode(Env, E)};
+              ({I, {upd, Z, E}}, R) -> {set_proj, to_fann(Ann), R, I - 1,
                                         {'let', Z, Proj(I), expr_to_fcode(bind_var(Env, Z), E)}}
            end,
     Expand  = length(Fields) == length(FieldTypes),
@@ -1277,26 +1277,26 @@ lambda_lift_expr(Layout, {remote_u, Ann, ArgsT, RetT, Ct, F}) ->
     make_closure(FVs, Xs, {remote, Ann, ArgsT, RetT, Ct1, F, Args});
 lambda_lift_expr(Layout, Expr) ->
     case Expr of
-        {lit, _}               -> Expr;
-        nil                    -> Expr;
-        {var, _}               -> Expr;
-        {closure, _, _, _}     -> Expr;
-        {def, D, As}           -> {def, D, lambda_lift_exprs(Layout, As)};
-        {builtin, B, As}       -> {builtin, B, lambda_lift_exprs(Layout, As)};
+        {lit, _}                 -> Expr;
+        nil                      -> Expr;
+        {var, _}                 -> Expr;
+        {closure, _, _, _}       -> Expr;
+        {def, D, As}             -> {def, D, lambda_lift_exprs(Layout, As)};
+        {builtin, B, As}         -> {builtin, B, lambda_lift_exprs(Layout, As)};
         {remote, Ann, ArgsT, RetT, Ct, F, As} -> {remote, Ann, ArgsT, RetT, lambda_lift_expr(Layout, Ct), F, lambda_lift_exprs(Layout, As)};
-        {con, Ar, C, As}       -> {con, Ar, C, lambda_lift_exprs(Layout, As)};
-        {tuple, As}            -> {tuple, lambda_lift_exprs(Layout, As)};
-        {proj, Ann, A, I}      -> {proj, Ann, lambda_lift_expr(Layout, A), I};
-        {set_proj, A, I, B}    -> {set_proj, lambda_lift_expr(Layout, A), I, lambda_lift_expr(Layout, B)};
-        {op, Op, As}           -> {op, Op, lambda_lift_exprs(Layout, As)};
-        {'let', X, A, B}       -> {'let', X, lambda_lift_expr(Layout, A), lambda_lift_expr(Layout, B)};
-        {funcall, Ann, A, Bs}  -> {funcall, Ann, lambda_lift_expr(Layout, A), lambda_lift_exprs(Layout, Bs)};
-        {set_state, Ann, R, A} -> {set_state, Ann, R, lambda_lift_expr(Layout, A)};
-        {get_state, _}         -> Expr;
-        {switch, S}            -> {switch, lambda_lift_expr(Layout, S)};
-        {split, Type, X, Alts} -> {split, Type, X, lambda_lift_exprs(Layout, Alts)};
-        {nosplit, A}           -> {nosplit, lambda_lift_expr(Layout, A)};
-        {'case', P, S}         -> {'case', P, lambda_lift_expr(Layout, S)}
+        {con, Ar, C, As}         -> {con, Ar, C, lambda_lift_exprs(Layout, As)};
+        {tuple, As}              -> {tuple, lambda_lift_exprs(Layout, As)};
+        {proj, Ann, A, I}        -> {proj, Ann, lambda_lift_expr(Layout, A), I};
+        {set_proj, Ann, A, I, B} -> {set_proj, Ann, lambda_lift_expr(Layout, A), I, lambda_lift_expr(Layout, B)};
+        {op, Op, As}             -> {op, Op, lambda_lift_exprs(Layout, As)};
+        {'let', X, A, B}         -> {'let', X, lambda_lift_expr(Layout, A), lambda_lift_expr(Layout, B)};
+        {funcall, Ann, A, Bs}    -> {funcall, Ann, lambda_lift_expr(Layout, A), lambda_lift_exprs(Layout, Bs)};
+        {set_state, Ann, R, A}   -> {set_state, Ann, R, lambda_lift_expr(Layout, A)};
+        {get_state, _}           -> Expr;
+        {switch, S}              -> {switch, lambda_lift_expr(Layout, S)};
+        {split, Type, X, Alts}   -> {split, Type, X, lambda_lift_exprs(Layout, Alts)};
+        {nosplit, A}             -> {nosplit, lambda_lift_expr(Layout, A)};
+        {'case', P, S}           -> {'case', P, lambda_lift_expr(Layout, S)}
     end.
 
 lambda_lift_exprs(Layout, As) -> [lambda_lift_expr(Layout, A) || A <- As].
@@ -1355,8 +1355,8 @@ bind_subexpressions(Expr) ->
 
 bind_subexpressions(_, {tuple, Es}) ->
     ?make_lets(Xs, Es, {tuple, Xs});
-bind_subexpressions(_, {set_proj, A, I, B}) ->
-    ?make_lets([X, Y], [A, B], {set_proj, X, I, Y});
+bind_subexpressions(_, {set_proj, Ann, A, I, B}) ->
+    ?make_lets([X, Y], [A, B], {set_proj, Ann, X, I, Y});
 bind_subexpressions(_, E) -> E.
 
 make_lets(Es, Body) -> make_lets(Es, [], Body).
@@ -1390,8 +1390,8 @@ let_float(_, {'let', X, E, Body}) ->
     pull_out_let({'let', X, {here, E}, Body});
 let_float(_, {proj, Ann, E, I}) ->
     pull_out_let({proj, Ann, {here, E}, I});
-let_float(_, {set_proj, E, I, V}) ->
-    pull_out_let({set_proj, {here, E}, I, {here, V}});
+let_float(_, {set_proj, Ann, E, I, V}) ->
+    pull_out_let({set_proj, Ann, {here, E}, I, {here, V}});
 let_float(_, {op, Op, Es}) ->
     {Lets, Es1} = pull_out_let([{here, E} || E <- Es]),
     let_bind(Lets, {op, Op, Es1});
@@ -1475,13 +1475,13 @@ simpl_proj(Env, I, Expr) ->
                          false -> false
                        end end,
     case Expr of
-        false                 -> false;
-        {var, X}              -> simpl_proj(Env, I, maps:get(X, Env, false));
-        {tuple, Es}           -> IfSafe(lists:nth(I + 1, Es));
-        {set_proj, _, I, Val} -> IfSafe(Val);
-        {set_proj, E, _, _}   -> simpl_proj(Env, I, E);
-        {proj, _, E, J}       -> simpl_proj(Env, I, simpl_proj(Env, J, E));
-        _                     -> false
+        false                    -> false;
+        {var, X}                 -> simpl_proj(Env, I, maps:get(X, Env, false));
+        {tuple, Es}              -> IfSafe(lists:nth(I + 1, Es));
+        {set_proj, _, _, I, Val} -> IfSafe(Val);
+        {set_proj, _, E, _, _}   -> simpl_proj(Env, I, E);
+        {proj, _, E, J}          -> simpl_proj(Env, I, simpl_proj(Env, J, E));
+        _                        -> false
     end.
 
 get_catchalls(Alts) ->
@@ -1551,7 +1551,7 @@ constructor_form(Env, Expr) ->
                 free -> false;
                 E    -> constructor_form(Env, E)    %% TODO: shadowing?
             end;
-        {set_proj, E, I, V} ->
+        {set_proj, _, E, I, V} ->
             case constructor_form(Env, E) of
                 {tuple, Es} -> {tuple, setnth(I + 1, V, Es)};
                 _           -> false
@@ -1596,7 +1596,7 @@ read_only(nil)                        -> true;
 read_only({con, _, _, Es})            -> read_only(Es);
 read_only({tuple, Es})                -> read_only(Es);
 read_only({proj, _, E, _})            -> read_only(E);
-read_only({set_proj, A, _, B})        -> read_only([A, B]);
+read_only({set_proj, _, A, _, B})     -> read_only([A, B]);
 read_only({op, _, Es})                -> read_only(Es);
 read_only({get_state, _})             -> true;
 read_only({set_state, _, _, _})       -> false;
@@ -1825,62 +1825,62 @@ free_vars(Xs) when is_list(Xs) ->
     lists:umerge([ free_vars(X) || X <- Xs ]);
 free_vars(Expr) ->
     case Expr of
-        {var, X}             -> [X];
-        {lit, _}             -> [];
-        nil                  -> [];
-        {def, _, As}         -> free_vars(As);
-        {def_u, _, _}        -> [];
+        {var, X}               -> [X];
+        {lit, _}               -> [];
+        nil                    -> [];
+        {def, _, As}           -> free_vars(As);
+        {def_u, _, _}          -> [];
         {remote, _, _, _, Ct, _, As} -> free_vars([Ct | As]);
         {remote_u, _, _, _, Ct, _}   -> free_vars(Ct);
-        {builtin, _, As}     -> free_vars(As);
-        {builtin_u, _, _}    -> [];
-        {builtin_u, _, _, _} -> [];     %% Typereps are always literals
-        {con, _, _, As}      -> free_vars(As);
-        {tuple, As}          -> free_vars(As);
-        {proj, _, A, _}      -> free_vars(A);
-        {set_proj, A, _, B}  -> free_vars([A, B]);
-        {op, _, As}          -> free_vars(As);
-        {'let', X, A, B}     -> free_vars([A, {lam, [X], B}]);
-        {funcall, _, A, Bs}  -> free_vars([A | Bs]);
-        {set_state, _, _, A} -> free_vars(A);
-        {get_state, _}       -> [];
-        {lam, Xs, B}         -> free_vars(B) -- lists:sort(Xs);
-        {closure, _, _, A}   -> free_vars(A);
-        {switch, A}          -> free_vars(A);
-        {split, _, X, As}    -> free_vars([{var, X} | As]);
-        {nosplit, A}         -> free_vars(A);
-        {'case', P, A}       -> free_vars(A) -- lists:sort(fsplit_pat_vars(P))
+        {builtin, _, As}       -> free_vars(As);
+        {builtin_u, _, _}      -> [];
+        {builtin_u, _, _, _}   -> [];     %% Typereps are always literals
+        {con, _, _, As}        -> free_vars(As);
+        {tuple, As}            -> free_vars(As);
+        {proj, _, A, _}        -> free_vars(A);
+        {set_proj, _, A, _, B} -> free_vars([A, B]);
+        {op, _, As}            -> free_vars(As);
+        {'let', X, A, B}       -> free_vars([A, {lam, [X], B}]);
+        {funcall, _, A, Bs}    -> free_vars([A | Bs]);
+        {set_state, _, _, A}   -> free_vars(A);
+        {get_state, _}         -> [];
+        {lam, Xs, B}           -> free_vars(B) -- lists:sort(Xs);
+        {closure, _, _, A}     -> free_vars(A);
+        {switch, A}            -> free_vars(A);
+        {split, _, X, As}      -> free_vars([{var, X} | As]);
+        {nosplit, A}           -> free_vars(A);
+        {'case', P, A}         -> free_vars(A) -- lists:sort(fsplit_pat_vars(P))
     end.
 
 used_defs(Xs) when is_list(Xs) ->
     lists:umerge([ used_defs(X) || X <- Xs ]);
 used_defs(Expr) ->
     case Expr of
-        {var, _}             -> [];
-        {lit, _}             -> [];
-        nil                  -> [];
-        {def, F, As}         -> lists:umerge([F], used_defs(As));
-        {def_u, F, _}        -> [F];
+        {var, _}               -> [];
+        {lit, _}               -> [];
+        nil                    -> [];
+        {def, F, As}           -> lists:umerge([F], used_defs(As));
+        {def_u, F, _}          -> [F];
         {remote, _, _, _, Ct, _, As} -> used_defs([Ct | As]);
         {remote_u, _, _, _, Ct, _}   -> used_defs(Ct);
-        {builtin, _, As}     -> used_defs(As);
-        {builtin_u, _, _}    -> [];
-        {builtin_u, _, _, _} -> [];
-        {con, _, _, As}      -> used_defs(As);
-        {tuple, As}          -> used_defs(As);
-        {proj, _, A, _}      -> used_defs(A);
-        {set_proj, A, _, B}  -> used_defs([A, B]);
-        {op, _, As}          -> used_defs(As);
-        {'let', _, A, B}     -> used_defs([A, B]);
-        {funcall, _, A, Bs}  -> used_defs([A | Bs]);
-        {set_state, _, _, A} -> used_defs(A);
-        {get_state, _}       -> [];
-        {lam, _, B}          -> used_defs(B);
-        {closure, _, F, A}   -> lists:umerge([F], used_defs(A));
-        {switch, A}          -> used_defs(A);
-        {split, _, _, As}    -> used_defs(As);
-        {nosplit, A}         -> used_defs(A);
-        {'case', _, A}       -> used_defs(A)
+        {builtin, _, As}       -> used_defs(As);
+        {builtin_u, _, _}      -> [];
+        {builtin_u, _, _, _}   -> [];
+        {con, _, _, As}        -> used_defs(As);
+        {tuple, As}            -> used_defs(As);
+        {proj, _, A, _}        -> used_defs(A);
+        {set_proj, _, A, _, B} -> used_defs([A, B]);
+        {op, _, As}            -> used_defs(As);
+        {'let', _, A, B}       -> used_defs([A, B]);
+        {funcall, _, A, Bs}    -> used_defs([A | Bs]);
+        {set_state, _, _, A}   -> used_defs(A);
+        {get_state, _}         -> [];
+        {lam, _, B}            -> used_defs(B);
+        {closure, _, F, A}     -> lists:umerge([F], used_defs(A));
+        {switch, A}            -> used_defs(A);
+        {split, _, _, As}      -> used_defs(As);
+        {nosplit, A}           -> used_defs(A);
+        {'case', _, A}         -> used_defs(A)
     end.
 
 bottom_up(F, Expr) -> bottom_up(F, #{}, Expr).
@@ -1900,7 +1900,7 @@ bottom_up(F, Env, Expr) ->
         {con, Ar, I, Es}                 -> {con, Ar, I, [bottom_up(F, Env, E) || E <- Es]};
         {tuple, Es}                      -> {tuple, [bottom_up(F, Env, E) || E <- Es]};
         {proj, Ann, E, I}                -> {proj, Ann, bottom_up(F, Env, E), I};
-        {set_proj, R, I, E}              -> {set_proj, bottom_up(F, Env, R), I, bottom_up(F, Env, E)};
+        {set_proj, Ann, R, I, E}         -> {set_proj, Ann, bottom_up(F, Env, R), I, bottom_up(F, Env, E)};
         {op, Op, Es}                     -> {op, Op, [bottom_up(F, Env, E) || E <- Es]};
         {funcall, Ann, Fun, Es}          -> {funcall, Ann, bottom_up(F, Env, Fun), [bottom_up(F, Env, E) || E <- Es]};
         {set_state, Ann, R, E}           -> {set_state, Ann, R, bottom_up(F, Env, E)};
@@ -1945,26 +1945,26 @@ get_named_arg({named_arg_t, _, {id, _, Name}, _, Default}, Args) ->
 -spec rename([{var_name(), var_name()}], fexpr()) -> fexpr().
 rename(Ren, Expr) ->
     case Expr of
-        {lit, _}                -> Expr;
-        nil                     -> nil;
-        {var, X}                -> {var, rename_var(Ren, X)};
-        {def, D, Es}            -> {def, D, [rename(Ren, E) || E <- Es]};
-        {def_u, _, _}           -> Expr;
-        {builtin, B, Es}        -> {builtin, B, [rename(Ren, E) || E <- Es]};
-        {builtin_u, _, _}       -> Expr;
-        {builtin_u, _, _, _}    -> Expr;
+        {lit, _}                 -> Expr;
+        nil                      -> nil;
+        {var, X}                 -> {var, rename_var(Ren, X)};
+        {def, D, Es}             -> {def, D, [rename(Ren, E) || E <- Es]};
+        {def_u, _, _}            -> Expr;
+        {builtin, B, Es}         -> {builtin, B, [rename(Ren, E) || E <- Es]};
+        {builtin_u, _, _}        -> Expr;
+        {builtin_u, _, _, _}     -> Expr;
         {remote, Ann, ArgsT, RetT, Ct, F, Es} -> {remote,   Ann, ArgsT, RetT, rename(Ren, Ct), F, [rename(Ren, E) || E <- Es]};
         {remote_u, Ann, ArgsT, RetT, Ct, F}   -> {remote_u, Ann, ArgsT, RetT, rename(Ren, Ct), F};
-        {con, Ar, I, Es}        -> {con, Ar, I, [rename(Ren, E) || E <- Es]};
-        {tuple, Es}             -> {tuple, [rename(Ren, E) || E <- Es]};
-        {proj, Ann, E, I}       -> {proj, Ann, rename(Ren, E), I};
-        {set_proj, R, I, E}     -> {set_proj, rename(Ren, R), I, rename(Ren, E)};
-        {op, Op, Es}            -> {op, Op, [rename(Ren, E) || E <- Es]};
-        {funcall, Ann, Fun, Es} -> {funcall, Ann, rename(Ren, Fun), [rename(Ren, E) || E <- Es]};
-        {set_state, Ann, R, E}  -> {set_state, Ann, R, rename(Ren, E)};
-        {get_state, _}          -> Expr;
-        {closure, Ann, F, Env}  -> {closure, Ann, F, rename(Ren, Env)};
-        {switch, Split}         -> {switch, rename_split(Ren, Split)};
+        {con, Ar, I, Es}         -> {con, Ar, I, [rename(Ren, E) || E <- Es]};
+        {tuple, Es}              -> {tuple, [rename(Ren, E) || E <- Es]};
+        {proj, Ann, E, I}        -> {proj, Ann, rename(Ren, E), I};
+        {set_proj, Ann, R, I, E} -> {set_proj, Ann, rename(Ren, R), I, rename(Ren, E)};
+        {op, Op, Es}             -> {op, Op, [rename(Ren, E) || E <- Es]};
+        {funcall, Ann, Fun, Es}  -> {funcall, Ann, rename(Ren, Fun), [rename(Ren, E) || E <- Es]};
+        {set_state, Ann, R, E}   -> {set_state, Ann, R, rename(Ren, E)};
+        {get_state, _}           -> Expr;
+        {closure, Ann, F, Env}   -> {closure, Ann, F, rename(Ren, Env)};
+        {switch, Split}          -> {switch, rename_split(Ren, Split)};
         {lam, Xs, B} ->
             {Zs, Ren1} = rename_bindings(Ren, Xs),
             {lam, Zs, rename(Ren1, B)};
@@ -2170,7 +2170,7 @@ pp_fexpr({closure, _, Fun, ClEnv}) ->
               {var, _}    -> [ClEnv]
           end,
     pp_call(pp_text("__CLOSURE__"), [{def, Fun} | FVs]);
-pp_fexpr({set_proj, E, I, A}) ->
+pp_fexpr({set_proj, _, E, I, A}) ->
     pp_beside(pp_fexpr(E), pp_braces(pp_beside([pp_int(I), pp_text(" = "), pp_fexpr(A)])));
 pp_fexpr({op, Op, [A, B] = Args}) ->
     case is_infix(Op) of
