@@ -84,7 +84,7 @@
                | {remote_u, fann(), [ftype()], ftype(), fexpr(), fun_name()}
                | {builtin_u, builtin(), arity()}
                | {builtin_u, builtin(), arity(), [fexpr()]} %% Typerep arguments to be added after normal args.
-               | {lam, [var_name()], fexpr()}.
+               | {lam, fann(), [var_name()], fexpr()}.
 
 -type fsplit() :: {split, ftype(), var_name(), [fcase()]}
                 | {nosplit, fexpr()}.
@@ -661,9 +661,9 @@ expr_to_fcode(Env, _Type, {list_comp, As, Yield, []}) ->
 expr_to_fcode(Env, _Type, {list_comp, As, Yield, [{comprehension_bind, Pat = {typed, _, _, PatType}, BindExpr}|Rest]}) ->
     Arg  = fresh_name(),
     Env1 = bind_var(Env, Arg),
-    Bind = {lam, [Arg], expr_to_fcode(Env1, {switch, As, {typed, As, {id, As, Arg}, PatType},
-                                                [{'case', As, Pat, [{guarded, As, [], {list_comp, As, Yield, Rest}}]},
-                                                 {'case', As, {id, As, "_"}, [{guarded, As, [], {list, As, []}}]}]})},
+    Bind = {lam, to_fann(As), [Arg], expr_to_fcode(Env1, {switch, As, {typed, As, {id, As, Arg}, PatType},
+                                                             [{'case', As, Pat, [{guarded, As, [], {list_comp, As, Yield, Rest}}]},
+                                                              {'case', As, {id, As, "_"}, [{guarded, As, [], {list, As, []}}]}]})},
     {def_u, Ann, FlatMap, _} = resolve_fun(Env, ["ListInternal", "flat_map"]),
     {def, Ann, FlatMap, [Bind, expr_to_fcode(Env, BindExpr)]};
 expr_to_fcode(Env, Type, {list_comp, As, Yield, [{comprehension_if, _, Cond}|Rest]}) ->
@@ -788,10 +788,10 @@ expr_to_fcode(Env, _Type, {map_get, Ann, Map, Key}) ->
 expr_to_fcode(Env, _Type, {map_get, Ann, Map, Key, Def}) ->
     {op, to_fann(Ann), map_get_d, [expr_to_fcode(Env, Map), expr_to_fcode(Env, Key), expr_to_fcode(Env, Def)]};
 
-expr_to_fcode(Env, _Type, {lam, _, Args, Body}) ->
+expr_to_fcode(Env, _Type, {lam, Ann, Args, Body}) ->
     GetArg = fun({arg, _, {id, _, X}, _}) -> X end,
     Xs = lists:map(GetArg, Args),
-    {lam, Xs, expr_to_fcode(bind_vars(Env, Xs), Body)};
+    {lam, to_fann(Ann), Xs, expr_to_fcode(bind_vars(Env, Xs), Body)};
 
 expr_to_fcode(_Env, Type, Expr) ->
     error({todo, {Expr, ':', Type}}).
@@ -1259,8 +1259,8 @@ make_closure(FVs, Xs, Body) ->
     Tup = fun([Y]) -> Y; (Ys) -> {tuple, Ys} end,
     {closure, get_fann(Body), Fun, Tup([{var, Y} || Y <- FVs])}.
 
-lambda_lift_expr(Layout, {lam, Xs, Body}) ->
-    FVs   = free_vars({lam, Xs, Body}),
+lambda_lift_expr(Layout, L = {lam, _, Xs, Body}) ->
+    FVs   = free_vars(L),
     make_closure(FVs, Xs, lambda_lift_expr(Layout, Body));
 lambda_lift_expr(Layout, UExpr) when element(1, UExpr) == def_u; element(1, UExpr) == builtin_u ->
     [Tag, _, F, Ar | _] = tuple_to_list(UExpr),
@@ -1384,8 +1384,8 @@ inline_local_functions(Expr) ->
 inline_local_functions(Env, {funcall, _, {proj, _, {var, Y}, 0}, [{proj, _, {var, Y}, 1} | Args]} = Expr) ->
     %% TODO: Don't always inline local funs?
     case maps:get(Y, Env, free) of
-        {lam, Xs, Body} -> let_bind(lists:zip(Xs, Args), Body);
-        _               -> Expr
+        {lam, _, Xs, Body} -> let_bind(lists:zip(Xs, Args), Body);
+        _                  -> Expr
     end;
 inline_local_functions(_, Expr) -> Expr.
 
@@ -1611,7 +1611,7 @@ read_only({def_u, _, _, _})           -> true;
 read_only({remote_u, _, _, _, _, _})  -> true;
 read_only({builtin_u, _, _})          -> true;
 read_only({builtin_u, _, _, _})       -> true;
-read_only({lam, _, _})                -> true;
+read_only({lam, _, _, _})             -> true;
 read_only({def, _, _, _})             -> false; %% TODO: purity analysis
 read_only({remote, _, _, _, _, _, _}) -> false;
 read_only({builtin, _, _})            -> false; %% TODO: some builtins are
@@ -1847,11 +1847,11 @@ free_vars(Expr) ->
         {proj, _, A, _}        -> free_vars(A);
         {set_proj, _, A, _, B} -> free_vars([A, B]);
         {op, _, _, As}         -> free_vars(As);
-        {'let', _, X, A, B}    -> free_vars([A, {lam, [X], B}]);
+        {'let', Ann, X, A, B}  -> free_vars([A, {lam, Ann, [X], B}]);
         {funcall, _, A, Bs}    -> free_vars([A | Bs]);
         {set_state, _, _, A}   -> free_vars(A);
         {get_state, _}         -> [];
-        {lam, Xs, B}           -> free_vars(B) -- lists:sort(Xs);
+        {lam, _, Xs, B}        -> free_vars(B) -- lists:sort(Xs);
         {closure, _, _, A}     -> free_vars(A);
         {switch, A}            -> free_vars(A);
         {split, _, X, As}      -> free_vars([{var, X} | As]);
@@ -1882,7 +1882,7 @@ used_defs(Expr) ->
         {funcall, _, A, Bs}    -> used_defs([A | Bs]);
         {set_state, _, _, A}   -> used_defs(A);
         {get_state, _}         -> [];
-        {lam, _, B}            -> used_defs(B);
+        {lam, _, _, B}         -> used_defs(B);
         {closure, _, F, A}     -> lists:umerge([F], used_defs(A));
         {switch, A}            -> used_defs(A);
         {split, _, _, As}      -> used_defs(As);
@@ -1914,7 +1914,7 @@ bottom_up(F, Env, Expr) ->
         {get_state, _}                   -> Expr;
         {closure, Ann, F, CEnv}          -> {closure, Ann, F, bottom_up(F, Env, CEnv)};
         {switch, Split}                  -> {switch, bottom_up(F, Env, Split)};
-        {lam, Xs, B}                     -> {lam, Xs, bottom_up(F, Env, B)};
+        {lam, Ann, Xs, B}                -> {lam, Ann, Xs, bottom_up(F, Env, B)};
         {'let', Ann, X, E, Body}         ->
             E1 = bottom_up(F, Env, E),
             %% Always freshen user variables to avoid shadowing issues.
@@ -1972,9 +1972,9 @@ rename(Ren, Expr) ->
         {get_state, _}           -> Expr;
         {closure, Ann, F, Env}   -> {closure, Ann, F, rename(Ren, Env)};
         {switch, Split}          -> {switch, rename_split(Ren, Split)};
-        {lam, Xs, B} ->
+        {lam, Ann, Xs, B} ->
             {Zs, Ren1} = rename_bindings(Ren, Xs),
-            {lam, Zs, rename(Ren1, B)};
+            {lam, Ann, Zs, rename(Ren1, B)};
         {'let', Ann, X, E, Body} ->
             {Z, Ren1} = rename_binding(Ren, X),
             {'let', Ann, Z, rename(Ren, E), rename(Ren1, Body)}
@@ -2168,7 +2168,7 @@ pp_fexpr({tuple, Es}) ->
     pp_parens(pp_par(pp_punctuate(pp_text(","), [pp_fexpr(E) || E <- Es])));
 pp_fexpr({proj, _, E, I}) ->
     pp_beside([pp_fexpr(E), pp_text("."), pp_int(I)]);
-pp_fexpr({lam, Xs, A}) ->
+pp_fexpr({lam, _, Xs, A}) ->
     pp_par([pp_fexpr({tuple, [{var, X} || X <- Xs]}), pp_text("=>"),
             prettypr:nest(2, pp_fexpr(A))]);
 pp_fexpr({closure, _, Fun, ClEnv}) ->
