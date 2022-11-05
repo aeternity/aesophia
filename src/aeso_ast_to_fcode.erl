@@ -71,7 +71,7 @@
                | {proj, fann(), fexpr(), integer()}
                | {set_proj, fann(), fexpr(), integer(), fexpr()}    %% tuple, field, new_value
                | {op, fann(), op(), [fexpr()]}
-               | {'let', var_name(), fexpr(), fexpr()}
+               | {'let', fann(), var_name(), fexpr(), fexpr()}
                | {funcall, fann(), fexpr(), [fexpr()]}  %% Call to unknown function
                | {closure, fann(), fun_name(), fexpr()}
                | {switch, fsplit()}
@@ -524,11 +524,11 @@ make_let(Expr, Body) ->
         {lit, {bool, _}} -> Body(Expr);
         _                ->
             X = fresh_name(),
-            {'let', X, Expr, Body({var, X})}
+            {'let', get_fann(Expr), X, Expr, Body({var, X})}
     end.
 
 let_bind(X, {var, Y}, Body) -> rename([{X, Y}], Body);
-let_bind(X, Expr, Body)     -> {'let', X, Expr, Body}.
+let_bind(X, Expr, Body)     -> {'let', get_fann(Expr), X, Expr, Body}.
 
 let_bind(Binds, Body) ->
     lists:foldr(fun({X, E}, Rest) -> let_bind(X, E, Rest) end,
@@ -620,23 +620,24 @@ expr_to_fcode(Env, {record_t, FieldTypes}, {record, _Ann, Fields}) ->
            end,
     make_tuple(lists:map(FVal, FieldTypes));
 
-expr_to_fcode(Env, {record_t, [FieldT]}, {record, _Ann, Rec, Fields}) ->
+expr_to_fcode(Env, {record_t, [FieldT]}, {record, Ann, Rec, Fields}) ->
     case field_value(FieldT, Fields) of
         false       -> expr_to_fcode(Env, Rec);
         {set, E}    -> expr_to_fcode(Env, E);
-        {upd, Z, E} -> {'let', Z, expr_to_fcode(Env, Rec), expr_to_fcode(bind_var(Env, Z), E)}
+        {upd, Z, E} -> {'let', to_fann(Ann), Z, expr_to_fcode(Env, Rec), expr_to_fcode(bind_var(Env, Z), E)}
     end;
 expr_to_fcode(Env, {record_t, FieldTypes}, {record, Ann, Rec, Fields}) ->
     X    = fresh_name(),
-    Proj = fun(I) -> {proj, to_fann(Ann), {var, X}, I - 1} end,
+    FAnn = to_fann(Ann),
+    Proj = fun(I) -> {proj, FAnn, {var, X}, I - 1} end,
     Comp = fun({I, false})       -> Proj(I);
               ({_, {set, E}})    -> expr_to_fcode(Env, E);
-              ({I, {upd, Z, E}}) -> {'let', Z, Proj(I), expr_to_fcode(bind_var(Env, Z), E)}
+              ({I, {upd, Z, E}}) -> {'let', FAnn, Z, Proj(I), expr_to_fcode(bind_var(Env, Z), E)}
            end,
     Set  = fun({_, false}, R)       -> R;
-              ({I, {set, E}}, R)    -> {set_proj, to_fann(Ann), R, I - 1, expr_to_fcode(Env, E)};
-              ({I, {upd, Z, E}}, R) -> {set_proj, to_fann(Ann), R, I - 1,
-                                        {'let', Z, Proj(I), expr_to_fcode(bind_var(Env, Z), E)}}
+              ({I, {set, E}}, R)    -> {set_proj, FAnn, R, I - 1, expr_to_fcode(Env, E)};
+              ({I, {upd, Z, E}}, R) -> {set_proj, FAnn, R, I - 1,
+                                        {'let', FAnn, Z, Proj(I), expr_to_fcode(bind_var(Env, Z), E)}}
            end,
     Expand  = length(Fields) == length(FieldTypes),
     Updates = [ {I, field_value(FT, Fields)} || {I, FT} <- indexed(FieldTypes) ],
@@ -644,7 +645,7 @@ expr_to_fcode(Env, {record_t, FieldTypes}, {record, Ann, Rec, Fields}) ->
              true  -> {tuple, lists:map(Comp, Updates)};
              false -> lists:foldr(Set, {var, X}, Updates)
            end,
-    {'let', X, expr_to_fcode(Env, Rec), Body};
+    {'let', FAnn, X, expr_to_fcode(Env, Rec), Body};
 
 %% Lists
 expr_to_fcode(Env, _Type, {list, _, Es}) ->
@@ -682,7 +683,7 @@ expr_to_fcode(Env, _Type, {'if', _, Cond, Then, Else}) ->
             expr_to_fcode(Env, Else));
 
 %% Switch
-expr_to_fcode(Env, _, S = {switch, _, Expr = {typed, _, E, Type}, Alts}) ->
+expr_to_fcode(Env, _, S = {switch, Ann, Expr = {typed, _, E, Type}, Alts}) ->
     Switch = fun(X) ->
                 {switch, alts_to_fcode(Env, type_to_fcode(Env, Type), X, Alts, S)}
              end,
@@ -690,7 +691,7 @@ expr_to_fcode(Env, _, S = {switch, _, Expr = {typed, _, E, Type}, Alts}) ->
         {id, _, X} -> Switch(X);
         _ ->
             X = fresh_name(),
-            {'let', X, expr_to_fcode(Env, Expr),
+            {'let', to_fann(Ann), X, expr_to_fcode(Env, Expr),
              Switch(X)}
     end;
 
@@ -748,7 +749,7 @@ expr_to_fcode(Env, _, {app, _, Fun = {typed, Ann, FunE, {fun_t, _, NamedArgsT, A
             case FFun of
                 {var, X} -> Call(X);
                 _        -> X = fresh_name(),
-                            {'let', X, FFun, Call(X)}
+                            {'let', FAnn, X, FFun, Call(X)}
             end
     end;
 
@@ -778,7 +779,7 @@ expr_to_fcode(Env, _Type, {map, _, Map, KVs}) ->
                                             []  -> {op, FAnn, map_get, [Map1, Key]};
                                             [D] -> {op, FAnn, map_get_d, [Map1, Key, expr_to_fcode(Env, D)]}
                                         end,
-                                    {'let', Z1, GetExpr,
+                                    {'let', FAnn, Z1, GetExpr,
                                     {op, FAnn, map_set, [M, Key, rename([{Z, Z1}], expr_to_fcode(bind_var(Env, Z), V))]}}
                                 end)
                         end end, Map1, KVs));
@@ -801,14 +802,14 @@ make_if({var, X}, Then, Else) ->
          {'case', {bool, true},  {nosplit, Then}}]}};
 make_if(Cond, Then, Else) ->
     X = fresh_name(),
-    {'let', X, Cond, make_if({var, X}, Then, Else)}.
+    {'let', get_fann(Cond), X, Cond, make_if({var, X}, Then, Else)}.
 
 make_if_no_else({var, X}, Then) ->
     {switch, {split, boolean, X,
         [{'case', {bool, true},  {nosplit, Then}}]}};
 make_if_no_else(Cond, Then) ->
     X = fresh_name(),
-    {'let', X, Cond, make_if_no_else({var, X}, Then)}.
+    {'let', get_fann(Cond), X, Cond, make_if_no_else({var, X}, Then)}.
 
 -spec make_tuple([fexpr()]) -> fexpr().
 make_tuple([E]) -> E;
@@ -1073,15 +1074,15 @@ decision_tree_to_fcode(true)      -> {lit, {bool, true}};
 decision_tree_to_fcode({atom, B}) -> B;
 decision_tree_to_fcode({'if', A, Then, Else}) ->
     X = fresh_name(),
-    {'let', X, A,
+    {'let', [], X, A,
         {switch, {split, boolean, X, [{'case', {bool, false}, {nosplit, decision_tree_to_fcode(Else)}},
                                       {'case', {bool, true},  {nosplit, decision_tree_to_fcode(Then)}}]}}}.
 
 %% -- Statements --
 
 -spec stmts_to_fcode(env(), [aeso_syntax:stmt()]) -> fexpr().
-stmts_to_fcode(Env, [{letval, _, {typed, _, {id, _, X}, _}, Expr} | Stmts]) ->
-    {'let', X, expr_to_fcode(Env, Expr), stmts_to_fcode(bind_var(Env, X), Stmts)};
+stmts_to_fcode(Env, [{letval, Ann, {typed, _, {id, _, X}, _}, Expr} | Stmts]) ->
+    {'let', to_fann(Ann), X, expr_to_fcode(Env, Expr), stmts_to_fcode(bind_var(Env, X), Stmts)};
 stmts_to_fcode(Env, [{letval, Ann, Pat, Expr} | Stmts]) ->
     expr_to_fcode(Env, {switch, Ann, Expr, [{'case', Ann, Pat, [{guarded, Ann, [], {block, Ann, Stmts}}]}]});
 stmts_to_fcode(Env, [{letfun, Ann, {id, _, X}, Args, _Type, [{guarded, _, [], Expr}]} | Stmts]) ->
@@ -1089,12 +1090,12 @@ stmts_to_fcode(Env, [{letfun, Ann, {id, _, X}, Args, _Type, [{guarded, _, [], Ex
                     {typed, Ann1, Id, T} -> {arg, Ann1, Id, T};
                     _ -> internal_error({bad_arg, Arg})   %% pattern matching has been desugared
                 end || Arg <- Args ],
-    {'let', X, expr_to_fcode(Env, {lam, Ann, LamArgs, Expr}),
+    {'let', to_fann(Ann), X, expr_to_fcode(Env, {lam, Ann, LamArgs, Expr}),
                stmts_to_fcode(bind_var(Env, X), Stmts)};
 stmts_to_fcode(Env, [Expr]) ->
     expr_to_fcode(Env, Expr);
 stmts_to_fcode(Env, [Expr | Stmts]) ->
-    {'let', "_", expr_to_fcode(Env, Expr), stmts_to_fcode(Env, Stmts)}.
+    {'let', to_fann(aeso_syntax:get_ann(Expr)), "_", expr_to_fcode(Env, Expr), stmts_to_fcode(Env, Stmts)}.
 
 %% -- Builtins --
 
@@ -1122,7 +1123,7 @@ set_state({reg, R}, Val) ->
 set_state({tuple, Ls}, Val) ->
     ?make_let(X, Val,
     lists:foldr(fun({I, L}, Code) ->
-                    {'let', "_", set_state(L, {proj, get_fann(Val), X, I - 1}), Code}
+                    {'let', [], "_", set_state(L, {proj, get_fann(Val), X, I - 1}), Code}
                 end, {tuple, []}, indexed(Ls))).
 
 get_state({reg, R}) ->
@@ -1246,7 +1247,7 @@ lifted_fun([Z], Xs, Body) ->
        body   => Body };
 lifted_fun(FVs, Xs, Body) ->
     Z    = "%env",
-    Proj = fun({I, Y}, E) -> {'let', Y, {proj, get_fann(Body), {var, Z}, I - 1}, E} end,
+    Proj = fun({I, Y}, E) -> {'let', get_fann(Body), Y, {proj, get_fann(Body), {var, Z}, I - 1}, E} end,
     #{ attrs  => [private],
        args   => [{Z, any} | [{X, any} || X <- Xs]],
        return => any,
@@ -1295,7 +1296,7 @@ lambda_lift_expr(Layout, Expr) ->
         {proj, Ann, A, I}        -> {proj, Ann, lambda_lift_expr(Layout, A), I};
         {set_proj, Ann, A, I, B} -> {set_proj, Ann, lambda_lift_expr(Layout, A), I, lambda_lift_expr(Layout, B)};
         {op, Ann, Op, As}        -> {op, Ann, Op, lambda_lift_exprs(Layout, As)};
-        {'let', X, A, B}         -> {'let', X, lambda_lift_expr(Layout, A), lambda_lift_expr(Layout, B)};
+        {'let', Ann, X, A, B}    -> {'let', Ann, X, lambda_lift_expr(Layout, A), lambda_lift_expr(Layout, B)};
         {funcall, Ann, A, Bs}    -> {funcall, Ann, lambda_lift_expr(Layout, A), lambda_lift_exprs(Layout, Bs)};
         {set_state, Ann, R, A}   -> {set_state, Ann, R, lambda_lift_expr(Layout, A)};
         {get_state, _}           -> Expr;
@@ -1392,8 +1393,8 @@ inline_local_functions(_, Expr) -> Expr.
 
 let_floating(Expr) -> bottom_up(fun let_float/2, Expr).
 
-let_float(_, {'let', X, E, Body}) ->
-    pull_out_let({'let', X, {here, E}, Body});
+let_float(_, {'let', Ann, X, E, Body}) ->
+    pull_out_let({'let', Ann, X, {here, E}, Body});
 let_float(_, {proj, Ann, E, I}) ->
     pull_out_let({proj, Ann, {here, E}, I});
 let_float(_, {set_proj, Ann, E, I, V}) ->
@@ -1424,7 +1425,7 @@ pull_out_let(Es) when is_list(Es) ->
 %% Also renames the variables to fresh names
 let_view(E) -> let_view(E, [], []).
 
-let_view({'let', X, E, Rest}, Ren, Lets) ->
+let_view({'let', _, X, E, Rest}, Ren, Lets) ->
     Z = fresh_name(),
     let_view(Rest, [{X, Z} | Ren], [{Z, rename(Ren, E)} | Lets]);
 let_view(E, Ren, Lets) ->
@@ -1440,7 +1441,7 @@ simplifier(Expr) ->
 
 %% (e₀, .., en).i ->
 %% let _ = e₀ in .. let x = ei in .. let _ = en in x
-simplify(_Env, {proj, _, {tuple, Es}, I}) ->
+simplify(_Env, {proj, FAnn, {tuple, Es}, I}) ->
     It  = lists:nth(I + 1, Es),
     X   = fresh_name(),
     Dup = safe_to_duplicate(It),
@@ -1449,12 +1450,12 @@ simplify(_Env, {proj, _, {tuple, Es}, I}) ->
       fun({J, E}, Rest) when I == J ->
             case Dup of
                 true  -> Rest;
-                false -> {'let', X, E, Rest}
+                false -> {'let', FAnn, X, E, Rest}
             end;
          ({_, E}, Rest) ->
             case read_only(E) of
                 true  -> Rest;
-                false -> {'let', "_", E, Rest}
+                false -> {'let', FAnn, "_", E, Rest}
             end
         end, Val, indexed(Es));
 
@@ -1579,10 +1580,10 @@ constructor_form(Env, Expr) ->
 
 drop_unused_lets(Expr) -> bottom_up(fun drop_unused_lets/2, Expr).
 
-drop_unused_lets(_, {'let', X, E, Body} = Expr) ->
+drop_unused_lets(_, {'let', Ann, X, E, Body} = Expr) ->
     case {read_only(E), not lists:member(X, free_vars(Body))} of
         {true, true}  -> Body;
-        {false, true} -> {'let', "_", E, Body};
+        {false, true} -> {'let', Ann, "_", E, Body};
         _             -> Expr
     end;
 drop_unused_lets(_, Expr) -> Expr.
@@ -1618,7 +1619,7 @@ read_only({switch, Split})            -> read_only(Split);
 read_only({split, _, _, Cases})       -> read_only(Cases);
 read_only({nosplit, E})               -> read_only(E);
 read_only({'case', _, Split})         -> read_only(Split);
-read_only({'let', _, A, B})           -> read_only([A, B]);
+read_only({'let', _, _, A, B})        -> read_only([A, B]);
 read_only({funcall, _, _, _})         -> false;
 read_only({closure, _, _, _})         -> internal_error(no_closures_here);
 read_only(Es) when is_list(Es)        -> lists:all(fun read_only/1, Es).
@@ -1846,7 +1847,7 @@ free_vars(Expr) ->
         {proj, _, A, _}        -> free_vars(A);
         {set_proj, _, A, _, B} -> free_vars([A, B]);
         {op, _, _, As}         -> free_vars(As);
-        {'let', X, A, B}       -> free_vars([A, {lam, [X], B}]);
+        {'let', _, X, A, B}    -> free_vars([A, {lam, [X], B}]);
         {funcall, _, A, Bs}    -> free_vars([A | Bs]);
         {set_state, _, _, A}   -> free_vars(A);
         {get_state, _}         -> [];
@@ -1877,7 +1878,7 @@ used_defs(Expr) ->
         {proj, _, A, _}        -> used_defs(A);
         {set_proj, _, A, _, B} -> used_defs([A, B]);
         {op, _, _, As}         -> used_defs(As);
-        {'let', _, A, B}       -> used_defs([A, B]);
+        {'let', _, _, A, B}    -> used_defs([A, B]);
         {funcall, _, A, Bs}    -> used_defs([A | Bs]);
         {set_state, _, _, A}   -> used_defs(A);
         {get_state, _}         -> [];
@@ -1914,7 +1915,7 @@ bottom_up(F, Env, Expr) ->
         {closure, Ann, F, CEnv}          -> {closure, Ann, F, bottom_up(F, Env, CEnv)};
         {switch, Split}                  -> {switch, bottom_up(F, Env, Split)};
         {lam, Xs, B}                     -> {lam, Xs, bottom_up(F, Env, B)};
-        {'let', X, E, Body}              ->
+        {'let', Ann, X, E, Body}         ->
             E1 = bottom_up(F, Env, E),
             %% Always freshen user variables to avoid shadowing issues.
             ShouldFreshen = fun(Y = "%" ++ _) -> maps:is_key(Y, Env);
@@ -1923,10 +1924,10 @@ bottom_up(F, Env, Expr) ->
                 true ->
                     Z = fresh_name_save(X),
                     Env1 = Env#{ Z => E1 },
-                    {'let', Z, E1, bottom_up(F, Env1, rename([{X, Z}], Body))};
+                    {'let', Ann, Z, E1, bottom_up(F, Env1, rename([{X, Z}], Body))};
                 false ->
                     Env1 = Env#{ X => E1 },
-                    {'let', X, E1, bottom_up(F, Env1, Body)}
+                    {'let', Ann, X, E1, bottom_up(F, Env1, Body)}
             end;
         {split, Type, X, Cases}          -> {split, Type, X, [bottom_up(F, Env, Case) || Case <- Cases]};
         {nosplit, E}                     -> {nosplit, bottom_up(F, Env, E)};
@@ -1974,9 +1975,9 @@ rename(Ren, Expr) ->
         {lam, Xs, B} ->
             {Zs, Ren1} = rename_bindings(Ren, Xs),
             {lam, Zs, rename(Ren1, B)};
-        {'let', X, E, Body} ->
+        {'let', Ann, X, E, Body} ->
             {Z, Ren1} = rename_binding(Ren, X),
-            {'let', Z, rename(Ren, E), rename(Ren1, Body)}
+            {'let', Ann, Z, rename(Ren, E), rename(Ren1, Body)}
     end.
 
 rename_var(Ren, X) -> proplists:get_value(X, Ren, X).
@@ -2190,8 +2191,8 @@ pp_fexpr({op, _, Op, [A] = Args}) ->
     end;
 pp_fexpr({op, _, Op, As}) ->
     pp_beside(pp_text(Op), pp_fexpr({tuple, As}));
-pp_fexpr({'let', _, _, _} = Expr) ->
-    Lets = fun Lets({'let', Y, C, D}) ->
+pp_fexpr({'let', _, _, _, _} = Expr) ->
+    Lets = fun Lets({'let', _, Y, C, D}) ->
                         {Ls, E} = Lets(D),
                         {[{Y, C} | Ls], E};
                Lets(E) -> {[], E} end,
