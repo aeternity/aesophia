@@ -70,7 +70,7 @@
                | {tuple, [fexpr()]}
                | {proj, fann(), fexpr(), integer()}
                | {set_proj, fann(), fexpr(), integer(), fexpr()}    %% tuple, field, new_value
-               | {op, op(), [fexpr()]}
+               | {op, fann(), op(), [fexpr()]}
                | {'let', var_name(), fexpr(), fexpr()}
                | {funcall, fann(), fexpr(), [fexpr()]}  %% Call to unknown function
                | {closure, fann(), fun_name(), fexpr()}
@@ -598,7 +598,7 @@ expr_to_fcode(Env, _Type, {tuple, _, Es}) ->
 expr_to_fcode(Env, Type, {proj, Ann, Rec = {typed, _, _, RecType}, {id, _, X}}) ->
     case RecType of
         {con, _, _} when X == "address" ->
-            {op, contract_to_address, [expr_to_fcode(Env, Rec)]};
+            {op, to_fann(Ann), contract_to_address, [expr_to_fcode(Env, Rec)]};
         {con, _, _} ->
             {fun_t, _, _, Args, Ret} = Type,
             FArgs = [type_to_fcode(Env, Arg) || Arg <- Args],
@@ -648,15 +648,15 @@ expr_to_fcode(Env, {record_t, FieldTypes}, {record, Ann, Rec, Fields}) ->
 
 %% Lists
 expr_to_fcode(Env, _Type, {list, _, Es}) ->
-    lists:foldr(fun(E, L) -> {op, '::', [expr_to_fcode(Env, E), L]} end,
+    lists:foldr(fun(E, L) -> {op, to_fann(aeso_syntax:get_ann(E)), '::', [expr_to_fcode(Env, E), L]} end,
                 nil, Es);
 
 expr_to_fcode(Env, _Type, {app, _, {'..', _}, [A, B]}) ->
     {def_u, Ann, FromTo, _} = resolve_fun(Env, ["ListInternal", "from_to"]),
     {def, Ann, FromTo, [expr_to_fcode(Env, A), expr_to_fcode(Env, B)]};
 
-expr_to_fcode(Env, _Type, {list_comp, _, Yield, []}) ->
-    {op, '::', [expr_to_fcode(Env, Yield), nil]};
+expr_to_fcode(Env, _Type, {list_comp, As, Yield, []}) ->
+    {op, to_fann(As), '::', [expr_to_fcode(Env, Yield), nil]};
 expr_to_fcode(Env, _Type, {list_comp, As, Yield, [{comprehension_bind, Pat = {typed, _, _, PatType}, BindExpr}|Rest]}) ->
     Arg  = fresh_name(),
     Env1 = bind_var(Env, Arg),
@@ -705,12 +705,13 @@ expr_to_fcode(Env, _Type, Expr = {app, _, {Op, _}, [_, _]}) when Op == '&&'; Op 
 expr_to_fcode(Env, Type, {app, Ann, {Op, _}, [A, B]}) when is_atom(Op) ->
     case Op of
         '|>' -> expr_to_fcode(Env, Type, {app, Ann, B, [A]});
-        _    -> {op, Op, [expr_to_fcode(Env, A), expr_to_fcode(Env, B)]}
+        _    -> {op, to_fann(Ann), Op, [expr_to_fcode(Env, A), expr_to_fcode(Env, B)]}
     end;
-expr_to_fcode(Env, _Type, {app, _Ann, {Op, _}, [A]}) when is_atom(Op) ->
+expr_to_fcode(Env, _Type, {app, Ann, {Op, _}, [A]}) when is_atom(Op) ->
+    FAnn = to_fann(Ann),
     case Op of
-        '-' -> {op, '-', [{lit, {int, 0}}, expr_to_fcode(Env, A)]};
-        '!' -> {op, '!', [expr_to_fcode(Env, A)]}
+        '-' -> {op, FAnn, '-', [{lit, {int, 0}}, expr_to_fcode(Env, A)]};
+        '!' -> {op, FAnn, '!', [expr_to_fcode(Env, A)]}
     end;
 
 %% Function calls
@@ -763,27 +764,28 @@ expr_to_fcode(Env, _Type, {map, _, Map, KVs}) ->
     ?make_let(Map1, expr_to_fcode(Env, Map),
         lists:foldr(fun(Fld, M) ->
                         case Fld of
-                            {field, _, [{map_get, _, K}], V} ->
-                                {op, map_set, [M, expr_to_fcode(Env, K), expr_to_fcode(Env, V)]};
-                            {field_upd, _, [MapGet], {typed, _, {lam, _, [{arg, _, {id, _, Z}, _}], V}, _}} when element(1, MapGet) == map_get ->
+                            {field, Ann, [{map_get, _, K}], V} ->
+                                {op, to_fann(Ann), map_set, [M, expr_to_fcode(Env, K), expr_to_fcode(Env, V)]};
+                            {field_upd, Ann, [MapGet], {typed, _, {lam, _, [{arg, _, {id, _, Z}, _}], V}, _}} when element(1, MapGet) == map_get ->
                                 [map_get, _, K | Default] = tuple_to_list(MapGet),
                                 ?make_let(Key, expr_to_fcode(Env, K),
                                 begin
                                     %% Z might shadow Map1 or Key
                                     Z1 = fresh_name(),
+                                    FAnn = to_fann(Ann),
                                     GetExpr =
                                         case Default of
-                                            []  -> {op, map_get, [Map1, Key]};
-                                            [D] -> {op, map_get_d, [Map1, Key, expr_to_fcode(Env, D)]}
+                                            []  -> {op, FAnn, map_get, [Map1, Key]};
+                                            [D] -> {op, FAnn, map_get_d, [Map1, Key, expr_to_fcode(Env, D)]}
                                         end,
                                     {'let', Z1, GetExpr,
-                                    {op, map_set, [M, Key, rename([{Z, Z1}], expr_to_fcode(bind_var(Env, Z), V))]}}
+                                    {op, FAnn, map_set, [M, Key, rename([{Z, Z1}], expr_to_fcode(bind_var(Env, Z), V))]}}
                                 end)
                         end end, Map1, KVs));
-expr_to_fcode(Env, _Type, {map_get, _, Map, Key}) ->
-    {op, map_get, [expr_to_fcode(Env, Map), expr_to_fcode(Env, Key)]};
-expr_to_fcode(Env, _Type, {map_get, _, Map, Key, Def}) ->
-    {op, map_get_d, [expr_to_fcode(Env, Map), expr_to_fcode(Env, Key), expr_to_fcode(Env, Def)]};
+expr_to_fcode(Env, _Type, {map_get, Ann, Map, Key}) ->
+    {op, to_fann(Ann), map_get, [expr_to_fcode(Env, Map), expr_to_fcode(Env, Key)]};
+expr_to_fcode(Env, _Type, {map_get, Ann, Map, Key, Def}) ->
+    {op, to_fann(Ann), map_get_d, [expr_to_fcode(Env, Map), expr_to_fcode(Env, Key), expr_to_fcode(Env, Def)]};
 
 expr_to_fcode(Env, _Type, {lam, _, Args, Body}) ->
     GetArg = fun({arg, _, {id, _, X}, _}) -> X end,
@@ -1137,20 +1139,24 @@ builtin_to_fcode(_Layout, require, [Cond, Msg]) ->
 builtin_to_fcode(_Layout, chain_event, [Event]) ->
     {def, [], event, [Event]};
 builtin_to_fcode(_Layout, map_delete, [Key, Map]) ->
-    {op, map_delete, [Map, Key]};
+    {op, get_fann(Map), map_delete, [Map, Key]};
 builtin_to_fcode(_Layout, map_member, [Key, Map]) ->
-    {op, map_member, [Map, Key]};
+    {op, get_fann(Map), map_member, [Map, Key]};
 builtin_to_fcode(_Layout, map_lookup, [Key0, Map0]) ->
     ?make_let(Key, Key0,
     ?make_let(Map, Map0,
-     make_if({op, map_member, [Map, Key]},
-             {con, [0, 1], 1, [{op, map_get, [Map, Key]}]},
+     make_if({op, get_fann(Map), map_member, [Map, Key]},
+             {con, [0, 1], 1, [{op, get_fann(Map), map_get, [Map, Key]}]},
              {con, [0, 1], 0, []})));
 builtin_to_fcode(_Layout, map_lookup_default, [Key, Map, Def]) ->
-    {op, map_get_d, [Map, Key, Def]};
+    {op, get_fann(Map), map_get_d, [Map, Key, Def]};
 builtin_to_fcode(_Layout, Builtin, Args) ->
+    FAnn = case Args of
+               [Arg | _] -> to_fann(aeso_syntax:get_ann(Arg));
+               _         -> []
+           end,
     case lists:member(Builtin, op_builtins()) of
-        true  -> {op, Builtin, Args};
+        true  -> {op, FAnn, Builtin, Args};
         false -> {builtin, Builtin, Args}
     end.
 
@@ -1288,7 +1294,7 @@ lambda_lift_expr(Layout, Expr) ->
         {tuple, As}              -> {tuple, lambda_lift_exprs(Layout, As)};
         {proj, Ann, A, I}        -> {proj, Ann, lambda_lift_expr(Layout, A), I};
         {set_proj, Ann, A, I, B} -> {set_proj, Ann, lambda_lift_expr(Layout, A), I, lambda_lift_expr(Layout, B)};
-        {op, Op, As}             -> {op, Op, lambda_lift_exprs(Layout, As)};
+        {op, Ann, Op, As}        -> {op, Ann, Op, lambda_lift_exprs(Layout, As)};
         {'let', X, A, B}         -> {'let', X, lambda_lift_expr(Layout, A), lambda_lift_expr(Layout, B)};
         {funcall, Ann, A, Bs}    -> {funcall, Ann, lambda_lift_expr(Layout, A), lambda_lift_exprs(Layout, Bs)};
         {set_state, Ann, R, A}   -> {set_state, Ann, R, lambda_lift_expr(Layout, A)};
@@ -1392,9 +1398,9 @@ let_float(_, {proj, Ann, E, I}) ->
     pull_out_let({proj, Ann, {here, E}, I});
 let_float(_, {set_proj, Ann, E, I, V}) ->
     pull_out_let({set_proj, Ann, {here, E}, I, {here, V}});
-let_float(_, {op, Op, Es}) ->
+let_float(_, {op, Ann, Op, Es}) ->
     {Lets, Es1} = pull_out_let([{here, E} || E <- Es]),
-    let_bind(Lets, {op, Op, Es1});
+    let_bind(Lets, {op, Ann, Op, Es1});
 let_float(_, E) -> E.
 
 pull_out_let(Expr) when is_tuple(Expr) ->
@@ -1535,14 +1541,14 @@ simpl_case(Env, E, [{'case', Pat, Body} | Alts]) ->
     end.
 
 -spec match_pat(fsplit_pat(), fexpr()) -> false | [{var_name(), fexpr()}].
-match_pat({tuple, Xs}, {tuple, Es})         -> lists:zip(Xs, Es);
-match_pat({con, _, C, Xs}, {con, _, C, Es}) -> lists:zip(Xs, Es);
-match_pat(L, {lit, L})                      -> [];
-match_pat(nil, nil)                         -> [];
-match_pat({'::', X, Y}, {op, '::', [A, B]}) -> [{X, A}, {Y, B}];
-match_pat({var, X}, E)                      -> [{X, E}];
-match_pat({assign, X, P}, E)                -> [{X, E}, {P, E}];
-match_pat(_, _)                             -> false.
+match_pat({tuple, Xs}, {tuple, Es})            -> lists:zip(Xs, Es);
+match_pat({con, _, C, Xs}, {con, _, C, Es})    -> lists:zip(Xs, Es);
+match_pat(L, {lit, L})                         -> [];
+match_pat(nil, nil)                            -> [];
+match_pat({'::', X, Y}, {op, _, '::', [A, B]}) -> [{X, A}, {Y, B}];
+match_pat({var, X}, E)                         -> [{X, E}];
+match_pat({assign, X, P}, E)                   -> [{X, E}, {P, E}];
+match_pat(_, _)                                -> false.
 
 constructor_form(Env, Expr) ->
     case Expr of
@@ -1561,12 +1567,12 @@ constructor_form(Env, Expr) ->
                 {tuple, Es} -> constructor_form(Env, lists:nth(I + 1, Es));
                 _           -> false
             end;
-        {con, _, _, _} -> Expr;
-        {tuple, _}     -> Expr;
-        {lit, _}       -> Expr;
-        nil            -> Expr;
-        {op, '::', _}  -> Expr;
-        _              -> false
+        {con, _, _, _}    -> Expr;
+        {tuple, _}        -> Expr;
+        {lit, _}          -> Expr;
+        nil               -> Expr;
+        {op, _, '::', _}  -> Expr;
+        _                 -> false
     end.
 
 %% --- Drop unused lets ---
@@ -1597,7 +1603,7 @@ read_only({con, _, _, Es})            -> read_only(Es);
 read_only({tuple, Es})                -> read_only(Es);
 read_only({proj, _, E, _})            -> read_only(E);
 read_only({set_proj, _, A, _, B})     -> read_only([A, B]);
-read_only({op, _, Es})                -> read_only(Es);
+read_only({op, _, _, Es})             -> read_only(Es);
 read_only({get_state, _})             -> true;
 read_only({set_state, _, _, _})       -> false;
 read_only({def_u, _, _, _})           -> true;
@@ -1839,7 +1845,7 @@ free_vars(Expr) ->
         {tuple, As}            -> free_vars(As);
         {proj, _, A, _}        -> free_vars(A);
         {set_proj, _, A, _, B} -> free_vars([A, B]);
-        {op, _, As}            -> free_vars(As);
+        {op, _, _, As}         -> free_vars(As);
         {'let', X, A, B}       -> free_vars([A, {lam, [X], B}]);
         {funcall, _, A, Bs}    -> free_vars([A | Bs]);
         {set_state, _, _, A}   -> free_vars(A);
@@ -1870,7 +1876,7 @@ used_defs(Expr) ->
         {tuple, As}            -> used_defs(As);
         {proj, _, A, _}        -> used_defs(A);
         {set_proj, _, A, _, B} -> used_defs([A, B]);
-        {op, _, As}            -> used_defs(As);
+        {op, _, _, As}         -> used_defs(As);
         {'let', _, A, B}       -> used_defs([A, B]);
         {funcall, _, A, Bs}    -> used_defs([A | Bs]);
         {set_state, _, _, A}   -> used_defs(A);
@@ -1901,7 +1907,7 @@ bottom_up(F, Env, Expr) ->
         {tuple, Es}                      -> {tuple, [bottom_up(F, Env, E) || E <- Es]};
         {proj, Ann, E, I}                -> {proj, Ann, bottom_up(F, Env, E), I};
         {set_proj, Ann, R, I, E}         -> {set_proj, Ann, bottom_up(F, Env, R), I, bottom_up(F, Env, E)};
-        {op, Op, Es}                     -> {op, Op, [bottom_up(F, Env, E) || E <- Es]};
+        {op, Ann, Op, Es}                -> {op, Ann, Op, [bottom_up(F, Env, E) || E <- Es]};
         {funcall, Ann, Fun, Es}          -> {funcall, Ann, bottom_up(F, Env, Fun), [bottom_up(F, Env, E) || E <- Es]};
         {set_state, Ann, R, E}           -> {set_state, Ann, R, bottom_up(F, Env, E)};
         {get_state, _}                   -> Expr;
@@ -1959,7 +1965,7 @@ rename(Ren, Expr) ->
         {tuple, Es}              -> {tuple, [rename(Ren, E) || E <- Es]};
         {proj, Ann, E, I}        -> {proj, Ann, rename(Ren, E), I};
         {set_proj, Ann, R, I, E} -> {set_proj, Ann, rename(Ren, R), I, rename(Ren, E)};
-        {op, Op, Es}             -> {op, Op, [rename(Ren, E) || E <- Es]};
+        {op, Ann, Op, Es}        -> {op, Ann, Op, [rename(Ren, E) || E <- Es]};
         {funcall, Ann, Fun, Es}  -> {funcall, Ann, rename(Ren, Fun), [rename(Ren, E) || E <- Es]};
         {set_state, Ann, R, E}   -> {set_state, Ann, R, rename(Ren, E)};
         {get_state, _}           -> Expr;
@@ -2172,17 +2178,17 @@ pp_fexpr({closure, _, Fun, ClEnv}) ->
     pp_call(pp_text("__CLOSURE__"), [{def, Fun} | FVs]);
 pp_fexpr({set_proj, _, E, I, A}) ->
     pp_beside(pp_fexpr(E), pp_braces(pp_beside([pp_int(I), pp_text(" = "), pp_fexpr(A)])));
-pp_fexpr({op, Op, [A, B] = Args}) ->
+pp_fexpr({op, _, Op, [A, B] = Args}) ->
     case is_infix(Op) of
         false -> pp_call(pp_text(Op), Args);
         true  -> pp_parens(pp_par([pp_fexpr(A), pp_text(Op), pp_fexpr(B)]))
     end;
-pp_fexpr({op, Op, [A] = Args}) ->
+pp_fexpr({op, _, Op, [A] = Args}) ->
     case is_infix(Op) of
         false -> pp_call(pp_text(Op), Args);
         true  -> pp_parens(pp_par([pp_text(Op), pp_fexpr(A)]))
     end;
-pp_fexpr({op, Op, As}) ->
+pp_fexpr({op, _, Op, As}) ->
     pp_beside(pp_text(Op), pp_fexpr({tuple, As}));
 pp_fexpr({'let', _, _, _} = Expr) ->
     Lets = fun Lets({'let', Y, C, D}) ->
@@ -2254,7 +2260,7 @@ pp_case({'case', Pat, Split}) ->
                   prettypr:nest(2, pp_split(Split))]).
 
 pp_pat({tuple, Xs})      -> pp_fexpr({tuple, [{var, X} || X <- Xs]});
-pp_pat({'::', X, Xs})    -> pp_fexpr({op, '::', [{var, X}, {var, Xs}]});
+pp_pat({'::', X, Xs})    -> pp_fexpr({op, [], '::', [{var, X}, {var, Xs}]});
 pp_pat({con, As, I, Xs}) -> pp_fexpr({con, As, I, [{var, X} || X <- Xs]});
 pp_pat({var, X})         -> pp_fexpr({var, X});
 pp_pat(P = {Tag, _}) when Tag == bool; Tag == int; Tag == string
