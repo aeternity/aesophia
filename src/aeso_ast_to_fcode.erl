@@ -82,8 +82,8 @@
                %% to closures by the lambda lifter.
                | {def_u, fann(), fun_name(), arity()}
                | {remote_u, fann(), [ftype()], ftype(), fexpr(), fun_name()}
-               | {builtin_u, builtin(), arity()}
-               | {builtin_u, builtin(), arity(), [fexpr()]} %% Typerep arguments to be added after normal args.
+               | {builtin_u, fann(), builtin(), arity()}
+               | {builtin_u, fann(), builtin(), arity(), [fexpr()]} %% Typerep arguments to be added after normal args.
                | {lam, fann(), [var_name()], fexpr()}.
 
 -type fsplit() :: {split, ftype(), var_name(), [fcase()]}
@@ -557,25 +557,25 @@ expr_to_fcode(_Env, _Type, {bytes,           _, B}) -> {lit, {bytes, B}};
 expr_to_fcode(Env, _Type, {id, _, X})  -> resolve_var(Env, [X]);
 expr_to_fcode(Env, Type, {qid, _, X}) ->
     case resolve_var(Env, X) of
-        {builtin_u, B, Ar} when B =:= oracle_query;
-                                B =:= oracle_get_question;
-                                B =:= oracle_get_answer;
-                                B =:= oracle_respond;
-                                B =:= oracle_register;
-                                B =:= oracle_check;
-                                B =:= oracle_check_query ->
+        {builtin_u, Ann, B, Ar} when B =:= oracle_query;
+                                     B =:= oracle_get_question;
+                                     B =:= oracle_get_answer;
+                                     B =:= oracle_respond;
+                                     B =:= oracle_register;
+                                     B =:= oracle_check;
+                                     B =:= oracle_check_query ->
             OType = get_oracle_type(B, Type),
             {oracle, QType, RType} = type_to_fcode(Env, OType),
             TypeArgs = [{lit, {typerep, QType}}, {lit, {typerep, RType}}],
-            {builtin_u, B, Ar, TypeArgs};
-        {builtin_u, B = aens_resolve, Ar} ->
+            {builtin_u, Ann, B, Ar, TypeArgs};
+        {builtin_u, Ann, B = aens_resolve, Ar} ->
             {fun_t, _, _, _, ResType} = Type,
             AensType = type_to_fcode(Env, ResType),
             TypeArgs = [{lit, {typerep, AensType}}],
-            {builtin_u, B, Ar, TypeArgs};
-        {builtin_u, B = bytes_split, Ar} ->
+            {builtin_u, Ann, B, Ar, TypeArgs};
+        {builtin_u, Ann, B = bytes_split, Ar} ->
             {fun_t, _, _, _, {tuple_t, _, [{bytes_t, _, N}, _]}} = Type,
-            {builtin_u, B, Ar, [{lit, {int, N}}]};
+            {builtin_u, Ann, B, Ar, [{lit, {int, N}}]};
         Other -> Other
     end;
 
@@ -720,8 +720,8 @@ expr_to_fcode(Env, _, {app, _, Fun = {typed, Ann, FunE, {fun_t, _, NamedArgsT, A
     Args1 = get_named_args(NamedArgsT, Args),
     FArgs = [expr_to_fcode(Env, Arg) || Arg <- Args1],
     case expr_to_fcode(Env, Fun) of
-        {builtin_u, B, _Ar, TypeArgs}     -> builtin_to_fcode(state_layout(Env), B, FArgs ++ TypeArgs);
-        {builtin_u, chain_clone, _Ar}     ->
+        {builtin_u, Ann, B, _Ar, TypeArgs} -> builtin_to_fcode(state_layout(Env), B, FArgs ++ TypeArgs);
+        {builtin_u, Ann, chain_clone, _Ar} ->
             case ArgsT of
                 var_args -> fcode_error({var_args_not_set, FunE});
                 _ ->
@@ -730,7 +730,7 @@ expr_to_fcode(Env, _, {app, _, Fun = {typed, Ann, FunE, {fun_t, _, NamedArgsT, A
                     FInitArgsT = aeb_fate_data:make_typerep([type_to_fcode(Env, T) || T <- ArgsT]),
                     builtin_to_fcode(state_layout(Env), chain_clone, [{lit, FInitArgsT}|FArgs])
             end;
-        {builtin_u, chain_create, _Ar}     ->
+        {builtin_u, Ann, chain_create, _Ar} ->
             case {ArgsT, Type} of
                 {var_args, _} -> fcode_error({var_args_not_set, FunE});
                 {_, {con, _, Contract}} ->
@@ -738,8 +738,8 @@ expr_to_fcode(Env, _, {app, _, Fun = {typed, Ann, FunE, {fun_t, _, NamedArgsT, A
                     builtin_to_fcode(state_layout(Env), chain_create, [{lit, {contract_code, Contract}}, {lit, FInitArgsT}|FArgs]);
                 {_, _} -> fcode_error({not_a_contract_type, Type})
             end;
-        {builtin_u, B, _Ar}               -> builtin_to_fcode(state_layout(Env), B, FArgs);
-        {def_u, Ann, F, _Ar}              -> {def, Ann, F, FArgs};
+        {builtin_u, Ann, B, _Ar}                 -> builtin_to_fcode(state_layout(Env), B, FArgs);
+        {def_u, Ann, F, _Ar}                     -> {def, Ann, F, FArgs};
         {remote_u, Ann, RArgsT, RRetT, Ct, RFun} -> {remote, Ann, RArgsT, RRetT, Ct, RFun, FArgs};
         FFun ->
             %% FFun is a closure, with first component the function name and
@@ -1265,8 +1265,8 @@ lambda_lift_expr(Layout, L = {lam, _, Xs, Body}) ->
 lambda_lift_expr(Layout, UExpr) when element(1, UExpr) == def_u; element(1, UExpr) == builtin_u ->
     [Tag, _, F, Ar | _] = tuple_to_list(UExpr),
     ExtraArgs = case UExpr of
-                    {builtin_u, _, _, TypeArgs} -> TypeArgs;
-                    _                           -> []
+                    {builtin_u, _, _, _, TypeArgs} -> TypeArgs;
+                    _                              -> []
                 end,
     Xs   = [ lists:concat(["arg", I]) || I <- lists:seq(1, Ar) ],
     Args = [{var, X} || X <- Xs] ++ ExtraArgs,
@@ -1609,8 +1609,8 @@ read_only({get_state, _})             -> true;
 read_only({set_state, _, _, _})       -> false;
 read_only({def_u, _, _, _})           -> true;
 read_only({remote_u, _, _, _, _, _})  -> true;
-read_only({builtin_u, _, _})          -> true;
 read_only({builtin_u, _, _, _})       -> true;
+read_only({builtin_u, _, _, _, _})    -> true;
 read_only({lam, _, _, _})             -> true;
 read_only({def, _, _, _})             -> false; %% TODO: purity analysis
 read_only({remote, _, _, _, _, _, _}) -> false;
@@ -1767,7 +1767,7 @@ resolve_fun(#{ fun_env := Funs, builtins := Builtin } = Env, Q) ->
     case {maps:get(Q, Funs, not_found), maps:get(Q, Builtin, not_found)} of
         {not_found, not_found} -> internal_error({unbound_variable, Q});
         {_, {B, none}}         -> builtin_to_fcode(state_layout(Env), B, []);
-        {_, {B, Ar}}           -> {builtin_u, B, Ar};
+        {_, {B, Ar}}           -> {builtin_u, [], B, Ar};
         {{Fun, Ar}, _}         -> {def_u, [], Fun, Ar}
     end.
 
@@ -1832,62 +1832,62 @@ free_vars(Xs) when is_list(Xs) ->
     lists:umerge([ free_vars(X) || X <- Xs ]);
 free_vars(Expr) ->
     case Expr of
-        {var, X}               -> [X];
-        {lit, _}               -> [];
-        nil                    -> [];
-        {def, _, _, As}        -> free_vars(As);
-        {def_u, _, _, _}       -> [];
+        {var, X}                -> [X];
+        {lit, _}                -> [];
+        nil                     -> [];
+        {def, _, _, As}         -> free_vars(As);
+        {def_u, _, _, _}        -> [];
         {remote, _, _, _, Ct, _, As} -> free_vars([Ct | As]);
         {remote_u, _, _, _, Ct, _}   -> free_vars(Ct);
-        {builtin, _, As}       -> free_vars(As);
-        {builtin_u, _, _}      -> [];
-        {builtin_u, _, _, _}   -> [];     %% Typereps are always literals
-        {con, _, _, As}        -> free_vars(As);
-        {tuple, As}            -> free_vars(As);
-        {proj, _, A, _}        -> free_vars(A);
-        {set_proj, _, A, _, B} -> free_vars([A, B]);
-        {op, _, _, As}         -> free_vars(As);
-        {'let', Ann, X, A, B}  -> free_vars([A, {lam, Ann, [X], B}]);
-        {funcall, _, A, Bs}    -> free_vars([A | Bs]);
-        {set_state, _, _, A}   -> free_vars(A);
-        {get_state, _}         -> [];
-        {lam, _, Xs, B}        -> free_vars(B) -- lists:sort(Xs);
-        {closure, _, _, A}     -> free_vars(A);
-        {switch, A}            -> free_vars(A);
-        {split, _, X, As}      -> free_vars([{var, X} | As]);
-        {nosplit, A}           -> free_vars(A);
-        {'case', P, A}         -> free_vars(A) -- lists:sort(fsplit_pat_vars(P))
+        {builtin, _, As}        -> free_vars(As);
+        {builtin_u, _, _, _}    -> [];
+        {builtin_u, _, _, _, _} -> [];     %% Typereps are always literals
+        {con, _, _, As}         -> free_vars(As);
+        {tuple, As}             -> free_vars(As);
+        {proj, _, A, _}         -> free_vars(A);
+        {set_proj, _, A, _, B}  -> free_vars([A, B]);
+        {op, _, _, As}          -> free_vars(As);
+        {'let', Ann, X, A, B}   -> free_vars([A, {lam, Ann, [X], B}]);
+        {funcall, _, A, Bs}     -> free_vars([A | Bs]);
+        {set_state, _, _, A}    -> free_vars(A);
+        {get_state, _}          -> [];
+        {lam, _, Xs, B}         -> free_vars(B) -- lists:sort(Xs);
+        {closure, _, _, A}      -> free_vars(A);
+        {switch, A}             -> free_vars(A);
+        {split, _, X, As}       -> free_vars([{var, X} | As]);
+        {nosplit, A}            -> free_vars(A);
+        {'case', P, A}          -> free_vars(A) -- lists:sort(fsplit_pat_vars(P))
     end.
 
 used_defs(Xs) when is_list(Xs) ->
     lists:umerge([ used_defs(X) || X <- Xs ]);
 used_defs(Expr) ->
     case Expr of
-        {var, _}               -> [];
-        {lit, _}               -> [];
-        nil                    -> [];
-        {def, _, F, As}        -> lists:umerge([F], used_defs(As));
-        {def_u, _, F, _}       -> [F];
+        {var, _}                 -> [];
+        {lit, _}                 -> [];
+        nil                      -> [];
+        {def, _, F, As}          -> lists:umerge([F], used_defs(As));
+        {def_u, _, F, _}         -> [F];
         {remote, _, _, _, Ct, _, As} -> used_defs([Ct | As]);
         {remote_u, _, _, _, Ct, _}   -> used_defs(Ct);
-        {builtin, _, As}       -> used_defs(As);
-        {builtin_u, _, _}      -> [];
-        {builtin_u, _, _, _}   -> [];
-        {con, _, _, As}        -> used_defs(As);
-        {tuple, As}            -> used_defs(As);
-        {proj, _, A, _}        -> used_defs(A);
-        {set_proj, _, A, _, B} -> used_defs([A, B]);
-        {op, _, _, As}         -> used_defs(As);
-        {'let', _, _, A, B}    -> used_defs([A, B]);
-        {funcall, _, A, Bs}    -> used_defs([A | Bs]);
-        {set_state, _, _, A}   -> used_defs(A);
-        {get_state, _}         -> [];
-        {lam, _, _, B}         -> used_defs(B);
-        {closure, _, F, A}     -> lists:umerge([F], used_defs(A));
-        {switch, A}            -> used_defs(A);
-        {split, _, _, As}      -> used_defs(As);
-        {nosplit, A}           -> used_defs(A);
-        {'case', _, A}         -> used_defs(A)
+        {builtin, _, As}        -> used_defs(As);
+        {builtin_u, _, _, _}    -> [];
+        {builtin_u, _, _, _, _} -> [];
+        {con, _, _, As}         -> used_defs(As);
+        {tuple, As}             -> used_defs(As);
+        {proj, _, A, _}         -> used_defs(A);
+        {set_proj, _, A, _, B}  -> used_defs([A, B]);
+        {op, _, _, As}          -> used_defs(As);
+        {'let', _, _, A, B}     -> used_defs([A, B]);
+        {funcall, _, A, Bs}     -> used_defs([A | Bs]);
+        {set_state, _, _, A}    -> used_defs(A);
+        {get_state, _}          -> [];
+        {lam, _, _, B}          -> used_defs(B);
+        {closure, _, F, A}      -> lists:umerge([F], used_defs(A));
+        {switch, A}             -> used_defs(A);
+        {split, _, _, As}       -> used_defs(As);
+        {nosplit, A}            -> used_defs(A);
+        {'case', _, A}          -> used_defs(A)
     end.
 
 bottom_up(F, Expr) -> bottom_up(F, #{}, Expr).
@@ -1900,8 +1900,8 @@ bottom_up(F, Env, Expr) ->
         {def, Ann, D, Es}                -> {def, Ann, D, [bottom_up(F, Env, E) || E <- Es]};
         {def_u, _, _, _}                 -> Expr;
         {builtin, B, Es}                 -> {builtin, B, [bottom_up(F, Env, E) || E <- Es]};
-        {builtin_u, _, _}                -> Expr;
         {builtin_u, _, _, _}             -> Expr;
+        {builtin_u, _, _, _, _}          -> Expr;
         {remote, Ann, ArgsT, RetT, Ct, Fun, Es} -> {remote,   Ann, ArgsT, RetT, bottom_up(F, Env, Ct), Fun, [bottom_up(F, Env, E) || E <- Es]};
         {remote_u, Ann, ArgsT, RetT, Ct, Fun}   -> {remote_u, Ann, ArgsT, RetT, bottom_up(F, Env, Ct), Fun};
         {con, Ar, I, Es}                 -> {con, Ar, I, [bottom_up(F, Env, E) || E <- Es]};
@@ -1958,8 +1958,8 @@ rename(Ren, Expr) ->
         {def, Ann, D, Es}        -> {def, Ann, D, [rename(Ren, E) || E <- Es]};
         {def_u, _, _, _}         -> Expr;
         {builtin, B, Es}         -> {builtin, B, [rename(Ren, E) || E <- Es]};
-        {builtin_u, _, _}        -> Expr;
         {builtin_u, _, _, _}     -> Expr;
+        {builtin_u, _, _, _, _}  -> Expr;
         {remote, Ann, ArgsT, RetT, Ct, F, Es} -> {remote,   Ann, ArgsT, RetT, rename(Ren, Ct), F, [rename(Ren, E) || E <- Es]};
         {remote_u, Ann, ArgsT, RetT, Ct, F}   -> {remote_u, Ann, ArgsT, RetT, rename(Ren, Ct), F};
         {con, Ar, I, Es}         -> {con, Ar, I, [rename(Ren, E) || E <- Es]};
@@ -2203,9 +2203,9 @@ pp_fexpr({'let', _, _, _, _} = Expr) ->
                       pp_above([ pp_par([pp_text(X), pp_text("="), prettypr:nest(2, pp_fexpr(A))]) || {X, A} <- Ls ]),
                       pp_text(" in ") ]),
           pp_fexpr(Body) ]));
-pp_fexpr({builtin_u, B, N}) ->
+pp_fexpr({builtin_u, _, B, N}) ->
     pp_beside([pp_text(B), pp_text("/"), pp_text(N)]);
-pp_fexpr({builtin_u, B, N, TypeArgs}) ->
+pp_fexpr({builtin_u, _, B, N, TypeArgs}) ->
     pp_beside([pp_text(B), pp_text("@"), pp_fexpr({tuple, TypeArgs}), pp_text("/"), pp_text(N)]);
 pp_fexpr({builtin, B, As}) ->
     pp_call(pp_text(B), As);
