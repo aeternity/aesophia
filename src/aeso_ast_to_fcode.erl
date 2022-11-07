@@ -117,18 +117,21 @@
                | bits
                | {variant, [[ftype()]]}
                | {function, [ftype()], ftype()}
-               | any | {tvar, var_name()}.
+               | any
+               | {tvar, var_name()}.
 
 -type fun_def() :: #{ attrs  := [attribute()],
                       args   := [{var_name(), ftype()}],
                       return := ftype(),
                       body   := fexpr() }.
 
+-type functions() :: #{ fun_name() => fun_def() }.
+
 -type fcode() :: #{ contract_name := string(),
                     state_type    := ftype(),
                     state_layout  := state_layout(),
                     event_type    := ftype() | none,
-                    functions     := #{ fun_name() => fun_def() },
+                    functions     := functions(),
                     payable       := boolean() }.
 
 -type type_def() :: fun(([ftype()]) -> ftype()).
@@ -139,11 +142,14 @@
 -record(con_tag, { tag :: tag(), arities :: arities() }).
 -type con_tag() :: #con_tag{}.
 
--type type_env() :: #{ sophia_name() => type_def() }.
--type fun_env()  :: #{ sophia_name() => {fun_name(), non_neg_integer()} }.
--type con_env()  :: #{ sophia_name() => con_tag() }.
--type child_con_env() :: #{sophia_name() => fcode()}.
--type builtins() :: #{ sophia_name() => {builtin(), non_neg_integer() | none | variable} }.
+-type expr_env()      :: #{ var_name() => fexpr() }.
+-type type_env()      :: #{ sophia_name() => type_def() }.
+-type fun_env()       :: #{ sophia_name() => {fun_name(), non_neg_integer()} }.
+-type con_env()       :: #{ sophia_name() => con_tag() }.
+-type child_con_env() :: #{ sophia_name() => fcode() }.
+-type builtins()      :: #{ sophia_name() => {builtin(), non_neg_integer() | none | variable} }.
+
+-type rename() :: [{var_name(), var_name()}].
 
 -type context() :: {contract_def, string()}
                  | {namespace, string()}
@@ -190,6 +196,7 @@ ast_to_fcode(Code, Options) ->
     clear_fresh_names(Options),
     {Env3, FCode2}.
 
+-spec optimize(fcode(), [option()]) -> fcode().
 optimize(FCode1, Options) ->
     Verbose = lists:member(pp_fcode, Options),
     [io:format("-- Before lambda lifting --\n~s\n\n", [format_fcode(FCode1)]) || Verbose],
@@ -288,6 +295,7 @@ builtins() ->
                      || {NS, Funs} <- Scopes,
                         {Fun, Arity} <- Funs ]).
 
+-spec state_layout(env()) -> state_layout().
 state_layout(Env) -> maps:get(state_layout, Env, {reg, 1}).
 
 -define(type(T),       fun([])     -> T end).
@@ -324,12 +332,15 @@ init_type_env() ->
        ["MCL_BLS12_381", "fp"]  => ?type({bytes, 48})
      }.
 
+-spec is_no_code(env()) -> boolean().
 is_no_code(Env) ->
     get_option(no_code, Env).
 
+-spec get_option(atom(), env()) -> option().
 get_option(Opt, Env) ->
     get_option(Opt, Env, false).
 
+-spec get_option(atom(), env(), option()) -> option().
 get_option(Opt, Env, Default) ->
     proplists:get_value(Opt, maps:get(options, Env, []), Default).
 
@@ -451,6 +462,7 @@ typedef_to_fcode(Env, {id, _, Name}, Xs, Def) ->
     Env3 = compute_state_layout(Env2, Name, FDef),
     bind_type(Env3, Q, FDef).
 
+-spec compute_state_layout(env(), string(), type_def()) -> env().
 compute_state_layout(Env = #{ context := {contract_def, _} }, "state", Type) ->
     NoLayout = get_option(no_flatten_state, Env),
     Layout =
@@ -463,6 +475,7 @@ compute_state_layout(Env = #{ context := {contract_def, _} }, "state", Type) ->
     Env#{ state_layout => Layout };
 compute_state_layout(Env, _, _) -> Env.
 
+-spec compute_state_layout(state_reg(), ftype()) -> {state_reg(), state_layout() | [state_layout()]}.
 compute_state_layout(R, {tuple, [T]}) ->
     compute_state_layout(R, T);
 compute_state_layout(R, {tuple, Ts}) ->
@@ -517,6 +530,7 @@ args_to_fcode(Env, Args) ->
 -define(make_let(X, Expr, Body),
         make_let(Expr, fun(X) -> Body end)).
 
+-spec make_let(fexpr(), fun((fexpr()) -> fexpr())) -> fexpr().
 make_let(Expr, Body) ->
     case Expr of
         {var, _}         -> Body(Expr);
@@ -527,9 +541,11 @@ make_let(Expr, Body) ->
             {'let', get_fann(Expr), X, Expr, Body({var, X})}
     end.
 
+-spec let_bind(var_name(), fexpr(), fexpr()) -> fexpr().
 let_bind(X, {var, Y}, Body) -> rename([{X, Y}], Body);
 let_bind(X, Expr, Body)     -> {'let', get_fann(Expr), X, Expr, Body}.
 
+-spec let_bind([{var_name(), fexpr()}], fexpr()) -> fexpr().
 let_bind(Binds, Body) ->
     lists:foldr(fun({X, E}, Rest) -> let_bind(X, E, Rest) end,
                 Body, Binds).
@@ -606,7 +622,7 @@ expr_to_fcode(Env, Type, {proj, Ann, Rec = {typed, _, _, RecType}, {id, _, X}}) 
                        {entrypoint, list_to_binary(X)}};
         {record_t, [_]} -> expr_to_fcode(Env, Rec); %% Singleton record
         {record_t, _} ->
-            {proj, to_fann(Ann), expr_to_fcode(Env, Rec), field_index(Rec, X)}
+            {proj, to_fann(Ann), expr_to_fcode(Env, Rec), field_index(RecType, X)}
     end;
 
 expr_to_fcode(Env, {record_t, [FieldT]}, {record, _Ann, [_] = Fields}) ->
@@ -796,6 +812,7 @@ expr_to_fcode(Env, _Type, {lam, Ann, Args, Body}) ->
 expr_to_fcode(_Env, Type, Expr) ->
     error({todo, {Expr, ':', Type}}).
 
+-spec make_if(fexpr(), fexpr(), fexpr()) -> fexpr().
 make_if({var, X}, Then, Else) ->
     {switch, {split, boolean, X,
         [{'case', {bool, false}, {nosplit, Else}},
@@ -804,6 +821,7 @@ make_if(Cond, Then, Else) ->
     X = fresh_name(),
     {'let', get_fann(Cond), X, Cond, make_if({var, X}, Then, Else)}.
 
+-spec make_if_no_else(fexpr(), fexpr()) -> fexpr().
 make_if_no_else({var, X}, Then) ->
     {switch, {split, boolean, X,
         [{'case', {bool, true},  {nosplit, Then}}]}};
@@ -819,6 +837,10 @@ make_tuple(Es) -> {tuple, Es}.
 strip_singleton_tuples({tuple, [T]}) -> strip_singleton_tuples(T);
 strip_singleton_tuples(T) -> T.
 
+-spec get_oracle_type(OracleFun, FunT) -> OracleType when
+      OracleFun :: atom(),
+      FunT :: aeso_syntax:type(),
+      OracleType :: aeso_syntax:type().
 get_oracle_type(oracle_register,     {fun_t, _, _, _, OType})       -> OType;
 get_oracle_type(oracle_query,        {fun_t, _, _, [OType | _], _}) -> OType;
 get_oracle_type(oracle_get_question, {fun_t, _, _, [OType | _], _}) -> OType;
@@ -840,11 +862,13 @@ alts_to_fcode(Env, Type, X, Alts, Switch) ->
               | {bool, false | true}
               | {int, integer()}
               | {string, binary()}
-              | nil | {'::', fpat(), fpat()}
+              | nil
+              | {'::', fpat(), fpat()}
               | {tuple, [fpat()]}
               | {con, arities(), tag(), [fpat()]}
               | {assign, fpat(), fpat()}.
 
+-spec remove_guards(env(), [aeso_syntax:alt()], aeso_syntax:expr()) -> [falt()].
 remove_guards(_Env, [], _Switch) ->
     [];
 remove_guards(Env, [Alt = {'case', _, _, [{guarded, _, [], _Expr}]} | Rest], Switch) ->
@@ -903,10 +927,13 @@ split_tree(Env, Vars, Alts = [{'case', Pats, Body} | _]) ->
             {split, Type1, X, Cases}
     end.
 
--spec merge_alts(integer(), var_name(), [{fsplit_pat(), falt()}]) -> [{fsplit_pat(), [falt()]}].
+-spec merge_alts(integer(), var_name(), Alts) -> [{fsplit_pat(), [falt()]}] when
+      Alts :: [{fsplit_pat(), falt()}].
 merge_alts(I, X, Alts) ->
     merge_alts(I, X, Alts, []).
 
+-spec merge_alts(integer(), var_name(), Alts, Alts) -> [{fsplit_pat(), [falt()]}] when
+      Alts :: [{fsplit_pat(), falt()}].
 merge_alts(I, X, Alts, Alts1) ->
     lists:foldr(fun(A, As) -> merge_alt(I, X, A, As) end,
                 Alts1, Alts).
@@ -937,6 +964,7 @@ merge_alt(I, X, {P, A}, [{Q, As} | Rest]) ->
         insert   -> [{P, [A]}, {Q, As} | Rest]
     end.
 
+-spec expand(integer(), var_name(), fsplit_pat(), fsplit_pat(), falt()) -> term().
 expand(I, X, P, Q, Case = {'case', Ps, E}) ->
     {Ps0, [{var, Y} | Ps1]} = lists:split(I - 1, Ps),
     {Ps0r, Ren1} = rename_fpats([{Y, X} || Y /= X], Ps0),
@@ -1054,6 +1082,12 @@ pat_to_fcode(_Env, Type, Pat) ->
 
 %% -- Decision trees for boolean operators --
 
+-type decision_tree() :: false
+                       | true
+                       | {atom, fexpr()}
+                       | {'if', fexpr(), decision_tree(), decision_tree()}.
+
+-spec decision_op(aeso_syntax:op(), decision_tree(), decision_tree()) -> decision_tree().
 decision_op('&&', {atom, A}, B) -> {'if', A, B, false};
 decision_op('&&', false, _)     -> false;
 decision_op('&&', true,  B)     -> B;
@@ -1063,12 +1097,14 @@ decision_op('||', true,  _)     -> true;
 decision_op(Op, {'if', A, Then, Else}, B) ->
     {'if', A, decision_op(Op, Then, B), decision_op(Op, Else, B)}.
 
+-spec expr_to_decision_tree(env(), aeso_syntax:expr()) -> decision_tree().
 expr_to_decision_tree(Env, {app, _Ann, {Op, _}, [A, B]}) when Op == '&&'; Op == '||' ->
     decision_op(Op, expr_to_decision_tree(Env, A), expr_to_decision_tree(Env, B));
 expr_to_decision_tree(Env, {typed, _, Expr, _}) -> expr_to_decision_tree(Env, Expr);
 expr_to_decision_tree(Env, Expr) ->
     {atom, expr_to_fcode(Env, Expr)}.
 
+-spec decision_tree_to_fcode(decision_tree()) -> fexpr().
 decision_tree_to_fcode(false)     -> {lit, {bool, false}};
 decision_tree_to_fcode(true)      -> {lit, {bool, true}};
 decision_tree_to_fcode({atom, B}) -> B;
@@ -1099,6 +1135,8 @@ stmts_to_fcode(Env, [Expr | Stmts]) ->
 
 %% -- Builtins --
 
+-spec op_builtins() -> [BuiltinFun] when
+      BuiltinFun :: atom().
 op_builtins() ->
     [map_from_list, map_to_list, map_delete, map_member, map_size,
      stringinternal_length, stringinternal_concat, stringinternal_to_list, stringinternal_from_list,
@@ -1118,6 +1156,7 @@ op_builtins() ->
      mcl_bls12_381_int_to_fr, mcl_bls12_381_int_to_fp, mcl_bls12_381_fr_to_int, mcl_bls12_381_fp_to_int
     ].
 
+-spec set_state(state_layout(), fexpr()) -> fexpr().
 set_state({reg, R}, Val) ->
     {set_state, get_fann(Val), R, Val};
 set_state({tuple, Ls}, Val) ->
@@ -1126,11 +1165,14 @@ set_state({tuple, Ls}, Val) ->
                     {'let', [], "_", set_state(L, {proj, get_fann(Val), X, I - 1}), Code}
                 end, {tuple, []}, indexed(Ls))).
 
+-spec get_state(state_layout()) -> fexpr().
 get_state({reg, R}) ->
     {get_state, R};
 get_state({tuple, Ls}) ->
     {tuple, [get_state(L) || L <- Ls]}.
 
+-spec builtin_to_fcode(state_layout(), BuiltinFun, [fexpr()]) -> fexpr() when
+      BuiltinFun :: atom().  %% No need to mention all of them
 builtin_to_fcode(Layout, set_state, [Val]) ->
     set_state(Layout, Val);
 builtin_to_fcode(Layout, get_state, []) ->
@@ -1163,6 +1205,7 @@ builtin_to_fcode(_Layout, Builtin, Args) ->
 
 %% -- Init function --
 
+-spec add_init_function(env(), functions()) -> functions().
 add_init_function(Env, Funs0) ->
     case is_no_code(Env) of
         true  -> Funs0;
@@ -1175,6 +1218,7 @@ add_init_function(Env, Funs0) ->
             Funs1
     end.
 
+-spec add_default_init_function(env(), functions()) -> functions().
 add_default_init_function(_Env, Funs) ->
     InitName = {entrypoint, <<"init">>},
     case maps:get(InitName, Funs, none) of
@@ -1188,10 +1232,12 @@ add_default_init_function(_Env, Funs) ->
 
 %% -- Event function --
 
+-spec add_event_function(env(), ftype() | none, functions()) -> functions().
 add_event_function(_Env, none, Funs) -> Funs;
 add_event_function(Env, EventFType, Funs) ->
     Funs#{ event => event_function(Env, EventFType) }.
 
+-spec event_function(env(), ftype()) -> fun_def().
 event_function(_Env = #{event_type := {variant_t, EventCons}}, EventType = {variant, FCons}) ->
     Cons = [ {Name, I - 1, proplists:get_value(indices, Ann)}
              || {I, {constr_t, Ann, {con, _, Name}, _}} <- indexed(EventCons) ],
@@ -1228,18 +1274,25 @@ lambda_lift(FCode = #{ functions := Funs, state_layout := StateLayout }) ->
     FCode#{ functions := maps:merge(Funs1, NewFuns) }.
 
 -define(lambda_key, '%lambdalifted').
+
+-spec init_lambda_funs() -> term().
 init_lambda_funs() -> put(?lambda_key, #{}).
+
+-spec get_lambda_funs() -> term().
 get_lambda_funs()  -> erase(?lambda_key).
 
+-spec add_lambda_fun(fun_def()) -> fun_name().
 add_lambda_fun(Def) ->
     Name = fresh_fun(),
     Funs = get(?lambda_key),
     put(?lambda_key, Funs#{ Name => Def }),
     Name.
 
+-spec lambda_lift_fun(state_layout(), fun_def()) -> fun_def().
 lambda_lift_fun(Layout, Def = #{ body := Body }) ->
     Def#{ body := lambda_lift_expr(Layout, Body) }.
 
+-spec lifted_fun([var_name()], [var_name()], fexpr()) -> fun_def().
 lifted_fun([Z], Xs, Body) ->
     #{ attrs  => [private],
        args   => [{Z, any} | [{X, any} || X <- Xs]],
@@ -1254,11 +1307,15 @@ lifted_fun(FVs, Xs, Body) ->
        body   => lists:foldr(Proj, Body, indexed(FVs))
      }.
 
+-spec make_closure([var_name()], [var_name()], fexpr()) -> Closure when
+      Closure :: fexpr().
 make_closure(FVs, Xs, Body) ->
     Fun   = add_lambda_fun(lifted_fun(FVs, Xs, Body)),
     Tup = fun([Y]) -> Y; (Ys) -> {tuple, Ys} end,
     {closure, get_fann(Body), Fun, Tup([{var, Y} || Y <- FVs])}.
 
+-spec lambda_lift_expr(state_layout(), fexpr()) -> Closure when
+      Closure :: fexpr().
 lambda_lift_expr(Layout, L = {lam, _, Xs, Body}) ->
     FVs   = free_vars(L),
     make_closure(FVs, Xs, lambda_lift_expr(Layout, Body));
@@ -1306,6 +1363,8 @@ lambda_lift_expr(Layout, Expr) ->
         {'case', P, S}           -> {'case', P, lambda_lift_expr(Layout, S)}
     end.
 
+-spec lambda_lift_exprs(state_layout(), [fexpr()]) -> [Closure] when
+      Closure :: fexpr().
 lambda_lift_exprs(Layout, As) -> [lambda_lift_expr(Layout, A) || A <- As].
 
 %% -- Optimisations ----------------------------------------------------------
@@ -1349,25 +1408,33 @@ inliner(Fcode, Fun, {def, _, Fun1, Args} = E) when Fun1 /= Fun ->
     end;
 inliner(_Fcode, _Fun, E) -> E.
 
+-spec should_inline(fcode(), fun_name()) -> boolean().
 should_inline(_Fcode, _Fun1) -> false == list_to_atom("true").  %% Dialyzer
 
+-spec inline(fcode(), fun_name(), Args) -> Def when
+      Args :: [fexpr()],
+      Def :: fexpr().
 inline(_Fcode, Fun, Args) -> {def, [], Fun, Args}. %% TODO
 
 %% --- Bind subexpressions ---
 
 -define(make_lets(Xs, Es, Body), make_lets(Es, fun(Xs) -> Body end)).
 
+-spec bind_subexpressions(fexpr()) -> fexpr().
 bind_subexpressions(Expr) ->
     bottom_up(fun bind_subexpressions/2, Expr).
 
+-spec bind_subexpressions(expr_env(), fexpr()) -> fexpr().
 bind_subexpressions(_, {tuple, Es}) ->
     ?make_lets(Xs, Es, {tuple, Xs});
 bind_subexpressions(_, {set_proj, Ann, A, I, B}) ->
     ?make_lets([X, Y], [A, B], {set_proj, Ann, X, I, Y});
 bind_subexpressions(_, E) -> E.
 
+-spec make_lets([fexpr()], fun(([fexpr()]) -> fexpr())) -> fexpr().
 make_lets(Es, Body) -> make_lets(Es, [], Body).
 
+-spec make_lets([fexpr()], [fexpr()], fun(([fexpr()]) -> fexpr())) -> fexpr().
 make_lets([], Xs, Body)       -> Body(lists:reverse(Xs));
 make_lets([{var, _} = E | Es], Xs, Body) ->
     make_lets(Es, [E | Xs], Body);
@@ -1378,9 +1445,11 @@ make_lets([E | Es], Xs, Body) ->
 
 %% --- Inline local functions ---
 
+-spec inline_local_functions(fexpr()) -> fexpr().
 inline_local_functions(Expr) ->
     bottom_up(fun inline_local_functions/2, Expr).
 
+-spec inline_local_functions(expr_env(), fexpr()) -> fexpr().
 inline_local_functions(Env, {funcall, _, {proj, _, {var, Y}, 0}, [{proj, _, {var, Y}, 1} | Args]} = Expr) ->
     %% TODO: Don't always inline local funs?
     case maps:get(Y, Env, free) of
@@ -1391,8 +1460,10 @@ inline_local_functions(_, Expr) -> Expr.
 
 %% --- Let-floating ---
 
+-spec let_floating(fexpr()) -> fexpr().
 let_floating(Expr) -> bottom_up(fun let_float/2, Expr).
 
+-spec let_float(expr_env(), fexpr()) -> fexpr().
 let_float(_, {'let', Ann, X, E, Body}) ->
     pull_out_let({'let', Ann, X, {here, E}, Body});
 let_float(_, {proj, Ann, E, I}) ->
@@ -1404,6 +1475,8 @@ let_float(_, {op, Ann, Op, Es}) ->
     let_bind(Lets, {op, Ann, Op, Es1});
 let_float(_, E) -> E.
 
+-spec pull_out_let(fexpr() | [fexpr()]) -> fexpr() | {Lets, [fexpr()]} when
+      Lets :: [{var_name(), fexpr()}].
 pull_out_let(Expr) when is_tuple(Expr) ->
     {Lets, Es} = pull_out_let(tuple_to_list(Expr)),
     Inner = list_to_tuple(Es),
@@ -1423,8 +1496,12 @@ pull_out_let(Es) when is_list(Es) ->
     end.
 
 %% Also renames the variables to fresh names
+-spec let_view(fexpr()) -> {Lets, fexpr()} when
+      Lets :: [{var_name(), fexpr()}].
 let_view(E) -> let_view(E, [], []).
 
+-spec let_view(fexpr(), rename(), Lets) -> {Lets, fexpr()} when
+      Lets :: [{var_name(), fexpr()}].
 let_view({'let', _, X, E, Rest}, Ren, Lets) ->
     Z = fresh_name(),
     let_view(Rest, [{X, Z} | Ren], [{Z, rename(Ren, E)} | Lets]);
@@ -1437,7 +1514,7 @@ let_view(E, Ren, Lets) ->
 simplifier(Expr) ->
     bottom_up(fun simplify/2, Expr).
 
--spec simplify(#{var_name() => fexpr()}, fexpr()) -> fexpr().
+-spec simplify(expr_env(), fexpr()) -> fexpr().
 
 %% (e₀, .., en).i ->
 %% let _ = e₀ in .. let x = ei in .. let _ = en in x
@@ -1476,6 +1553,7 @@ simplify(Env, {switch, Split}) ->
 simplify(_, E) ->
     E.
 
+-spec simpl_proj(expr_env(), integer(), fexpr()) -> fexpr() | false.
 simpl_proj(Env, I, Expr) ->
     IfSafe = fun(E) -> case safe_to_duplicate(E) of
                          true -> E;
@@ -1491,6 +1569,7 @@ simpl_proj(Env, I, Expr) ->
         _                        -> false
     end.
 
+-spec get_catchalls([fcase()]) -> [fcase()].
 get_catchalls(Alts) ->
     [ C || C = {'case', {var, _}, _} <- Alts ].
 
@@ -1502,6 +1581,7 @@ get_catchalls(Alts) ->
 %%    _ => switch(x)
 %%           ..
 %%           _ => e
+-spec add_catchalls([fcase()], [fcase()]) -> [fcase()].
 add_catchalls(Alts, []) -> Alts;
 add_catchalls(Alts, Catchalls) ->
     case lists:splitwith(fun({'case', {var, _}, _}) -> false; (_) -> true end,
@@ -1511,10 +1591,12 @@ add_catchalls(Alts, Catchalls) ->
         %% NOTE: relies on catchalls always being at the end
     end.
 
+-spec nest_catchalls([fcase()]) -> fcase().
 nest_catchalls([C = {'case', {var, _}, {nosplit, _}} | _]) -> C;
 nest_catchalls([{'case', P = {var, _}, {split, Type, X, Alts}} | Catchalls]) ->
     {'case', P, {split, Type, X, add_catchalls(Alts, Catchalls)}}.
 
+-spec simpl_switch(expr_env(), [fcase()], fsplit()) -> fexpr() | stuck | nomatch.
 simpl_switch(_Env, _, {nosplit, E}) -> E;
 simpl_switch(Env, Catchalls, {split, Type, X, Alts}) ->
     Alts1 = add_catchalls(Alts, Catchalls),
@@ -1528,6 +1610,7 @@ simpl_switch(Env, Catchalls, {split, Type, X, Alts}) ->
             end
     end.
 
+-spec simpl_case(expr_env(), fexpr(), [fcase()]) -> fexpr() | stuck | nomatch.
 simpl_case(_, _, []) -> nomatch;
 simpl_case(Env, E, [{'case', Pat, Body} | Alts]) ->
     case match_pat(Pat, E) of
@@ -1551,6 +1634,7 @@ match_pat({var, X}, E)                         -> [{X, E}];
 match_pat({assign, X, P}, E)                   -> [{X, E}, {P, E}];
 match_pat(_, _)                                -> false.
 
+-spec constructor_form(expr_env(), fexpr()) -> fexpr() | false.
 constructor_form(Env, Expr) ->
     case Expr of
         {var, X} ->
@@ -1578,8 +1662,10 @@ constructor_form(Env, Expr) ->
 
 %% --- Drop unused lets ---
 
+-spec drop_unused_lets(fexpr()) -> fexpr().
 drop_unused_lets(Expr) -> bottom_up(fun drop_unused_lets/2, Expr).
 
+-spec drop_unused_lets(expr_env(), fexpr()) -> fexpr().
 drop_unused_lets(_, {'let', Ann, X, E, Body} = Expr) ->
     case {read_only(E), not lists:member(X, free_vars(Body))} of
         {true, true}  -> Body;
@@ -1590,6 +1676,7 @@ drop_unused_lets(_, Expr) -> Expr.
 
 %% -- Static analysis --------------------------------------------------------
 
+-spec safe_to_duplicate(fexpr()) -> boolean().
 safe_to_duplicate({lit, _})    -> true;
 safe_to_duplicate({var, _})    -> true;
 safe_to_duplicate(nil)         -> true;
@@ -1632,12 +1719,15 @@ eliminate_dead_code(Code = #{ functions := Funs }) ->
     Code#{ functions := maps:filter(fun(Name, _) -> maps:is_key(Name, UsedFuns) end,
                                     Funs) }.
 
--spec used_functions(#{ fun_name() => fun_def() }) -> #{ fun_name() => true }.
+-spec used_functions(functions()) -> Used when
+      Used :: #{ fun_name() => true }.
 used_functions(Funs) ->
     Exported = [ Fun || {Fun, #{ attrs := Attrs }} <- maps:to_list(Funs),
                         not lists:member(private, Attrs) ],
     used_functions(#{}, Exported, Funs).
 
+-spec used_functions(Used, [fun_name()], functions()) -> Used when
+      Used :: #{ fun_name() => true }.
 used_functions(Used, [], _) -> Used;
 used_functions(Used, [Name | Rest], Defs) ->
     case maps:is_key(Name, Used) of
@@ -1698,6 +1788,7 @@ add_fun_env(Env = #{ fun_env := FunEnv }, Decls) ->
     FunEnv1 = maps:from_list(lists:flatmap(Entry, Decls)),
     Env#{ fun_env := maps:merge(FunEnv, FunEnv1) }.
 
+-spec make_fun_name(env(), aeso_syntax:ann(), aeso_syntax:name()) -> fun_name().
 make_fun_name(#{ context := Context }, Ann, Name) ->
     Entrypoint = proplists:get_value(entrypoint, Ann, false),
     case Context of
@@ -1737,11 +1828,14 @@ lookup_con(#{ con_env := ConEnv }, Con) ->
         Tag   -> Tag
     end.
 
+-spec bind_vars(env(), [var_name()]) -> env().
 bind_vars(Env, Xs) ->
     lists:foldl(fun(X, E) -> bind_var(E, X) end, Env, Xs).
 
+-spec bind_var(env(), var_name()) -> env().
 bind_var(Env = #{ vars := Vars }, X) -> Env#{ vars := [X | Vars] }.
 
+-spec resolve_var(env(), [aeso_syntax:name()]) -> fexpr().
 resolve_var(#{ vars := Vars } = Env, [X]) ->
     case lists:member(X, Vars) of
         true  -> {var, X};
@@ -1763,6 +1857,7 @@ resolve_const(#{ consts := Consts }, Q) ->
         Val       -> Val
     end.
 
+-spec resolve_fun(env(), [aeso_syntax:name()]) -> fexpr().
 resolve_fun(#{ fun_env := Funs, builtins := Builtin } = Env, Q) ->
     case {maps:get(Q, Funs, not_found), maps:get(Q, Builtin, not_found)} of
         {not_found, not_found} -> internal_error({unbound_variable, Q});
@@ -1771,17 +1866,21 @@ resolve_fun(#{ fun_env := Funs, builtins := Builtin } = Env, Q) ->
         {{Fun, Ar}, _}         -> {def_u, [], Fun, Ar}
     end.
 
+-spec init_fresh_names([option()]) -> term().
 init_fresh_names(Options) ->
     proplists:get_value(debug_info, Options, false) andalso init_saved_fresh_names(),
     put('%fresh', 0).
 
+-spec clear_fresh_names([option()]) -> term().
 clear_fresh_names(Options) ->
     proplists:get_value(debug_info, Options, false) andalso clear_saved_fresh_names(),
     erase('%fresh').
 
+-spec init_saved_fresh_names() -> term().
 init_saved_fresh_names() ->
     put(saved_fresh_names, #{}).
 
+-spec clear_saved_fresh_names() -> term().
 clear_saved_fresh_names() ->
     erase(saved_fresh_names).
 
@@ -1828,6 +1927,7 @@ fsplit_pat_vars({'::', P, Q})    -> [P, Q];
 fsplit_pat_vars({tuple, Ps})     -> Ps;
 fsplit_pat_vars({con, _, _, Ps}) -> Ps.
 
+-spec free_vars(fexpr() | [fexpr()]) -> [var_name()].
 free_vars(Xs) when is_list(Xs) ->
     lists:umerge([ free_vars(X) || X <- Xs ]);
 free_vars(Expr) ->
@@ -1859,6 +1959,7 @@ free_vars(Expr) ->
         {'case', P, A}          -> free_vars(A) -- lists:sort(fsplit_pat_vars(P))
     end.
 
+-spec used_defs(fexpr() | [fexpr()]) -> [fun_name()].
 used_defs(Xs) when is_list(Xs) ->
     lists:umerge([ used_defs(X) || X <- Xs ]);
 used_defs(Expr) ->
@@ -1890,8 +1991,12 @@ used_defs(Expr) ->
         {'case', _, A}          -> used_defs(A)
     end.
 
+-spec bottom_up(Fun, fexpr()) -> fexpr() when
+      Fun :: fun((expr_env(), fexpr()) -> fexpr()).
 bottom_up(F, Expr) -> bottom_up(F, #{}, Expr).
 
+-spec bottom_up(Fun, expr_env(), fexpr()) -> fexpr() when
+      Fun :: fun((expr_env(), fexpr()) -> fexpr()).
 bottom_up(F, Env, Expr) ->
     F(Env, case Expr of
         {lit, _}                         -> Expr;
@@ -1934,6 +2039,7 @@ bottom_up(F, Env, Expr) ->
         {'case', Pat, Split}             -> {'case', Pat, bottom_up(F, Env, Split)}
     end).
 
+-spec get_named_args([aeso_syntax:named_arg_t()], [aeso_syntax:arg_expr()]) -> [aeso_syntax:expr()].
 get_named_args(NamedArgsT, Args) ->
     IsNamed = fun({named_arg, _, _, _}) -> true;
                  (_) -> false end,
@@ -1941,6 +2047,7 @@ get_named_args(NamedArgsT, Args) ->
     NamedArgs = [get_named_arg(NamedArg, Named) || NamedArg <- NamedArgsT],
     NamedArgs ++ NotNamed.
 
+-spec get_named_arg(aeso_syntax:named_arg_t(), [aeso_syntax:arg_expr()]) -> aeso_syntax:expr().
 get_named_arg({named_arg_t, _, {id, _, Name}, _, Default}, Args) ->
     case [ Val || {named_arg, _, {id, _, X}, Val} <- Args, X == Name ] of
         [Val] -> Val;
@@ -1949,7 +2056,7 @@ get_named_arg({named_arg_t, _, {id, _, Name}, _, Default}, Args) ->
 
 %% -- Renaming --
 
--spec rename([{var_name(), var_name()}], fexpr()) -> fexpr().
+-spec rename(rename(), fexpr()) -> fexpr().
 rename(Ren, Expr) ->
     case Expr of
         {lit, _}                 -> Expr;
@@ -1980,7 +2087,10 @@ rename(Ren, Expr) ->
             {'let', Ann, Z, rename(Ren, E), rename(Ren1, Body)}
     end.
 
+-spec rename_var(rename(), var_name()) -> var_name().
 rename_var(Ren, X) -> proplists:get_value(X, Ren, X).
+
+-spec rename_binding(rename(), var_name()) -> {var_name(), rename()}.
 rename_binding(Ren, X) ->
     Ren1 = lists:keydelete(X, 1, Ren),
     case lists:keymember(X, 2, Ren) of
@@ -1990,18 +2100,21 @@ rename_binding(Ren, X) ->
             {Z, [{X, Z} | Ren1]}
     end.
 
+-spec rename_bindings(rename(), [var_name()]) -> {[var_name()], rename()}.
 rename_bindings(Ren, []) -> {[], Ren};
 rename_bindings(Ren, [X | Xs]) ->
     {Z, Ren1}  = rename_binding(Ren, X),
     {Zs, Ren2} = rename_bindings(Ren1, Xs),
     {[Z | Zs], Ren2}.
 
+-spec rename_fpats(rename(), [fpat()]) -> {[fpat()], rename()}.
 rename_fpats(Ren, []) -> {[], Ren};
 rename_fpats(Ren, [P | Ps]) ->
     {Q, Ren1}  = rename_fpat(Ren, P),
     {Qs, Ren2} = rename_fpats(Ren1, Ps),
     {[Q | Qs], Ren2}.
 
+-spec rename_fpat(rename(), fpat()) -> {fpat(), rename()}.
 rename_fpat(Ren, P = {bool, _})   -> {P, Ren};
 rename_fpat(Ren, P = {int, _})    -> {P, Ren};
 rename_fpat(Ren, P = {string, _}) -> {P, Ren};
@@ -2020,6 +2133,7 @@ rename_fpat(Ren, {tuple, Ps}) ->
     {Ps1, Ren1} = rename_fpats(Ren, Ps),
     {{tuple, Ps1}, Ren1}.
 
+-spec rename_spat(rename(), fsplit_pat()) -> {fsplit_pat(), rename()}.
 rename_spat(Ren, P = {bool, _})   -> {P, Ren};
 rename_spat(Ren, P = {int, _})    -> {P, Ren};
 rename_spat(Ren, P = {string, _}) -> {P, Ren};
@@ -2042,23 +2156,27 @@ rename_spat(Ren, {assign, X, P}) ->
     {P1, Ren2} = rename_binding(Ren1, P),
     {{assign, X1, P1}, Ren2}.
 
+-spec rename_split(rename(), fsplit()) -> fsplit().
 rename_split(Ren, {split, Type, X, Cases}) ->
     {split, Type, rename_var(Ren, X), [rename_case(Ren, C) || C <- Cases]};
 rename_split(Ren, {nosplit, E}) -> {nosplit, rename(Ren, E)}.
 
+-spec rename_case(rename(), fcase()) -> fcase().
 rename_case(Ren, {'case', Pat, Split}) ->
     {Pat1, Ren1} = rename_spat(Ren, Pat),
     {'case', Pat1, rename_split(Ren1, Split)}.
 
 %% -- Records --
 
-field_index({typed, _, _, RecTy}, X) ->
-    field_index(RecTy, X);
+-spec field_index(aeso_syntax:typedef(), aeso_syntax:name()) -> integer().
 field_index({record_t, Fields}, X) ->
     IsX = fun({field_t, _, {id, _, Y}, _}) -> X == Y end,
     [I] = [ I || {I, Field} <- indexed(Fields), IsX(Field) ],
     I - 1.  %% Tuples are 0-indexed
 
+-spec field_value(aeso_syntax:field_t(), [aeso_syntax:field(aeso_syntax:pat())]) -> Res when
+      Res :: {upd, aeso_syntax:name(), Expr} | {set, Expr} | false,
+      Expr :: aeso_syntax:expr().
 field_value({field_t, _, {id, _, X}, _}, Fields) ->
     View = fun({field, _, [{proj, _, {id, _, Y}}], E})    -> {Y, {set, E}};
               ({field_upd, _, [{proj, _, {id, _, Y}}],
@@ -2070,6 +2188,7 @@ field_value({field_t, _, {id, _, X}, _}, Fields) ->
 
 %% -- Attributes --
 
+-spec get_attributes(aeso_syntax:ann()) -> [stateful | payable | private].
 get_attributes(Ann) ->
     [stateful || proplists:get_value(stateful, Ann, false)] ++
     [payable  || proplists:get_value(payable, Ann, false)] ++
@@ -2077,36 +2196,46 @@ get_attributes(Ann) ->
 
 %% -- Basic utilities --
 
+-spec indexed([term()]) -> [{integer(), term()}].
 indexed(Xs) ->
     lists:zip(lists:seq(1, length(Xs)), Xs).
 
+-spec setnth(integer(), Val, Vals) -> Vals when
+      Val :: term(),
+      Vals :: [Val].
 setnth(I, X, Xs) ->
     {Ys, [_ | Zs]} = lists:split(I - 1, Xs),
     Ys ++ [X] ++ Zs.
 
 -dialyzer({nowarn_function, [fcode_error/1, internal_error/1]}).
 
+-spec fcode_error(string()) -> no_return().
 fcode_error(Error) ->
     Pos = aeso_errors:pos(0, 0),
     Msg = lists:flatten(io_lib:format("Unknown error: ~p\n", [Error])),
     aeso_errors:throw(aeso_errors:new(code_error, Pos, Msg)).
 
+-spec internal_error(string()) -> no_return().
 internal_error(Error) ->
     Msg = lists:flatten(io_lib:format("~p\n", [Error])),
     aeso_errors:throw(aeso_errors:new(internal_error, aeso_errors:pos(0, 0), Msg)).
 
 %% -- Pretty printing --------------------------------------------------------
 
+-spec format_fcode(fcode()) -> string().
 format_fcode(#{ functions := Funs }) ->
     prettypr:format(format_funs(Funs)).
 
+-spec format_funs(functions()) -> prettypr:document().
 format_funs(Funs) ->
     pp_above(
       [ pp_fun(Name, Def) || {Name, Def} <- maps:to_list(Funs) ]).
 
+-spec format_fexpr(fexpr()) -> string().
 format_fexpr(E) ->
     prettypr:format(pp_fexpr(E)).
 
+-spec pp_fun(fun_name(), fun_def()) -> prettypr:document().
 pp_fun(Name, #{ args := Args, return := Return, body := Body }) ->
     PPArg = fun({X, T}) -> pp_beside([pp_text(X), pp_text(" : "), pp_ftype(T)]) end,
     pp_above(pp_beside([pp_text("function "), pp_fun_name(Name),
@@ -2114,39 +2243,53 @@ pp_fun(Name, #{ args := Args, return := Return, body := Body }) ->
                pp_text(" : "), pp_ftype(Return), pp_text(" =")]),
              prettypr:nest(2, pp_fexpr(Body))).
 
+-spec pp_fun_name(fun_name()) -> prettypr:document().
 pp_fun_name(event)           -> pp_text(event);
 pp_fun_name({entrypoint, E}) -> pp_text(binary_to_list(E));
 pp_fun_name({local_fun, Q})  -> pp_text(string:join(Q, ".")).
 
+-spec pp_text(binary() | string() | atom() | integer()) -> prettypr:document().
 pp_text(<<>>) -> prettypr:text("\"\"");
 pp_text(Bin) when is_binary(Bin) -> prettypr:text(lists:flatten(io_lib:format("~p", [binary_to_list(Bin)])));
 pp_text(S) when is_list(S) -> prettypr:text(lists:concat([S]));
 pp_text(A) when is_atom(A) -> prettypr:text(atom_to_list(A));
 pp_text(N) when is_integer(N) -> prettypr:text(integer_to_list(N)).
 
+-spec pp_int(integer()) -> prettypr:document().
 pp_int(I) -> prettypr:text(integer_to_list(I)).
 
+-spec pp_beside([prettypr:document()]) -> prettypr:document().
 pp_beside([])       -> prettypr:empty();
 pp_beside([X])      -> X;
 pp_beside([X | Xs]) -> pp_beside(X, pp_beside(Xs)).
 
+-spec pp_beside(prettypr:document(), prettypr:document()) -> prettypr:document().
 pp_beside(A, B) -> prettypr:beside(A, B).
 
+-spec pp_above([prettypr:document()]) -> prettypr:document().
 pp_above([])       -> prettypr:empty();
 pp_above([X])      -> X;
 pp_above([X | Xs]) -> pp_above(X, pp_above(Xs)).
 
+-spec pp_above(prettypr:document(), prettypr:document()) -> prettypr:document().
 pp_above(A, B) -> prettypr:above(A, B).
 
+-spec pp_parens(prettypr:document()) -> prettypr:document().
 pp_parens(Doc) -> pp_beside([pp_text("("), Doc, pp_text(")")]).
+
+-spec pp_braces(prettypr:document()) -> prettypr:document().
 pp_braces(Doc) -> pp_beside([pp_text("{"), Doc, pp_text("}")]).
 
+-spec pp_punctuate(prettypr:document(), [prettypr:document()]) -> [prettypr:document()].
 pp_punctuate(_Sep, [])      -> [];
 pp_punctuate(_Sep, [X])     -> [X];
 pp_punctuate(Sep, [X | Xs]) -> [pp_beside(X, Sep) | pp_punctuate(Sep, Xs)].
 
+-spec pp_par([prettypr:document()]) -> prettypr:document().
 pp_par([]) -> prettypr:empty();
 pp_par(Xs) -> prettypr:par(Xs).
+
+-spec pp_fexpr(fexpr()) -> prettypr:document().
 pp_fexpr({lit, {typerep, T}}) ->
     pp_ftype(T);
 pp_fexpr({lit, {Tag, Lit}}) ->
@@ -2223,9 +2366,11 @@ pp_fexpr({switch, Split}) -> pp_split(Split);
 pp_fexpr({contract_code, Contract}) ->
     pp_beside(pp_text("contract "), pp_text(Contract)).
 
+-spec pp_call(prettypr:document(), [fexpr()]) -> prettypr:document().
 pp_call(Fun, Args) ->
     pp_beside(Fun, pp_fexpr({tuple, Args})).
 
+-spec pp_call_t(string(), [ftype()]) -> prettypr:document().
 pp_call_t(Fun, Args) ->
     pp_beside(pp_text(Fun), pp_ftype({tuple, Args})).
 
@@ -2251,15 +2396,18 @@ pp_ftype({variant, Cons}) ->
                      _  -> pp_beside(pp_fexpr({con, [], I - 1, []}), pp_ftype({tuple, Args}))
                    end || {I, Args} <- indexed(Cons)])).
 
+-spec pp_split(fsplit()) -> prettypr:document().
 pp_split({nosplit, E}) -> pp_fexpr(E);
 pp_split({split, Type, X, Alts}) ->
     pp_above([pp_beside([pp_text("switch("), pp_text(X), pp_text(" : "), pp_ftype(Type), pp_text(")")])] ++
              [prettypr:nest(2, pp_case(Alt)) || Alt <- Alts]).
 
+-spec pp_case(fcase()) -> prettypr:document().
 pp_case({'case', Pat, Split}) ->
     prettypr:sep([pp_beside(pp_pat(Pat), pp_text(" =>")),
                   prettypr:nest(2, pp_split(Split))]).
 
+-spec pp_pat(fsplit_pat()) -> prettypr:document().
 pp_pat({tuple, Xs})      -> pp_fexpr({tuple, [{var, X} || X <- Xs]});
 pp_pat({'::', X, Xs})    -> pp_fexpr({op, [], '::', [{var, X}, {var, Xs}]});
 pp_pat({con, As, I, Xs}) -> pp_fexpr({con, As, I, [{var, X} || X <- Xs]});
@@ -2268,6 +2416,7 @@ pp_pat(P = {Tag, _}) when Tag == bool; Tag == int; Tag == string
                          -> pp_fexpr({lit, P});
 pp_pat(Pat)              -> pp_fexpr(Pat).
 
+-spec is_infix(op()) -> boolean().
 is_infix(Op) ->
     C = hd(atom_to_list(Op)),
     C < $a orelse C > $z.
