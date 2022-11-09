@@ -62,7 +62,7 @@
 
 -type fexpr() :: {lit, flit()}
                | nil
-               | {var, var_name()}
+               | {var, fann(), var_name()}
                | {def, fann(), fun_name(), [fexpr()]}
                | {remote, fann(), [ftype()], ftype(), fexpr(), fun_name(), [fexpr()]}
                | {builtin, builtin(), [fexpr()]}
@@ -91,7 +91,7 @@
 
 -type fcase() :: {'case', fsplit_pat(), fsplit()}.
 
--type fsplit_pat()  :: {var, var_name()}
+-type fsplit_pat()  :: {var, fann(), var_name()}
                      | {bool, false | true}
                      | {int, integer()}
                      | {string, binary()}
@@ -533,17 +533,18 @@ args_to_fcode(Env, Args) ->
 -spec make_let(fexpr(), fun((fexpr()) -> fexpr())) -> fexpr().
 make_let(Expr, Body) ->
     case Expr of
-        {var, _}         -> Body(Expr);
+        {var, _, _}      -> Body(Expr);
         {lit, {int, _}}  -> Body(Expr);
         {lit, {bool, _}} -> Body(Expr);
         _                ->
             X = fresh_name(),
-            {'let', get_fann(Expr), X, Expr, Body({var, X})}
+            FAnn = get_fann(Expr),
+            {'let', FAnn, X, Expr, Body({var, FAnn, X})}
     end.
 
 -spec let_bind(var_name(), fexpr(), fexpr()) -> fexpr().
-let_bind(X, {var, Y}, Body) -> rename([{X, Y}], Body);
-let_bind(X, Expr, Body)     -> {'let', get_fann(Expr), X, Expr, Body}.
+let_bind(X, {var, _, Y}, Body) -> rename([{X, Y}], Body);
+let_bind(X, Expr, Body)        -> {'let', get_fann(Expr), X, Expr, Body}.
 
 -spec let_bind([{var_name(), fexpr()}], fexpr()) -> fexpr().
 let_bind(Binds, Body) ->
@@ -645,7 +646,7 @@ expr_to_fcode(Env, {record_t, [FieldT]}, {record, Ann, Rec, Fields}) ->
 expr_to_fcode(Env, {record_t, FieldTypes}, {record, Ann, Rec, Fields}) ->
     X    = fresh_name(),
     FAnn = to_fann(Ann),
-    Proj = fun(I) -> {proj, FAnn, {var, X}, I - 1} end,
+    Proj = fun(I) -> {proj, FAnn, {var, FAnn, X}, I - 1} end,
     Comp = fun({I, false})       -> Proj(I);
               ({_, {set, E}})    -> expr_to_fcode(Env, E);
               ({I, {upd, Z, E}}) -> {'let', FAnn, Z, Proj(I), expr_to_fcode(bind_var(Env, Z), E)}
@@ -659,7 +660,7 @@ expr_to_fcode(Env, {record_t, FieldTypes}, {record, Ann, Rec, Fields}) ->
     Updates = [ {I, field_value(FT, Fields)} || {I, FT} <- indexed(FieldTypes) ],
     Body = case Expand of
              true  -> {tuple, lists:map(Comp, Updates)};
-             false -> lists:foldr(Set, {var, X}, Updates)
+             false -> lists:foldr(Set, {var, FAnn, X}, Updates)
            end,
     {'let', FAnn, X, expr_to_fcode(Env, Rec), Body};
 
@@ -761,11 +762,11 @@ expr_to_fcode(Env, _, {app, _, Fun = {typed, Ann, FunE, {fun_t, _, NamedArgsT, A
             %% FFun is a closure, with first component the function name and
             %% second component the environment
             FAnn = to_fann(Ann),
-            Call = fun(X) -> {funcall, FAnn, {proj, FAnn, {var, X}, 0}, [{proj, FAnn, {var, X}, 1} | FArgs]} end,
+            Call = fun(X) -> {funcall, FAnn, {proj, FAnn, {var, FAnn, X}, 0}, [{proj, FAnn, {var, FAnn, X}, 1} | FArgs]} end,
             case FFun of
-                {var, X} -> Call(X);
-                _        -> X = fresh_name(),
-                            {'let', FAnn, X, FFun, Call(X)}
+                {var, _, X} -> Call(X);
+                _           -> X = fresh_name(),
+                               {'let', FAnn, X, FFun, Call(X)}
             end
     end;
 
@@ -813,21 +814,23 @@ expr_to_fcode(_Env, Type, Expr) ->
     error({todo, {Expr, ':', Type}}).
 
 -spec make_if(fexpr(), fexpr(), fexpr()) -> fexpr().
-make_if({var, X}, Then, Else) ->
+make_if({var, _, X}, Then, Else) ->
     {switch, {split, boolean, X,
         [{'case', {bool, false}, {nosplit, Else}},
          {'case', {bool, true},  {nosplit, Then}}]}};
 make_if(Cond, Then, Else) ->
     X = fresh_name(),
-    {'let', get_fann(Cond), X, Cond, make_if({var, X}, Then, Else)}.
+    FAnn = get_fann(Cond),
+    {'let', FAnn, X, Cond, make_if({var, FAnn, X}, Then, Else)}.
 
 -spec make_if_no_else(fexpr(), fexpr()) -> fexpr().
-make_if_no_else({var, X}, Then) ->
+make_if_no_else({var, _, X}, Then) ->
     {switch, {split, boolean, X,
         [{'case', {bool, true},  {nosplit, Then}}]}};
 make_if_no_else(Cond, Then) ->
     X = fresh_name(),
-    {'let', get_fann(Cond), X, Cond, make_if_no_else({var, X}, Then)}.
+    FAnn = get_fann(Cond),
+    {'let', FAnn, X, Cond, make_if_no_else({var, FAnn, X}, Then)}.
 
 -spec make_tuple([fexpr()]) -> fexpr().
 make_tuple([E]) -> E;
@@ -858,7 +861,7 @@ alts_to_fcode(Env, Type, X, Alts, Switch) ->
 
 %% Intermediate format before case trees (fcase() and fsplit()).
 -type falt() :: {'case', [fpat()], fexpr()}.
--type fpat() :: {var, var_name()}
+-type fpat() :: {var, fann(), var_name()}
               | {bool, false | true}
               | {int, integer()}
               | {string, binary()}
@@ -912,7 +915,7 @@ split_tree(Env, Vars, Alts = [{'case', Pats, Body} | _]) ->
     case next_split(Pats) of
         false ->
             Xs  = [ X || {X, _} <- Vars ],
-            Ys  = [ Y || {var, Y} <- Pats ],
+            Ys  = [ Y || {var, _, Y} <- Pats ],
             Ren = [ {Y, X} || {Y, X} <- lists:zip(Ys, Xs), X /= Y, Y /= "_" ],
             %% TODO: Unreachable clauses error
             {nosplit, rename(Ren, Body)};
@@ -920,7 +923,7 @@ split_tree(Env, Vars, Alts = [{'case', Pats, Body} | _]) ->
             {Vars0, [{X, Type} | Vars1]} = lists:split(I - 1, Vars),
             Type1 = strip_singleton_tuples(Type),
             SAlts = merge_alts(I, X, [ split_alt(I, A) || A <- Alts ]),
-            MakeCase = fun({var, Z}, Split) -> {'case', {var, "_"}, rename_split([{Z, X}], Split)};
+            MakeCase = fun({var, FAnn, Z}, Split) -> {'case', {var, FAnn, "_"}, rename_split([{Z, X}], Split)};
                           (SPat, Split)     -> {'case', SPat, Split} end,
             Cases = [ MakeCase(SPat, split_tree(Env, Vars0 ++ split_vars(SPat, Type1) ++ Vars1, FAlts))
                       || {SPat, FAlts} <- SAlts ],
@@ -942,7 +945,7 @@ merge_alts(I, X, Alts, Alts1) ->
         when Alts :: [{fsplit_pat(), [falt()]}].
 merge_alt(_, _, {P, A}, []) -> [{P, [A]}];
 merge_alt(I, X, {P, A}, [{Q, As} | Rest]) ->
-    Match = fun({var, _}, {var, _})             -> match;
+    Match = fun({var, _, _}, {var, _, _})       -> match;
                ({tuple, _}, {tuple, _})         -> match;
                ({bool, B}, {bool, B})           -> match;
                ({int, N},  {int, N})            -> match;
@@ -951,8 +954,8 @@ merge_alt(I, X, {P, A}, [{Q, As} | Rest]) ->
                ({'::', _, _}, {'::', _, _})     -> match;
                ({con, _, C, _}, {con, _, C, _}) -> match;
                ({con, _, _, _}, {con, _, _, _}) -> mismatch;
-               ({var, _}, _)                    -> expand;
-               (_, {var, _})                    -> insert;
+               ({var, _, _}, _)                 -> expand;
+               (_, {var, _, _})                 -> insert;
                (_, _)                           -> mismatch
             end,
     case Match(P, Q) of
@@ -966,11 +969,11 @@ merge_alt(I, X, {P, A}, [{Q, As} | Rest]) ->
 
 -spec expand(integer(), var_name(), fsplit_pat(), fsplit_pat(), falt()) -> term().
 expand(I, X, P, Q, Case = {'case', Ps, E}) ->
-    {Ps0, [{var, Y} | Ps1]} = lists:split(I - 1, Ps),
+    {Ps0, [{var, _, Y} | Ps1]} = lists:split(I - 1, Ps),
     {Ps0r, Ren1} = rename_fpats([{Y, X} || Y /= X], Ps0),
     {Ps1r, Ren2} = rename_fpats(Ren1, Ps1),
     E1 = rename(Ren2, E),
-    Splice = fun(N) -> Ps0r ++ lists:duplicate(N, {var, "_"}) ++ Ps1r end,
+    Splice = fun(N) -> Ps0r ++ lists:duplicate(N, {var, [], "_"}) ++ Ps1r end,
     Type = fun({tuple, Xs})     -> {tuple, length(Xs)};
               ({bool, _})       -> bool;
               ({int, _})        -> int;
@@ -997,16 +1000,16 @@ split_alt(I, {'case', Pats, Body}) ->
     {SPat, {'case', Pats0 ++ InnerPats ++ Pats1, Body}}.
 
 -spec split_pat(fpat()) -> {fsplit_pat(), [fpat()]}.
-split_pat(P = {var, _})  -> {{var, fresh_name()}, [P]};
-split_pat({bool, B})     -> {{bool, B}, []};
-split_pat({int, N})      -> {{int, N}, []};
-split_pat({string, N})   -> {{string, N}, []};
+split_pat(P = {var, FAnn, _}) -> {{var, FAnn, fresh_name()}, [P]};
+split_pat({bool, B})          -> {{bool, B}, []};
+split_pat({int, N})           -> {{int, N}, []};
+split_pat({string, N})        -> {{string, N}, []};
 split_pat(nil) -> {nil, []};
 split_pat({'::', P, Q}) -> {{'::', fresh_name(), fresh_name()}, [P, Q]};
 split_pat({con, As, I, Pats}) ->
     Xs = [fresh_name() || _ <- Pats],
     {{con, As, I, Xs}, Pats};
-split_pat({assign, X = {var, _}, P}) ->
+split_pat({assign, X = {var, _, _}, P}) ->
     {{assign, fresh_name(), fresh_name()}, [X, P]};
 split_pat({tuple, Pats}) ->
     Xs = [fresh_name() || _ <- Pats],
@@ -1023,11 +1026,11 @@ split_vars({con, _, I, Xs}, {variant, Cons}) ->
     lists:zip(Xs, lists:nth(I + 1, Cons));
 split_vars({tuple, Xs}, {tuple, Ts}) ->
     lists:zip(Xs, Ts);
-split_vars({var, X}, T) -> [{X, T}].
+split_vars({var, _, X}, T) -> [{X, T}].
 
 -spec next_split([fpat()]) -> integer() | false.
 next_split(Pats) ->
-    IsVar = fun({var, _}) -> true; (_) -> false end,
+    IsVar = fun({var, _, _}) -> true; (_) -> false end,
     case [ I || {I, P} <- indexed(Pats), not IsVar(P) ] of
         []      -> false;
         [I | _] -> I
@@ -1046,7 +1049,7 @@ pat_to_fcode(Env, Pat) ->
     pat_to_fcode(Env, no_type, Pat).
 
 -spec pat_to_fcode(env(), aeso_syntax:type() | no_type, aeso_syntax:pat()) -> fpat().
-pat_to_fcode(_Env, _Type, {id, _, X}) -> {var, X};
+pat_to_fcode(_Env, _Type, {id, Ann, X}) -> {var, to_fann(Ann), X};
 pat_to_fcode(Env, _Type, {C, _, _} = Con) when C == con; C == qcon ->
     #con_tag{tag = I, arities = As} = lookup_con(Env, Con),
     {con, As, I, []};
@@ -1250,9 +1253,9 @@ event_function(_Env = #{event_type := {variant_t, EventCons}}, EventType = {vari
                 Payload =
                     case [ V || {notindexed, V} <- IVars ] of
                         []  -> {lit, {string, <<>>}};
-                        [V] -> {var, V}
+                        [V] -> {var, [], V}
                     end,
-                Indices = [ {var, V} || {indexed, V} <- IVars ],
+                Indices = [ {var, [], V} || {indexed, V} <- IVars ],
                 Body = {builtin, chain_event, [Payload, Hash | Indices]},
                 {'case', {con, Arities, Tag, Vars}, {nosplit, Body}}
            end,
@@ -1300,7 +1303,8 @@ lifted_fun([Z], Xs, Body) ->
        body   => Body };
 lifted_fun(FVs, Xs, Body) ->
     Z    = "%env",
-    Proj = fun({I, Y}, E) -> {'let', get_fann(Body), Y, {proj, get_fann(Body), {var, Z}, I - 1}, E} end,
+    FAnn = get_fann(Body),
+    Proj = fun({I, Y}, E) -> {'let', get_fann(Body), Y, {proj, FAnn, {var, FAnn, Z}, I - 1}, E} end,
     #{ attrs  => [private],
        args   => [{Z, any} | [{X, any} || X <- Xs]],
        return => any,
@@ -1312,7 +1316,7 @@ lifted_fun(FVs, Xs, Body) ->
 make_closure(FVs, Xs, Body) ->
     Fun   = add_lambda_fun(lifted_fun(FVs, Xs, Body)),
     Tup = fun([Y]) -> Y; (Ys) -> {tuple, Ys} end,
-    {closure, get_fann(Body), Fun, Tup([{var, Y} || Y <- FVs])}.
+    {closure, get_fann(Body), Fun, Tup([{var, [], Y} || Y <- FVs])}.
 
 -spec lambda_lift_expr(state_layout(), fexpr()) -> Closure when
       Closure :: fexpr().
@@ -1326,7 +1330,7 @@ lambda_lift_expr(Layout, UExpr) when element(1, UExpr) == def_u; element(1, UExp
                     _                              -> []
                 end,
     Xs   = [ lists:concat(["arg", I]) || I <- lists:seq(1, Ar) ],
-    Args = [{var, X} || X <- Xs] ++ ExtraArgs,
+    Args = [{var, [], X} || X <- Xs] ++ ExtraArgs,
     Body = case Tag of
                builtin_u -> builtin_to_fcode(Layout, F, Args);
                def_u     -> {def, [], F, Args}
@@ -1337,13 +1341,13 @@ lambda_lift_expr(Layout, {remote_u, Ann, ArgsT, RetT, Ct, F}) ->
     Ct1  = lambda_lift_expr(Layout, Ct),
     NamedArgCount = 3,
     Xs   = [ lists:concat(["arg", I]) || I <- lists:seq(1, length(ArgsT) + NamedArgCount) ],
-    Args = [{var, X} || X <- Xs],
+    Args = [{var, [], X} || X <- Xs],
     make_closure(FVs, Xs, {remote, Ann, ArgsT, RetT, Ct1, F, Args});
 lambda_lift_expr(Layout, Expr) ->
     case Expr of
         {lit, _}                 -> Expr;
         nil                      -> Expr;
-        {var, _}                 -> Expr;
+        {var, _, _}              -> Expr;
         {closure, _, _, _}       -> Expr;
         {def, Ann, D, As}        -> {def, Ann, D, lambda_lift_exprs(Layout, As)};
         {builtin, B, As}         -> {builtin, B, lambda_lift_exprs(Layout, As)};
@@ -1436,7 +1440,7 @@ make_lets(Es, Body) -> make_lets(Es, [], Body).
 
 -spec make_lets([fexpr()], [fexpr()], fun(([fexpr()]) -> fexpr())) -> fexpr().
 make_lets([], Xs, Body)       -> Body(lists:reverse(Xs));
-make_lets([{var, _} = E | Es], Xs, Body) ->
+make_lets([{var, _, _} = E | Es], Xs, Body) ->
     make_lets(Es, [E | Xs], Body);
 make_lets([{lit, _} = E | Es], Xs, Body) ->
     make_lets(Es, [E | Xs], Body);
@@ -1450,7 +1454,7 @@ inline_local_functions(Expr) ->
     bottom_up(fun inline_local_functions/2, Expr).
 
 -spec inline_local_functions(expr_env(), fexpr()) -> fexpr().
-inline_local_functions(Env, {funcall, _, {proj, _, {var, Y}, 0}, [{proj, _, {var, Y}, 1} | Args]} = Expr) ->
+inline_local_functions(Env, {funcall, _, {proj, _, {var, _, Y}, 0}, [{proj, _, {var, _, Y}, 1} | Args]} = Expr) ->
     %% TODO: Don't always inline local funs?
     case maps:get(Y, Env, free) of
         {lam, _, Xs, Body} -> let_bind(lists:zip(Xs, Args), Body);
@@ -1522,7 +1526,7 @@ simplify(_Env, {proj, FAnn, {tuple, Es}, I}) ->
     It  = lists:nth(I + 1, Es),
     X   = fresh_name(),
     Dup = safe_to_duplicate(It),
-    Val = if Dup -> It; true -> {var, X} end,
+    Val = if Dup -> It; true -> {var, FAnn, X} end,
     lists:foldr(
       fun({J, E}, Rest) when I == J ->
             case Dup of
@@ -1537,8 +1541,8 @@ simplify(_Env, {proj, FAnn, {tuple, Es}, I}) ->
         end, Val, indexed(Es));
 
 %% let x = e in .. x.i ..
-simplify(Env, {proj, _, {var, X}, I} = Expr) ->
-    case simpl_proj(Env, I, {var, X}) of
+simplify(Env, {proj, _, Var = {var, _, _}, I} = Expr) ->
+    case simpl_proj(Env, I, Var) of
         false -> Expr;
         E     -> E
     end;
@@ -1560,7 +1564,7 @@ simpl_proj(Env, I, Expr) ->
                        end end,
     case Expr of
         false                    -> false;
-        {var, X}                 -> simpl_proj(Env, I, maps:get(X, Env, false));
+        {var, _, X}              -> simpl_proj(Env, I, maps:get(X, Env, false));
         {tuple, Es}              -> IfSafe(lists:nth(I + 1, Es));
         {set_proj, _, _, I, Val} -> IfSafe(Val);
         {set_proj, _, E, _, _}   -> simpl_proj(Env, I, E);
@@ -1570,7 +1574,7 @@ simpl_proj(Env, I, Expr) ->
 
 -spec get_catchalls([fcase()]) -> [fcase()].
 get_catchalls(Alts) ->
-    [ C || C = {'case', {var, _}, _} <- Alts ].
+    [ C || C = {'case', {var, _, _}, _} <- Alts ].
 
 %% The scode compiler can't handle multiple catch-alls, so we need to nest them
 %% inside each other. Instead of
@@ -1583,7 +1587,7 @@ get_catchalls(Alts) ->
 -spec add_catchalls([fcase()], [fcase()]) -> [fcase()].
 add_catchalls(Alts, []) -> Alts;
 add_catchalls(Alts, Catchalls) ->
-    case lists:splitwith(fun({'case', {var, _}, _}) -> false; (_) -> true end,
+    case lists:splitwith(fun({'case', {var, _, _}, _}) -> false; (_) -> true end,
                          Alts) of
         {Alts1, [C]} -> Alts1 ++ [nest_catchalls([C | Catchalls])];
         {_, []}      -> Alts  ++ [nest_catchalls(Catchalls)]
@@ -1591,8 +1595,8 @@ add_catchalls(Alts, Catchalls) ->
     end.
 
 -spec nest_catchalls([fcase()]) -> fcase().
-nest_catchalls([C = {'case', {var, _}, {nosplit, _}} | _]) -> C;
-nest_catchalls([{'case', P = {var, _}, {split, Type, X, Alts}} | Catchalls]) ->
+nest_catchalls([C = {'case', {var, _, _}, {nosplit, _}} | _]) -> C;
+nest_catchalls([{'case', P = {var, _, _}, {split, Type, X, Alts}} | Catchalls]) ->
     {'case', P, {split, Type, X, add_catchalls(Alts, Catchalls)}}.
 
 -spec simpl_switch(expr_env(), [fcase()], fsplit()) -> fexpr() | nomatch.
@@ -1600,7 +1604,7 @@ simpl_switch(_Env, _, {nosplit, E}) -> E;
 simpl_switch(Env, Catchalls, {split, Type, X, Alts}) ->
     Alts1 = add_catchalls(Alts, Catchalls),
     Stuck = {switch, {split, Type, X, Alts1}},
-    case constructor_form(Env, {var, X}) of
+    case constructor_form(Env, {var, [], X}) of
         false -> Stuck;
         E     -> simpl_case(Env, E, Alts1)
     end.
@@ -1624,14 +1628,14 @@ match_pat({con, _, C, Xs}, {con, _, C, Es})    -> lists:zip(Xs, Es);
 match_pat(L, {lit, L})                         -> [];
 match_pat(nil, nil)                            -> [];
 match_pat({'::', X, Y}, {op, _, '::', [A, B]}) -> [{X, A}, {Y, B}];
-match_pat({var, X}, E)                         -> [{X, E}];
+match_pat({var, _, X}, E)                      -> [{X, E}];
 match_pat({assign, X, P}, E)                   -> [{X, E}, {P, E}];
 match_pat(_, _)                                -> false.
 
 -spec constructor_form(expr_env(), fexpr()) -> fexpr() | false.
 constructor_form(Env, Expr) ->
     case Expr of
-        {var, X} ->
+        {var, _, X} ->
             case maps:get(X, Env, free) of
                 free -> false;
                 E    -> constructor_form(Env, E)    %% TODO: shadowing?
@@ -1672,14 +1676,14 @@ drop_unused_lets(_, Expr) -> Expr.
 
 -spec safe_to_duplicate(fexpr()) -> boolean().
 safe_to_duplicate({lit, _})    -> true;
-safe_to_duplicate({var, _})    -> true;
+safe_to_duplicate({var, _, _}) -> true;
 safe_to_duplicate(nil)         -> true;
 safe_to_duplicate({tuple, []}) -> true;
 safe_to_duplicate(_)           -> false.
 
 -spec read_only(fexpr() | fsplit() | fcase() | [fexpr()] | [fcase()]) -> boolean().
 read_only({lit, _})                   -> true;
-read_only({var, _})                   -> true;
+read_only({var, _, _})                -> true;
 read_only(nil)                        -> true;
 read_only({con, _, _, Es})            -> read_only(Es);
 read_only({tuple, Es})                -> read_only(Es);
@@ -1832,7 +1836,7 @@ bind_var(Env = #{ vars := Vars }, X) -> Env#{ vars := [X | Vars] }.
 -spec resolve_var(env(), [aeso_syntax:name()]) -> fexpr().
 resolve_var(#{ vars := Vars } = Env, [X]) ->
     case lists:member(X, Vars) of
-        true  -> {var, X};
+        true  -> {var, [], X};
         false ->
             case resolve_const(Env, [X]) of
                 false -> resolve_fun(Env, [X]);
@@ -1900,7 +1904,7 @@ fresh_name(Prefix) ->
     lists:concat([Prefix, N]).
 
 -spec pat_vars(fpat()) -> [var_name()].
-pat_vars({var, X})            -> [X || X /= "_"];
+pat_vars({var, _, X})         -> [X || X /= "_"];
 pat_vars({bool, _})           -> [];
 pat_vars({int, _})            -> [];
 pat_vars({string, _})         -> [];
@@ -1912,7 +1916,7 @@ pat_vars({assign, X, P})      -> pat_vars(X) ++ pat_vars(P);
 pat_vars(Ps) when is_list(Ps) -> [X || P <- Ps, X <- pat_vars(P)].
 
 -spec fsplit_pat_vars(fsplit_pat()) -> [var_name()].
-fsplit_pat_vars({var, X})        -> [X || X /= "_"];
+fsplit_pat_vars({var, _, X})     -> [X || X /= "_"];
 fsplit_pat_vars({bool, _})       -> [];
 fsplit_pat_vars({int, _})        -> [];
 fsplit_pat_vars({string, _})     -> [];
@@ -1926,7 +1930,7 @@ free_vars(Xs) when is_list(Xs) ->
     lists:umerge([ free_vars(X) || X <- Xs ]);
 free_vars(Expr) ->
     case Expr of
-        {var, X}                -> [X];
+        {var, _, X}             -> [X];
         {lit, _}                -> [];
         nil                     -> [];
         {def, _, _, As}         -> free_vars(As);
@@ -1948,7 +1952,7 @@ free_vars(Expr) ->
         {lam, _, Xs, B}         -> free_vars(B) -- lists:sort(Xs);
         {closure, _, _, A}      -> free_vars(A);
         {switch, A}             -> free_vars(A);
-        {split, _, X, As}       -> free_vars([{var, X} | As]);
+        {split, _, X, As}       -> free_vars([{var, [], X} | As]);
         {nosplit, A}            -> free_vars(A);
         {'case', P, A}          -> free_vars(A) -- lists:sort(fsplit_pat_vars(P))
     end.
@@ -1958,7 +1962,7 @@ used_defs(Xs) when is_list(Xs) ->
     lists:umerge([ used_defs(X) || X <- Xs ]);
 used_defs(Expr) ->
     case Expr of
-        {var, _}                 -> [];
+        {var, _, _}              -> [];
         {lit, _}                 -> [];
         nil                      -> [];
         {def, _, F, As}          -> lists:umerge([F], used_defs(As));
@@ -1995,7 +1999,7 @@ bottom_up(F, Env, Expr) ->
     F(Env, case Expr of
         {lit, _}                         -> Expr;
         nil                              -> Expr;
-        {var, _}                         -> Expr;
+        {var, _, _}                      -> Expr;
         {def, Ann, D, Es}                -> {def, Ann, D, [bottom_up(F, Env, E) || E <- Es]};
         {def_u, _, _, _}                 -> Expr;
         {builtin, B, Es}                 -> {builtin, B, [bottom_up(F, Env, E) || E <- Es]};
@@ -2055,7 +2059,7 @@ rename(Ren, Expr) ->
     case Expr of
         {lit, _}                 -> Expr;
         nil                      -> nil;
-        {var, X}                 -> {var, rename_var(Ren, X)};
+        {var, Ann, X}            -> {var, Ann, rename_var(Ren, X)};
         {def, Ann, D, Es}        -> {def, Ann, D, [rename(Ren, E) || E <- Es]};
         {def_u, _, _, _}         -> Expr;
         {builtin, B, Es}         -> {builtin, B, [rename(Ren, E) || E <- Es]};
@@ -2117,9 +2121,9 @@ rename_fpat(Ren, {'::', P, Q})    ->
     {P1, Ren1} = rename_fpat(Ren, P),
     {Q1, Ren2} = rename_fpat(Ren1, Q),
     {{'::', P1, Q1}, Ren2};
-rename_fpat(Ren, {var, X}) ->
+rename_fpat(Ren, {var, Ann, X}) ->
     {Z, Ren1} = rename_binding(Ren, X),
-    {{var, Z}, Ren1};
+    {{var, Ann, Z}, Ren1};
 rename_fpat(Ren, {con, Ar, C, Ps}) ->
     {Ps1, Ren1} = rename_fpats(Ren, Ps),
     {{con, Ar, C, Ps1}, Ren1};
@@ -2136,9 +2140,9 @@ rename_spat(Ren, {'::', X, Y}) ->
     {X1, Ren1} = rename_binding(Ren, X),
     {Y1, Ren2} = rename_binding(Ren1, Y),
     {{'::', X1, Y1}, Ren2};
-rename_spat(Ren, {var, X}) ->
+rename_spat(Ren, {var, Ann, X}) ->
     {Z, Ren1} = rename_binding(Ren, X),
-    {{var, Z}, Ren1};
+    {{var, Ann, Z}, Ren1};
 rename_spat(Ren, {con, Ar, C, Xs}) ->
     {Zs, Ren1} = rename_bindings(Ren, Xs),
     {{con, Ar, C, Zs}, Ren1};
@@ -2290,7 +2294,7 @@ pp_fexpr({lit, {Tag, Lit}}) ->
     aeso_pretty:expr({Tag, [], Lit});
 pp_fexpr(nil) ->
     pp_text("[]");
-pp_fexpr({var, X})   -> pp_text(X);
+pp_fexpr({var, _, X}) -> pp_text(X);
 pp_fexpr({def, Fun}) -> pp_fun_name(Fun);
 pp_fexpr({def_u, _, Fun, Ar}) ->
     pp_beside([pp_fun_name(Fun), pp_text("/"), pp_int(Ar)]);
@@ -2306,12 +2310,12 @@ pp_fexpr({tuple, Es}) ->
 pp_fexpr({proj, _, E, I}) ->
     pp_beside([pp_fexpr(E), pp_text("."), pp_int(I)]);
 pp_fexpr({lam, _, Xs, A}) ->
-    pp_par([pp_fexpr({tuple, [{var, X} || X <- Xs]}), pp_text("=>"),
+    pp_par([pp_fexpr({tuple, [{var, [], X} || X <- Xs]}), pp_text("=>"),
             prettypr:nest(2, pp_fexpr(A))]);
 pp_fexpr({closure, _, Fun, ClEnv}) ->
     FVs = case ClEnv of
               {tuple, Xs} -> Xs;
-              {var, _}    -> [ClEnv]
+              {var, _, _} -> [ClEnv]
           end,
     pp_call(pp_text("__CLOSURE__"), [{def, Fun} | FVs]);
 pp_fexpr({set_proj, _, E, I, A}) ->
@@ -2402,10 +2406,10 @@ pp_case({'case', Pat, Split}) ->
                   prettypr:nest(2, pp_split(Split))]).
 
 -spec pp_pat(fsplit_pat()) -> prettypr:document().
-pp_pat({tuple, Xs})      -> pp_fexpr({tuple, [{var, X} || X <- Xs]});
-pp_pat({'::', X, Xs})    -> pp_fexpr({op, [], '::', [{var, X}, {var, Xs}]});
-pp_pat({con, As, I, Xs}) -> pp_fexpr({con, As, I, [{var, X} || X <- Xs]});
-pp_pat({var, X})         -> pp_fexpr({var, X});
+pp_pat({tuple, Xs})      -> pp_fexpr({tuple, [{var, [], X} || X <- Xs]});
+pp_pat({'::', X, Xs})    -> pp_fexpr({op, [], '::', [{var, [], X}, {var, [], Xs}]});
+pp_pat({con, As, I, Xs}) -> pp_fexpr({con, As, I, [{var, [], X} || X <- Xs]});
+pp_pat({var, Ann, X})    -> pp_fexpr({var, Ann, X});
 pp_pat(P = {Tag, _}) when Tag == bool; Tag == int; Tag == string
                          -> pp_fexpr({lit, P});
 pp_pat(Pat)              -> pp_fexpr(Pat).
