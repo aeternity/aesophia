@@ -74,7 +74,7 @@
                | {'let', fann(), var_name(), fexpr(), fexpr()}
                | {funcall, fann(), fexpr(), [fexpr()]}  %% Call to unknown function
                | {closure, fann(), fun_name(), fexpr()}
-               | {switch, fsplit()}
+               | {switch, fann(), fsplit()}
                | {set_state, fann(), state_reg(), fexpr()}
                | {get_state, state_reg()}
                %% The following (unapplied top-level functions/builtins and
@@ -702,7 +702,7 @@ expr_to_fcode(Env, _Type, {'if', _, Cond, Then, Else}) ->
 %% Switch
 expr_to_fcode(Env, _, S = {switch, Ann, Expr = {typed, _, E, Type}, Alts}) ->
     Switch = fun(X) ->
-                {switch, alts_to_fcode(Env, type_to_fcode(Env, Type), X, Alts, S)}
+                {switch, to_fann(Ann), alts_to_fcode(Env, type_to_fcode(Env, Type), X, Alts, S)}
              end,
     case E of
         {id, _, X} -> Switch(X);
@@ -814,8 +814,8 @@ expr_to_fcode(_Env, Type, Expr) ->
     error({todo, {Expr, ':', Type}}).
 
 -spec make_if(fexpr(), fexpr(), fexpr()) -> fexpr().
-make_if({var, _, X}, Then, Else) ->
-    {switch, {split, boolean, X,
+make_if({var, FAnn, X}, Then, Else) ->
+    {switch, FAnn, {split, boolean, X,
         [{'case', {bool, false}, {nosplit, Else}},
          {'case', {bool, true},  {nosplit, Then}}]}};
 make_if(Cond, Then, Else) ->
@@ -824,8 +824,8 @@ make_if(Cond, Then, Else) ->
     {'let', FAnn, X, Cond, make_if({var, FAnn, X}, Then, Else)}.
 
 -spec make_if_no_else(fexpr(), fexpr()) -> fexpr().
-make_if_no_else({var, _, X}, Then) ->
-    {switch, {split, boolean, X,
+make_if_no_else({var, FAnn, X}, Then) ->
+    {switch, FAnn, {split, boolean, X,
         [{'case', {bool, true},  {nosplit, Then}}]}};
 make_if_no_else(Cond, Then) ->
     X = fresh_name(),
@@ -1114,8 +1114,8 @@ decision_tree_to_fcode({atom, B}) -> B;
 decision_tree_to_fcode({'if', A, Then, Else}) ->
     X = fresh_name(),
     {'let', [], X, A,
-        {switch, {split, boolean, X, [{'case', {bool, false}, {nosplit, decision_tree_to_fcode(Else)}},
-                                      {'case', {bool, true},  {nosplit, decision_tree_to_fcode(Then)}}]}}}.
+        {switch, [], {split, boolean, X, [{'case', {bool, false}, {nosplit, decision_tree_to_fcode(Else)}},
+                                          {'case', {bool, true},  {nosplit, decision_tree_to_fcode(Then)}}]}}}.
 
 %% -- Statements --
 
@@ -1262,7 +1262,7 @@ event_function(_Env = #{event_type := {variant_t, EventCons}}, EventType = {vari
     #{ attrs  => [private],
        args   => [{"e", EventType}],
        return => {tuple, []},
-       body   => {switch, {split, EventType, "e", lists:map(Case, Cons)}} }.
+       body   => {switch, [], {split, EventType, "e", lists:map(Case, Cons)}} }.
 
 %% -- Lambda lifting ---------------------------------------------------------
 %% The expr_to_fcode compiler lambda expressions to {lam, Xs, Body}, but in
@@ -1361,7 +1361,7 @@ lambda_lift_expr(Layout, Expr) ->
         {funcall, Ann, A, Bs}    -> {funcall, Ann, lambda_lift_expr(Layout, A), lambda_lift_exprs(Layout, Bs)};
         {set_state, Ann, R, A}   -> {set_state, Ann, R, lambda_lift_expr(Layout, A)};
         {get_state, _}           -> Expr;
-        {switch, S}              -> {switch, lambda_lift_expr(Layout, S)};
+        {switch, Ann, S}         -> {switch, Ann, lambda_lift_expr(Layout, S)};
         {split, Type, X, Alts}   -> {split, Type, X, lambda_lift_exprs(Layout, Alts)};
         {nosplit, A}             -> {nosplit, lambda_lift_expr(Layout, A)};
         {'case', P, S}           -> {'case', P, lambda_lift_expr(Layout, S)}
@@ -1547,7 +1547,7 @@ simplify(Env, {proj, _, Var = {var, _, _}, I} = Expr) ->
         E     -> E
     end;
 
-simplify(Env, {switch, Split}) ->
+simplify(Env, {switch, _, Split}) ->
     case simpl_switch(Env, [], Split) of
         nomatch -> {builtin, abort, [{lit, {string, <<"Incomplete patterns">>}}]};
         Expr    -> Expr
@@ -1603,7 +1603,7 @@ nest_catchalls([{'case', P = {var, _, _}, {split, Type, X, Alts}} | Catchalls]) 
 simpl_switch(_Env, _, {nosplit, E}) -> E;
 simpl_switch(Env, Catchalls, {split, Type, X, Alts}) ->
     Alts1 = add_catchalls(Alts, Catchalls),
-    Stuck = {switch, {split, Type, X, Alts1}},
+    Stuck = {switch, [], {split, Type, X, Alts1}},
     case constructor_form(Env, {var, [], X}) of
         false -> Stuck;
         E     -> simpl_case(Env, E, Alts1)
@@ -1700,7 +1700,7 @@ read_only({lam, _, _, _})             -> true;
 read_only({def, _, _, _})             -> false; %% TODO: purity analysis
 read_only({remote, _, _, _, _, _, _}) -> false;
 read_only({builtin, _, _})            -> false; %% TODO: some builtins are
-read_only({switch, Split})            -> read_only(Split);
+read_only({switch, _, Split})         -> read_only(Split);
 read_only({split, _, _, Cases})       -> read_only(Cases);
 read_only({nosplit, E})               -> read_only(E);
 read_only({'case', _, Split})         -> read_only(Split);
@@ -1951,7 +1951,7 @@ free_vars(Expr) ->
         {get_state, _}          -> [];
         {lam, _, Xs, B}         -> free_vars(B) -- lists:sort(Xs);
         {closure, _, _, A}      -> free_vars(A);
-        {switch, A}             -> free_vars(A);
+        {switch, _, A}          -> free_vars(A);
         {split, _, X, As}       -> free_vars([{var, [], X} | As]);
         {nosplit, A}            -> free_vars(A);
         {'case', P, A}          -> free_vars(A) -- lists:sort(fsplit_pat_vars(P))
@@ -1983,7 +1983,7 @@ used_defs(Expr) ->
         {get_state, _}          -> [];
         {lam, _, _, B}          -> used_defs(B);
         {closure, _, F, A}      -> lists:umerge([F], used_defs(A));
-        {switch, A}             -> used_defs(A);
+        {switch, _, A}          -> used_defs(A);
         {split, _, _, As}       -> used_defs(As);
         {nosplit, A}            -> used_defs(A);
         {'case', _, A}          -> used_defs(A)
@@ -2016,7 +2016,7 @@ bottom_up(F, Env, Expr) ->
         {set_state, Ann, R, E}           -> {set_state, Ann, R, bottom_up(F, Env, E)};
         {get_state, _}                   -> Expr;
         {closure, Ann, F, CEnv}          -> {closure, Ann, F, bottom_up(F, Env, CEnv)};
-        {switch, Split}                  -> {switch, bottom_up(F, Env, Split)};
+        {switch, Ann, Split}             -> {switch, Ann, bottom_up(F, Env, Split)};
         {lam, Ann, Xs, B}                -> {lam, Ann, Xs, bottom_up(F, Env, B)};
         {'let', Ann, X, E, Body}         ->
             E1 = bottom_up(F, Env, E),
@@ -2076,7 +2076,7 @@ rename(Ren, Expr) ->
         {set_state, Ann, R, E}   -> {set_state, Ann, R, rename(Ren, E)};
         {get_state, _}           -> Expr;
         {closure, Ann, F, Env}   -> {closure, Ann, F, rename(Ren, Env)};
-        {switch, Split}          -> {switch, rename_split(Ren, Split)};
+        {switch, Ann, Split}     -> {switch, Ann, rename_split(Ren, Split)};
         {lam, Ann, Xs, B} ->
             {Zs, Ren1} = rename_bindings(Ren, Xs),
             {lam, Ann, Zs, rename(Ren1, B)};
@@ -2360,7 +2360,7 @@ pp_fexpr({set_state, _, R, A}) ->
     pp_call(pp_text("set_state"), [{lit, {int, R}}, A]);
 pp_fexpr({get_state, R}) ->
     pp_call(pp_text("get_state"), [{lit, {int, R}}]);
-pp_fexpr({switch, Split}) -> pp_split(Split);
+pp_fexpr({switch, _, Split}) -> pp_split(Split);
 pp_fexpr({contract_code, Contract}) ->
     pp_beside(pp_text("contract "), pp_text(Contract)).
 
