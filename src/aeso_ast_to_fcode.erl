@@ -475,7 +475,7 @@ compute_state_layout(Env = #{ context := {contract_def, _} }, "state", Type) ->
     Env#{ state_layout => Layout };
 compute_state_layout(Env, _, _) -> Env.
 
--spec compute_state_layout(state_reg(), ftype()) -> {state_reg(), state_layout() | [state_layout()]}.
+-spec compute_state_layout(state_reg(), ftype() | [ftype()]) -> {state_reg(), state_layout() | [state_layout()]}.
 compute_state_layout(R, {tuple, [T]}) ->
     compute_state_layout(R, T);
 compute_state_layout(R, {tuple, Ts}) ->
