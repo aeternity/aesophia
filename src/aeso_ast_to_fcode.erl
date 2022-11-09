@@ -65,7 +65,7 @@
                | {var, fann(), var_name()}
                | {def, fann(), fun_name(), [fexpr()]}
                | {remote, fann(), [ftype()], ftype(), fexpr(), fun_name(), [fexpr()]}
-               | {builtin, builtin(), [fexpr()]}
+               | {builtin, fann(), builtin(), [fexpr()]}
                | {con, arities(), tag(), [fexpr()]}
                | {tuple, [fexpr()]}
                | {proj, fann(), fexpr(), integer()}
@@ -771,8 +771,8 @@ expr_to_fcode(Env, _, {app, _, Fun = {typed, Ann, FunE, {fun_t, _, NamedArgsT, A
     end;
 
 %% Maps
-expr_to_fcode(_Env, _Type, {map, _, []}) ->
-    {builtin, map_empty, []};
+expr_to_fcode(_Env, _Type, {map, Ann, []}) ->
+    {builtin, to_fann(Ann), map_empty, []};
 expr_to_fcode(Env, Type, {map, Ann, KVs}) ->
     %% Cheaper to do incremental map_update than building the list and doing
     %% map_from_list (I think).
@@ -1181,7 +1181,7 @@ builtin_to_fcode(Layout, set_state, [Val]) ->
 builtin_to_fcode(Layout, get_state, []) ->
     get_state(Layout);
 builtin_to_fcode(_Layout, require, [Cond, Msg]) ->
-    make_if(Cond, {tuple, []}, {builtin, abort, [Msg]});
+    make_if(Cond, {tuple, []}, {builtin, get_fann(Cond), abort, [Msg]});
 builtin_to_fcode(_Layout, chain_event, [Event]) ->
     {def, [], event, [Event]};
 builtin_to_fcode(_Layout, map_delete, [Key, Map]) ->
@@ -1203,7 +1203,7 @@ builtin_to_fcode(_Layout, Builtin, Args) ->
            end,
     case lists:member(Builtin, op_builtins()) of
         true  -> {op, FAnn, Builtin, Args};
-        false -> {builtin, Builtin, Args}
+        false -> {builtin, FAnn, Builtin, Args}
     end.
 
 %% -- Init function --
@@ -1256,7 +1256,7 @@ event_function(_Env = #{event_type := {variant_t, EventCons}}, EventType = {vari
                         [V] -> {var, [], V}
                     end,
                 Indices = [ {var, [], V} || {indexed, V} <- IVars ],
-                Body = {builtin, chain_event, [Payload, Hash | Indices]},
+                Body = {builtin, [], chain_event, [Payload, Hash | Indices]},
                 {'case', {con, Arities, Tag, Vars}, {nosplit, Body}}
            end,
     #{ attrs  => [private],
@@ -1350,7 +1350,7 @@ lambda_lift_expr(Layout, Expr) ->
         {var, _, _}              -> Expr;
         {closure, _, _, _}       -> Expr;
         {def, Ann, D, As}        -> {def, Ann, D, lambda_lift_exprs(Layout, As)};
-        {builtin, B, As}         -> {builtin, B, lambda_lift_exprs(Layout, As)};
+        {builtin, Ann, B, As}    -> {builtin, Ann, B, lambda_lift_exprs(Layout, As)};
         {remote, Ann, ArgsT, RetT, Ct, F, As} -> {remote, Ann, ArgsT, RetT, lambda_lift_expr(Layout, Ct), F, lambda_lift_exprs(Layout, As)};
         {con, Ar, C, As}         -> {con, Ar, C, lambda_lift_exprs(Layout, As)};
         {tuple, As}              -> {tuple, lambda_lift_exprs(Layout, As)};
@@ -1549,7 +1549,7 @@ simplify(Env, {proj, _, Var = {var, _, _}, I} = Expr) ->
 
 simplify(Env, {switch, FAnn, Split}) ->
     case simpl_switch(Env, [], Split) of
-        nomatch -> {builtin, abort, [{lit, FAnn, {string, <<"Incomplete patterns">>}}]};
+        nomatch -> {builtin, FAnn, abort, [{lit, FAnn, {string, <<"Incomplete patterns">>}}]};
         Expr    -> Expr
     end;
 
@@ -1699,7 +1699,7 @@ read_only({builtin_u, _, _, _, _})    -> true;
 read_only({lam, _, _, _})             -> true;
 read_only({def, _, _, _})             -> false; %% TODO: purity analysis
 read_only({remote, _, _, _, _, _, _}) -> false;
-read_only({builtin, _, _})            -> false; %% TODO: some builtins are
+read_only({builtin, _, _, _})         -> false; %% TODO: some builtins are
 read_only({switch, _, Split})         -> read_only(Split);
 read_only({split, _, _, Cases})       -> read_only(Cases);
 read_only({nosplit, E})               -> read_only(E);
@@ -1937,7 +1937,7 @@ free_vars(Expr) ->
         {def_u, _, _, _}        -> [];
         {remote, _, _, _, Ct, _, As} -> free_vars([Ct | As]);
         {remote_u, _, _, _, Ct, _}   -> free_vars(Ct);
-        {builtin, _, As}        -> free_vars(As);
+        {builtin, _, _, As}     -> free_vars(As);
         {builtin_u, _, _, _}    -> [];
         {builtin_u, _, _, _, _} -> [];     %% Typereps are always literals
         {con, _, _, As}         -> free_vars(As);
@@ -1969,7 +1969,7 @@ used_defs(Expr) ->
         {def_u, _, F, _}         -> [F];
         {remote, _, _, _, Ct, _, As} -> used_defs([Ct | As]);
         {remote_u, _, _, _, Ct, _}   -> used_defs(Ct);
-        {builtin, _, As}        -> used_defs(As);
+        {builtin, _, _, As}     -> used_defs(As);
         {builtin_u, _, _, _}    -> [];
         {builtin_u, _, _, _, _} -> [];
         {con, _, _, As}         -> used_defs(As);
@@ -2002,7 +2002,7 @@ bottom_up(F, Env, Expr) ->
         {var, _, _}                      -> Expr;
         {def, Ann, D, Es}                -> {def, Ann, D, [bottom_up(F, Env, E) || E <- Es]};
         {def_u, _, _, _}                 -> Expr;
-        {builtin, B, Es}                 -> {builtin, B, [bottom_up(F, Env, E) || E <- Es]};
+        {builtin, Ann, B, Es}            -> {builtin, Ann, B, [bottom_up(F, Env, E) || E <- Es]};
         {builtin_u, _, _, _}             -> Expr;
         {builtin_u, _, _, _, _}          -> Expr;
         {remote, Ann, ArgsT, RetT, Ct, Fun, Es} -> {remote,   Ann, ArgsT, RetT, bottom_up(F, Env, Ct), Fun, [bottom_up(F, Env, E) || E <- Es]};
@@ -2062,7 +2062,7 @@ rename(Ren, Expr) ->
         {var, Ann, X}            -> {var, Ann, rename_var(Ren, X)};
         {def, Ann, D, Es}        -> {def, Ann, D, [rename(Ren, E) || E <- Es]};
         {def_u, _, _, _}         -> Expr;
-        {builtin, B, Es}         -> {builtin, B, [rename(Ren, E) || E <- Es]};
+        {builtin, Ann, B, Es}    -> {builtin, Ann, B, [rename(Ren, E) || E <- Es]};
         {builtin_u, _, _, _}     -> Expr;
         {builtin_u, _, _, _, _}  -> Expr;
         {remote, Ann, ArgsT, RetT, Ct, F, Es} -> {remote,   Ann, ArgsT, RetT, rename(Ren, Ct), F, [rename(Ren, E) || E <- Es]};
@@ -2348,7 +2348,7 @@ pp_fexpr({builtin_u, _, B, N}) ->
     pp_beside([pp_text(B), pp_text("/"), pp_text(N)]);
 pp_fexpr({builtin_u, _, B, N, TypeArgs}) ->
     pp_beside([pp_text(B), pp_text("@"), pp_fexpr({tuple, TypeArgs}), pp_text("/"), pp_text(N)]);
-pp_fexpr({builtin, B, As}) ->
+pp_fexpr({builtin, _, B, As}) ->
     pp_call(pp_text(B), As);
 pp_fexpr({remote_u, _, ArgsT, RetT, Ct, Fun}) ->
     pp_beside([pp_fexpr(Ct), pp_text("."), pp_fun_name(Fun), pp_text(" : "), pp_ftype({function, ArgsT, RetT})]);
