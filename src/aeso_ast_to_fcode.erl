@@ -66,7 +66,7 @@
                | {def, fann(), fun_name(), [fexpr()]}
                | {remote, fann(), [ftype()], ftype(), fexpr(), fun_name(), [fexpr()]}
                | {builtin, fann(), builtin(), [fexpr()]}
-               | {con, arities(), tag(), [fexpr()]}
+               | {con, fann(), arities(), tag(), [fexpr()]}
                | {tuple, [fexpr()]}
                | {proj, fann(), fexpr(), integer()}
                | {set_proj, fann(), fexpr(), integer(), fexpr()}    %% tuple, field, new_value
@@ -97,7 +97,7 @@
                      | {string, binary()}
                      | nil
                      | {'::', var_name(), var_name()}
-                     | {con, arities(), tag(), [var_name()]}
+                     | {con, fann(), arities(), tag(), [var_name()]}
                      | {tuple, [var_name()]}
                      | {assign, var_name(), var_name()}.
 
@@ -599,11 +599,11 @@ expr_to_fcode(Env, Type, {qid, _, X}) ->
 %% Constructors
 expr_to_fcode(Env, Type, {C, _, _} = Con) when C == con; C == qcon ->
     expr_to_fcode(Env, Type, {app, [], {typed, [], Con, Type}, []});
-expr_to_fcode(Env, _Type, {app, _, {typed, _, {C, _, _} = Con, _}, Args}) when C == con; C == qcon ->
+expr_to_fcode(Env, _Type, {app, _, {typed, _, {C, Ann, _} = Con, _}, Args}) when C == con; C == qcon ->
     #con_tag{ tag = I, arities = Arities } = lookup_con(Env, Con),
     Arity = lists:nth(I + 1, Arities),
     case length(Args) == Arity of
-        true  -> {con, Arities, I, [expr_to_fcode(Env, Arg) || Arg <- Args]};
+        true  -> {con, to_fann(Ann), Arities, I, [expr_to_fcode(Env, Arg) || Arg <- Args]};
         false -> internal_error({constructor_arity_mismatch, Con, length(Args), Arity})
     end;
 
@@ -868,7 +868,7 @@ alts_to_fcode(Env, Type, X, Alts, Switch) ->
               | nil
               | {'::', fpat(), fpat()}
               | {tuple, [fpat()]}
-              | {con, arities(), tag(), [fpat()]}
+              | {con, fann(), arities(), tag(), [fpat()]}
               | {assign, fpat(), fpat()}.
 
 -spec remove_guards(env(), [aeso_syntax:alt()], aeso_syntax:expr()) -> [falt()].
@@ -945,18 +945,18 @@ merge_alts(I, X, Alts, Alts1) ->
         when Alts :: [{fsplit_pat(), [falt()]}].
 merge_alt(_, _, {P, A}, []) -> [{P, [A]}];
 merge_alt(I, X, {P, A}, [{Q, As} | Rest]) ->
-    Match = fun({var, _, _}, {var, _, _})       -> match;
-               ({tuple, _}, {tuple, _})         -> match;
-               ({bool, B}, {bool, B})           -> match;
-               ({int, N},  {int, N})            -> match;
-               ({string, S}, {string, S})       -> match;
-               (nil,       nil)                 -> match;
-               ({'::', _, _}, {'::', _, _})     -> match;
-               ({con, _, C, _}, {con, _, C, _}) -> match;
-               ({con, _, _, _}, {con, _, _, _}) -> mismatch;
-               ({var, _, _}, _)                 -> expand;
-               (_, {var, _, _})                 -> insert;
-               (_, _)                           -> mismatch
+    Match = fun({var, _, _}, {var, _, _})             -> match;
+               ({tuple, _}, {tuple, _})               -> match;
+               ({bool, B}, {bool, B})                 -> match;
+               ({int, N},  {int, N})                  -> match;
+               ({string, S}, {string, S})             -> match;
+               (nil,       nil)                       -> match;
+               ({'::', _, _}, {'::', _, _})           -> match;
+               ({con, _, _, C, _}, {con, _, _, C, _}) -> match;
+               ({con, _, _, _, _}, {con, _, _, _, _}) -> mismatch;
+               ({var, _, _}, _)                       -> expand;
+               (_, {var, _, _})                       -> insert;
+               (_, _)                                 -> mismatch
             end,
     case Match(P, Q) of
         match    -> [{Q, [A | As]} | Rest];
@@ -974,13 +974,13 @@ expand(I, X, P, Q, Case = {'case', Ps, E}) ->
     {Ps1r, Ren2} = rename_fpats(Ren1, Ps1),
     E1 = rename(Ren2, E),
     Splice = fun(N) -> Ps0r ++ lists:duplicate(N, {var, [], "_"}) ++ Ps1r end,
-    Type = fun({tuple, Xs})     -> {tuple, length(Xs)};
-              ({bool, _})       -> bool;
-              ({int, _})        -> int;
-              ({string, _})     -> string;
-              (nil)             -> list;
-              ({'::', _, _})    -> list;
-              ({con, As, _, _}) -> {variant, As}
+    Type = fun({tuple, Xs})        -> {tuple, length(Xs)};
+              ({bool, _})          -> bool;
+              ({int, _})           -> int;
+              ({string, _})        -> string;
+              (nil)                -> list;
+              ({'::', _, _})       -> list;
+              ({con, _, As, _, _}) -> {variant, As}
            end,
     MkCase = fun(Pat, Vars) -> {Pat, {'case', Splice(Vars), E1}} end,
     case Type(Q) of
@@ -989,7 +989,7 @@ expand(I, X, P, Q, Case = {'case', Ps, E}) ->
         int           -> {[MkCase(Q, 0)], [{P, Case}]};
         string        -> {[MkCase(Q, 0)], [{P, Case}]};
         list          -> {[MkCase(nil, 0), MkCase({'::', fresh_name(), fresh_name()}, 2)], []};
-        {variant, As} -> {[MkCase({con, As, C - 1, [fresh_name() || _ <- lists:seq(1, Ar)]}, Ar)
+        {variant, As} -> {[MkCase({con, [], As, C - 1, [fresh_name() || _ <- lists:seq(1, Ar)]}, Ar)
                            || {C, Ar} <- indexed(As)], []}
     end.
 
@@ -1006,9 +1006,9 @@ split_pat({int, N})           -> {{int, N}, []};
 split_pat({string, N})        -> {{string, N}, []};
 split_pat(nil) -> {nil, []};
 split_pat({'::', P, Q}) -> {{'::', fresh_name(), fresh_name()}, [P, Q]};
-split_pat({con, As, I, Pats}) ->
+split_pat({con, FAnn, As, I, Pats}) ->
     Xs = [fresh_name() || _ <- Pats],
-    {{con, As, I, Xs}, Pats};
+    {{con, FAnn, As, I, Xs}, Pats};
 split_pat({assign, X = {var, _, _}, P}) ->
     {{assign, fresh_name(), fresh_name()}, [X, P]};
 split_pat({tuple, Pats}) ->
@@ -1022,7 +1022,7 @@ split_vars({string, _}, string)      -> [];
 split_vars(nil,         {list, _})   -> [];
 split_vars({'::', X, Xs}, {list, T}) -> [{X, T}, {Xs, {list, T}}];
 split_vars({assign, X, P}, T)        -> [{X, T}, {P, T}];
-split_vars({con, _, I, Xs}, {variant, Cons}) ->
+split_vars({con, _, _, I, Xs}, {variant, Cons}) ->
     lists:zip(Xs, lists:nth(I + 1, Cons));
 split_vars({tuple, Xs}, {tuple, Ts}) ->
     lists:zip(Xs, Ts);
@@ -1050,12 +1050,12 @@ pat_to_fcode(Env, Pat) ->
 
 -spec pat_to_fcode(env(), aeso_syntax:type() | no_type, aeso_syntax:pat()) -> fpat().
 pat_to_fcode(_Env, _Type, {id, Ann, X}) -> {var, to_fann(Ann), X};
-pat_to_fcode(Env, _Type, {C, _, _} = Con) when C == con; C == qcon ->
+pat_to_fcode(Env, _Type, {C, Ann, _} = Con) when C == con; C == qcon ->
     #con_tag{tag = I, arities = As} = lookup_con(Env, Con),
-    {con, As, I, []};
-pat_to_fcode(Env, _Type, {app, _, {typed, _, {C, _, _} = Con, _}, Pats}) when C == con; C == qcon ->
+    {con, to_fann(Ann), As, I, []};
+pat_to_fcode(Env, _Type, {app, _, {typed, _, {C, Ann, _} = Con, _}, Pats}) when C == con; C == qcon ->
     #con_tag{tag = I, arities = As} = lookup_con(Env, Con),
-    {con, As, I, [pat_to_fcode(Env, Pat) || Pat <- Pats]};
+    {con, to_fann(Ann), As, I, [pat_to_fcode(Env, Pat) || Pat <- Pats]};
 pat_to_fcode(Env, _Type, {tuple, _, Pats}) ->
     make_tuple([ pat_to_fcode(Env, Pat) || Pat <- Pats ]);
 pat_to_fcode(_Env, _Type, {bool, _, B})   -> {bool, B};
@@ -1192,8 +1192,8 @@ builtin_to_fcode(_Layout, map_lookup, [Key0, Map0]) ->
     ?make_let(Key, Key0,
     ?make_let(Map, Map0,
      make_if({op, get_fann(Map), map_member, [Map, Key]},
-             {con, [0, 1], 1, [{op, get_fann(Map), map_get, [Map, Key]}]},
-             {con, [0, 1], 0, []})));
+             {con, get_fann(Map), [0, 1], 1, [{op, get_fann(Map), map_get, [Map, Key]}]},
+             {con, get_fann(Map), [0, 1], 0, []})));
 builtin_to_fcode(_Layout, map_lookup_default, [Key, Map, Def]) ->
     {op, get_fann(Map), map_get_d, [Map, Key, Def]};
 builtin_to_fcode(_Layout, Builtin, Args) ->
@@ -1257,7 +1257,7 @@ event_function(_Env = #{event_type := {variant_t, EventCons}}, EventType = {vari
                     end,
                 Indices = [ {var, [], V} || {indexed, V} <- IVars ],
                 Body = {builtin, [], chain_event, [Payload, Hash | Indices]},
-                {'case', {con, Arities, Tag, Vars}, {nosplit, Body}}
+                {'case', {con, [], Arities, Tag, Vars}, {nosplit, Body}}
            end,
     #{ attrs  => [private],
        args   => [{"e", EventType}],
@@ -1352,7 +1352,7 @@ lambda_lift_expr(Layout, Expr) ->
         {def, Ann, D, As}        -> {def, Ann, D, lambda_lift_exprs(Layout, As)};
         {builtin, Ann, B, As}    -> {builtin, Ann, B, lambda_lift_exprs(Layout, As)};
         {remote, Ann, ArgsT, RetT, Ct, F, As} -> {remote, Ann, ArgsT, RetT, lambda_lift_expr(Layout, Ct), F, lambda_lift_exprs(Layout, As)};
-        {con, Ar, C, As}         -> {con, Ar, C, lambda_lift_exprs(Layout, As)};
+        {con, Ann, Ar, C, As}    -> {con, Ann, Ar, C, lambda_lift_exprs(Layout, As)};
         {tuple, As}              -> {tuple, lambda_lift_exprs(Layout, As)};
         {proj, Ann, A, I}        -> {proj, Ann, lambda_lift_expr(Layout, A), I};
         {set_proj, Ann, A, I, B} -> {set_proj, Ann, lambda_lift_expr(Layout, A), I, lambda_lift_expr(Layout, B)};
@@ -1623,14 +1623,14 @@ simpl_case(Env, E, [{'case', Pat, Body} | Alts]) ->
     end.
 
 -spec match_pat(fsplit_pat(), fexpr()) -> false | [{var_name(), fexpr()}].
-match_pat({tuple, Xs}, {tuple, Es})            -> lists:zip(Xs, Es);
-match_pat({con, _, C, Xs}, {con, _, C, Es})    -> lists:zip(Xs, Es);
-match_pat(L, {lit, _, L})                      -> [];
-match_pat(nil, nil)                            -> [];
-match_pat({'::', X, Y}, {op, _, '::', [A, B]}) -> [{X, A}, {Y, B}];
-match_pat({var, _, X}, E)                      -> [{X, E}];
-match_pat({assign, X, P}, E)                   -> [{X, E}, {P, E}];
-match_pat(_, _)                                -> false.
+match_pat({tuple, Xs}, {tuple, Es})               -> lists:zip(Xs, Es);
+match_pat({con, _, _, C, Xs}, {con, _, _, C, Es}) -> lists:zip(Xs, Es);
+match_pat(L, {lit, _, L})                         -> [];
+match_pat(nil, nil)                               -> [];
+match_pat({'::', X, Y}, {op, _, '::', [A, B]})    -> [{X, A}, {Y, B}];
+match_pat({var, _, X}, E)                         -> [{X, E}];
+match_pat({assign, X, P}, E)                      -> [{X, E}, {P, E}];
+match_pat(_, _)                                   -> false.
 
 -spec constructor_form(expr_env(), fexpr()) -> fexpr() | false.
 constructor_form(Env, Expr) ->
@@ -1650,7 +1650,7 @@ constructor_form(Env, Expr) ->
                 {tuple, Es} -> constructor_form(Env, lists:nth(I + 1, Es));
                 _           -> false
             end;
-        {con, _, _, _}    -> Expr;
+        {con, _, _, _, _} -> Expr;
         {tuple, _}        -> Expr;
         {lit, _, _}       -> Expr;
         nil               -> Expr;
@@ -1685,7 +1685,7 @@ safe_to_duplicate(_)           -> false.
 read_only({lit, _, _})                -> true;
 read_only({var, _, _})                -> true;
 read_only(nil)                        -> true;
-read_only({con, _, _, Es})            -> read_only(Es);
+read_only({con, _, _, _, Es})         -> read_only(Es);
 read_only({tuple, Es})                -> read_only(Es);
 read_only({proj, _, E, _})            -> read_only(E);
 read_only({set_proj, _, A, _, B})     -> read_only([A, B]);
@@ -1911,19 +1911,19 @@ pat_vars({string, _})         -> [];
 pat_vars(nil)                 -> [];
 pat_vars({'::', P, Q})        -> pat_vars(P) ++ pat_vars(Q);
 pat_vars({tuple, Ps})         -> pat_vars(Ps);
-pat_vars({con, _, _, Ps})     -> pat_vars(Ps);
+pat_vars({con, _, _, _, Ps})  -> pat_vars(Ps);
 pat_vars({assign, X, P})      -> pat_vars(X) ++ pat_vars(P);
 pat_vars(Ps) when is_list(Ps) -> [X || P <- Ps, X <- pat_vars(P)].
 
 -spec fsplit_pat_vars(fsplit_pat()) -> [var_name()].
-fsplit_pat_vars({var, _, X})     -> [X || X /= "_"];
-fsplit_pat_vars({bool, _})       -> [];
-fsplit_pat_vars({int, _})        -> [];
-fsplit_pat_vars({string, _})     -> [];
-fsplit_pat_vars(nil)             -> [];
-fsplit_pat_vars({'::', P, Q})    -> [P, Q];
-fsplit_pat_vars({tuple, Ps})     -> Ps;
-fsplit_pat_vars({con, _, _, Ps}) -> Ps.
+fsplit_pat_vars({var, _, X})        -> [X || X /= "_"];
+fsplit_pat_vars({bool, _})          -> [];
+fsplit_pat_vars({int, _})           -> [];
+fsplit_pat_vars({string, _})        -> [];
+fsplit_pat_vars(nil)                -> [];
+fsplit_pat_vars({'::', P, Q})       -> [P, Q];
+fsplit_pat_vars({tuple, Ps})        -> Ps;
+fsplit_pat_vars({con, _, _, _, Ps}) -> Ps.
 
 -spec free_vars(fexpr() | [fexpr()]) -> [var_name()].
 free_vars(Xs) when is_list(Xs) ->
@@ -1940,7 +1940,7 @@ free_vars(Expr) ->
         {builtin, _, _, As}     -> free_vars(As);
         {builtin_u, _, _, _}    -> [];
         {builtin_u, _, _, _, _} -> [];     %% Typereps are always literals
-        {con, _, _, As}         -> free_vars(As);
+        {con, _, _, _, As}         -> free_vars(As);
         {tuple, As}             -> free_vars(As);
         {proj, _, A, _}         -> free_vars(A);
         {set_proj, _, A, _, B}  -> free_vars([A, B]);
@@ -1972,7 +1972,7 @@ used_defs(Expr) ->
         {builtin, _, _, As}     -> used_defs(As);
         {builtin_u, _, _, _}    -> [];
         {builtin_u, _, _, _, _} -> [];
-        {con, _, _, As}         -> used_defs(As);
+        {con, _, _, _, As}         -> used_defs(As);
         {tuple, As}             -> used_defs(As);
         {proj, _, A, _}         -> used_defs(A);
         {set_proj, _, A, _, B}  -> used_defs([A, B]);
@@ -2007,7 +2007,7 @@ bottom_up(F, Env, Expr) ->
         {builtin_u, _, _, _, _}          -> Expr;
         {remote, Ann, ArgsT, RetT, Ct, Fun, Es} -> {remote,   Ann, ArgsT, RetT, bottom_up(F, Env, Ct), Fun, [bottom_up(F, Env, E) || E <- Es]};
         {remote_u, Ann, ArgsT, RetT, Ct, Fun}   -> {remote_u, Ann, ArgsT, RetT, bottom_up(F, Env, Ct), Fun};
-        {con, Ar, I, Es}                 -> {con, Ar, I, [bottom_up(F, Env, E) || E <- Es]};
+        {con, Ann, Ar, I, Es}            -> {con, Ann, Ar, I, [bottom_up(F, Env, E) || E <- Es]};
         {tuple, Es}                      -> {tuple, [bottom_up(F, Env, E) || E <- Es]};
         {proj, Ann, E, I}                -> {proj, Ann, bottom_up(F, Env, E), I};
         {set_proj, Ann, R, I, E}         -> {set_proj, Ann, bottom_up(F, Env, R), I, bottom_up(F, Env, E)};
@@ -2067,7 +2067,7 @@ rename(Ren, Expr) ->
         {builtin_u, _, _, _, _}  -> Expr;
         {remote, Ann, ArgsT, RetT, Ct, F, Es} -> {remote,   Ann, ArgsT, RetT, rename(Ren, Ct), F, [rename(Ren, E) || E <- Es]};
         {remote_u, Ann, ArgsT, RetT, Ct, F}   -> {remote_u, Ann, ArgsT, RetT, rename(Ren, Ct), F};
-        {con, Ar, I, Es}         -> {con, Ar, I, [rename(Ren, E) || E <- Es]};
+        {con, Ann, Ar, I, Es}    -> {con, Ann, Ar, I, [rename(Ren, E) || E <- Es]};
         {tuple, Es}              -> {tuple, [rename(Ren, E) || E <- Es]};
         {proj, Ann, E, I}        -> {proj, Ann, rename(Ren, E), I};
         {set_proj, Ann, R, I, E} -> {set_proj, Ann, rename(Ren, R), I, rename(Ren, E)};
@@ -2124,9 +2124,9 @@ rename_fpat(Ren, {'::', P, Q})    ->
 rename_fpat(Ren, {var, Ann, X}) ->
     {Z, Ren1} = rename_binding(Ren, X),
     {{var, Ann, Z}, Ren1};
-rename_fpat(Ren, {con, Ar, C, Ps}) ->
+rename_fpat(Ren, {con, Ann, Ar, C, Ps}) ->
     {Ps1, Ren1} = rename_fpats(Ren, Ps),
-    {{con, Ar, C, Ps1}, Ren1};
+    {{con, Ann, Ar, C, Ps1}, Ren1};
 rename_fpat(Ren, {tuple, Ps}) ->
     {Ps1, Ren1} = rename_fpats(Ren, Ps),
     {{tuple, Ps1}, Ren1}.
@@ -2143,9 +2143,9 @@ rename_spat(Ren, {'::', X, Y}) ->
 rename_spat(Ren, {var, Ann, X}) ->
     {Z, Ren1} = rename_binding(Ren, X),
     {{var, Ann, Z}, Ren1};
-rename_spat(Ren, {con, Ar, C, Xs}) ->
+rename_spat(Ren, {con, Ann, Ar, C, Xs}) ->
     {Zs, Ren1} = rename_bindings(Ren, Xs),
-    {{con, Ar, C, Zs}, Ren1};
+    {{con, Ann, Ar, C, Zs}, Ren1};
 rename_spat(Ren, {tuple, Xs}) ->
     {Zs, Ren1} = rename_bindings(Ren, Xs),
     {{tuple, Zs}, Ren1};
@@ -2300,10 +2300,10 @@ pp_fexpr({def_u, _, Fun, Ar}) ->
     pp_beside([pp_fun_name(Fun), pp_text("/"), pp_int(Ar)]);
 pp_fexpr({def, _, Fun, Args}) ->
     pp_call(pp_fun_name(Fun), Args);
-pp_fexpr({con, _, I, []}) ->
+pp_fexpr({con, _, _, I, []}) ->
     pp_beside(pp_text("C"), pp_int(I));
-pp_fexpr({con, _, I, Es}) ->
-    pp_beside(pp_fexpr({con, [], I, []}),
+pp_fexpr({con, Ann, _, I, Es}) ->
+    pp_beside(pp_fexpr({con, Ann, [], I, []}),
               pp_fexpr({tuple, Es}));
 pp_fexpr({tuple, Es}) ->
     pp_parens(pp_par(pp_punctuate(pp_text(","), [pp_fexpr(E) || E <- Es])));
@@ -2390,8 +2390,8 @@ pp_ftype({variant, Cons}) ->
     pp_par(
     pp_punctuate(pp_text(" |"),
                  [ case Args of
-                     [] -> pp_fexpr({con, [], I - 1, []});
-                     _  -> pp_beside(pp_fexpr({con, [], I - 1, []}), pp_ftype({tuple, Args}))
+                     [] -> pp_fexpr({con, [], [], I - 1, []});
+                     _  -> pp_beside(pp_fexpr({con, [], [], I - 1, []}), pp_ftype({tuple, Args}))
                    end || {I, Args} <- indexed(Cons)])).
 
 -spec pp_split(fsplit()) -> prettypr:document().
@@ -2406,13 +2406,13 @@ pp_case({'case', Pat, Split}) ->
                   prettypr:nest(2, pp_split(Split))]).
 
 -spec pp_pat(fsplit_pat()) -> prettypr:document().
-pp_pat({tuple, Xs})      -> pp_fexpr({tuple, [{var, [], X} || X <- Xs]});
-pp_pat({'::', X, Xs})    -> pp_fexpr({op, [], '::', [{var, [], X}, {var, [], Xs}]});
-pp_pat({con, As, I, Xs}) -> pp_fexpr({con, As, I, [{var, [], X} || X <- Xs]});
-pp_pat({var, Ann, X})    -> pp_fexpr({var, Ann, X});
+pp_pat({tuple, Xs})           -> pp_fexpr({tuple, [{var, [], X} || X <- Xs]});
+pp_pat({'::', X, Xs})         -> pp_fexpr({op, [], '::', [{var, [], X}, {var, [], Xs}]});
+pp_pat({con, Ann, As, I, Xs}) -> pp_fexpr({con, Ann, As, I, [{var, [], X} || X <- Xs]});
+pp_pat({var, Ann, X})         -> pp_fexpr({var, Ann, X});
 pp_pat(P = {Tag, _}) when Tag == bool; Tag == int; Tag == string
-                         -> pp_fexpr({lit, [], P});
-pp_pat(Pat)              -> pp_fexpr(Pat).
+                              -> pp_fexpr({lit, [], P});
+pp_pat(Pat)                   -> pp_fexpr(Pat).
 
 -spec is_infix(op()) -> boolean().
 is_infix(Op) ->
