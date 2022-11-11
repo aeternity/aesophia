@@ -906,6 +906,7 @@ infer1(Env0, [Contract0 = {Contract, Ann, ConName, Impls, Code} | Rest], Acc, Op
         contract -> ets_insert(defined_contracts, {qname(ConName)});
         contract_interface -> ok
     end,
+    check_contract_preserved_payability(Env, ConName, Ann, Impls, Acc, What),
     populate_functions_to_implement(Env, ConName, Impls, Acc),
     Env1 = bind_contract(untyped, Contract0, Env),
     {Env2, Code1} = infer_contract_top(push_scope(contract, ConName, Env1), What, Code, Options),
@@ -930,6 +931,25 @@ infer1(Env, [Using = {using, _, _, _, _} | Rest], Acc, Options) ->
 infer1(Env, [{pragma, _, _} | Rest], Acc, Options) ->
     %% Pragmas are checked in check_modifiers
     infer1(Env, Rest, Acc, Options).
+
+-spec check_contract_preserved_payability(env(), Con, Ann, Impls, Contracts, Kind) -> ok | no_return() when
+      Con :: aeso_syntax:con(),
+      Ann :: aeso_syntax:ann(),
+      Impls :: [Con],
+      Contracts :: [aeso_syntax:decl()],
+      Kind :: contract | contract_interface.
+check_contract_preserved_payability(Env, ContractName, ContractAnn, Impls, DefinedContracts, Kind) ->
+    Payable = proplists:get_value(payable, ContractAnn, false),
+    ImplsNames = [ name(I) || I <- Impls ],
+    Interfaces = [ Con || I = {contract_interface, _, Con, _, _} <- DefinedContracts,
+                          lists:member(name(Con), ImplsNames),
+                          aeso_syntax:get_ann(payable, I, false) ],
+
+    create_type_errors(),
+    [ type_error({unpreserved_payablity, Kind, ContractName, I}) || I <- Interfaces, Payable == false ],
+    destroy_and_report_type_errors(Env),
+
+    ok.
 
 %% Report all functions that were not implemented by the contract ContractName.
 -spec report_unimplemented_functions(env(), ContractName) -> ok | no_return() when
@@ -1487,19 +1507,37 @@ check_reserved_entrypoints(Funs) ->
 check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type = {fun_t, _, _, _, _}}) ->
     Type1 = {fun_t, _, Named, Args, Ret} = check_type(Env, Type),
     TypeSig = {type_sig, Ann, none, Named, Args, Ret},
-    register_implementation(Name),
+    register_implementation(Id, TypeSig),
     {{Name, TypeSig}, {fun_decl, Ann, Id, Type1}};
 check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type}) ->
     type_error({fundecl_must_have_funtype, Ann, Id, Type}),
     {{Name, {type_sig, Ann, none, [], [], Type}}, check_type(Env, Type)}.
 
-%% Register the function FunName as implemented by deleting it from the functions
+%% Register the function FunId as implemented by deleting it from the functions
 %% to be implemented table if it is included there, or return true otherwise.
--spec register_implementation(FunName) -> true | no_return() when
-      FunName :: string().
-register_implementation(Name) ->
+-spec register_implementation(FunId, FunSig) -> true | no_return() when
+      FunId :: aeso_syntax:id(),
+      FunSig :: typesig().
+register_implementation(Id, Sig) ->
+    Name = name(Id),
     case ets_lookup(functions_to_implement, Name) of
-        [{Name, _, {fun_decl, _, _, _}}] ->
+        [{Name, Interface, Decl = {fun_decl, _, DeclId, _}}] ->
+            DeclStateful   = aeso_syntax:get_ann(stateful,   Decl, false),
+            DeclPayable    = aeso_syntax:get_ann(payable,    Decl, false),
+
+            SigEntrypoint = aeso_syntax:get_ann(entrypoint, Sig, false),
+            SigStateful   = aeso_syntax:get_ann(stateful,   Sig, false),
+            SigPayable    = aeso_syntax:get_ann(payable,    Sig, false),
+
+            [ type_error({function_should_be_entrypoint, Id, DeclId, Interface})
+                || not SigEntrypoint ],
+
+            [ type_error({entrypoint_cannot_be_stateful, Id, DeclId, Interface})
+                || SigStateful andalso not DeclStateful ],
+
+            [ type_error({entrypoint_must_be_payable, Id, DeclId, Interface})
+                || not SigPayable andalso DeclPayable ],
+
             ets_delete(functions_to_implement, Name);
         [] ->
             true;
@@ -1509,9 +1547,9 @@ register_implementation(Name) ->
 
 infer_nonrec(Env, LetFun) ->
     create_constraints(),
-    NewLetFun = {{FunName, _}, _} = infer_letfun(Env, LetFun),
+    NewLetFun = {{_, Sig}, _} = infer_letfun(Env, LetFun),
     check_special_funs(Env, NewLetFun),
-    register_implementation(FunName),
+    register_implementation(get_letfun_id(LetFun), Sig),
     solve_then_destroy_and_report_unsolved_constraints(Env),
     Result = {TypeSig, _} = instantiate(NewLetFun),
     print_typesig(TypeSig),
@@ -1540,8 +1578,8 @@ infer_letrec(Env, Defs) ->
     ExtendEnv = bind_funs(Funs, Env),
     Inferred =
         [ begin
-            Res    = {{Name, TypeSig}, _} = infer_letfun(ExtendEnv, LF),
-            register_implementation(Name),
+            Res    = {{Name, TypeSig}, LetFun} = infer_letfun(ExtendEnv, LF),
+            register_implementation(get_letfun_id(LetFun), TypeSig),
             Got    = proplists:get_value(Name, Funs),
             Expect = typesig_to_fun_t(TypeSig),
             unify(Env, Got, Expect, {check_typesig, Name, Got, Expect}),
@@ -1592,6 +1630,9 @@ infer_letfun1(Env0 = #env{ namespace = NS }, {letfun, Attrib, Fun = {id, NameAtt
     TypeSig = {type_sig, Attrib, none, NamedArgs, ArgTypes, ResultType},
     {{Name, TypeSig},
      {letfun, Attrib, {id, NameAttrib, Name}, TypedArgs, ResultType, NewGuardedBodies}}.
+
+get_letfun_id({fun_clauses, _, Id, _, _}) -> Id;
+get_letfun_id({letfun, _, Id, _, _, _})   -> Id.
 
 desugar_clauses(Ann, Fun, {type_sig, _, _, _, ArgTypes, RetType}, Clauses) ->
     NeedDesugar =
@@ -3659,7 +3700,7 @@ mk_error({empty_record_definition, Ann, Name}) ->
     Msg = io_lib:format("Empty record definitions are not allowed. Cannot define the record `~s`", [Name]),
     mk_t_err(pos(Ann), Msg);
 mk_error({unimplemented_interface_function, ConId, InterfaceName, FunName}) ->
-    Msg = io_lib:format("Unimplemented function `~s` from the interface `~s` in the contract `~s`", [FunName, InterfaceName, pp(ConId)]),
+    Msg = io_lib:format("Unimplemented entrypoint `~s` from the interface `~s` in the contract `~s`", [FunName, InterfaceName, pp(ConId)]),
     mk_t_err(pos(ConId), Msg);
 mk_error({referencing_undefined_interface, InterfaceId}) ->
     Msg = io_lib:format("Trying to implement or extend an undefined interface `~s`", [pp(InterfaceId)]),
@@ -3707,6 +3748,29 @@ mk_error({interface_implementation_conflict, Contract, I1, I2, Fun}) ->
                         "the contract `~s` have a function called `~s`",
                         [name(I1), name(I2), name(Contract), name(Fun)]),
     mk_t_err(pos(Contract), Msg);
+mk_error({function_should_be_entrypoint, Impl, Base, Interface}) ->
+    Msg = io_lib:format("`~s` must be declared as an entrypoint instead of a function "
+                        "in order to implement the entrypoint `~s` from the interface `~s`",
+                        [name(Impl), name(Base), name(Interface)]),
+    mk_t_err(pos(Impl), Msg);
+mk_error({entrypoint_cannot_be_stateful, Impl, Base, Interface}) ->
+    Msg = io_lib:format("`~s` cannot be stateful because the entrypoint `~s` in the "
+                        "interface `~s` is not stateful",
+                        [name(Impl), name(Base), name(Interface)]),
+    mk_t_err(pos(Impl), Msg);
+mk_error({entrypoint_must_be_payable, Impl, Base, Interface}) ->
+    Msg = io_lib:format("`~s` must be payable because the entrypoint `~s` in the "
+                        "interface `~s` is payable",
+                        [name(Impl), name(Base), name(Interface)]),
+    mk_t_err(pos(Impl), Msg);
+mk_error({unpreserved_payablity, Kind, ContractCon, InterfaceCon}) ->
+    KindStr = case Kind of
+                  contract -> "contract";
+                  contract_interface -> "interface"
+              end,
+    Msg = io_lib:format("Non-payable ~s ~s cannot implement payable interface ~s",
+                        [KindStr, name(ContractCon), name(InterfaceCon)]),
+    mk_t_err(pos(ContractCon), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),
     mk_t_err(pos(0, 0), Msg).
