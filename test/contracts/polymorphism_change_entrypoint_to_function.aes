@@ -1,0 +1,6 @@
+contract interface I =
+    entrypoint f : () => int
+
+contract C : I =
+    entrypoint init() = ()
+    function f() = 1

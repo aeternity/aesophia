@@ -1155,6 +1155,26 @@ failing_contracts() ->
                      "to arguments\n"
                      "  `Chain.create : (value : int, var_args) => 'c`">>
                   ])
+    , ?TYPE_ERROR(polymorphism_add_stateful_entrypoint,
+                  [<<?Pos(5,25)
+                     "`f` cannot be stateful because the entrypoint `f` in the interface `I` is not stateful">>
+                  ])
+    , ?TYPE_ERROR(polymorphism_change_entrypoint_to_function,
+                  [<<?Pos(6,14)
+                     "`f` must be declared as an entrypoint instead of a function in order to implement the entrypoint `f` from the interface `I`">>
+                  ])
+    , ?TYPE_ERROR(polymorphism_non_payable_contract_implement_payable,
+                  [<<?Pos(4,10)
+                     "Non-payable contract `C` cannot implement payable interface `I`">>
+                  ])
+    , ?TYPE_ERROR(polymorphism_non_payable_interface_implement_payable,
+                  [<<?Pos(4,20)
+                     "Non-payable interface `H` cannot implement payable interface `I`">>
+                  ])
+    , ?TYPE_ERROR(polymorphism_remove_payable_entrypoint,
+                  [<<?Pos(5,16)
+                     "`f` must be payable because the entrypoint `f` in the interface `I` is payable">>
+                  ])
     ].
 
 validation_test_() ->

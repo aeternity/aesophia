@@ -3768,7 +3768,7 @@ mk_error({unpreserved_payablity, Kind, ContractCon, InterfaceCon}) ->
                   contract -> "contract";
                   contract_interface -> "interface"
               end,
-    Msg = io_lib:format("Non-payable ~s ~s cannot implement payable interface ~s",
+    Msg = io_lib:format("Non-payable ~s `~s` cannot implement payable interface `~s`",
                         [KindStr, name(ContractCon), name(InterfaceCon)]),
     mk_t_err(pos(ContractCon), Msg);
 mk_error(Err) ->
