@@ -1,0 +1,7 @@
+contract interface I =
+    stateful entrypoint f : () => int
+    stateful entrypoint g : () => int
+
+contract C : I =
+    stateful entrypoint f() = 1
+    entrypoint g() = 2
