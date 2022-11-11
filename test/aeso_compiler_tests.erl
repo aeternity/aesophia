@@ -868,7 +868,7 @@ failing_contracts() ->
                      "  - line 9, column 5">>])
     , ?TYPE_ERROR(polymorphism_contract_missing_implementation,
                   [<<?Pos(4,20)
-                     "Unimplemented function `f` from the interface `I1` in the contract `I2`">>
+                     "Unimplemented entrypoint `f` from the interface `I1` in the contract `I2`">>
                   ])
     , ?TYPE_ERROR(polymorphism_contract_same_decl_multi_interface,
                   [<<?Pos(7,10)
