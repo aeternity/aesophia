@@ -540,6 +540,8 @@ global_env() ->
     TTL       = {qid, Ann, ["Chain", "ttl"]},
     Pointee   = {qid, Ann, ["AENS", "pointee"]},
     AENSName  = {qid, Ann, ["AENS", "name"]},
+    PointeeV2 = {qid, Ann, ["AENSv2", "pointee"]},
+    AENSNameV2 = {qid, Ann, ["AENSv2", "name"]},
     Fr        = {qid, Ann, ["MCL_BLS12_381", "fr"]},
     Fp        = {qid, Ann, ["MCL_BLS12_381", "fp"]},
     Fp2       = {tuple_t, Ann, [Fp, Fp]},
@@ -675,20 +677,33 @@ global_env() ->
 
     AENSScope = #scope
         { funs = MkDefs(
-                     [{"resolve",  Fun([String, String], option_t(Ann, A))},
-                      {"preclaim", SignFun([Address, Hash], Unit)},
-                      {"claim",    SignFun([Address, String, Int, Int], Unit)},
-                      {"transfer", SignFun([Address, Address, String], Unit)},
-                      {"revoke",   SignFun([Address, String], Unit)},
-                      {"update",   SignFun([Address, String, Option(TTL), Option(Int), Option(Map(String, Pointee))], Unit)},
-                      {"lookup",   Fun([String], option_t(Ann, AENSName))},
-                      %% AENS pointee constructors
+                     [%% AENS pointee constructors
                       {"AccountPt",  Fun1(Address, Pointee)},
                       {"OraclePt",   Fun1(Address, Pointee)},
                       {"ContractPt", Fun1(Address, Pointee)},
                       {"ChannelPt",  Fun1(Address, Pointee)},
                       %% Name object constructor
                       {"Name",   Fun([Address, TTL, Map(String, Pointee)], AENSName)}
+                     ])
+        , types = MkDefs([{"pointee", 0}, {"name", 0}]) },
+
+    AENSv2Scope = #scope
+        { funs = MkDefs(
+                     [{"resolve",  Fun([String, String], option_t(Ann, A))},
+                      {"preclaim", SignFun([Address, Hash], Unit)},
+                      {"claim",    SignFun([Address, String, Int, Int], Unit)},
+                      {"transfer", SignFun([Address, Address, String], Unit)},
+                      {"revoke",   SignFun([Address, String], Unit)},
+                      {"update",   SignFun([Address, String, Option(TTL), Option(Int), Option(Map(String, PointeeV2))], Unit)},
+                      {"lookup",   Fun([String], option_t(Ann, AENSNameV2))},
+                      %% AENS pointee constructors v2
+                      {"AccountPt",  Fun1(Address, PointeeV2)},
+                      {"OraclePt",   Fun1(Address, PointeeV2)},
+                      {"ContractPt", Fun1(Address, PointeeV2)},
+                      {"ChannelPt",  Fun1(Address, PointeeV2)},
+                      {"DataPt",     Fun1(String,  PointeeV2)},
+                      %% Name object constructor v2
+                      {"Name", Fun([Address, TTL, Map(String, PointeeV2)], AENSNameV2)}
                      ])
         , types = MkDefs([{"pointee", 0}, {"name", 0}]) },
 
@@ -814,6 +829,7 @@ global_env() ->
              , ["Call"]     => CallScope
              , ["Oracle"]   => OracleScope
              , ["AENS"]     => AENSScope
+             , ["AENSv2"]   => AENSv2Scope
              , ["Map"]      => MapScope
              , ["Auth"]     => AuthScope
              , ["Crypto"]   => CryptoScope
@@ -1883,7 +1899,7 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
             unify(Env, FunType, {fun_t, [], NamedArgsVar, ArgTypes, GeneralResultType}, When),
             when_warning(warn_negative_spend, fun() -> warn_potential_negative_spend(Ann, NewFun1, NewArgs) end),
             [ add_constraint({aens_resolve_type, GeneralResultType})
-              || element(3, FunName) =:= ["AENS", "resolve"] ],
+              || element(3, FunName) =:= ["AENSv2", "resolve"] ],
             [ add_constraint({oracle_type, Ann, OType})
               || OType <- [get_oracle_type(FunName, ArgTypes, GeneralResultType)],
                  OType =/= false ],
@@ -3702,7 +3718,7 @@ mk_error({higher_order_entrypoint, Ann, {id, _, Name}, Thing}) ->
                         [ThingS, Name, Bad]),
     mk_t_err(pos(Ann), Msg);
 mk_error({invalid_aens_resolve_type, Ann, T}) ->
-    Msg = io_lib:format("Invalid return type of `AENS.resolve`:\n"
+    Msg = io_lib:format("Invalid return type of `AENSv2.resolve`:\n"
                         "~s`\n"
                         "It must be a `string` or a pubkey type (`address`, `oracle`, etc)",
                         [pp_type("  `", T)]),
