@@ -1166,13 +1166,13 @@ set_state({tuple, Ls}, Val) ->
     ?make_let(X, Val,
     lists:foldr(fun({I, L}, Code) ->
                     {'let', [], "_", set_state(L, {proj, get_fann(Val), X, I - 1}), Code}
-                end, {tuple, []}, indexed(Ls))).
+                end, {tuple, [], []}, indexed(Ls))).
 
 -spec get_state(state_layout()) -> fexpr().
 get_state({reg, R}) ->
     {get_state, [], R};
 get_state({tuple, Ls}) ->
-    {tuple, [get_state(L) || L <- Ls]}.
+    {tuple, [], [get_state(L) || L <- Ls]}.
 
 -spec builtin_to_fcode(state_layout(), BuiltinFun, [fexpr()]) -> fexpr() when
       BuiltinFun :: atom().  %% No need to mention all of them
