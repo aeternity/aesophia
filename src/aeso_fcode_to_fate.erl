@@ -268,44 +268,44 @@ lit_to_fate(Env, L) ->
 term_to_fate(E) -> term_to_fate(#env{}, #{}, E).
 term_to_fate(GlobEnv, E) -> term_to_fate(GlobEnv, #{}, E).
 
-term_to_fate(GlobEnv, _Env, {lit, L}) ->
+term_to_fate(GlobEnv, _Env, {lit, _, L}) ->
     lit_to_fate(GlobEnv, L);
 %% negative literals are parsed as 0 - N
-term_to_fate(_GlobEnv, _Env, {op, '-', [{lit, {int, 0}}, {lit, {int, N}}]}) ->
+term_to_fate(_GlobEnv, _Env, {op, _, '-', [{lit, _, {int, 0}}, {lit, _, {int, N}}]}) ->
     aeb_fate_data:make_integer(-N);
-term_to_fate(_GlobEnv, _Env, nil) ->
+term_to_fate(_GlobEnv, _Env, {nil, _}) ->
     aeb_fate_data:make_list([]);
-term_to_fate(GlobEnv, Env, {op, '::', [Hd, Tl]}) ->
+term_to_fate(GlobEnv, Env, {op, _, '::', [Hd, Tl]}) ->
     %% The Tl will translate into a list, because FATE lists are just lists
     [term_to_fate(GlobEnv, Env, Hd) | term_to_fate(GlobEnv, Env, Tl)];
-term_to_fate(GlobEnv, Env, {tuple, As}) ->
+term_to_fate(GlobEnv, Env, {tuple, _, As}) ->
     aeb_fate_data:make_tuple(list_to_tuple([ term_to_fate(GlobEnv, Env, A) || A<-As]));
-term_to_fate(GlobEnv, Env, {con, Ar, I, As}) ->
+term_to_fate(GlobEnv, Env, {con, _, Ar, I, As}) ->
     FateAs = [ term_to_fate(GlobEnv, Env, A) || A <- As ],
     aeb_fate_data:make_variant(Ar, I, list_to_tuple(FateAs));
-term_to_fate(_GlobEnv, _Env, {builtin, bits_all, []}) ->
+term_to_fate(_GlobEnv, _Env, {builtin, _, bits_all, []}) ->
     aeb_fate_data:make_bits(-1);
-term_to_fate(_GlobEnv, _Env, {builtin, bits_none, []}) ->
+term_to_fate(_GlobEnv, _Env, {builtin, _, bits_none, []}) ->
     aeb_fate_data:make_bits(0);
-term_to_fate(GlobEnv, _Env, {op, bits_set, [B, I]}) ->
+term_to_fate(GlobEnv, _Env, {op, _, bits_set, [B, I]}) ->
     {bits, N} = term_to_fate(GlobEnv, B),
     J         = term_to_fate(GlobEnv, I),
     {bits, N bor (1 bsl J)};
-term_to_fate(GlobEnv, _Env, {op, bits_clear, [B, I]}) ->
+term_to_fate(GlobEnv, _Env, {op, _, bits_clear, [B, I]}) ->
     {bits, N} = term_to_fate(GlobEnv, B),
     J         = term_to_fate(GlobEnv, I),
     {bits, N band bnot (1 bsl J)};
-term_to_fate(GlobEnv, Env, {'let', X, E, Body}) ->
+term_to_fate(GlobEnv, Env, {'let', _, X, E, Body}) ->
     Env1 = Env#{ X => term_to_fate(GlobEnv, Env, E) },
     term_to_fate(GlobEnv, Env1, Body);
-term_to_fate(_GlobEnv, Env, {var, X}) ->
+term_to_fate(_GlobEnv, Env, {var, _, X}) ->
     case maps:get(X, Env, undefined) of
         undefined -> throw(not_a_fate_value);
         V         -> V
     end;
-term_to_fate(_GlobEnv, _Env, {builtin, map_empty, []}) ->
+term_to_fate(_GlobEnv, _Env, {builtin, _, map_empty, []}) ->
     aeb_fate_data:make_map(#{});
-term_to_fate(GlobEnv, Env, {op, map_set, [M, K, V]}) ->
+term_to_fate(GlobEnv, Env, {op, _, map_set, [M, K, V]}) ->
     Map = term_to_fate(GlobEnv, Env, M),
     Map#{term_to_fate(GlobEnv, Env, K) => term_to_fate(GlobEnv, Env, V)};
 term_to_fate(_GlobEnv, _Env, _) ->
@@ -318,47 +318,52 @@ to_scode(Env, T) ->
         to_scode1(Env, T)
     end.
 
-to_scode1(Env, {lit, L}) ->
-    [push(?i(lit_to_fate(Env, L)))];
+to_scode1(Env, {lit, Ann, L}) ->
+    [ dbgloc(Env, Ann), push(?i(lit_to_fate(Env, L))) ];
 
-to_scode1(_Env, nil) ->
-    [aeb_fate_ops:nil(?a)];
+to_scode1(Env, {nil, Ann}) ->
+    [ dbgloc(Env, Ann), aeb_fate_ops:nil(?a) ];
 
-to_scode1(Env, {var, X}) ->
-    [push(lookup_var(Env, X))];
+to_scode1(Env, {var, Ann, X}) ->
+    [ dbgloc(Env, Ann), push(lookup_var(Env, X)) ];
 
-to_scode1(Env, {con, Ar, I, As}) ->
+to_scode1(Env, {con, Ann, Ar, I, As}) ->
     N = length(As),
-    [[to_scode(notail(Env), A) || A <- As],
-     aeb_fate_ops:variant(?a, ?i(Ar), ?i(I), ?i(N))];
+    [ dbgloc(Env, Ann),
+      [to_scode(notail(Env), A) || A <- As],
+      aeb_fate_ops:variant(?a, ?i(Ar), ?i(I), ?i(N)) ];
 
-to_scode1(Env, {tuple, As}) ->
+to_scode1(Env, {tuple, Ann, As}) ->
     N = length(As),
-    [[ to_scode(notail(Env), A) || A <- As ],
-     tuple(N)];
+    [ dbgloc(Env, Ann),
+      [ to_scode(notail(Env), A) || A <- As ],
+      tuple(N) ];
 
-to_scode1(Env, {proj, E, I}) ->
-    [to_scode(notail(Env), E),
-     aeb_fate_ops:element_op(?a, ?i(I), ?a)];
+to_scode1(Env, {proj, Ann, E, I}) ->
+    [ dbgloc(Env, Ann),
+      to_scode(notail(Env), E),
+      aeb_fate_ops:element_op(?a, ?i(I), ?a) ];
 
-to_scode1(Env, {set_proj, R, I, E}) ->
-    [to_scode(notail(Env), E),
-     to_scode(notail(Env), R),
-     aeb_fate_ops:setelement(?a, ?i(I), ?a, ?a)];
+to_scode1(Env, {set_proj, Ann, R, I, E}) ->
+    [ dbgloc(Env, Ann),
+      to_scode(notail(Env), E),
+      to_scode(notail(Env), R),
+      aeb_fate_ops:setelement(?a, ?i(I), ?a, ?a) ];
 
-to_scode1(Env, {op, Op, Args}) ->
-    call_to_scode(Env, op_to_scode(Op), Args);
+to_scode1(Env, {op, Ann, Op, Args}) ->
+    [ dbgloc(Env, Ann) | call_to_scode(Env, op_to_scode(Op), Args) ];
 
-to_scode1(Env, {'let', X, {var, Y}, Body}) ->
+to_scode1(Env, {'let', Ann, X, {var, _, Y}, Body}) ->
     Env1 = bind_var(X, lookup_var(Env, Y), Env),
-    to_scode(Env1, Body);
-to_scode1(Env, {'let', X, Expr, Body}) ->
+    [ dbgloc(Env, Ann) | to_scode(Env1, Body) ];
+to_scode1(Env, {'let', Ann, X, Expr, Body}) ->
     {I, Env1} = bind_local(X, Env),
-    [ to_scode(notail(Env), Expr),
+    [ dbgloc(Env, Ann),
+      to_scode(notail(Env), Expr),
       aeb_fate_ops:store({var, I}, {stack, 0}),
       to_scode(Env1, Body) ];
 
-to_scode1(Env = #env{ current_function = Fun, tailpos = true }, {def, Fun, Args}) ->
+to_scode1(Env = #env{ current_function = Fun, tailpos = true }, {def, Ann, Fun, Args}) ->
     %% Tail-call to current function, f(e0..en). Compile to
     %%      [ let xi = ei ]
     %%      [ STORE argi xi ]
@@ -371,55 +376,56 @@ to_scode1(Env = #env{ current_function = Fun, tailpos = true }, {def, Fun, Args}
                                 aeb_fate_ops:store({var, I}, ?a)],
                         {[I | Is], Acc1, Env2}
                     end, {[], [], Env}, Args),
-    [ Code,
+    [ dbgloc(Env, Ann),
+      Code,
       [ aeb_fate_ops:store({arg, I}, {var, J})
         || {I, J} <- lists:zip(lists:seq(0, length(Vars) - 1),
                                lists:reverse(Vars)) ],
       loop ];
-to_scode1(Env, {def, Fun, Args}) ->
+to_scode1(Env, {def, Ann, Fun, Args}) ->
     FName = make_function_id(Fun),
     Lbl   = aeb_fate_data:make_string(FName),
-    call_to_scode(Env, local_call(Env, ?i(Lbl)), Args);
-to_scode1(Env, {funcall, Fun, Args}) ->
-    call_to_scode(Env, [to_scode(Env, Fun), local_call(Env, ?a)], Args);
+    [ dbgloc(Env, Ann) | call_to_scode(Env, local_call(Env, ?i(Lbl)), Args) ];
+to_scode1(Env, {funcall, Ann, Fun, Args}) ->
+    [ dbgloc(Env, Ann) | call_to_scode(Env, [to_scode(Env, Fun), local_call(Env, ?a)], Args) ];
 
-to_scode1(Env, {builtin, B, Args}) ->
-    builtin_to_scode(Env, B, Args);
+to_scode1(Env, {builtin, Ann, B, Args}) ->
+    [ dbgloc(Env, Ann) | builtin_to_scode(Env, B, Args) ];
 
-to_scode1(Env, {remote, ArgsT, RetT, Ct, Fun, [Gas, Value, Protected | Args]}) ->
+to_scode1(Env, {remote, Ann, ArgsT, RetT, Ct, Fun, [Gas, Value, Protected | Args]}) ->
     Lbl = make_function_id(Fun),
     {ArgTypes, RetType0} = typesig_to_scode([{"_", T} || T <- ArgsT], RetT),
     ArgType = ?i(aeb_fate_data:make_typerep({tuple, ArgTypes})),
     RetType = ?i(aeb_fate_data:make_typerep(RetType0)),
-    case Protected of
-        {lit, {bool, false}} ->
+    SCode = case Protected of
+        {lit, _, {bool, false}} ->
             case Gas of
-                {builtin, call_gas_left, _} ->
+                {builtin, _, call_gas_left, _} ->
                     Call = aeb_fate_ops:call_r(?a, Lbl, ArgType, RetType, ?a),
                     call_to_scode(Env, Call, [Ct, Value | Args]);
                 _ ->
                     Call = aeb_fate_ops:call_gr(?a, Lbl, ArgType, RetType, ?a, ?a),
                     call_to_scode(Env, Call, [Ct, Value, Gas | Args])
             end;
-        {lit, {bool, true}} ->
+        {lit, _, {bool, true}} ->
             Call = aeb_fate_ops:call_pgr(?a, Lbl, ArgType, RetType, ?a, ?a, ?i(true)),
             call_to_scode(Env, Call, [Ct, Value, Gas | Args]);
         _ ->
             Call = aeb_fate_ops:call_pgr(?a, Lbl, ArgType, RetType, ?a, ?a, ?a),
             call_to_scode(Env, Call, [Ct, Value, Gas, Protected | Args])
-    end;
+    end,
+    [ dbgloc(Env, Ann) | SCode ];
 
-to_scode1(_Env, {get_state, Reg}) ->
-    [push(?s(Reg))];
-to_scode1(Env, {set_state, Reg, Val}) ->
-    call_to_scode(Env, [{'STORE', ?s(Reg), ?a},
-                        tuple(0)], [Val]);
+to_scode1(Env, {get_state, Ann, Reg}) ->
+    [ dbgloc(Env, Ann), push(?s(Reg)) ];
+to_scode1(Env, {set_state, Ann, Reg, Val}) ->
+    [ dbgloc(Env, Ann) | call_to_scode(Env, [{'STORE', ?s(Reg), ?a}, tuple(0)], [Val]) ];
 
-to_scode1(Env, {closure, Fun, FVs}) ->
-    to_scode(Env, {tuple, [{lit, {string, make_function_id(Fun)}}, FVs]});
+to_scode1(Env, {closure, Ann, Fun, FVs}) ->
+    to_scode(Env, {tuple, Ann, [{lit, Ann, {string, make_function_id(Fun)}}, FVs]});
 
-to_scode1(Env, {switch, Case}) ->
-    split_to_scode(Env, Case).
+to_scode1(Env, {switch, Ann, Case}) ->
+    [ dbgloc(Env, Ann) | split_to_scode(Env, Case) ].
 
 local_call( Env, Fun) when Env#env.tailpos -> aeb_fate_ops:call_t(Fun);
 local_call(_Env, Fun)                      -> aeb_fate_ops:call(Fun).
@@ -429,7 +435,7 @@ split_to_scode(Env, {nosplit, Expr}) ->
 split_to_scode(Env, {split, {tuple, _}, X, Alts}) ->
     {Def, Alts1} = catchall_to_scode(Env, X, Alts),
     Arg = lookup_var(Env, X),
-    Alt = case [ {Xs, Split} || {'case', {tuple, Xs}, Split} <- Alts1 ] of
+    Alt = case [ {Xs, Split} || {'case', {tuple, _, Xs}, Split} <- Alts1 ] of
             []            -> missing;
             [{Xs, S} | _] ->
                 {Code, Env1} = match_tuple(Env, Arg, Xs),
@@ -456,7 +462,7 @@ split_to_scode(Env, {split, {list, _}, X, Alts}) ->
     GetAlt = fun(P) ->
                  case [C || C = {'case', Pat, _} <- Alts1, Pat == P orelse is_tuple(Pat) andalso element(1, Pat) == P] of
                      []      -> missing;
-                     [{'case', nil, S} | _]           -> split_to_scode(Env, S);
+                     [{'case', {nil, _}, S} | _]           -> split_to_scode(Env, S);
                      [{'case', {'::', Y, Z}, S} | _] ->
                          {I, Env1} = bind_local(Y, Env),
                          {J, Env2} = bind_local(Z, Env1),
@@ -475,7 +481,7 @@ split_to_scode(Env, {split, {variant, Cons}, X, Alts}) ->
     {Def, Alts1} = catchall_to_scode(Env, X, Alts),
     Arg = lookup_var(Env, X),
     GetAlt = fun(I) ->
-                case [{Xs, S} || {'case', {con, _, J, Xs}, S} <- Alts1, I == J] of
+                case [{Xs, S} || {'case', {con, _, _, J, Xs}, S} <- Alts1, I == J] of
                     [] -> missing;
                     [{Xs, S} | _] ->
                         {Code, Env1} = match_variant(Env, Arg, Xs),
@@ -507,7 +513,7 @@ literal_split_to_scode(Env, Type, Arg, [{'case', Lit, Body} | Alts], Def) when T
 
 catchall_to_scode(Env, X, Alts) -> catchall_to_scode(Env, X, Alts, []).
 
-catchall_to_scode(Env, X, [{'case', {var, Y}, Split} | _], Acc) ->
+catchall_to_scode(Env, X, [{'case', {var, _, Y}, Split} | _], Acc) ->
     Env1 = bind_var(Y, lookup_var(Env, X), Env),
     {split_to_scode(Env1, Split), lists:reverse(Acc)};
 catchall_to_scode(Env, X, [Alt | Alts], Acc) ->
@@ -649,7 +655,7 @@ builtin_to_scode(Env, chain_bytecode_hash, [_Addr] = Args) ->
 builtin_to_scode(Env, chain_clone,
                  [InitArgsT, GasCap, Value, Prot, Contract | InitArgs]) ->
     case GasCap of
-        {builtin, call_gas_left, _} ->
+        {builtin, _, call_gas_left, _} ->
             call_to_scode(Env, aeb_fate_ops:clone(?a, ?a, ?a, ?a),
                           [Contract, InitArgsT, Value, Prot | InitArgs]
                          );
@@ -750,6 +756,12 @@ push(A) -> {'STORE', ?a, A}.
 
 tuple(0) -> push(?i({tuple, {}}));
 tuple(N) -> aeb_fate_ops:tuple(?a, N).
+
+dbgloc(Env, Ann) ->
+    case proplists:get_value(debug_info, Env#env.options, false) of
+        false -> [];
+        true  -> [{'DBGLOC', proplists:get_value(line, Ann, -1)}]
+    end.
 
 %% -- Phase II ---------------------------------------------------------------
 %%  Optimize
@@ -886,6 +898,7 @@ attributes(I) ->
         loop                                  -> Impure(pc, []);
         switch_body                           -> Pure(none, []);
         'RETURN'                              -> Impure(pc, []);
+        {'DBGLOC', _}                         -> Impure(pc, []);
         {'RETURNR', A}                        -> Impure(pc, A);
         {'CALL', A}                           -> Impure(?a, [A]);
         {'CALL_R', A, _, B, C, D}             -> Impure(?a, [A, B, C, D]);
