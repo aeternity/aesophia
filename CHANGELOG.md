@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Int.mulmod` - combined builtin operation for multiplication and modulus.
 - `Crypto.poseidon` - a ZK/SNARK-friendly hash function (over the BLS12-381 scalar field).
 - `Address.to_bytes` - convert an address to its binary representation (for hashing, etc.).
+- Raw data pointers added to AENS. In short we have introduced a new namespace
+  `AENSv2`; they contain types similar to the old `AENS`; `AENS.name` and
+  `AENS.pointee`, where the latter now has a constructor `DataPt(string)`. All
+  AENS actions have been moved to `AENSv2`, and `AENSv2.lookup` and
+  `AENSv2.update` consume and produce the new types. The old `AENS` namespace
+  only contains the old datatypes, that can be used to interface existing
+  contracts. Standard library `AENSCompat` is added to convert between old and
+  new pointers.
 ### Changed
 ### Removed
 - `Bitwise.aes` standard library is removed - the builtin operations are superior.

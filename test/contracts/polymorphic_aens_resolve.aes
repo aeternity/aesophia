@@ -1,7 +1,7 @@
 contract PolymorphicAENSresolve =
 
   function fail() : option('a) =
-    AENS.resolve("foo.aet", "whatever")
+    AENSv2.resolve("foo.aet", "whatever")
 
   entrypoint main_fun() = ()
 
