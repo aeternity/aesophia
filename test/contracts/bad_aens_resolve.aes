@@ -3,7 +3,7 @@ contract BadAENSresolve =
   type t('a) = option(list('a))
 
   function fail() : t(int) =
-    AENS.resolve("foo.aet", "whatever")
+    AENSv2.resolve("foo.aet", "whatever")
 
   entrypoint main_fun() = ()
 

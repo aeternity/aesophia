@@ -1,17 +1,30 @@
-contract AENSUpdate =
+include "Option.aes"
+include "AENSCompat.aes"
+contract interface OldAENSContract =
+  entrypoint set : (string, string, AENS.pointee) => unit
+  entrypoint lookup : (string, string) => AENS.pointee
+
+main contract AENSUpdate =
   stateful entrypoint update_name(owner : address, name : string) =
-    let p1 : AENS.pointee = AENS.AccountPt(Call.caller)
-    let p2 : AENS.pointee = AENS.OraclePt(Call.caller)
-    let p3 : AENS.pointee = AENS.ContractPt(Call.caller)
-    let p4 : AENS.pointee = AENS.ChannelPt(Call.caller)
-    AENS.update(owner, name, None, None,
-                Some({ ["account_pubkey"] = p1, ["oracle_pubkey"] = p2,
-                       ["contract_pubkey"] = p3, ["misc"] = p4 }))
+    let p1 : AENSv2.pointee = AENSv2.AccountPt(Call.caller)
+    let p2 : AENSv2.pointee = AENSv2.OraclePt(Call.caller)
+    let p3 : AENSv2.pointee = AENSv2.ContractPt(Call.caller)
+    let p4 : AENSv2.pointee = AENSv2.ChannelPt(Call.caller)
+    let p5 : AENSv2.pointee = AENSv2.DataPt("any something will do")
+    AENSv2.update(owner, name, None, None,
+                  Some({ ["account_pubkey"] = p1, ["oracle_pubkey"] = p2,
+                         ["contract_pubkey"] = p3, ["misc"] = p4, ["data"] = p5 }))
+
+  stateful entrypoint old_interaction(c : OldAENSContract, owner : address, name : string) =
+    let p : AENS.pointee = c.lookup(name, "key1")
+    AENSv2.update(owner, name, None, None, Some({ ["key1"] = AENSCompat.pointee_to_V2(p) }))
+    switch(AENSv2.lookup(name))
+      Some(AENSv2.Name(_, _, pt_map)) =>
+        c.set(name, "key2", Option.force(AENSCompat.pointee_from_V2(pt_map["key1"])))
 
   entrypoint get_ttl(name : string) =
-    switch(AENS.lookup(name))
-     Some(AENS.Name(_, FixedTTL(ttl), _)) => ttl
+    switch(AENSv2.lookup(name))
+     Some(AENSv2.Name(_, FixedTTL(ttl), _)) => ttl
 
   entrypoint expiry(o : oracle(int, int)) : int =
     Oracle.expiry(o)
-
