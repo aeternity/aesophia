@@ -14,6 +14,7 @@ The out-of-the-box namespaces are:
 
 - [Address](#address)
 - [AENS](#aens)
+- [AENSv2](#aensv2)
 - [Auth](#auth)
 - [Bits](#bits)
 - [Bytes](#bytes)
@@ -31,6 +32,7 @@ The following ones need to be included as regular files with `.aes` suffix, for 
 include "List.aes"
 ```
 
+- [AENSCompat](#aenscompat)
 - [Bitwise](#bitwise)
 - [BLS12_381](#bls12_381)
 - [Func](#func)
@@ -90,13 +92,10 @@ Cast address to contract type C (where `C` is a contract)
 
 ### AENS
 
-The following functionality is available for interacting with the æternity
-naming system (AENS).
-If `owner` is equal to `Contract.address` the signature `signature` is
-ignored, and can be left out since it is a named argument. Otherwise we need
-a signature to prove that we are allowed to do AENS operations on behalf of
-`owner`. The [signature is tied to a network id](https://github.com/aeternity/protocol/blob/iris/consensus/consensus.md#transaction-signature),
-i.e. the signature material should be prefixed by the network id.
+The old AENS namespace, kept in the compiler to be able to interact with
+contracts from before Ceres, compiled using aesophia compiler version 7.x and
+earlier. Used in [AENSCompat](#aenscompat) when converting between old and new
+pointers.
 
 #### Types
 
@@ -113,12 +112,41 @@ datatype pointee = AccountPt(address) | OraclePt(address)
                  | ContractPt(address) | ChannelPt(address)
 ```
 
+### AENSv2
+
+Note: introduced in v8.0
+
+The following functionality is available for interacting with the æternity
+naming system (AENS).  If `owner` is equal to `Contract.address` the signature
+`signature` is ignored, and can be left out since it is a named argument.
+Otherwise we need a signature to prove that we are allowed to do AENS
+operations on behalf of `owner`. The [signature is tied to a network
+id](https://github.com/aeternity/protocol/blob/iris/consensus/consensus.md#transaction-signature),
+i.e. the signature material should be prefixed by the network id.
+
+#### Types
+
+##### name
+```
+datatype name = Name(address, Chain.ttl, map(string, AENSv2.pointee))
+```
+
+
+##### pointee
+
+```
+datatype pointee = AccountPt(address) | OraclePt(address)
+                 | ContractPt(address) | ChannelPt(address) | DataPt(string)
+```
+
+Note: on-chain there is a maximum length enforced for `DataPt`, it is 1024 bytes.
+Sophia itself does _not_ enforce this.
 
 #### Functions
 
 ##### resolve
 ```
-AENS.resolve(name : string, key : string) : option('a)
+AENSv2.resolve(name : string, key : string) : option('a)
 ```
 
 Name resolution. Here `name` should be a registered name and `key` one of the attributes
@@ -129,21 +157,22 @@ type checked against this type at run time.
 
 ##### lookup
 ```
-AENS.lookup(name : string) : option(AENS.name)
+AENSv2.lookup(name : string) : option(AENSv2.name)
 ```
 
-If `name` is an active name `AENS.lookup` returns a name object.
+If `name` is an active name `AENSv2.lookup` returns a name object.
 The three arguments to `Name` are `owner`, `expiry` and a map of the
 `pointees` for the name. Note: the expiry of the name is always a fixed TTL.
 For example:
 ```
-let Some(Name(owner, FixedTTL(expiry), ptrs)) = AENS.lookup("example.chain")
+let Some(AENSv2.Name(owner, FixedTTL(expiry), ptrs)) = AENSv2.lookup("example.chain")
 ```
 
+Note: Changed to produce `AENSv2.name` in v8.0 (Ceres protocol upgrade).
 
 ##### preclaim
 ```
-AENS.preclaim(owner : address, commitment_hash : hash, <signature : signature>) : unit
+AENSv2.preclaim(owner : address, commitment_hash : hash, <signature : signature>) : unit
 ```
 
 The [signature](./sophia_features.md#delegation-signature) should be over
@@ -152,7 +181,7 @@ The [signature](./sophia_features.md#delegation-signature) should be over
 
 ##### claim
 ```
-AENS.claim(owner : address, name : string, salt : int, name_fee : int, <signature : signature>) : unit
+AENSv2.claim(owner : address, name : string, salt : int, name_fee : int, <signature : signature>) : unit
 ```
 
 The [signature](./sophia_features.md#delegation-signature) should be over
@@ -163,7 +192,7 @@ using the private key of the `owner` account for signing.
 
 ##### transfer
 ```
-AENS.transfer(owner : address, new_owner : address, name : string, <signature : signature>) : unit
+AENSv2.transfer(owner : address, new_owner : address, name : string, <signature : signature>) : unit
 ```
 
 Transfers name to the new owner.
@@ -176,7 +205,7 @@ using the private key of the `owner` account for signing.
 
 ##### revoke
 ```
-AENS.revoke(owner : address, name : string, <signature : signature>) : unit
+AENSv2.revoke(owner : address, name : string, <signature : signature>) : unit
 ```
 
 Revokes the name to extend the ownership time.
@@ -189,14 +218,15 @@ using the private key of the `owner` account for signing.
 
 ##### update
 ```
-AENS.update(owner : address, name : string, expiry : option(Chain.ttl), client_ttl : option(int),
-            new_ptrs : option(map(string, AENS.pointee)), <signature : signature>) : unit
+AENSv2.update(owner : address, name : string, expiry : option(Chain.ttl), client_ttl : option(int),
+            new_ptrs : option(map(string, AENSv2.pointee)), <signature : signature>) : unit
 ```
 
 Updates the name. If the optional parameters are set to `None` that parameter
 will not be updated, for example if `None` is passed as `expiry` the expiry
 block of the name is not changed.
 
+Note: Changed to consume `AENSv2.pointee` in v8.0 (Ceres protocol upgrade).
 
 ### Auth
 
@@ -944,6 +974,23 @@ It returns `true` iff the oracle query exist and has the expected type.
 ## Includable namespaces
 
 These need to be explicitly included (with `.aes` suffix)
+
+
+### AENSCompat
+
+#### pointee\_to\_V2
+```
+AENSCompat.pointee_to_V2(p : AENS.pointee) : AENSv2.pointee
+```
+
+Translate old pointee format to new, this is always possible.
+
+#### pointee\_from\_V2
+```
+AENSCompat.pointee_from_V2(p2 : AENSv2.pointee) : option(AENS.pointee)
+```
+
+Translate new pointee format to old, `DataPt` can't be translated, so `None` is returned in this case.
 
 
 ### BLS12\_381
