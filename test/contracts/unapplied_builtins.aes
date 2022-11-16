@@ -2,10 +2,10 @@
 // Named argument builtins are:
 //    Oracle.register
 //    Oracle.respond
-//    AENS.preclaim
-//    AENS.claim
-//    AENS.transfer
-//    AENS.revoke
+//    AENSv2.preclaim
+//    AENSv2.claim
+//    AENSv2.transfer
+//    AENSv2.revoke
 //    Oracle.extend
 include "String.aes"
 contract UnappliedBuiltins =
@@ -28,7 +28,7 @@ contract UnappliedBuiltins =
   function oracle_get_answer()           = Oracle.get_answer   : (o, _) => _
   function oracle_check()                = Oracle.check        : o => _
   function oracle_check_query()          = Oracle.check_query  : (o, _) => _
-  function aens_resolve()                = AENS.resolve        : (_, _) => option(string)
+  function aens_resolve()                = AENSv2.resolve      : (_, _) => option(string)
   function map_lookup()                  = Map.lookup          : (_, m) => _
   function map_lookup_default()          = Map.lookup_default  : (_, m, _) => _
   function map_member()                  = Map.member          : (_, m) => _

@@ -1096,19 +1096,19 @@ failing_contracts() ->
                   ])
     , ?TYPE_ERROR(polymorphic_aens_resolve,
                   [<<?Pos(4,5)
-                     "Invalid return type of `AENS.resolve`:\n"
+                     "Invalid return type of `AENSv2.resolve`:\n"
                      "  `'a`\n"
                      "It must be a `string` or a pubkey type (`address`, `oracle`, etc)">>
                   ])
     , ?TYPE_ERROR(bad_aens_resolve,
                   [<<?Pos(6,5)
-                     "Invalid return type of `AENS.resolve`:\n"
+                     "Invalid return type of `AENSv2.resolve`:\n"
                      "  `list(int)`\n"
                      "It must be a `string` or a pubkey type (`address`, `oracle`, etc)">>
                   ])
     , ?TYPE_ERROR(bad_aens_resolve_using,
                   [<<?Pos(7,5)
-                     "Invalid return type of `AENS.resolve`:\n"
+                     "Invalid return type of `AENSv2.resolve`:\n"
                      "  `list(int)`\n"
                      "It must be a `string` or a pubkey type (`address`, `oracle`, etc)">>
                   ])

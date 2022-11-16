@@ -1,0 +1,17 @@
+namespace AENSCompat =
+  // Translate old format to new format - always possible
+  function pointee_to_V2(p : AENS.pointee) : AENSv2.pointee =
+    switch(p)
+      AENS.AccountPt(a)  => AENSv2.AccountPt(a)
+      AENS.OraclePt(a)   => AENSv2.OraclePt(a)
+      AENS.ContractPt(a) => AENSv2.ContractPt(a)
+      AENS.ChannelPt(a)  => AENSv2.ChannelPt(a)
+
+  // Translate new format to old format - option type!
+  function pointee_from_V2(p2 : AENSv2.pointee) : option(AENS.pointee) =
+    switch(p2)
+      AENSv2.AccountPt(a)  => Some(AENS.AccountPt(a))
+      AENSv2.OraclePt(a)   => Some(AENS.OraclePt(a))
+      AENSv2.ContractPt(a) => Some(AENS.ContractPt(a))
+      AENSv2.ChannelPt(a)  => Some(AENS.ChannelPt(a))
+      AENSv2.DataPt(a)     => None
