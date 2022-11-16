@@ -228,6 +228,12 @@ init_env(Options) ->
                       ["AENS", "ContractPt"] => #con_tag{ tag = 2, arities = [1, 1, 1, 1] },
                       ["AENS", "ChannelPt"]  => #con_tag{ tag = 3, arities = [1, 1, 1, 1] },
                       ["AENS", "Name"]       => #con_tag{ tag = 0, arities = [3] },
+                      ["AENSv2", "AccountPt"]  => #con_tag{ tag = 0, arities = [1, 1, 1, 1, 1] },
+                      ["AENSv2", "OraclePt"]   => #con_tag{ tag = 1, arities = [1, 1, 1, 1, 1] },
+                      ["AENSv2", "ContractPt"] => #con_tag{ tag = 2, arities = [1, 1, 1, 1, 1] },
+                      ["AENSv2", "ChannelPt"]  => #con_tag{ tag = 3, arities = [1, 1, 1, 1, 1] },
+                      ["AENSv2", "DataPt"]     => #con_tag{ tag = 4, arities = [1, 1, 1, 1, 1] },
+                      ["AENSv2", "Name"]       => #con_tag{ tag = 0, arities = [3] },
                       ["Chain", "GAMetaTx"]               => #con_tag{ tag = 0, arities = [2] },
                       ["Chain", "PayingForTx"]            => #con_tag{ tag = 0, arities = [2] },
                       ["Chain", "SpendTx"]                => #con_tag{ tag = 0, arities = ChainTxArities },
@@ -260,8 +266,11 @@ init_env(Options) ->
 
 -spec builtins() -> builtins().
 builtins() ->
-    MkName = fun(NS, Fun) ->
-                list_to_atom(string:to_lower(string:join(NS ++ [Fun], "_")))
+    MkName = fun
+               (["AENSv2"], Fun) ->
+                 list_to_atom(string:to_lower("AENS_" ++ Fun));
+               (NS, Fun) ->
+                 list_to_atom(string:to_lower(string:join(NS ++ [Fun], "_")))
              end,
     Scopes = [{[],           [{"abort", 1}, {"require", 2}, {"exit", 1}]},
               {["Chain"],    [{"spend", 2}, {"balance", 1}, {"block_hash", 1}, {"coinbase", none},
@@ -273,7 +282,7 @@ builtins() ->
               {["Oracle"],   [{"register", 4}, {"expiry", 1}, {"query_fee", 1}, {"query", 5}, {"get_question", 2},
                               {"respond", 4}, {"extend", 3}, {"get_answer", 2},
                               {"check", 1}, {"check_query", 2}]},
-              {["AENS"],     [{"resolve", 2}, {"preclaim", 3}, {"claim", 5}, {"transfer", 4},
+              {["AENSv2"],   [{"resolve", 2}, {"preclaim", 3}, {"claim", 5}, {"transfer", 4},
                               {"revoke", 3}, {"update", 6}, {"lookup", 1}]},
               {["Map"],      [{"from_list", 1}, {"to_list", 1}, {"lookup", 2},
                               {"lookup_default", 3}, {"delete", 2}, {"member", 2}, {"size", 1}]},
@@ -330,11 +339,13 @@ init_type_env() ->
        ["Chain", "ttl"]    => ?type({variant, [[integer], [integer]]}),
        ["AENS", "pointee"] => ?type({variant, [[address], [address], [address], [address]]}),
        ["AENS", "name"]    => ?type({variant, [[address, {variant, [[integer], [integer]]}, {map, string, {variant, [[address], [address], [address], [address]]}}]]}),
+       ["AENSv2", "pointee"] => ?type({variant, [[address], [address], [address], [address], [string]]}),
+       ["AENSv2", "name"]    => ?type({variant, [[address, {variant, [[integer], [integer]]}, {map, string, {variant, [[address], [address], [address], [address], [string]]}}]]}),
        ["Chain", "ga_meta_tx"]    => ?type({variant, [[address, integer]]}),
        ["Chain", "paying_for_tx"] => ?type({variant, [[address, integer]]}),
        ["Chain", "base_tx"]       => ?type(BaseTx),
-       ["MCL_BLS12_381", "fr"]  => ?type({bytes, 32}),
-       ["MCL_BLS12_381", "fp"]  => ?type({bytes, 48})
+       ["MCL_BLS12_381", "fr"] => ?type({bytes, 32}),
+       ["MCL_BLS12_381", "fp"] => ?type({bytes, 48})
      }.
 
 -spec is_no_code(env()) -> boolean().
