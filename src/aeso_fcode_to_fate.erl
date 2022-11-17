@@ -279,7 +279,7 @@ serialize_contract_code(Env, C) ->
             Options = Env#env.options,
             SavedFreshNames = Env#env.saved_fresh_names,
             FCode = maps:get(C, Env#env.child_contracts),
-            {FateCode, _} = compile1(Env#env.child_contracts, FCode, SavedFreshNames, Options),
+            {FateCode, _, _} = compile1(Env#env.child_contracts, FCode, SavedFreshNames, Options),
             ByteCode = aeb_fate_code:serialize(FateCode, []),
             {ok, Version} = aeso_compiler:version(),
             OriginalSourceCode = proplists:get_value(original_src, Options, ""),
