@@ -106,25 +106,25 @@ compile1(ChildContracts, FCode, SavedFreshNames, Options) ->
     {FateCode2, get_variables_registers(), DbglocMap}.
 
 -spec block_dbgloc_map(bcode()) -> DbglocMap when
-      DbglocMap :: #{integer() => integer()}.
+      DbglocMap :: #{integer() => {integer(), integer()}}.
 block_dbgloc_map(BB) -> block_dbgloc_map(BB, 0, maps:new()).
 
 -spec block_dbgloc_map(bcode(), integer(), DbglocMap) -> DbglocMap when
-      DbglocMap :: #{integer() => integer()}.
+      DbglocMap :: #{integer() => {integer(), integer()}}.
 block_dbgloc_map([], _, DbglocMap) ->
      DbglocMap;
-block_dbgloc_map([{'DBGLOC', Line} | Rest], Index, DbglocMap) ->
-    block_dbgloc_map(Rest, Index, maps:put(Index, Line, DbglocMap));
+block_dbgloc_map([{'DBGLOC', Line, Col} | Rest], Index, DbglocMap) ->
+    block_dbgloc_map(Rest, Index, maps:put(Index, {Line, Col}, DbglocMap));
 block_dbgloc_map([_ | Rest], Index, DbglocMap) ->
     block_dbgloc_map(Rest, Index + 1, DbglocMap).
 
 -spec remove_dbgloc(aeb_fate_code:fcode()) -> {aeb_fate_code:fcode(), DbglocMap} when
-      DbglocMap :: #{integer() => integer()}.
+      DbglocMap :: #{integer() => {integer(), integer()}}.
 remove_dbgloc(FateCode) ->
     RemoveDbglocFromBBs =
         fun(_, BB) ->
-            IsDbg = fun({'DBGLOC', _}) -> false;
-                       (_)             -> true
+            IsDbg = fun({'DBGLOC', _, _}) -> false;
+                       (_)                -> true
                     end,
             lists:filter(IsDbg, BB)
         end,
@@ -806,9 +806,12 @@ dbgloc(Env, Ann) ->
     case proplists:get_value(debug_info, Env#env.options, false) of
         false -> [];
         true  ->
-            case proplists:get_value(line, Ann) of
-                undefined -> [];
-                Line      -> [{'DBGLOC', Line}]
+            Line = proplists:get_value(line, Ann),
+            Col  = proplists:get_value(col, Ann),
+            case {Line, Col} of
+                {undefined, _} -> [];
+                {_, undefined} -> [];
+                {Line, Col}    -> [{'DBGLOC', Line, Col}]
             end
     end.
 
@@ -947,7 +950,7 @@ attributes(I) ->
         loop                                  -> Impure(pc, []);
         switch_body                           -> Pure(none, []);
         'RETURN'                              -> Impure(pc, []);
-        {'DBGLOC', _}                         -> Impure(pc, []);
+        {'DBGLOC', _, _}                      -> Impure(pc, []);
         {'RETURNR', A}                        -> Impure(pc, A);
         {'CALL', A}                           -> Impure(?a, [A]);
         {'CALL_R', A, _, B, C, D}             -> Impure(?a, [A, B, C, D]);
