@@ -58,7 +58,7 @@
               | {contract_code, string()} %% for CREATE, by name
               | {typerep, ftype()}.
 
--type fann() :: [ {file, string() | no_file} | {line, aeso_syntax:ann_line()} | {col, aeso_syntax:ann_col()} ].
+-type fann() :: [ {file, aeso_syntax:ann_file()} | {line, aeso_syntax:ann_line()} | {col, aeso_syntax:ann_col()} ].
 
 -type fexpr() :: {lit, fann(), flit()}
                | {nil, fann()}
