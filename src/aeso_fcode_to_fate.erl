@@ -93,12 +93,57 @@ compile1(ChildContracts, FCode, SavedFreshNames, Options) ->
     SFuns  = functions_to_scode(ChildContracts, ContractName, Functions, SavedFreshNames, Options),
     SFuns1 = optimize_scode(SFuns, Options),
     FateCode = to_basic_blocks(SFuns1),
-    ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
-    FateCode1 = case proplists:get_value(include_child_contract_symbols, Options, false) of
-                    false -> FateCode;
-                    true -> add_child_symbols(ChildContracts, FateCode)
+    {FateCode1, DbglocMap} =
+        case proplists:get_value(debug_info, Options, false) of
+            true  -> remove_dbgloc(FateCode);
+            false -> {FateCode, #{}}
+        end,
+    ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode1)]),
+    FateCode2 = case proplists:get_value(include_child_contract_symbols, Options, false) of
+                    false -> FateCode1;
+                    true -> add_child_symbols(ChildContracts, FateCode1)
                 end,
-    {FateCode1, get_variables_registers()}.
+    {FateCode2, get_variables_registers(), DbglocMap}.
+
+-spec block_dbgloc_map(bcode()) -> DbglocMap when
+      DbglocMap :: #{integer() => integer()}.
+block_dbgloc_map(BB) -> block_dbgloc_map(BB, 0, maps:new()).
+
+-spec block_dbgloc_map(bcode(), integer(), DbglocMap) -> DbglocMap when
+      DbglocMap :: #{integer() => integer()}.
+block_dbgloc_map([], _, DbglocMap) ->
+     DbglocMap;
+block_dbgloc_map([{'DBGLOC', Line} | Rest], Index, DbglocMap) ->
+    block_dbgloc_map(Rest, Index, maps:put(Index, Line, DbglocMap));
+block_dbgloc_map([_ | Rest], Index, DbglocMap) ->
+    block_dbgloc_map(Rest, Index + 1, DbglocMap).
+
+-spec remove_dbgloc(aeb_fate_code:fcode()) -> {aeb_fate_code:fcode(), DbglocMap} when
+      DbglocMap :: #{integer() => integer()}.
+remove_dbgloc(FateCode) ->
+    RemoveDbglocFromBBs =
+        fun(_, BB) ->
+            IsDbg = fun({'DBGLOC', _}) -> false;
+                       (_)             -> true
+                    end,
+            lists:filter(IsDbg, BB)
+        end,
+
+    RemoveDbglocFromFuns =
+        fun(_, Fun = {_, _, BBs}) ->
+            NewBBs = maps:map(RemoveDbglocFromBBs, BBs),
+            setelement(3, Fun, NewBBs)
+        end,
+
+    DbglocMapFromBBs =
+        fun(_, {_, _, BBs}) ->
+            maps:map(fun(_, BB) -> block_dbgloc_map(BB) end, BBs)
+        end,
+
+    OldFuns = aeb_fate_code:functions(FateCode),
+    DbglocMap = maps:map(DbglocMapFromBBs, OldFuns),
+    NewFuns = maps:map(RemoveDbglocFromFuns, OldFuns),
+    {aeb_fate_code:update_functions(FateCode, NewFuns), DbglocMap}.
 
 make_function_id(X) ->
     aeb_fate_code:symbol_identifier(make_function_name(X)).
@@ -760,7 +805,11 @@ tuple(N) -> aeb_fate_ops:tuple(?a, N).
 dbgloc(Env, Ann) ->
     case proplists:get_value(debug_info, Env#env.options, false) of
         false -> [];
-        true  -> [{'DBGLOC', proplists:get_value(line, Ann, -1)}]
+        true  ->
+            case proplists:get_value(line, Ann) of
+                undefined -> [];
+                Line      -> [{'DBGLOC', Line}]
+            end
     end.
 
 %% -- Phase II ---------------------------------------------------------------
