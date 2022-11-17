@@ -950,7 +950,7 @@ attributes(I) ->
         loop                                  -> Impure(pc, []);
         switch_body                           -> Pure(none, []);
         'RETURN'                              -> Impure(pc, []);
-        {'DBGLOC', _, _}                      -> Impure(pc, []);
+        {'DBGLOC', _, _}                      -> Pure(none, []);
         {'RETURNR', A}                        -> Impure(pc, A);
         {'CALL', A}                           -> Impure(?a, [A]);
         {'CALL_R', A, _, B, C, D}             -> Impure(?a, [A, B, C, D]);
