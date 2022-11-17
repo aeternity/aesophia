@@ -1190,6 +1190,16 @@ contract interface X : Z =
      entrypoint y() = 1
      entrypoint z() = 1
 </code></pre></div>
+<h4 id="adding-or-removing-modifiers">Adding or removing modifiers</h4>
+<p>When a <code>contract</code> or a <code>contract interface</code> implements another <code>contract interface</code>, the <code>payable</code> and <code>stateful</code> modifiers can be kept or changed, both in the contract and in the entrypoints, according to the following rules:</p>
+<ol>
+<li>A <code>payable</code> contract or interface can implement a <code>payable</code> interface or a non-<code>payable</code> interface.</li>
+<li>A non-<code>payable</code> contract or interface can only implement a non-<code>payable</code> interface, and cannot implement a <code>payable</code> interface.</li>
+<li>A <code>payable</code> entrypoint can implement a <code>payable</code> entrypoint or a non-<code>payable</code> entrypoint.</li>
+<li>A non-<code>payable</code> entrypoint can only implement a non-<code>payable</code> entrypoint, and cannot implement a <code>payable</code> entrypoint.</li>
+<li>A non-<code>stateful</code> entrypoint can implement a <code>stateful</code> entrypoint or a non-<code>stateful</code> entrypoint.</li>
+<li>A <code>stateful</code> entrypoint can only implement a <code>stateful</code> entrypoint, and cannot implement a non-<code>stateful</code> entrypoint.</li>
+</ol>
 <h4 id="subtyping-and-variance">Subtyping and variance</h4>
 <p>Subtyping in Sophia follows common rules that take type variance into account. As described by <a href="https://en.wikipedia.org/wiki/Covariance_and_contravariance_(computer_science)">Wikipedia</a>, </p>
 <blockquote>
