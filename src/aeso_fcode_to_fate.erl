@@ -113,8 +113,8 @@ block_dbgloc_map(BB) -> block_dbgloc_map(BB, 0, maps:new()).
       DbglocMap :: #{integer() => {integer(), integer()}}.
 block_dbgloc_map([], _, DbglocMap) ->
      DbglocMap;
-block_dbgloc_map([{'DBGLOC', Line, Col} | Rest], Index, DbglocMap) ->
-    block_dbgloc_map(Rest, Index, maps:put(Index, {Line, Col}, DbglocMap));
+block_dbgloc_map([{'DBGLOC', File, Line, Col} | Rest], Index, DbglocMap) ->
+    block_dbgloc_map(Rest, Index, maps:put(Index, {File, Line, Col}, DbglocMap));
 block_dbgloc_map([_ | Rest], Index, DbglocMap) ->
     block_dbgloc_map(Rest, Index + 1, DbglocMap).
 
@@ -123,8 +123,8 @@ block_dbgloc_map([_ | Rest], Index, DbglocMap) ->
 remove_dbgloc(FateCode) ->
     RemoveDbglocFromBBs =
         fun(_, BB) ->
-            IsDbg = fun({'DBGLOC', _, _}) -> false;
-                       (_)                -> true
+            IsDbg = fun({'DBGLOC', _, _, _}) -> false;
+                       (_)                   -> true
                     end,
             lists:filter(IsDbg, BB)
         end,
@@ -806,12 +806,13 @@ dbgloc(Env, Ann) ->
     case proplists:get_value(debug_info, Env#env.options, false) of
         false -> [];
         true  ->
+            File = proplists:get_value(file, Ann),
             Line = proplists:get_value(line, Ann),
             Col  = proplists:get_value(col, Ann),
             case {Line, Col} of
                 {undefined, _} -> [];
                 {_, undefined} -> [];
-                {Line, Col}    -> [{'DBGLOC', Line, Col}]
+                {Line, Col}    -> [{'DBGLOC', File, Line, Col}]
             end
     end.
 
@@ -950,7 +951,7 @@ attributes(I) ->
         loop                                  -> Impure(pc, []);
         switch_body                           -> Pure(none, []);
         'RETURN'                              -> Impure(pc, []);
-        {'DBGLOC', _, _}                      -> Pure(none, []);
+        {'DBGLOC', _, _, _}                   -> Pure(none, []);
         {'RETURNR', A}                        -> Impure(pc, A);
         {'CALL', A}                           -> Impure(?a, [A]);
         {'CALL_R', A, _, B, C, D}             -> Impure(?a, [A, B, C, D]);
