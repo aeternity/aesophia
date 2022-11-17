@@ -106,11 +106,11 @@ compile1(ChildContracts, FCode, SavedFreshNames, Options) ->
     {FateCode2, get_variables_registers(), DbglocMap}.
 
 -spec block_dbgloc_map(bcode()) -> DbglocMap when
-      DbglocMap :: #{integer() => {integer(), integer()}}.
+      DbglocMap :: #{integer() => {aeso_syntax:ann_file(), aeso_syntax:ann_line(), aeso_syntax:ann_col()}}.
 block_dbgloc_map(BB) -> block_dbgloc_map(BB, 0, maps:new()).
 
 -spec block_dbgloc_map(bcode(), integer(), DbglocMap) -> DbglocMap when
-      DbglocMap :: #{integer() => {integer(), integer()}}.
+      DbglocMap :: #{integer() => {aeso_syntax:ann_file(), aeso_syntax:ann_line(), aeso_syntax:ann_col()}}.
 block_dbgloc_map([], _, DbglocMap) ->
      DbglocMap;
 block_dbgloc_map([{'DBGLOC', File, Line, Col} | Rest], Index, DbglocMap) ->
@@ -119,7 +119,7 @@ block_dbgloc_map([_ | Rest], Index, DbglocMap) ->
     block_dbgloc_map(Rest, Index + 1, DbglocMap).
 
 -spec remove_dbgloc(aeb_fate_code:fcode()) -> {aeb_fate_code:fcode(), DbglocMap} when
-      DbglocMap :: #{integer() => {integer(), integer()}}.
+      DbglocMap :: #{integer() => {aeso_syntax:ann_file(), aeso_syntax:ann_line(), aeso_syntax:ann_col()}}.
 remove_dbgloc(FateCode) ->
     RemoveDbglocFromBBs =
         fun(_, BB) ->
