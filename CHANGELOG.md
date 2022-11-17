@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Return a mapping from variables to FATE registers in the compilation output.
 ### Changed
 - Type definitions serialised to ACI as `typedefs` field instead of `type_defs` to increase compatibility.
+- Check contracts and entrypoints modifiers when implementing interfaces.
 ### Removed
 ### Fixed
 - Typechecker crashes if Chain.create or Chain.clone are used without arguments.

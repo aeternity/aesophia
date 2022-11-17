@@ -1,0 +1,5 @@
+payable contract interface I =
+    payable entrypoint f : () => int
+
+contract C : I =
+    entrypoint f() = 123

@@ -205,6 +205,9 @@ compilable_contracts() ->
      "polymorphism_variance_switching_chain_create",
      "polymorphism_variance_switching_void_supertype",
      "polymorphism_variance_switching_unify_with_interface_decls",
+     "polymorphism_preserve_or_add_payable_contract",
+     "polymorphism_preserve_or_add_payable_entrypoint",
+     "polymorphism_preserve_or_remove_stateful_entrypoint",
      "missing_init_fun_state_unit",
      "complex_compare_leq",
      "complex_compare",
@@ -868,7 +871,7 @@ failing_contracts() ->
                      "  - line 9, column 5">>])
     , ?TYPE_ERROR(polymorphism_contract_missing_implementation,
                   [<<?Pos(4,20)
-                     "Unimplemented function `f` from the interface `I1` in the contract `I2`">>
+                     "Unimplemented entrypoint `f` from the interface `I1` in the contract `I2`">>
                   ])
     , ?TYPE_ERROR(polymorphism_contract_same_decl_multi_interface,
                   [<<?Pos(7,10)
@@ -1151,6 +1154,26 @@ failing_contracts() ->
                      "  `g : (() => 'b) => 'b`\n"
                      "to arguments\n"
                      "  `Chain.create : (value : int, var_args) => 'c`">>
+                  ])
+    , ?TYPE_ERROR(polymorphism_add_stateful_entrypoint,
+                  [<<?Pos(5,25)
+                     "`f` cannot be stateful because the entrypoint `f` in the interface `I` is not stateful">>
+                  ])
+    , ?TYPE_ERROR(polymorphism_change_entrypoint_to_function,
+                  [<<?Pos(6,14)
+                     "`f` must be declared as an entrypoint instead of a function in order to implement the entrypoint `f` from the interface `I`">>
+                  ])
+    , ?TYPE_ERROR(polymorphism_non_payable_contract_implement_payable,
+                  [<<?Pos(4,10)
+                     "Non-payable contract `C` cannot implement payable interface `I`">>
+                  ])
+    , ?TYPE_ERROR(polymorphism_non_payable_interface_implement_payable,
+                  [<<?Pos(4,20)
+                     "Non-payable interface `H` cannot implement payable interface `I`">>
+                  ])
+    , ?TYPE_ERROR(polymorphism_remove_payable_entrypoint,
+                  [<<?Pos(5,16)
+                     "`f` must be payable because the entrypoint `f` in the interface `I` is payable">>
                   ])
     ].
 

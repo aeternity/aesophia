@@ -1,0 +1,7 @@
+contract interface I =
+    payable entrypoint f : () => int
+    entrypoint g : () => int
+
+contract C : I =
+    payable entrypoint f() = 1
+    payable entrypoint g() = 2

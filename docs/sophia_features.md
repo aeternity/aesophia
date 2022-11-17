@@ -191,6 +191,17 @@ contract interface X : Z =
      entrypoint z() = 1
 ```
 
+#### Adding or removing modifiers
+
+When a `contract` or a `contract interface` implements another `contract interface`, the `payable` and `stateful` modifiers can be kept or changed, both in the contract and in the entrypoints, according to the following rules:
+
+1. A `payable` contract or interface can implement a `payable` interface or a non-`payable` interface.
+2. A non-`payable` contract or interface can only implement a non-`payable` interface, and cannot implement a `payable` interface.
+3. A `payable` entrypoint can implement a `payable` entrypoint or a non-`payable` entrypoint.
+4. A non-`payable` entrypoint can only implement a non-`payable` entrypoint, and cannot implement a `payable` entrypoint.
+5. A non-`stateful` entrypoint can implement a `stateful` entrypoint or a non-`stateful` entrypoint.
+6. A `stateful` entrypoint can only implement a `stateful` entrypoint, and cannot implement a non-`stateful` entrypoint.
+
 #### Subtyping and variance
 
 Subtyping in Sophia follows common rules that take type variance into account. As described by [Wikipedia](https://en.wikipedia.org/wiki/Covariance_and_contravariance_(computer_science)), 

@@ -1,0 +1,14 @@
+contract interface F =
+    entrypoint f : () => int
+
+payable contract interface G : F =
+    payable entrypoint f : () => int
+    entrypoint g : () => int
+
+payable contract interface H =
+    payable entrypoint h : () => int
+
+payable contract C : G, H =
+    payable entrypoint f() = 1
+    payable entrypoint g() = 2
+    payable entrypoint h() = 3
