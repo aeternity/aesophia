@@ -1175,6 +1175,13 @@ failing_contracts() ->
                   [<<?Pos(5,16)
                      "`f` must be payable because the entrypoint `f` in the interface `I` is payable">>
                   ])
+    , ?TYPE_ERROR(calling_child_contract_entrypoint,
+                  [<<?Pos(5,20)
+                     "Invalid call to contract entrypoint `F.g`.\n"
+                     "It must be called as `c.g` for some `c : F`.">>])
+    , ?TYPE_ERROR(using_contract_as_namespace,
+                  [<<?Pos(5,3)
+                     "Cannot use undefined namespace F">>])
     ].
 
 validation_test_() ->

@@ -1,0 +1,7 @@
+contract F =
+  entrypoint g() = 1
+
+main contract C =
+  using F for [g]
+
+  entrypoint f() = g()
