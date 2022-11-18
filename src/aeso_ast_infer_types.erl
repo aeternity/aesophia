@@ -1257,6 +1257,10 @@ check_usings(Env = #env{ used_namespaces = UsedNamespaces }, [{using, Ann, Con, 
             create_type_errors(),
             type_error({using_undefined_namespace, Ann, qname(Con)}),
             destroy_and_report_type_errors(Env);
+        #scope{kind = contract} ->
+            create_type_errors(),
+            type_error({using_undefined_namespace, Ann, qname(Con)}),
+            destroy_and_report_type_errors(Env);
         Scope ->
             Nsp = case Parts of
                       none ->
