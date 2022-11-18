@@ -229,7 +229,7 @@ force_bind_fun(X, Type, Env = #env{ what = What }) ->
     NoCode = get_option(no_code, false),
     Entry = if X == "init", What == contract, not NoCode ->
                     {reserved_init, Ann, Type};
-               What == contract_interface -> {contract_fun, Ann, Type};
+               What == contract orelse What == contract_interface -> {contract_fun, Ann, Type};
                true -> {Ann, Type}
             end,
     on_current_scope(Env, fun(Scope = #scope{ funs = Funs }) ->
@@ -426,6 +426,7 @@ lookup_env(Env, Kind, Ann, Name) ->
 lookup_env1(#env{ namespace = Current, used_namespaces = UsedNamespaces, scopes = Scopes }, Kind, Ann, QName) ->
     Qual = lists:droplast(QName),
     Name = lists:last(QName),
+    QNameIsEvent = lists:suffix(["Chain", "event"], QName),
     AllowPrivate = lists:prefix(Qual, Current),
     %% Get the scope
     case maps:get(Qual, Scopes, false) of
@@ -441,6 +442,8 @@ lookup_env1(#env{ namespace = Current, used_namespaces = UsedNamespaces, scopes 
                 {reserved_init, Ann1, Type} ->
                     type_error({cannot_call_init_function, Ann}),
                     {QName, {Ann1, Type}};  %% Return the type to avoid an extra not-in-scope error
+                {contract_fun, Ann1, Type} when AllowPrivate orelse QNameIsEvent ->
+                    {QName, {Ann1, Type}};
                 {contract_fun, Ann1, Type} ->
                     type_error({contract_treated_as_namespace, Ann, QName}),
                     {QName, {Ann1, Type}};
