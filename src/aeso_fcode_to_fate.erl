@@ -507,7 +507,7 @@ split_to_scode(Env, {split, {list, _}, X, Alts}) ->
     GetAlt = fun(P) ->
                  case [C || C = {'case', Pat, _} <- Alts1, Pat == P orelse is_tuple(Pat) andalso element(1, Pat) == P] of
                      []      -> missing;
-                     [{'case', {nil, _}, S} | _]           -> split_to_scode(Env, S);
+                     [{'case', nil, S} | _]           -> split_to_scode(Env, S);
                      [{'case', {'::', Y, Z}, S} | _] ->
                          {I, Env1} = bind_local(Y, Env),
                          {J, Env2} = bind_local(Z, Env1),
@@ -558,7 +558,7 @@ literal_split_to_scode(Env, Type, Arg, [{'case', Lit, Body} | Alts], Def) when T
 
 catchall_to_scode(Env, X, Alts) -> catchall_to_scode(Env, X, Alts, []).
 
-catchall_to_scode(Env, X, [{'case', {var, _, Y}, Split} | _], Acc) ->
+catchall_to_scode(Env, X, [{'case', {var, Y}, Split} | _], Acc) ->
     Env1 = bind_var(Y, lookup_var(Env, X), Env),
     {split_to_scode(Env1, Split), lists:reverse(Acc)};
 catchall_to_scode(Env, X, [Alt | Alts], Acc) ->
