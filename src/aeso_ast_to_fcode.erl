@@ -662,22 +662,22 @@ expr_to_fcode(Env, {record_t, FieldTypes}, {record, Ann, Rec, Fields}) ->
     Expand  = length(Fields) == length(FieldTypes),
     Updates = [ {I, field_value(FT, Fields)} || {I, FT} <- indexed(FieldTypes) ],
     Body = case Expand of
-             true  -> {tuple, [], lists:map(Comp, Updates)};
+             true  -> {tuple, FAnn, lists:map(Comp, Updates)};
              false -> lists:foldr(Set, {var, FAnn, X}, Updates)
            end,
     {'let', FAnn, X, expr_to_fcode(Env, Rec), Body};
 
 %% Lists
-expr_to_fcode(Env, _Type, {list, _, Es}) ->
+expr_to_fcode(Env, _Type, {list, Ann, Es}) ->
     lists:foldr(fun(E, L) -> {op, to_fann(aeso_syntax:get_ann(E)), '::', [expr_to_fcode(Env, E), L]} end,
-                {nil, []}, Es);
+                {nil, to_fann(Ann)}, Es);
 
 expr_to_fcode(Env, _Type, {app, _, {'..', _}, [A, B]}) ->
     {def_u, FAnn, FromTo, _} = resolve_fun(Env, ["ListInternal", "from_to"]),
     {def, FAnn, FromTo, [expr_to_fcode(Env, A), expr_to_fcode(Env, B)]};
 
 expr_to_fcode(Env, _Type, {list_comp, As, Yield, []}) ->
-    {op, to_fann(As), '::', [expr_to_fcode(Env, Yield), {nil, []}]};
+    {op, to_fann(As), '::', [expr_to_fcode(Env, Yield), {nil, to_fann(As)}]};
 expr_to_fcode(Env, _Type, {list_comp, As, Yield, [{comprehension_bind, Pat = {typed, _, _, PatType}, BindExpr}|Rest]}) ->
     Arg  = fresh_name(),
     Env1 = bind_var(Env, Arg),
@@ -689,7 +689,7 @@ expr_to_fcode(Env, _Type, {list_comp, As, Yield, [{comprehension_bind, Pat = {ty
 expr_to_fcode(Env, Type, {list_comp, As, Yield, [{comprehension_if, _, Cond}|Rest]}) ->
     make_if(expr_to_fcode(Env, Cond),
             expr_to_fcode(Env, Type, {list_comp, As, Yield, Rest}),
-            {nil, []}
+            {nil, to_fann(As)}
            );
 expr_to_fcode(Env, Type, {list_comp, As, Yield, [LV = {letval, _, _, _}|Rest]}) ->
     expr_to_fcode(Env, Type, {block, As, [LV, {list_comp, As, Yield, Rest}]});
@@ -1120,9 +1120,9 @@ decision_tree_to_fcode(true)      -> {lit, [], {bool, true}};
 decision_tree_to_fcode({atom, B}) -> B;
 decision_tree_to_fcode({'if', A, Then, Else}) ->
     X = fresh_name(),
-    {'let', [], X, A,
-        {switch, [], {split, boolean, X, [{'case', {bool, false}, {nosplit, decision_tree_to_fcode(Else)}},
-                                          {'case', {bool, true},  {nosplit, decision_tree_to_fcode(Then)}}]}}}.
+    {'let', get_fann(A), X, A,
+        {switch, get_fann(A), {split, boolean, X, [{'case', {bool, false}, {nosplit, decision_tree_to_fcode(Else)}},
+                                                  {'case', {bool, true},  {nosplit, decision_tree_to_fcode(Then)}}]}}}.
 
 %% -- Statements --
 
@@ -1172,8 +1172,8 @@ set_state({reg, R}, Val) ->
 set_state({tuple, Ls}, Val) ->
     ?make_let(X, Val,
     lists:foldr(fun({I, L}, Code) ->
-                    {'let', [], "_", set_state(L, {proj, get_fann(Val), X, I - 1}), Code}
-                end, {tuple, [], []}, indexed(Ls))).
+                    {'let', get_fann(Val), "_", set_state(L, {proj, get_fann(Val), X, I - 1}), Code}
+                end, {tuple, get_fann(Val), []}, indexed(Ls))).
 
 -spec get_state(state_layout()) -> fexpr().
 get_state({reg, R}) ->
@@ -1190,7 +1190,7 @@ builtin_to_fcode(Layout, get_state, []) ->
 builtin_to_fcode(_Layout, require, [Cond, Msg]) ->
     make_if(Cond, {tuple, get_fann(Cond), []}, {builtin, get_fann(Cond), abort, [Msg]});
 builtin_to_fcode(_Layout, chain_event, [Event]) ->
-    {def, [], event, [Event]};
+    {def, get_fann(Event), event, [Event]};
 builtin_to_fcode(_Layout, map_delete, [Key, Map]) ->
     {op, get_fann(Map), map_delete, [Map, Key]};
 builtin_to_fcode(_Layout, map_member, [Key, Map]) ->
@@ -1322,8 +1322,9 @@ lifted_fun(FVs, Xs, Body) ->
       Closure :: fexpr().
 make_closure(FVs, Xs, Body) ->
     Fun   = add_lambda_fun(lifted_fun(FVs, Xs, Body)),
-    Tup = fun([Y]) -> Y; (Ys) -> {tuple, [], Ys} end,
-    {closure, get_fann(Body), Fun, Tup([{var, [], Y} || Y <- FVs])}.
+    FAnn  = get_fann(Body),
+    Tup = fun([Y]) -> Y; (Ys) -> {tuple, FAnn, Ys} end,
+    {closure, FAnn, Fun, Tup([{var, FAnn, Y} || Y <- FVs])}.
 
 -spec lambda_lift_expr(state_layout(), fexpr()) -> Closure when
       Closure :: fexpr().
@@ -1337,10 +1338,10 @@ lambda_lift_expr(Layout, UExpr) when element(1, UExpr) == def_u; element(1, UExp
                     _                              -> []
                 end,
     Xs   = [ lists:concat(["arg", I]) || I <- lists:seq(1, Ar) ],
-    Args = [{var, [], X} || X <- Xs] ++ ExtraArgs,
+    Args = [{var, get_fann(UExpr), X} || X <- Xs] ++ ExtraArgs,
     Body = case Tag of
                builtin_u -> builtin_to_fcode(Layout, F, Args);
-               def_u     -> {def, [], F, Args}
+               def_u     -> {def, get_fann(UExpr), F, Args}
            end,
     make_closure([], Xs, Body);
 lambda_lift_expr(Layout, {remote_u, FAnn, ArgsT, RetT, Ct, F}) ->
