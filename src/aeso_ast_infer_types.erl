@@ -229,7 +229,7 @@ force_bind_fun(X, Type, Env = #env{ what = What }) ->
     NoCode = get_option(no_code, false),
     Entry = if X == "init", What == contract, not NoCode ->
                     {reserved_init, Ann, Type};
-               What == contract orelse What == contract_interface -> {contract_fun, Ann, Type};
+               What == contract; What == contract_interface -> {contract_fun, Ann, Type};
                true -> {Ann, Type}
             end,
     on_current_scope(Env, fun(Scope = #scope{ funs = Funs }) ->
