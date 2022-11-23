@@ -1,0 +1,5 @@
+contract F =
+  entrypoint g() = 1
+
+main contract C =
+  entrypoint f() = F.g()
