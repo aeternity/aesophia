@@ -14,4 +14,4 @@ namespace AENSCompat =
       AENSv2.OraclePt(a)   => Some(AENS.OraclePt(a))
       AENSv2.ContractPt(a) => Some(AENS.ContractPt(a))
       AENSv2.ChannelPt(a)  => Some(AENS.ChannelPt(a))
-      AENSv2.DataPt(a)     => None
+      AENSv2.DataPt(_)     => None
