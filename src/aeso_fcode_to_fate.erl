@@ -84,7 +84,8 @@ compile(ChildContracts, FCode, SavedFreshNames, Options) ->
     try
         compile1(ChildContracts, FCode, SavedFreshNames, Options)
     after
-        put(variables_registers, undefined)
+        put(variables_registers, undefined),
+        put(instructions_locations, undefined)
     end.
 
 compile1(ChildContracts, FCode, SavedFreshNames, Options) ->
@@ -98,12 +99,13 @@ compile1(ChildContracts, FCode, SavedFreshNames, Options) ->
             true  -> remove_dbgloc(FateCode);
             false -> {FateCode, #{}}
         end,
+    add_instructions_locations(ContractName, DbglocMap),
     ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode1)]),
     FateCode2 = case proplists:get_value(include_child_contract_symbols, Options, false) of
                     false -> FateCode1;
                     true -> add_child_symbols(ChildContracts, FateCode1)
                 end,
-    {FateCode2, get_variables_registers(), DbglocMap}.
+    {FateCode2, get_variables_registers(), get_instructions_locations()}.
 
 -spec block_dbgloc_map(bcode()) -> DbglocMap when
       DbglocMap :: #{integer() => {aeso_syntax:ann_file(), aeso_syntax:ann_line(), aeso_syntax:ann_col()}}.
@@ -181,6 +183,16 @@ get_variables_registers() ->
         undefined -> #{};
         Vs        -> Vs
     end.
+
+get_instructions_locations() ->
+    case get(instructions_locations) of
+        undefined -> #{};
+        IL        -> IL
+    end.
+
+add_instructions_locations(Contract, Map) ->
+    Old = get_instructions_locations(),
+    put(instructions_locations, Old#{Contract => Map}).
 
 add_variables_register(Env = #env{saved_fresh_names = SavedFreshNames}, Name, Register) ->
     Olds = get_variables_registers(),
