@@ -770,7 +770,7 @@ dbgloc(Env, Ann) ->
             case {Line, Col} of
                 {undefined, _} -> [];
                 {_, undefined} -> [];
-                {Line, Col}    -> [{'DBGLOC', File, Line, Col}]
+                {Line, Col}    -> [{'DBGLOC', {immediate, File}, {immediate, Line}, {immediate, Col}}]
             end
     end.
 
