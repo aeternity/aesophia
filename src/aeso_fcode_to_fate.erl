@@ -84,8 +84,7 @@ compile(ChildContracts, FCode, SavedFreshNames, Options) ->
     try
         compile1(ChildContracts, FCode, SavedFreshNames, Options)
     after
-        put(variables_registers, undefined),
-        put(instructions_locations, undefined)
+        put(variables_registers, undefined)
     end.
 
 compile1(ChildContracts, FCode, SavedFreshNames, Options) ->
@@ -94,58 +93,12 @@ compile1(ChildContracts, FCode, SavedFreshNames, Options) ->
     SFuns  = functions_to_scode(ChildContracts, ContractName, Functions, SavedFreshNames, Options),
     SFuns1 = optimize_scode(SFuns, Options),
     FateCode = to_basic_blocks(SFuns1),
-    {FateCode1, DbglocMap} =
-        case proplists:get_value(debug_info, Options, false) of
-            true  -> remove_dbgloc(FateCode);
-            false -> {FateCode, #{}}
-        end,
-    add_instructions_locations(ContractName, DbglocMap),
-    ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode1)]),
+    ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
     FateCode2 = case proplists:get_value(include_child_contract_symbols, Options, false) of
-                    false -> FateCode1;
-                    true -> add_child_symbols(ChildContracts, FateCode1)
+                    false -> FateCode;
+                    true -> add_child_symbols(ChildContracts, FateCode)
                 end,
-    {FateCode2, get_variables_registers(), get_instructions_locations()}.
-
--spec block_dbgloc_map(bcode()) -> DbglocMap when
-      DbglocMap :: #{integer() => {aeso_syntax:ann_file(), aeso_syntax:ann_line(), aeso_syntax:ann_col()}}.
-block_dbgloc_map(BB) -> block_dbgloc_map(BB, 0, maps:new()).
-
--spec block_dbgloc_map(bcode(), integer(), DbglocMap) -> DbglocMap when
-      DbglocMap :: #{integer() => {aeso_syntax:ann_file(), aeso_syntax:ann_line(), aeso_syntax:ann_col()}}.
-block_dbgloc_map([], _, DbglocMap) ->
-     DbglocMap;
-block_dbgloc_map([{'DBGLOC', File, Line, Col} | Rest], Index, DbglocMap) ->
-    block_dbgloc_map(Rest, Index, maps:put(Index, {File, Line, Col}, DbglocMap));
-block_dbgloc_map([_ | Rest], Index, DbglocMap) ->
-    block_dbgloc_map(Rest, Index + 1, DbglocMap).
-
--spec remove_dbgloc(aeb_fate_code:fcode()) -> {aeb_fate_code:fcode(), DbglocMap} when
-      DbglocMap :: #{integer() => {aeso_syntax:ann_file(), aeso_syntax:ann_line(), aeso_syntax:ann_col()}}.
-remove_dbgloc(FateCode) ->
-    RemoveDbglocFromBBs =
-        fun(_, BB) ->
-            IsDbg = fun({'DBGLOC', _, _, _}) -> false;
-                       (_)                   -> true
-                    end,
-            lists:filter(IsDbg, BB)
-        end,
-
-    RemoveDbglocFromFuns =
-        fun(_, Fun = {_, _, BBs}) ->
-            NewBBs = maps:map(RemoveDbglocFromBBs, BBs),
-            setelement(3, Fun, NewBBs)
-        end,
-
-    DbglocMapFromBBs =
-        fun(_, {_, _, BBs}) ->
-            maps:map(fun(_, BB) -> block_dbgloc_map(BB) end, BBs)
-        end,
-
-    OldFuns = aeb_fate_code:functions(FateCode),
-    DbglocMap = maps:map(DbglocMapFromBBs, OldFuns),
-    NewFuns = maps:map(RemoveDbglocFromFuns, OldFuns),
-    {aeb_fate_code:update_functions(FateCode, NewFuns), DbglocMap}.
+    {FateCode2, get_variables_registers()}.
 
 make_function_id(X) ->
     aeb_fate_code:symbol_identifier(make_function_name(X)).
@@ -183,16 +136,6 @@ get_variables_registers() ->
         undefined -> #{};
         Vs        -> Vs
     end.
-
-get_instructions_locations() ->
-    case get(instructions_locations) of
-        undefined -> #{};
-        IL        -> IL
-    end.
-
-add_instructions_locations(Contract, Map) ->
-    Old = get_instructions_locations(),
-    put(instructions_locations, Old#{Contract => Map}).
 
 add_variables_register(Env = #env{saved_fresh_names = SavedFreshNames}, Name, Register) ->
     Olds = get_variables_registers(),
@@ -291,7 +234,7 @@ serialize_contract_code(Env, C) ->
             Options = Env#env.options,
             SavedFreshNames = Env#env.saved_fresh_names,
             FCode = maps:get(C, Env#env.child_contracts),
-            {FateCode, _, _} = compile1(Env#env.child_contracts, FCode, SavedFreshNames, Options),
+            {FateCode, _} = compile1(Env#env.child_contracts, FCode, SavedFreshNames, Options),
             ByteCode = aeb_fate_code:serialize(FateCode, []),
             {ok, Version} = aeso_compiler:version(),
             OriginalSourceCode = proplists:get_value(original_src, Options, ""),
