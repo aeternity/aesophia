@@ -761,7 +761,10 @@ dbgloc(Env, Ann) ->
     case proplists:get_value(debug_info, Env#env.options, false) of
         false -> [];
         true  ->
-            File = proplists:get_value(file, Ann),
+            File = case proplists:get_value(file, Ann) of
+                       no_file -> "";
+                       F       -> F
+                   end,
             Line = proplists:get_value(line, Ann),
             Col  = proplists:get_value(col, Ann),
             case {Line, Col} of
