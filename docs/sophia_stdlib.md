@@ -483,7 +483,7 @@ The address of the account that mined the current block.
 Chain.timestamp : int
 ```
 
-The timestamp of the current block.
+The timestamp of the current block (unix time, milliseconds).
 
 
 ##### difficulty
