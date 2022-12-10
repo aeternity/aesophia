@@ -1718,10 +1718,14 @@ check_stateful(#env { current_function = Fun }, _Id, _Type) ->
 
 %% Hack: don't allow passing the 'value' named arg if not stateful. This only
 %% works since the user can't create functions with named arguments.
-check_stateful_named_arg(#env{ stateful = false, current_function = Fun }, {id, _, "value"}, Default) ->
+check_stateful_named_arg(#env{ stateful = Stateful, current_function = Fun }, {id, _, "value"}, Default) ->
     case Default of
         {int, _, 0} -> ok;
-        _           -> type_error({value_arg_not_allowed, Default, Fun})
+        _           ->
+            case Stateful of
+                true  -> when_warning(warn_unused_stateful, fun() -> used_stateful(Fun) end);
+                false -> type_error({value_arg_not_allowed, Default, Fun})
+            end
     end;
 check_stateful_named_arg(_, _, _) -> ok.
 
