@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Type definitions serialised to ACI as `typedefs` field instead of `type_defs` to increase compatibility.
 - Check contracts and entrypoints modifiers when implementing interfaces.
 - Contracts can no longer be used as namespaces.
+- Do not show unused stateful warning for functions that call other contracts with a non-zero value argument.
 ### Removed
 ### Fixed
 - Typechecker crashes if Chain.create or Chain.clone are used without arguments.
