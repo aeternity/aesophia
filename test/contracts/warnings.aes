@@ -12,7 +12,7 @@ namespace UnusedNamespace =
   // Unused
   private function h() = 3
 
-contract Warnings =
+main contract Warnings =
 
   type state = int
 
@@ -58,3 +58,10 @@ namespace FunctionsAsArgs =
     private function inc(n : int) : int = n + 1
     // Never used
     private function dec(n : int) : int = n - 1
+
+contract Remote =
+  entrypoint id(_) = 0
+
+contract C = 
+  payable stateful entrypoint
+    call_missing_con() : int = (ct_1111111111111111111111111111112JF6Dz72 : Remote).id(value = 1, 0)
