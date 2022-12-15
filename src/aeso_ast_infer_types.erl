@@ -187,9 +187,13 @@ pop_scope(Env) ->
 get_scope(#env{ scopes = Scopes }, Name) ->
     maps:get(Name, Scopes, false).
 
+-spec get_current_scope(env()) -> scope().
+get_current_scope(#env{ namespace = NS, scopes = Scopes }) ->
+    maps:get(NS, Scopes).
+
 -spec on_current_scope(env(), fun((scope()) -> scope())) -> env().
 on_current_scope(Env = #env{ namespace = NS, scopes = Scopes }, Fun) ->
-    Scope = maps:get(NS, Scopes),
+    Scope = get_current_scope(Env),
     Env#env{ scopes = Scopes#{ NS => Fun(Scope) } }.
 
 -spec on_scopes(env(), fun((scope()) -> scope())) -> env().
@@ -197,8 +201,8 @@ on_scopes(Env = #env{ scopes = Scopes }, Fun) ->
     Env#env{ scopes = maps:map(fun(_, Scope) -> Fun(Scope) end, Scopes) }.
 
 -spec bind_var(aeso_syntax:id(), utype(), env()) -> env().
-bind_var({id, Ann, X}, T, Env = #env{ vars = Vars }) ->
-    when_warning(warn_shadowing, fun() -> warn_potential_shadowing(Ann, X, Vars) end),
+bind_var({id, Ann, X}, T, Env) ->
+    when_warning(warn_shadowing, fun() -> warn_potential_shadowing(Env, Ann, X) end),
     Env#env{ vars = [{X, {Ann, T}} | Env#env.vars] }.
 
 -spec bind_vars([{aeso_syntax:id(), utype()}], env()) -> env().
@@ -3355,9 +3359,11 @@ destroy_and_report_unused_functions() ->
 
 %% Warnings (Shadowing)
 
-warn_potential_shadowing(_, "_", _) -> ok;
-warn_potential_shadowing(Ann, Name, Vars) ->
-    case proplists:get_value(Name, Vars, false) of
+warn_potential_shadowing(_, _, "_") -> ok;
+warn_potential_shadowing(Env = #env{ vars = Vars }, Ann, Name) ->
+    CurrentScope = get_current_scope(Env),
+    Consts = CurrentScope#scope.consts,
+    case proplists:get_value(Name, Vars ++ Consts, false) of
         false -> ok;
         {AnnOld, _} -> ets_insert(warnings, {shadowing, Ann, Name, AnnOld})
     end.
