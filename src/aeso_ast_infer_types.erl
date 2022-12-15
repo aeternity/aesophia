@@ -124,15 +124,18 @@
 
 -type variance() :: invariant | covariant | contravariant | bivariant.
 
--type fun_info()  :: {aeso_syntax:ann(), typesig() | type()}.
--type type_info() :: {aeso_syntax:ann(), typedef()}.
--type var_info()  :: {aeso_syntax:ann(), utype()}.
+-type fun_info()   :: {aeso_syntax:ann(), typesig() | type()}.
+-type type_info()  :: {aeso_syntax:ann(), typedef()}.
+-type const_info() :: {aeso_syntax:ann(), type()}.
+-type var_info()   :: {aeso_syntax:ann(), utype()}.
 
--type fun_env()  :: [{name(), fun_info()}].
--type type_env() :: [{name(), type_info()}].
+-type fun_env()   :: [{name(), fun_info()}].
+-type type_env()  :: [{name(), type_info()}].
+-type const_env() :: [{name(), const_info()}].
 
 -record(scope, { funs   = [] :: fun_env()
                , types  = [] :: type_env()
+               , consts = [] :: const_env()
                , access = public :: access()
                , kind   = namespace :: namespace | contract
                , ann    = [{origin, system}] :: aeso_syntax:ann()
@@ -152,6 +155,7 @@
     , in_guard         = false              :: boolean()
     , stateful         = false              :: boolean()
     , unify_throws     = true               :: boolean()
+    , current_const    = none               :: none | aeso_syntax:id()
     , current_function = none               :: none | aeso_syntax:id()
     , what             = top                :: top | namespace | contract | contract_interface
     }).
@@ -246,6 +250,37 @@ bind_type(X, Ann, Def, Env) ->
     on_current_scope(Env, fun(Scope = #scope{ types = Types }) ->
                             Scope#scope{ types = [{X, {Ann, Def}} | Types] }
                           end).
+
+-spec bind_const(name(), aeso_syntax:ann(), type(), env()) -> env().
+bind_const(X, Ann, Type, Env) ->
+    case lookup_env(Env, term, Ann, [X]) of
+        false ->
+            on_current_scope(Env, fun(Scope = #scope{ consts = Consts }) ->
+                                    Scope#scope{ consts = [{X, {Ann, Type}} | Consts] }
+                                end);
+        _ ->
+            type_error({duplicate_definition, X, [Ann, aeso_syntax:get_ann(Type)]}),
+            Env
+    end.
+
+-spec bind_consts(env(), #{ name() => aeso_syntax:decl() }, [{acyclic, name()} | {cyclic, [name()]}], [aeso_syntax:decl()]) ->
+        {env(), [aeso_syntax:decl()]}.
+bind_consts(Env, _Consts, [], Acc) ->
+    {Env, lists:reverse(Acc)};
+bind_consts(Env, Consts, [{cyclic, Xs} | _SCCs], _Acc) ->
+    ConstDecls = [ maps:get(X, Consts) || X <- Xs ],
+    type_error({mutually_recursive_constants, lists:reverse(ConstDecls)}),
+    {Env, []};
+bind_consts(Env, Consts, [{acyclic, X} | SCCs], Acc) ->
+    case maps:get(X, Consts, undefined) of
+        Const = {letval, Ann, Id, _} ->
+            NewConst = {letval, _, {typed, _, _, Type}, _} = infer_const(Env, Const),
+            NewEnv = bind_const(name(Id), Ann, Type, Env),
+            bind_consts(NewEnv, Consts, SCCs, [NewConst | Acc]);
+        undefined ->
+            %% When a used id is not a letval, a type error will be thrown
+            bind_consts(Env, Consts, SCCs, Acc)
+    end.
 
 %% Bind state primitives
 -spec bind_state(env()) -> env().
@@ -431,10 +466,10 @@ lookup_env1(#env{ namespace = Current, used_namespaces = UsedNamespaces, scopes 
     %% Get the scope
     case maps:get(Qual, Scopes, false) of
         false -> false; %% TODO: return reason for not in scope
-        #scope{ funs = Funs, types = Types } ->
+        #scope{ funs = Funs, types = Types, consts = Consts } ->
             Defs = case Kind of
                      type -> Types;
-                     term -> Funs
+                     term -> Funs ++ Consts
                    end,
             %% Look up the unqualified name
             case proplists:get_value(Name, Defs, false) of
@@ -1049,12 +1084,13 @@ infer_contract(Env0, What, Defs0, Options) ->
            end,
     destroy_and_report_type_errors(Env0),
     Env  = Env0#env{ what = What },
-    Kind = fun({type_def, _, _, _, _})    -> type;
-              ({letfun, _, _, _, _, _})   -> function;
-              ({fun_clauses, _, _, _, _}) -> function;
-              ({fun_decl, _, _, _})       -> prototype;
-              ({using, _, _, _, _})       -> using;
-              (_)                         -> unexpected
+    Kind = fun({type_def, _, _, _, _})     -> type;
+              ({letfun, _, _, _, _, _})    -> function;
+              ({fun_clauses, _, _, _, _})  -> function;
+              ({fun_decl, _, _, _})        -> prototype;
+              ({using, _, _, _, _})        -> using;
+              ({letval, _, {id, _, _}, _}) -> constant;
+              (_)                          -> unexpected
            end,
     Get = fun(K, In) -> [ Def || Def <- In, Kind(Def) == K ] end,
     OldUsedNamespaces = Env#env.used_namespaces,
@@ -1069,11 +1105,12 @@ infer_contract(Env0, What, Defs0, Options) ->
             contract_interface -> Env1;
             contract           -> bind_state(Env1)   %% bind state and put
         end,
-    {ProtoSigs, Decls} = lists:unzip([ check_fundecl(Env1, Decl) || Decl <- Get(prototype, Defs) ]),
+    {Env2C, Consts} = check_constants(Env2, Get(constant, Defs)),
+    {ProtoSigs, Decls} = lists:unzip([ check_fundecl(Env2C, Decl) || Decl <- Get(prototype, Defs) ]),
     [ type_error({missing_definition, Id}) || {fun_decl, _, Id, _} <- Decls,
                                               What =:= contract,
                                               get_option(no_code, false) =:= false ],
-    Env3      = bind_funs(ProtoSigs, Env2),
+    Env3      = bind_funs(ProtoSigs, Env2C),
     Functions = Get(function, Defs),
     %% Check for duplicates in Functions (we turn it into a map below)
     FunBind   = fun({letfun, Ann, {id, _, Fun}, _, _, _})   -> {Fun, {tuple_t, Ann, []}};
@@ -1093,7 +1130,7 @@ infer_contract(Env0, What, Defs0, Options) ->
     check_entrypoints(Defs1),
     destroy_and_report_type_errors(Env4),
     %% Add inferred types of definitions
-    {Env5, TypeDefs ++ Decls ++ Defs1}.
+    {Env5, TypeDefs ++ Decls ++ Consts ++ Defs1}.
 
 %% Restructure blocks into multi-clause fundefs (`fun_clauses`).
 -spec process_blocks([aeso_syntax:decl()]) -> [aeso_syntax:decl()].
@@ -1242,6 +1279,13 @@ opposite_variance(invariant) -> invariant;
 opposite_variance(covariant) -> contravariant;
 opposite_variance(contravariant) -> covariant;
 opposite_variance(bivariant) -> bivariant.
+
+-spec check_constants(env(), [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
+check_constants(Env, Consts) ->
+    ConstMap = maps:from_list([ {name(Id), Const} || Const = {letval, _, Id, _} <- Consts ]),
+    DepGraph = maps:map(fun(_, Const) -> aeso_syntax_utils:used_ids(Const) end, ConstMap),
+    SCCs = aeso_utils:scc(DepGraph),
+    bind_consts(Env, ConstMap, SCCs, []).
 
 check_usings(Env, []) ->
     Env;
@@ -1861,10 +1905,10 @@ infer_expr(Env, {list, As, Elems}) ->
     ElemType = fresh_uvar(As),
     NewElems = [check_expr(Env, X, ElemType) || X <- Elems],
     {typed, As, {list, As, NewElems}, {app_t, As, {id, As, "list"}, [ElemType]}};
-infer_expr(Env, {list_comp, As, Yield, []}) ->
+infer_expr(Env = #env{ current_const = none }, {list_comp, As, Yield, []}) ->
     {typed, _, _, Type} = TypedYield = infer_expr(Env, Yield),
     {typed, As, {list_comp, As, TypedYield, []}, {app_t, As, {id, As, "list"}, [Type]}};
-infer_expr(Env, {list_comp, As, Yield, [{comprehension_bind, Pat, BExpr}|Rest]}) ->
+infer_expr(Env = #env{ current_const = none }, {list_comp, As, Yield, [{comprehension_bind, Pat, BExpr}|Rest]}) ->
     TypedBind = {typed, As2, _, TypeBExpr} = infer_expr(Env, BExpr),
     {NewE, TypedPat = {typed, _, _, PatType}} = infer_pattern(Env, Pat),
     unify( Env
@@ -1877,7 +1921,7 @@ infer_expr(Env, {list_comp, As, Yield, [{comprehension_bind, Pat, BExpr}|Rest]})
     , As
     , {list_comp, As, TypedYield, [{comprehension_bind, TypedPat, TypedBind}|TypedRest]}
     , ResType};
-infer_expr(Env, {list_comp, AttrsL, Yield, [{comprehension_if, AttrsIF, Cond}|Rest]}) ->
+infer_expr(Env = #env{ current_const = none }, {list_comp, AttrsL, Yield, [{comprehension_if, AttrsIF, Cond}|Rest]}) ->
     NewCond = check_expr(Env, Cond, {id, AttrsIF, "bool"}),
     {typed, _, {list_comp, _, TypedYield, TypedRest}, ResType} =
         infer_expr(Env, {list_comp, AttrsL, Yield, Rest}),
@@ -1885,7 +1929,7 @@ infer_expr(Env, {list_comp, AttrsL, Yield, [{comprehension_if, AttrsIF, Cond}|Re
     , AttrsL
     , {list_comp, AttrsL, TypedYield, [{comprehension_if, AttrsIF, NewCond}|TypedRest]}
     , ResType};
-infer_expr(Env, {list_comp, AsLC, Yield, [{letval, AsLV, Pattern, E}|Rest]}) ->
+infer_expr(Env = #env{ current_const = none }, {list_comp, AsLC, Yield, [{letval, AsLV, Pattern, E}|Rest]}) ->
     NewE = {typed, _, _, PatType} = infer_expr(Env, E),
     BlockType = fresh_uvar(AsLV),
     {'case', _, NewPattern, [{guarded, _, [], NewRest}]} =
@@ -1901,7 +1945,7 @@ infer_expr(Env, {list_comp, AsLC, Yield, [{letval, AsLV, Pattern, E}|Rest]}) ->
     , {list_comp, AsLC, TypedYield, [{letval, AsLV, NewPattern, NewE}|TypedRest]}
     , ResType
     };
-infer_expr(Env, {list_comp, AsLC, Yield, [Def={letfun, AsLF, _, _, _, _}|Rest]}) ->
+infer_expr(Env = #env{ current_const = none }, {list_comp, AsLC, Yield, [Def={letfun, AsLF, _, _, _, _}|Rest]}) ->
     {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
     FunT = typesig_to_fun_t(TypeSig),
     NewE = bind_var({id, AsLF, Name}, FunT, Env),
@@ -1916,13 +1960,16 @@ infer_expr(Env, {typed, As, Body, Type}) ->
     Type1 = check_type(Env, Type),
     {typed, _, NewBody, NewType} = check_expr(Env, Body, Type1),
     {typed, As, NewBody, NewType};
-infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
+infer_expr(Env = #env{ current_const = CurrentConst }, {app, Ann, Fun, Args0} = App) ->
     {NamedArgs, Args} = split_args(Args0),
     case aeso_syntax:get_ann(format, Ann) of
         infix ->
             infer_op(Env, Ann, Fun, Args, fun infer_infix/1);
         prefix ->
             infer_op(Env, Ann, Fun, Args, fun infer_prefix/1);
+        _ when CurrentConst =/= none ->
+            type_error({invalid_const_expr, CurrentConst}),
+            destroy_and_report_type_errors(Env);
         _ ->
             NamedArgsVar = fresh_uvar(Ann),
             NamedArgs1 = [ infer_named_arg(Env, NamedArgsVar, Arg) || Arg <- NamedArgs ],
@@ -1948,19 +1995,19 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
                                           context = {check_return, App} }),
             {typed, Ann, {app, Ann, NewFun1, NamedArgs1 ++ NewArgs}, dereference(ResultType)}
     end;
-infer_expr(Env, {'if', Attrs, Cond, Then, Else}) ->
+infer_expr(Env = #env{ current_const = none }, {'if', Attrs, Cond, Then, Else}) ->
     NewCond = check_expr(Env, Cond, {id, Attrs, "bool"}),
     NewThen = {typed, _, _, ThenType} = infer_expr(Env, Then),
     NewElse = {typed, _, _, ElseType} = infer_expr(Env, Else),
     unify(Env, ThenType, ElseType, {if_branches, Then, ThenType, Else, ElseType}),
     {typed, Attrs, {'if', Attrs, NewCond, NewThen, NewElse}, ThenType};
-infer_expr(Env, {switch, Attrs, Expr, Cases}) ->
+infer_expr(Env = #env{ current_const = none }, {switch, Attrs, Expr, Cases}) ->
     NewExpr = {typed, _, _, ExprType} = infer_expr(Env, Expr),
     SwitchType = fresh_uvar(Attrs),
     NewCases = [infer_case(Env, As, Pattern, ExprType, GuardedBranches, SwitchType)
                 || {'case', As, Pattern, GuardedBranches} <- Cases],
     {typed, Attrs, {switch, Attrs, NewExpr, NewCases}, SwitchType};
-infer_expr(Env, {record, Attrs, Fields}) ->
+infer_expr(Env = #env{ current_const = none }, {record, Attrs, Fields}) ->
     RecordType = fresh_uvar(Attrs),
     NewFields = [{field, A, FieldName, infer_expr(Env, Expr)}
                  || {field, A, FieldName, Expr} <- Fields],
@@ -1979,11 +2026,11 @@ infer_expr(Env, {record, Attrs, Fields}) ->
                          context  = Fld}
                     end || {Fld, {field, _, LV, {typed, _, _, T}}} <- lists:zip(Fields, NewFields)]),
     {typed, Attrs, {record, Attrs, NewFields}, RecordType};
-infer_expr(Env, {record, Attrs, Record, Update}) ->
+infer_expr(Env = #env{ current_const = none }, {record, Attrs, Record, Update}) ->
     NewRecord = {typed, _, _, RecordType} = infer_expr(Env, Record),
     NewUpdate = [ check_record_update(Env, RecordType, Fld) || Fld <- Update ],
     {typed, Attrs, {record, Attrs, NewRecord, NewUpdate}, RecordType};
-infer_expr(Env, {proj, Attrs, Record, FieldName}) ->
+infer_expr(Env = #env{ current_const = none }, {proj, Attrs, Record, FieldName}) ->
     NewRecord = {typed, _, _, RecordType} = infer_expr(Env, Record),
     FieldType = fresh_uvar(Attrs),
     add_constraint([#field_constraint{
@@ -1994,14 +2041,14 @@ infer_expr(Env, {proj, Attrs, Record, FieldName}) ->
         context  = {proj, Attrs, Record, FieldName} }]),
     {typed, Attrs, {proj, Attrs, NewRecord, FieldName}, FieldType};
 %% Maps
-infer_expr(Env, {map_get, Attrs, Map, Key}) ->  %% map lookup
+infer_expr(Env = #env{ current_const = none }, {map_get, Attrs, Map, Key}) ->  %% map lookup
     KeyType = fresh_uvar(Attrs),
     ValType = fresh_uvar(Attrs),
     MapType = map_t(Attrs, KeyType, ValType),
     Map1 = check_expr(Env, Map, MapType),
     Key1 = check_expr(Env, Key, KeyType),
     {typed, Attrs, {map_get, Attrs, Map1, Key1}, ValType};
-infer_expr(Env, {map_get, Attrs, Map, Key, Val}) ->  %% map lookup with default
+infer_expr(Env = #env{ current_const = none }, {map_get, Attrs, Map, Key, Val}) ->  %% map lookup with default
     KeyType = fresh_uvar(Attrs),
     ValType = fresh_uvar(Attrs),
     MapType = map_t(Attrs, KeyType, ValType),
@@ -2015,28 +2062,28 @@ infer_expr(Env, {map, Attrs, KVs}) ->   %% map construction
     KVs1 = [ {check_expr(Env, K, KeyType), check_expr(Env, V, ValType)}
              || {K, V} <- KVs ],
     {typed, Attrs, {map, Attrs, KVs1}, map_t(Attrs, KeyType, ValType)};
-infer_expr(Env, {map, Attrs, Map, Updates}) -> %% map update
+infer_expr(Env = #env{ current_const = none }, {map, Attrs, Map, Updates}) -> %% map update
     KeyType  = fresh_uvar(Attrs),
     ValType  = fresh_uvar(Attrs),
     MapType  = map_t(Attrs, KeyType, ValType),
     Map1     = check_expr(Env, Map, MapType),
     Updates1 = [ check_map_update(Env, Upd, KeyType, ValType) || Upd <- Updates ],
     {typed, Attrs, {map, Attrs, Map1, Updates1}, MapType};
-infer_expr(Env, {block, Attrs, Stmts}) ->
+infer_expr(Env = #env{ current_const = none }, {block, Attrs, Stmts}) ->
     BlockType = fresh_uvar(Attrs),
     NewStmts = infer_block(Env, Attrs, Stmts, BlockType),
     {typed, Attrs, {block, Attrs, NewStmts}, BlockType};
-infer_expr(_Env, {record_or_map_error, Attrs, Fields}) ->
+infer_expr(#env{ current_const = none }, {record_or_map_error, Attrs, Fields}) ->
     type_error({mixed_record_and_map, {record, Attrs, Fields}}),
     Type = fresh_uvar(Attrs),
     {typed, Attrs, {record, Attrs, []}, Type};
-infer_expr(Env, {record_or_map_error, Attrs, Expr, []}) ->
+infer_expr(Env = #env{ current_const = none }, {record_or_map_error, Attrs, Expr, []}) ->
     type_error({empty_record_or_map_update, {record, Attrs, Expr, []}}),
     infer_expr(Env, Expr);
-infer_expr(Env, {record_or_map_error, Attrs, Expr, Fields}) ->
+infer_expr(Env = #env{ current_const = none }, {record_or_map_error, Attrs, Expr, Fields}) ->
     type_error({mixed_record_and_map, {record, Attrs, Expr, Fields}}),
     infer_expr(Env, Expr);
-infer_expr(Env, {lam, Attrs, Args, Body}) ->
+infer_expr(Env = #env{ current_const = none }, {lam, Attrs, Args, Body}) ->
     ArgTypes = [fresh_uvar(As) || {arg, As, _, _} <- Args],
     ArgPatterns = [{typed, As, Pat, check_type(Env, T)} || {arg, As, Pat, T} <- Args],
     ResultType = fresh_uvar(Attrs),
@@ -2044,15 +2091,18 @@ infer_expr(Env, {lam, Attrs, Args, Body}) ->
         infer_case(Env, Attrs, {tuple, Attrs, ArgPatterns}, {tuple_t, Attrs, ArgTypes}, [{guarded, Attrs, [], Body}], ResultType),
     NewArgs = [{arg, As, NewPat, NewT} || {typed, As, NewPat, NewT} <- NewArgPatterns],
     {typed, Attrs, {lam, Attrs, NewArgs, NewBody}, {fun_t, Attrs, [], ArgTypes, ResultType}};
-infer_expr(Env, {letpat, Attrs, Id, Pattern}) ->
+infer_expr(Env = #env{ current_const = none }, {letpat, Attrs, Id, Pattern}) ->
     NewPattern = {typed, _, _, PatType} = infer_expr(Env, Pattern),
     {typed, Attrs, {letpat, Attrs, check_expr(Env, Id, PatType), NewPattern}, PatType};
-infer_expr(Env, Let = {letval, Attrs, _, _}) ->
+infer_expr(Env = #env{ current_const = none }, Let = {letval, Attrs, _, _}) ->
     type_error({missing_body_for_let, Attrs}),
     infer_expr(Env, {block, Attrs, [Let, abort_expr(Attrs, "missing body")]});
-infer_expr(Env, Let = {letfun, Attrs, _, _, _, _}) ->
+infer_expr(Env = #env{ current_const = none }, Let = {letfun, Attrs, _, _, _, _}) ->
     type_error({missing_body_for_let, Attrs}),
-    infer_expr(Env, {block, Attrs, [Let, abort_expr(Attrs, "missing body")]}).
+    infer_expr(Env, {block, Attrs, [Let, abort_expr(Attrs, "missing body")]});
+infer_expr(Env = #env{ current_const = Id }, _) ->
+    type_error({invalid_const_expr, Id}),
+    destroy_and_report_type_errors(Env).
 
 infer_var_args_fun(Env, {typed, Ann, Fun, FunType0}, NamedArgs, ArgTypes) ->
     FunType =
@@ -2213,6 +2263,12 @@ infer_block(Env, Attrs, [E|Rest], BlockType) ->
     NewE = infer_expr(Env, E),
     when_warning(warn_unused_return_value, fun() -> potential_unused_return_value(NewE) end),
     [NewE|infer_block(Env, Attrs, Rest, BlockType)].
+
+infer_const(Env, {letval, Ann, Id = {id, AnnId, _}, Expr}) ->
+    NewExpr = {typed, _, _, Type} = infer_expr(Env#env{ current_const = Id }, Expr),
+    IdType = setelement(2, Type, AnnId),
+    NewId = {typed, aeso_syntax:get_ann(Id), Id, IdType},
+    {letval, Ann, NewId, NewExpr}.
 
 infer_infix({BoolOp, As})
   when BoolOp =:= '&&'; BoolOp =:= '||' ->
@@ -3794,6 +3850,15 @@ mk_error({unpreserved_payablity, Kind, ContractCon, InterfaceCon}) ->
     Msg = io_lib:format("Non-payable ~s `~s` cannot implement payable interface `~s`",
                         [KindStr, name(ContractCon), name(InterfaceCon)]),
     mk_t_err(pos(ContractCon), Msg);
+mk_error({mutually_recursive_constants, Consts}) ->
+    Msg = [ "Mutual recursion detected between the constants",
+            [ io_lib:format("\n  - `~s` at ~s", [name(Id), pp_loc(Ann)])
+                || {letval, Ann, Id, _} <- Consts ] ],
+    [{letval, Ann, _, _} | _] = Consts,
+    mk_t_err(pos(Ann), Msg);
+mk_error({invalid_const_expr, ConstId}) ->
+    Msg = io_lib:format("Invalid expression in the definition of the constant `~s`", [name(ConstId)]),
+    mk_t_err(pos(aeso_syntax:get_ann(ConstId)), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),
     mk_t_err(pos(0, 0), Msg).

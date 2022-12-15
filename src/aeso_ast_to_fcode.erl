@@ -160,6 +160,7 @@
                   context           => context(),
                   vars              => [var_name()],
                   functions         := #{ fun_name() => fun_def() },
+                  consts            := #{ var_name() => fexpr() },
                   saved_fresh_names => #{ var_name() => var_name() }
                }.
 
@@ -240,7 +241,8 @@ init_env(Options) ->
                       ["Chain", "GAAttachTx"]             => #con_tag{ tag = 21, arities = ChainTxArities }
                      },
        options   => Options,
-       functions => #{}
+       functions => #{},
+       consts    => #{}
     }.
 
 -spec builtins() -> builtins().
@@ -395,7 +397,11 @@ decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, {id, _, Name}, Args, R
                return => FRet,
                body   => FBody },
     NewFuns = Funs#{ FName => Def },
-    Env#{ functions := NewFuns }.
+    Env#{ functions := NewFuns };
+decl_to_fcode(Env = #{ consts := Consts }, {letval, _, {typed, _, {id, _, X}, _}, Val}) ->
+    FVal = expr_to_fcode(Env, Val),
+    NewConsts = Consts#{ qname(Env, X) => FVal },
+    Env#{ consts := NewConsts }.
 
 -spec typedef_to_fcode(env(), aeso_syntax:id(), [aeso_syntax:tvar()], aeso_syntax:typedef()) -> env().
 typedef_to_fcode(Env, {id, _, Name}, Xs, Def) ->
@@ -1722,9 +1728,15 @@ bind_var(Env = #{ vars := Vars }, X) -> Env#{ vars := [X | Vars] }.
 resolve_var(#{ vars := Vars } = Env, [X]) ->
     case lists:member(X, Vars) of
         true  -> {var, X};
-        false -> resolve_fun(Env, [X])
+        false -> resolve_const(Env, [X])
     end;
-resolve_var(Env, Q) -> resolve_fun(Env, Q).
+resolve_var(Env, Q) -> resolve_const(Env, Q).
+
+resolve_const(#{ consts := Consts } = Env, Q) ->
+    case maps:get(Q, Consts, not_found) of
+        not_found -> resolve_fun(Env, Q);
+        Val       -> Val
+    end.
 
 resolve_fun(#{ fun_env := Funs, builtins := Builtin } = Env, Q) ->
     case {maps:get(Q, Funs, not_found), maps:get(Q, Builtin, not_found)} of
