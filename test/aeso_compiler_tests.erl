@@ -658,10 +658,6 @@ failing_contracts() ->
          [<<?Pos(5, 28)
             "Invalid call to contract entrypoint `Foo.foo`.\n"
             "It must be called as `c.foo` for some `c : Foo`.">>])
-    , ?TYPE_ERROR(toplevel_let,
-                  [<<?Pos(2, 7)
-                     "Toplevel \"let\" definitions are not supported. "
-                     "Value `this_is_illegal` could be replaced by 0-argument function.">>])
     , ?TYPE_ERROR(empty_typedecl,
                   [<<?Pos(2, 8)
                      "Empty type declarations are not supported. "
