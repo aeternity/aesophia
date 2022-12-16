@@ -2011,7 +2011,7 @@ infer_expr(Env = #env{ current_const = none }, {switch, Attrs, Expr, Cases}) ->
     NewCases = [infer_case(Env, As, Pattern, ExprType, GuardedBranches, SwitchType)
                 || {'case', As, Pattern, GuardedBranches} <- Cases],
     {typed, Attrs, {switch, Attrs, NewExpr, NewCases}, SwitchType};
-infer_expr(Env = #env{ current_const = none }, {record, Attrs, Fields}) ->
+infer_expr(Env, {record, Attrs, Fields}) ->
     RecordType = fresh_uvar(Attrs),
     NewFields = [{field, A, FieldName, infer_expr(Env, Expr)}
                  || {field, A, FieldName, Expr} <- Fields],
@@ -2269,10 +2269,12 @@ infer_block(Env, Attrs, [E|Rest], BlockType) ->
     [NewE|infer_block(Env, Attrs, Rest, BlockType)].
 
 infer_const(Env, {letval, Ann, Id = {id, AnnId, _}, Expr}) ->
+    create_constraints(),
     NewExpr = {typed, _, _, Type} = infer_expr(Env#env{ current_const = Id }, Expr),
+    solve_then_destroy_and_report_unsolved_constraints(Env),
     IdType = setelement(2, Type, AnnId),
     NewId = {typed, aeso_syntax:get_ann(Id), Id, IdType},
-    {letval, Ann, NewId, NewExpr}.
+    instantiate({letval, Ann, NewId, NewExpr}).
 
 infer_infix({BoolOp, As})
   when BoolOp =:= '&&'; BoolOp =:= '||' ->
