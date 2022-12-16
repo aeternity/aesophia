@@ -3651,10 +3651,6 @@ mk_error({type_decl, _, {id, Pos, Name}, _}) ->
     Msg = io_lib:format("Empty type declarations are not supported. Type `~s` lacks a definition",
                         [Name]),
     mk_t_err(pos(Pos), Msg);
-mk_error({letval, _Pos, {id, Pos, Name}, _Def}) ->
-    Msg = io_lib:format("Toplevel \"let\" definitions are not supported. Value `~s` could be replaced by 0-argument function.",
-                        [Name]),
-    mk_t_err(pos(Pos), Msg);
 mk_error({stateful_not_allowed, Id, Fun}) ->
     Msg = io_lib:format("Cannot reference stateful function `~s` in the definition of non-stateful function `~s`.",
                         [pp(Id), pp(Fun)]),
