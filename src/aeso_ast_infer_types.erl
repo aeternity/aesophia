@@ -1971,10 +1971,18 @@ infer_expr(Env = #env{ current_const = CurrentConst }, {app, Ann, Fun, Args0} = 
             infer_op(Env, Ann, Fun, Args, fun infer_infix/1);
         prefix ->
             infer_op(Env, Ann, Fun, Args, fun infer_prefix/1);
-        _ when CurrentConst =/= none ->
-            type_error({invalid_const_expr, CurrentConst}),
-            destroy_and_report_type_errors(Env);
         _ ->
+            case CurrentConst of
+                none -> ok;
+                Id   ->
+                    case Fun of
+                        {con, _, _}  -> ok;
+                        {qcon, _, _} -> ok;
+                        _            ->
+                            type_error({invalid_const_expr, Id}),
+                            destroy_and_report_type_errors(Env)
+                    end
+            end,
             NamedArgsVar = fresh_uvar(Ann),
             NamedArgs1 = [ infer_named_arg(Env, NamedArgsVar, Arg) || Arg <- NamedArgs ],
             NewFun0 = infer_expr(Env, Fun),
