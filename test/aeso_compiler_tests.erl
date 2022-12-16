@@ -287,7 +287,9 @@ warnings() ->
       <<?PosW(48, 5)
         "Unused return value.">>,
       <<?PosW(60, 5)
-        "The function `dec` is defined but never used.">>
+        "The function `dec` is defined but never used.">>,
+      <<?PosW(73, 9)
+        "The definition of `const` shadows an older definition at line 70, column 3.">>
      ]).
 
 failing_contracts() ->
@@ -856,7 +858,9 @@ failing_contracts() ->
                    <<?Pos(48, 5)
                      "Unused return value.">>,
                    <<?Pos(60, 5)
-                     "The function `dec` is defined but never used.">>
+                     "The function `dec` is defined but never used.">>,
+                   <<?Pos(73, 9)
+                     "The definition of `const` shadows an older definition at line 70, column 3.">>
                   ])
     , ?TYPE_ERROR(polymorphism_contract_interface_recursive,
                   [<<?Pos(1,24)

@@ -65,3 +65,10 @@ contract Remote =
 contract C = 
   payable stateful entrypoint
     call_missing_con() : int = (ct_1111111111111111111111111111112JF6Dz72 : Remote).id(value = 1, 0)
+
+namespace ShadowingConst =
+  let const = 1
+
+  function f() =
+    let const = 2
+    const
