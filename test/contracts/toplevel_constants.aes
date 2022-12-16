@@ -32,6 +32,7 @@ contract C =
     let c20 = oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY
     let c21 = ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ : C
     let c22 = N.nsconst
+    let c23 = c01
 
     entrypoint f01() = c01
     entrypoint f02() = c02
@@ -55,3 +56,4 @@ contract C =
     entrypoint f20() = c20
     entrypoint f21() = c21
     entrypoint f22() = c22
+    entrypoint f23() = c23
