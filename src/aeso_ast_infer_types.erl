@@ -270,7 +270,7 @@ bind_const(X, Ann, Type, Env) ->
 -spec bind_consts(env(), #{ name() => aeso_syntax:decl() }, [{acyclic, name()} | {cyclic, [name()]}], [aeso_syntax:decl()]) ->
         {env(), [aeso_syntax:decl()]}.
 bind_consts(Env, _Consts, [], Acc) ->
-    {Env, lists:reverse(Acc)};
+    {Env, Acc};
 bind_consts(Env, Consts, [{cyclic, Xs} | _SCCs], _Acc) ->
     ConstDecls = [ maps:get(X, Consts) || X <- Xs ],
     type_error({mutually_recursive_constants, lists:reverse(ConstDecls)}),
