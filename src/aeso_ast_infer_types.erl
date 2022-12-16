@@ -2267,12 +2267,13 @@ infer_pattern(Env, Pattern) ->
     {NewEnv#env{ in_pattern = Env#env.in_pattern }, NewPattern}.
 
 infer_case(Env = #env{ namespace = NS, current_function = FunId }, Attrs, Pattern, ExprType, GuardedBranches, SwitchType) ->
+    {NewEnv, NewPattern = {typed, _, _, PatType}} = infer_pattern(Env, Pattern),
+
     %% Make sure we are inside a function before warning about potentially unused var
     [ when_warning(warn_unused_variables,
                    fun() -> potential_unused_variables(NS, Fun, free_vars(Pattern)) end)
       || {id, _, Fun} <- [FunId] ],
 
-    {NewEnv, NewPattern = {typed, _, _, PatType}} = infer_pattern(Env, Pattern),
     InferGuardedBranches = fun({guarded, Ann, Guards, Branch}) ->
         NewGuards = lists:map(fun(Guard) ->
                                   check_expr(NewEnv#env{ in_guard = true }, Guard, {id, Attrs, "bool"})
