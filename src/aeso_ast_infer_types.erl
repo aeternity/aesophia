@@ -1088,13 +1088,13 @@ infer_contract(Env0, What, Defs0, Options) ->
            end,
     destroy_and_report_type_errors(Env0),
     Env  = Env0#env{ what = What },
-    Kind = fun({type_def, _, _, _, _})     -> type;
-              ({letfun, _, _, _, _, _})    -> function;
-              ({fun_clauses, _, _, _, _})  -> function;
-              ({fun_decl, _, _, _})        -> prototype;
-              ({using, _, _, _, _})        -> using;
-              ({letval, _, {id, _, _}, _}) -> constant;
-              (_)                          -> unexpected
+    Kind = fun({type_def, _, _, _, _})    -> type;
+              ({letfun, _, _, _, _, _})   -> function;
+              ({fun_clauses, _, _, _, _}) -> function;
+              ({fun_decl, _, _, _})       -> prototype;
+              ({using, _, _, _, _})       -> using;
+              ({letval, _, _, _})         -> constant;
+              (_)                         -> unexpected
            end,
     Get = fun(K, In) -> [ Def || Def <- In, Kind(Def) == K ] end,
     OldUsedNamespaces = Env#env.used_namespaces,
@@ -1286,7 +1286,12 @@ opposite_variance(bivariant) -> bivariant.
 
 -spec check_constants(env(), [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
 check_constants(Env, Consts) ->
-    ConstMap = maps:from_list([ {name(Id), Const} || Const = {letval, _, Id, _} <- Consts ]),
+    HasValidId = fun({letval, _, {id, _, _}, _}) -> true;
+                    (_)                          -> false
+                 end,
+    {ValidConsts, InvalidConsts} = lists:partition(HasValidId, Consts),
+    [ type_error({invalid_const_id, aeso_syntax:get_ann(Pat)}) || {letval, _, Pat, _} <- InvalidConsts ],
+    ConstMap = maps:from_list([ {name(Id), Const} || Const = {letval, _, Id, _} <- ValidConsts ]),
     DepGraph = maps:map(fun(_, Const) -> aeso_syntax_utils:used_ids(Const) end, ConstMap),
     SCCs = aeso_utils:scc(DepGraph),
     bind_consts(Env, ConstMap, SCCs, []).
@@ -3902,6 +3907,9 @@ mk_error({mutually_recursive_constants, Consts}) ->
             [ io_lib:format("\n  - `~s` at ~s", [name(Id), pp_loc(Ann)])
                 || {letval, Ann, Id, _} <- Consts ] ],
     [{letval, Ann, _, _} | _] = Consts,
+    mk_t_err(pos(Ann), Msg);
+mk_error({invalid_const_id, Ann}) ->
+    Msg = "Pattern matching is not allowed when defining compile-time constants",
     mk_t_err(pos(Ann), Msg);
 mk_error({invalid_const_expr, ConstId}) ->
     Msg = io_lib:format("Invalid expression in the definition of the constant `~s`", [name(ConstId)]),
