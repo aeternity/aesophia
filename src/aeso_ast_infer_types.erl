@@ -2093,7 +2093,7 @@ infer_expr(Env = #env{ current_const = none }, {block, Attrs, Stmts}) ->
     BlockType = fresh_uvar(Attrs),
     NewStmts = infer_block(Env, Attrs, Stmts, BlockType),
     {typed, Attrs, {block, Attrs, NewStmts}, BlockType};
-infer_expr(#env{ current_const = none }, {record_or_map_error, Attrs, Fields}) ->
+infer_expr(_Env, {record_or_map_error, Attrs, Fields}) ->
     type_error({mixed_record_and_map, {record, Attrs, Fields}}),
     Type = fresh_uvar(Attrs),
     {typed, Attrs, {record, Attrs, []}, Type};
