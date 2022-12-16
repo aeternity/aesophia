@@ -2059,7 +2059,6 @@ infer_expr(Env, {record, Attrs, Record, Update}) ->
     NewUpdate = [ check_record_update(Env, RecordType, Fld) || Fld <- Update ],
     {typed, Attrs, {record, Attrs, NewRecord, NewUpdate}, RecordType};
 infer_expr(Env, {proj, Attrs, Record, FieldName}) ->
-    ban_when_const(Env),
     NewRecord = {typed, _, _, RecordType} = infer_expr(Env, Record),
     FieldType = fresh_uvar(Attrs),
     add_constraint([#field_constraint{
