@@ -1735,9 +1735,17 @@ lookup_name(Env = #env{ namespace = NS, current_function = CurFn }, As, Id, Opti
             type_error({unbound_variable, Id}),
             {Id, fresh_uvar(As)};
         {QId, {_, Ty}} ->
-            when_warning(warn_unused_variables, fun() -> used_variable(NS, name(CurFn), QId) end),
-            when_warning(warn_unused_functions,
-                         fun() -> register_function_call(NS ++ qname(CurFn), QId) end),
+            %% Variables and functions cannot be used when CurFn is `none`.
+            %% i.e. they cannot be used in toplevel constants
+            [ begin
+                when_warning(
+                    warn_unused_variables,
+                    fun() -> used_variable(NS, name(CurFn), QId) end),
+                when_warning(
+                    warn_unused_functions,
+                    fun() -> register_function_call(NS ++ qname(CurFn), QId) end)
+              end || CurFn =/= none ],
+
             Freshen = proplists:get_value(freshen, Options, false),
             check_stateful(Env, Id, Ty),
             Ty1 = case Ty of
