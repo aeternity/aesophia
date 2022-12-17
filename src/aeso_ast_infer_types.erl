@@ -1289,10 +1289,10 @@ check_constants(Env = #env{ what = What }, Consts) ->
     HasValidId = fun({letval, _, {id, _, _}, _}) -> true;
                     (_)                          -> false
                  end,
-    {ValidConsts, InvalidConsts} = lists:partition(HasValidId, Consts),
-    [ type_error({invalid_const_id, aeso_syntax:get_ann(Pat)}) || {letval, _, Pat, _} <- InvalidConsts ],
-    [ type_error({illegal_const_in_interface, Ann}) || {letval, Ann, _, _} <- ValidConsts, What == contract_interface ],
-    ConstMap = maps:from_list([ {name(Id), Const} || Const = {letval, _, Id, _} <- ValidConsts ]),
+    {Valid, Invalid} = lists:partition(HasValidId, Consts),
+    [ type_error({invalid_const_id, aeso_syntax:get_ann(Pat)}) || {letval, _, Pat, _} <- Invalid ],
+    [ type_error({illegal_const_in_interface, Ann}) || {letval, Ann, _, _} <- Valid, What == contract_interface ],
+    ConstMap = maps:from_list([ {name(Id), Const} || Const = {letval, _, Id, _} <- Valid ]),
     DepGraph = maps:map(fun(_, Const) -> aeso_syntax_utils:used_ids(Const) end, ConstMap),
     SCCs = aeso_utils:scc(DepGraph),
     bind_consts(Env, ConstMap, SCCs, []).
