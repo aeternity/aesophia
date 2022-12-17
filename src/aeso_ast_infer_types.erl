@@ -1285,12 +1285,13 @@ opposite_variance(contravariant) -> covariant;
 opposite_variance(bivariant) -> bivariant.
 
 -spec check_constants(env(), [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
-check_constants(Env, Consts) ->
+check_constants(Env = #env{ what = What }, Consts) ->
     HasValidId = fun({letval, _, {id, _, _}, _}) -> true;
                     (_)                          -> false
                  end,
     {ValidConsts, InvalidConsts} = lists:partition(HasValidId, Consts),
     [ type_error({invalid_const_id, aeso_syntax:get_ann(Pat)}) || {letval, _, Pat, _} <- InvalidConsts ],
+    [ type_error({illegal_const_in_interface, Ann}) || {letval, Ann, _, _} <- ValidConsts, What == contract_interface ],
     ConstMap = maps:from_list([ {name(Id), Const} || Const = {letval, _, Id, _} <- ValidConsts ]),
     DepGraph = maps:map(fun(_, Const) -> aeso_syntax_utils:used_ids(Const) end, ConstMap),
     SCCs = aeso_utils:scc(DepGraph),
@@ -3910,6 +3911,9 @@ mk_error({invalid_const_id, Ann}) ->
 mk_error({invalid_const_expr, ConstId}) ->
     Msg = io_lib:format("Invalid expression in the definition of the constant `~s`", [name(ConstId)]),
     mk_t_err(pos(aeso_syntax:get_ann(ConstId)), Msg);
+mk_error({illegal_const_in_interface, Ann}) ->
+    Msg = "Cannot define toplevel constants inside a contract interface",
+    mk_t_err(pos(Ann), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),
     mk_t_err(pos(0, 0), Msg).
