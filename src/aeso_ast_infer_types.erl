@@ -3906,7 +3906,7 @@ mk_error({mutually_recursive_constants, Consts}) ->
     [{letval, Ann, _, _} | _] = Consts,
     mk_t_err(pos(Ann), Msg);
 mk_error({invalid_const_id, Ann}) ->
-    Msg = "Pattern matching is not allowed when defining compile-time constants",
+    Msg = "The name of the compile-time constant cannot have pattern matching nor type",
     mk_t_err(pos(Ann), Msg);
 mk_error({invalid_const_expr, ConstId}) ->
     Msg = io_lib:format("Invalid expression in the definition of the constant `~s`", [name(ConstId)]),
