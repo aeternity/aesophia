@@ -470,21 +470,30 @@ lookup_env1(#env{ namespace = Current, used_namespaces = UsedNamespaces, scopes 
     %% Get the scope
     case maps:get(Qual, Scopes, false) of
         false -> false; %% TODO: return reason for not in scope
-        #scope{ funs = Funs, types = Types, consts = Consts } ->
+        #scope{ funs = Funs, types = Types, consts = Consts, kind = ScopeKind } ->
             Defs = case Kind of
                      type -> Types;
-                     term -> Funs ++ Consts
+                     term -> Funs
                    end,
             %% Look up the unqualified name
             case proplists:get_value(Name, Defs, false) of
-                false -> false;
+                false ->
+                    case proplists:get_value(Name, Consts, false) of
+                        false ->
+                            false;
+                        Const when AllowPrivate; ScopeKind == namespace ->
+                            {QName, Const};
+                        Const ->
+                            type_error({contract_treated_as_namespace_constant, Ann, QName}),
+                            {QName, Const}
+                    end;
                 {reserved_init, Ann1, Type} ->
                     type_error({cannot_call_init_function, Ann}),
                     {QName, {Ann1, Type}};  %% Return the type to avoid an extra not-in-scope error
                 {contract_fun, Ann1, Type} when AllowPrivate orelse QNameIsEvent ->
                     {QName, {Ann1, Type}};
                 {contract_fun, Ann1, Type} ->
-                    type_error({contract_treated_as_namespace, Ann, QName}),
+                    type_error({contract_treated_as_namespace_entrypoint, Ann, QName}),
                     {QName, {Ann1, Type}};
                 {Ann1, _} = E ->
                     %% Check that it's not private (or we can see private funs)
@@ -3735,9 +3744,13 @@ mk_error({cannot_call_init_function, Ann}) ->
     Msg = "The 'init' function is called exclusively by the create contract transaction "
           "and cannot be called from the contract code.",
     mk_t_err(pos(Ann), Msg);
-mk_error({contract_treated_as_namespace, Ann, [Con, Fun] = QName}) ->
+mk_error({contract_treated_as_namespace_entrypoint, Ann, [Con, Fun] = QName}) ->
     Msg = io_lib:format("Invalid call to contract entrypoint `~s`.", [string:join(QName, ".")]),
     Cxt = io_lib:format("It must be called as `c.~s` for some `c : ~s`.", [Fun, Con]),
+    mk_t_err(pos(Ann), Msg, Cxt);
+mk_error({contract_treated_as_namespace_constant, Ann, QName}) ->
+    Msg = io_lib:format("Invalid use of the contract constant `~s`.", [string:join(QName, ".")]),
+    Cxt = "Toplevel contract constants can only be used in the contracts where they are defined.",
     mk_t_err(pos(Ann), Msg, Cxt);
 mk_error({bad_top_level_decl, Decl}) ->
     What = case element(1, Decl) of
