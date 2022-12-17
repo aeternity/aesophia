@@ -1301,6 +1301,7 @@ check_constants(Env = #env{ what = What }, Consts) ->
     {Valid, Invalid} = lists:partition(HasValidId, Consts),
     [ type_error({invalid_const_id, aeso_syntax:get_ann(Pat)}) || {letval, _, Pat, _} <- Invalid ],
     [ type_error({illegal_const_in_interface, Ann}) || {letval, Ann, _, _} <- Valid, What == contract_interface ],
+    when_warning(warn_unused_constants, fun() -> potential_unused_constants(Env, Valid) end),
     ConstMap = maps:from_list([ {name(Id), Const} || Const = {letval, _, Id, _} <- Valid ]),
     DepGraph = maps:map(fun(_, Const) -> aeso_syntax_utils:used_ids(Const) end, ConstMap),
     SCCs = aeso_utils:scc(DepGraph),
@@ -1760,6 +1761,8 @@ lookup_name(Env = #env{ namespace = NS, current_function = CurFn }, As, Id, Opti
                     warn_unused_functions,
                     fun() -> register_function_call(NS ++ qname(CurFn), QId) end)
               end || CurFn =/= none ],
+
+            when_warning(warn_unused_constants, fun() -> used_constant(NS, QId) end),
 
             Freshen = proplists:get_value(freshen, Options, false),
             check_stateful(Env, Id, Ty),
@@ -3293,6 +3296,7 @@ all_warnings() ->
     [ warn_unused_includes
     , warn_unused_stateful
     , warn_unused_variables
+    , warn_unused_constants
     , warn_unused_typedefs
     , warn_unused_return_value
     , warn_unused_functions
@@ -3369,6 +3373,17 @@ potential_unused_variables(Namespace, Fun, Vars0) ->
 used_variable(Namespace, Fun, [VarName]) ->
     ets_match_delete(warnings, {unused_variable, '_', Namespace, Fun, VarName});
 used_variable(_, _, _) -> ok.
+
+%% Warnings (Unused constants)
+
+potential_unused_constants(#env{ what = namespace }, _Consts) ->
+    [];
+potential_unused_constants(#env{ namespace = Namespace }, Consts) ->
+    [ ets_insert(warnings, {unused_constant, Ann, Namespace, Name}) || {letval, _, {id, Ann, Name}, _} <- Consts ].
+
+used_constant(Namespace = [Contract], [Contract, ConstName]) ->
+    ets_match_delete(warnings, {unused_constant, '_', Namespace, ConstName});
+used_constant(_, _) -> ok.
 
 %% Warnings (Unused return value)
 
@@ -3939,6 +3954,9 @@ mk_warning({unused_stateful, Ann, FunName}) ->
     aeso_warnings:new(pos(Ann), Msg);
 mk_warning({unused_variable, Ann, _Namespace, _Fun, VarName}) ->
     Msg = io_lib:format("The variable `~s` is defined but never used.", [VarName]),
+    aeso_warnings:new(pos(Ann), Msg);
+mk_warning({unused_constant, Ann, _Namespace, ConstName}) ->
+    Msg = io_lib:format("The constant `~s` is defined but never used.", [ConstName]),
     aeso_warnings:new(pos(Ann), Msg);
 mk_warning({unused_typedef, Ann, QName, _Arity}) ->
     Msg = io_lib:format("The type `~s` is defined but never used.", [lists:last(QName)]),
