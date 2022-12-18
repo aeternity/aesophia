@@ -59,3 +59,4 @@ contract C =
     entrypoint f22() = c22
     entrypoint f23() = c23
     entrypoint f24() = c24
+    entrypoint fqual() = C.c01
