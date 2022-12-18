@@ -72,3 +72,17 @@ namespace ShadowingConst =
   function f() =
     let const = 2
     const
+
+namespace UnusedConstNamespace =
+  // No warnings should be shown even though const is not used
+  let const = 1
+
+contract UnusedConstContract =
+  // Only `c` should show a warning because it is never used in the contract
+  let a = 1
+  let b = 2
+  let c = 3
+
+  entrypoint f() =
+    // Both normal access and qualified access should prevent the unused const warning
+    a + UnusedConstContract.b

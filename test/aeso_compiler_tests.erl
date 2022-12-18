@@ -289,7 +289,9 @@ warnings() ->
       <<?PosW(60, 5)
         "The function `dec` is defined but never used.">>,
       <<?PosW(73, 9)
-        "The definition of `const` shadows an older definition at line 70, column 3.">>
+        "The definition of `const` shadows an older definition at line 70, column 3.">>,
+      <<?PosW(84, 7)
+        "The constant `c` is defined but never used.">>
      ]).
 
 failing_contracts() ->
@@ -860,7 +862,9 @@ failing_contracts() ->
                    <<?Pos(60, 5)
                      "The function `dec` is defined but never used.">>,
                    <<?Pos(73, 9)
-                     "The definition of `const` shadows an older definition at line 70, column 3.">>
+                     "The definition of `const` shadows an older definition at line 70, column 3.">>,
+                   <<?Pos(84, 7)
+                     "The constant `c` is defined but never used.">>
                   ])
     , ?TYPE_ERROR(polymorphism_contract_interface_recursive,
                   [<<?Pos(1,24)
