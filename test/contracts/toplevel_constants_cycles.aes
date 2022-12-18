@@ -1,0 +1,6 @@
+contract C =
+    let selfcycle = selfcycle
+
+    let cycle1 = cycle2
+    let cycle2 = cycle3
+    let cycle3 = cycle1

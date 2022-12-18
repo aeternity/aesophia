@@ -1,0 +1,7 @@
+contract interface I =
+    let (x::y::_) = [1,2,3]
+    let c = 10
+    let d = 10
+
+contract C =
+    entrypoint init() = ()

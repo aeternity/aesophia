@@ -1194,6 +1194,66 @@ failing_contracts() ->
                    <<?Pos(13,20)
                      "Found a hole of type `'a`">>
                   ])
+    , ?TYPE_ERROR(toplevel_constants_contract_as_namespace,
+                  [<<?Pos(5,13)
+                     "Invalid use of the contract constant `G.const`.\n"
+                     "Toplevel contract constants can only be used in the contracts where they are defined.">>,
+                   <<?Pos(10,11)
+                     "Record type `G` does not have field `const`">>,
+                   <<?Pos(10,11)
+                     "Unbound field const">>,
+                   <<?Pos(11,11)
+                     "Record type `G` does not have field `const`">>,
+                   <<?Pos(11,11)
+                     "Unbound field const">>
+                  ])
+    , ?TYPE_ERROR(toplevel_constants_cycles,
+                  [<<?Pos(2,21)
+                     "Unbound variable `selfcycle`">>,
+                   <<?Pos(4,5)
+                     "Mutual recursion detected between the constants\n"
+                     "  - `cycle1` at line 4, column 5\n"
+                     "  - `cycle2` at line 5, column 5\n"
+                     "  - `cycle3` at line 6, column 5">>
+                  ])
+    , ?TYPE_ERROR(toplevel_constants_in_interface,
+                  [<<?Pos(2,10)
+                     "The name of the compile-time constant cannot have pattern matching nor type">>,
+                   <<?Pos(3,5)
+                     "Cannot define toplevel constants inside a contract interface">>,
+                   <<?Pos(4,5)
+                     "Cannot define toplevel constants inside a contract interface">>
+                  ])
+    , ?TYPE_ERROR(toplevel_constants_invalid_expr,
+                  [<<?Pos(10,9)
+                     "Invalid expression in the definition of the constant `c01`">>,
+                   <<?Pos(11,9)
+                     "Invalid expression in the definition of the constant `c02`">>,
+                   <<?Pos(12,9)
+                     "Invalid expression in the definition of the constant `c03`">>,
+                   <<?Pos(13,9)
+                     "Invalid expression in the definition of the constant `c04`">>,
+                   <<?Pos(14,9)
+                     "Invalid expression in the definition of the constant `c05`">>,
+                   <<?Pos(17,9)
+                     "Invalid expression in the definition of the constant `c07`">>,
+                   <<?Pos(18,9)
+                     "Invalid expression in the definition of the constant `c08`">>,
+                   <<?Pos(19,9)
+                     "Invalid expression in the definition of the constant `c09`">>,
+                   <<?Pos(20,9)
+                     "Invalid expression in the definition of the constant `c10`">>,
+                   <<?Pos(21,9)
+                     "Invalid expression in the definition of the constant `c11`">>
+                  ])
+    , ?TYPE_ERROR(toplevel_constants_invalid_id,
+                  [<<?Pos(2,9)
+                     "The name of the compile-time constant cannot have pattern matching nor type">>,
+                   <<?Pos(3,9)
+                     "The name of the compile-time constant cannot have pattern matching nor type">>,
+                   <<?Pos(4,9)
+                     "The name of the compile-time constant cannot have pattern matching nor type">>
+                  ])
     ].
 
 validation_test_() ->
