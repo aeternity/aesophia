@@ -1995,7 +1995,7 @@ infer_expr(Env, {typed, As, Body, Type}) ->
     Type1 = check_type(Env, Type),
     {typed, _, NewBody, NewType} = check_expr(Env, Body, Type1),
     {typed, As, NewBody, NewType};
-infer_expr(Env = #env{ current_const = CurrentConst }, {app, Ann, Fun, Args0} = App) ->
+infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
     {NamedArgs, Args} = split_args(Args0),
     case aeso_syntax:get_ann(format, Ann) of
         infix ->
@@ -2003,17 +2003,9 @@ infer_expr(Env = #env{ current_const = CurrentConst }, {app, Ann, Fun, Args0} = 
         prefix ->
             infer_op(Env, Ann, Fun, Args, fun infer_prefix/1);
         _ ->
-            case CurrentConst of
-                none -> ok;
-                Id   ->
-                    case Fun of
-                        {con, _, _}  -> ok;
-                        {qcon, _, _} -> ok;
-                        _            ->
-                            type_error({invalid_const_expr, Id}),
-                            destroy_and_report_type_errors(Env)
-                    end
-            end,
+            %% Applications of data constructors are allowed in constants
+            lists:member(element(1, Fun), [con, qcon]) orelse ban_when_const(Env),
+
             NamedArgsVar = fresh_uvar(Ann),
             NamedArgs1 = [ infer_named_arg(Env, NamedArgsVar, Arg) || Arg <- NamedArgs ],
             NewFun0 = infer_expr(Env, Fun),
