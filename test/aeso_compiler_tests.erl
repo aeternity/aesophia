@@ -1230,25 +1230,35 @@ failing_contracts() ->
                   ])
     , ?TYPE_ERROR(toplevel_constants_invalid_expr,
                   [<<?Pos(10,9)
-                     "Invalid expression in the definition of the constant `c01`">>,
+                     "Invalid expression in the definition of the constant `c01`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>,
                    <<?Pos(11,9)
-                     "Invalid expression in the definition of the constant `c02`">>,
+                     "Invalid expression in the definition of the constant `c02`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>,
                    <<?Pos(12,9)
-                     "Invalid expression in the definition of the constant `c03`">>,
+                     "Invalid expression in the definition of the constant `c03`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>,
                    <<?Pos(13,9)
-                     "Invalid expression in the definition of the constant `c04`">>,
+                     "Invalid expression in the definition of the constant `c04`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>,
                    <<?Pos(14,9)
-                     "Invalid expression in the definition of the constant `c05`">>,
+                     "Invalid expression in the definition of the constant `c05`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>,
                    <<?Pos(17,9)
-                     "Invalid expression in the definition of the constant `c07`">>,
+                     "Invalid expression in the definition of the constant `c07`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>,
                    <<?Pos(18,9)
-                     "Invalid expression in the definition of the constant `c08`">>,
+                     "Invalid expression in the definition of the constant `c08`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>,
                    <<?Pos(19,9)
-                     "Invalid expression in the definition of the constant `c09`">>,
+                     "Invalid expression in the definition of the constant `c09`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>,
                    <<?Pos(20,9)
-                     "Invalid expression in the definition of the constant `c10`">>,
+                     "Invalid expression in the definition of the constant `c10`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>,
                    <<?Pos(21,9)
-                     "Invalid expression in the definition of the constant `c11`">>
+                     "Invalid expression in the definition of the constant `c11`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>
                   ])
     , ?TYPE_ERROR(toplevel_constants_invalid_id,
                   [<<?Pos(2,9)

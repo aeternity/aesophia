@@ -3937,7 +3937,9 @@ mk_error({invalid_const_id, Ann}) ->
     mk_t_err(pos(Ann), Msg);
 mk_error({invalid_const_expr, ConstId}) ->
     Msg = io_lib:format("Invalid expression in the definition of the constant `~s`", [name(ConstId)]),
-    mk_t_err(pos(aeso_syntax:get_ann(ConstId)), Msg);
+    Cxt = "You can only use the following expressions as constants: "
+          "literals, lists, tuples, maps, and other constants",
+    mk_t_err(pos(aeso_syntax:get_ann(ConstId)), Msg, Cxt);
 mk_error({illegal_const_in_interface, Ann}) ->
     Msg = "Cannot define toplevel constants inside a contract interface",
     mk_t_err(pos(Ann), Msg);
