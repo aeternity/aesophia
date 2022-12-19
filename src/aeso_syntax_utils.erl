@@ -31,11 +31,13 @@
             | aeso_syntax:field(aeso_syntax:expr())
             | aeso_syntax:stmt().
 fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
+    ExprKind = if K == bind_expr -> bind_expr; true -> expr end,
+    TypeKind = if K == bind_type -> bind_type; true -> type end,
     Sum  = fun(Xs) -> lists:foldl(Plus, Zero, Xs) end,
     Same = fun(A) -> fold(Alg, Fun, K, A) end,
     Decl = fun(D) -> fold(Alg, Fun, decl, D) end,
-    Type = fun(T) -> fold(Alg, Fun, type, T) end,
-    Expr = fun(E) -> fold(Alg, Fun, expr, E) end,
+    Type = fun(T) -> fold(Alg, Fun, TypeKind, T) end,
+    Expr = fun(E) -> fold(Alg, Fun, ExprKind, E) end,
     BindExpr = fun(P) -> fold(Alg, Fun, bind_expr, P) end,
     BindType = fun(T) -> fold(Alg, Fun, bind_type, T) end,
     Top = Fun(K, X),
@@ -155,4 +157,3 @@ used(D) ->
                (_, _)             -> #{}
             end, decl, D)),
     lists:filter(NotBound, Xs).
-
