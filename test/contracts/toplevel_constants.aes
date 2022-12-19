@@ -34,6 +34,7 @@ contract C =
     let c22 = N.nsconst
     let c23 = c01
     let c24 = c11.name
+    let c25 : int = 1
 
     entrypoint f01() = c01
     entrypoint f02() = c02
@@ -59,4 +60,5 @@ contract C =
     entrypoint f22() = c22
     entrypoint f23() = c23
     entrypoint f24() = c24
+    entrypoint f25() = c25
     entrypoint fqual() = C.c01

@@ -534,8 +534,11 @@ qname({qid,  _, Xs}) -> Xs;
 qname({con,  _, X})  -> [X];
 qname({qcon, _, Xs}) -> Xs.
 
--spec name(aeso_syntax:id() | aeso_syntax:con()) -> name().
-name({_, _, X}) -> X.
+-spec name(Named | {typed, _, Named, _}) -> name() when
+      Named :: aeso_syntax:id() | aeso_syntax:con().
+name({typed, _, X, _}) -> name(X);
+name({id, _, X}) -> X;
+name({con, _, X}) -> X.
 
 -spec qid(aeso_syntax:ann(), qname()) -> aeso_syntax:id() | aeso_syntax:qid().
 qid(Ann, [X]) -> {id, Ann, X};
@@ -1295,8 +1298,9 @@ opposite_variance(bivariant) -> bivariant.
 
 -spec check_constants(env(), [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
 check_constants(Env = #env{ what = What }, Consts) ->
-    HasValidId = fun({letval, _, {id, _, _}, _}) -> true;
-                    (_)                          -> false
+    HasValidId = fun({letval, _, {id, _, _}, _})                -> true;
+                    ({letval, _, {typed, _, {id, _, _}, _}, _}) -> true;
+                    (_)                                         -> false
                  end,
     {Valid, Invalid} = lists:partition(HasValidId, Consts),
     [ type_error({invalid_const_id, aeso_syntax:get_ann(Pat)}) || {letval, _, Pat, _} <- Invalid ],
@@ -2317,6 +2321,9 @@ infer_block(Env, Attrs, [E|Rest], BlockType) ->
     when_warning(warn_unused_return_value, fun() -> potential_unused_return_value(NewE) end),
     [NewE|infer_block(Env, Attrs, Rest, BlockType)].
 
+infer_const(Env, {letval, Ann, TypedId = {typed, _, Id = {id, _, _}, Type}, Expr}) ->
+    NewExpr = check_expr(Env#env{ current_const = Id }, Expr, Type),
+    {letval, Ann, TypedId, NewExpr};
 infer_const(Env, {letval, Ann, Id = {id, AnnId, _}, Expr}) ->
     create_constraints(),
     NewExpr = {typed, _, _, Type} = infer_expr(Env#env{ current_const = Id }, Expr),
@@ -3926,7 +3933,7 @@ mk_error({mutually_recursive_constants, Consts}) ->
     [{letval, Ann, _, _} | _] = Consts,
     mk_t_err(pos(Ann), Msg);
 mk_error({invalid_const_id, Ann}) ->
-    Msg = "The name of the compile-time constant cannot have pattern matching nor type",
+    Msg = "The name of the compile-time constant cannot have pattern matching",
     mk_t_err(pos(Ann), Msg);
 mk_error({invalid_const_expr, ConstId}) ->
     Msg = io_lib:format("Invalid expression in the definition of the constant `~s`", [name(ConstId)]),

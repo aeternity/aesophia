@@ -1222,7 +1222,7 @@ failing_contracts() ->
                   ])
     , ?TYPE_ERROR(toplevel_constants_in_interface,
                   [<<?Pos(2,10)
-                     "The name of the compile-time constant cannot have pattern matching nor type">>,
+                     "The name of the compile-time constant cannot have pattern matching">>,
                    <<?Pos(3,5)
                      "Cannot define toplevel constants inside a contract interface">>,
                    <<?Pos(4,5)
@@ -1252,11 +1252,12 @@ failing_contracts() ->
                   ])
     , ?TYPE_ERROR(toplevel_constants_invalid_id,
                   [<<?Pos(2,9)
-                     "The name of the compile-time constant cannot have pattern matching nor type">>,
+                     "The name of the compile-time constant cannot have pattern matching">>,
                    <<?Pos(3,9)
-                     "The name of the compile-time constant cannot have pattern matching nor type">>,
-                   <<?Pos(4,9)
-                     "The name of the compile-time constant cannot have pattern matching nor type">>
+                     "The name of the compile-time constant cannot have pattern matching">>,
+                   <<?Pos(4,20)
+                     "Cannot unify `string` and `bool`\n"
+                     "when checking the type of the expression `\"str\" : string` against the expected type `bool`">>
                   ])
     ].
 

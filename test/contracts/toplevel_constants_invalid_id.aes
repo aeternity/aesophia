@@ -1,4 +1,4 @@
 contract C =
     let x::_ = [1,2,3,4]
     let y::(p = z::_) = [1,2,3,4]
-    let t : int = 1
+    let q : bool = "str"
