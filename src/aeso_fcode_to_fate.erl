@@ -128,7 +128,8 @@ function_to_scode(ChildContracts, ContractName, Functions, Name, Attrs0, Args, B
     [ add_variables_register(Env, Arg, Register) ||
         proplists:get_value(debug_info, Options, false),
         {Arg, Register} <- Env#env.vars ],
-    SCode = to_scode(Env, Body),
+    ArgsNames = [ X || {X, _} <- lists:reverse(Env#env.vars) ],
+    SCode = dbg_scoped_vars(Env, ArgsNames, to_scode(Env, Body)),
     {Attrs, {ArgTypes, ResType1}, SCode}.
 
 get_variables_registers() ->
@@ -355,13 +356,13 @@ to_scode1(Env, {op, Ann, Op, Args}) ->
 
 to_scode1(Env, {'let', Ann, X, {var, _, Y}, Body}) ->
     Env1 = bind_var(X, lookup_var(Env, Y), Env),
-    [ dbgloc(Env, Ann) | to_scode(Env1, Body) ];
+    [ dbgloc(Env, Ann) | dbg_scoped_var(Env1, X, to_scode(Env1, Body)) ];
 to_scode1(Env, {'let', Ann, X, Expr, Body}) ->
     {I, Env1} = bind_local(X, Env),
-    [ dbgloc(Env, Ann),
-      to_scode(notail(Env), Expr),
-      aeb_fate_ops:store({var, I}, {stack, 0}),
-      to_scode(Env1, Body) ];
+    SCode = [ to_scode(notail(Env), Expr),
+              aeb_fate_ops:store({var, I}, {stack, 0}),
+              to_scode(Env1, Body) ],
+    [ dbgloc(Env, Ann) | dbg_scoped_var(Env1, X, SCode) ];
 
 to_scode1(Env = #env{ current_function = Fun, tailpos = true }, {def, Ann, Fun, Args}) ->
     %% Tail-call to current function, f(e0..en). Compile to
@@ -774,6 +775,26 @@ dbgloc(Env, Ann) ->
             end
     end.
 
+dbg_scoped_vars(_Env, [], SCode) ->
+    SCode;
+dbg_scoped_vars(Env, [Var | Rest], SCode) ->
+    dbg_scoped_vars(Env, Rest, dbg_scoped_var(Env, Var, SCode)).
+
+dbg_scoped_var(Env = #env{saved_fresh_names = SavedFreshNames}, Var, SCode) ->
+    case proplists:get_value(debug_info, Env#env.options, false) of
+        false -> SCode;
+        true  ->
+            Register = lookup_var(Env, Var),
+            case maps:get(Var, SavedFreshNames, Var) of
+                ["%" | _] -> SCode;
+                "_"       -> SCode;
+                VarName   ->
+                    Def   = [{'DBG_DEF',   {immediate, VarName}, Register}],
+                    Undef = [{'DBG_UNDEF', {immediate, VarName}, Register}],
+                    Def ++ SCode ++ Undef
+            end
+    end.
+
 %% -- Phase II ---------------------------------------------------------------
 %%  Optimize
 
@@ -910,6 +931,8 @@ attributes(I) ->
         switch_body                           -> Pure(none, []);
         'RETURN'                              -> Impure(pc, []);
         {'DBGLOC', _, _, _}                   -> Pure(none, []);
+        {'DBG_DEF', _, _}                     -> Pure(none, []);
+        {'DBG_UNDEF', _, _}                   -> Pure(none, []);
         {'RETURNR', A}                        -> Impure(pc, A);
         {'CALL', A}                           -> Impure(?a, [A]);
         {'CALL_R', A, _, B, C, D}             -> Impure(?a, [A, B, C, D]);
