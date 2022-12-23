@@ -786,9 +786,9 @@ dbg_scoped_var(Env = #env{saved_fresh_names = SavedFreshNames}, Var, SCode) ->
         true  ->
             Register = lookup_var(Env, Var),
             case maps:get(Var, SavedFreshNames, Var) of
-                ["%" | _] -> SCode;
-                "_"       -> SCode;
-                VarName   ->
+                "%" ++ _ -> SCode;
+                "_"      -> SCode;
+                VarName  ->
                     Def   = [{'DBG_DEF',   {immediate, VarName}, Register}],
                     Undef = [{'DBG_UNDEF', {immediate, VarName}, Register}],
                     Def ++ SCode ++ Undef
