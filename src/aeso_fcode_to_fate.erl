@@ -128,9 +128,8 @@ function_to_scode(ChildContracts, ContractName, Functions, Name, Attrs0, Args, B
     [ add_variables_register(Env, Arg, Register) ||
         proplists:get_value(debug_info, Options, false),
         {Arg, Register} <- Env#env.vars ],
-    %ArgsNames = [ X || {X, _} <- lists:reverse(Env#env.vars) ],
-    %SCode = dbg_scoped_vars(Env, ArgsNames, to_scode(Env, Body)),
-    SCode = to_scode(Env, Body),
+    ArgsNames = [ X || {X, _} <- lists:reverse(Env#env.vars) ],
+    SCode = dbg_scoped_vars(Env, ArgsNames, to_scode(Env, Body)),
     {Attrs, {ArgTypes, ResType1}, SCode}.
 
 get_variables_registers() ->
@@ -772,7 +771,7 @@ dbgloc(Env, Ann) ->
             case {Line, Col} of
                 {undefined, _} -> [];
                 {_, undefined} -> [];
-                {Line, Col}    -> [{'DBGLOC', {immediate, File}, {immediate, Line}, {immediate, Col}}]
+                {_, _}         -> [{'DBGLOC', {immediate, File}, {immediate, Line}, {immediate, Col}}]
             end
     end.
 
@@ -785,15 +784,40 @@ dbg_scoped_var(Env = #env{saved_fresh_names = SavedFreshNames}, Var, SCode) ->
     case proplists:get_value(debug_info, Env#env.options, false) of
         false -> SCode;
         true  ->
-            Register = lookup_var(Env, Var),
             case maps:get(Var, SavedFreshNames, Var) of
                 "%" ++ _ -> SCode;
                 "_"      -> SCode;
                 VarName  ->
-                    Def   = [{'DBG_DEF',   {immediate, VarName}, Register}],
-                    Undef = [{'DBG_UNDEF', {immediate, VarName}, Register}],
-                    Def ++ SCode ++ Undef
+                    Register = lookup_var(Env, Var),
+                    Def      = [{'DBG_DEF',   {immediate, VarName}, Register}],
+                    Undef    = [{'DBG_UNDEF', {immediate, VarName}, Register}],
+                    Def ++ dbg_undef(Undef, SCode)
             end
+    end.
+
+dbg_undef(_Undef, missing) ->
+    missing;
+dbg_undef(Undef, loop) ->
+    [Undef, loop];
+dbg_undef(Undef, switch_body) ->
+    [switch_body, Undef];
+dbg_undef(Undef, {switch, Arg, Type, Alts, Catch}) ->
+    NewAlts   = [ dbg_undef(Undef, Alt) || Alt <- Alts ],
+    NewCatch  = dbg_undef(Undef, Catch),
+    NewSwitch = {switch, Arg, Type, NewAlts, NewCatch},
+    NewSwitch;
+dbg_undef(Undef, SCode) when is_list(SCode) ->
+    lists:droplast(SCode) ++ [dbg_undef(Undef, lists:last(SCode))];
+dbg_undef(Undef, SCode) when is_tuple(SCode); is_atom(SCode) ->
+    [Mnemonic | _] =
+        case is_tuple(SCode) of
+            true  -> tuple_to_list(SCode);
+            false -> [SCode]
+        end,
+    Op = aeb_fate_opcodes:m_to_op(Mnemonic),
+    case aeb_fate_opcodes:end_bb(Op) of
+        true  -> [Undef, SCode];
+        false -> [SCode, Undef]
     end.
 
 %% -- Phase II ---------------------------------------------------------------
