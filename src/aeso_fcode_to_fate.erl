@@ -128,8 +128,9 @@ function_to_scode(ChildContracts, ContractName, Functions, Name, Attrs0, Args, B
     [ add_variables_register(Env, Arg, Register) ||
         proplists:get_value(debug_info, Options, false),
         {Arg, Register} <- Env#env.vars ],
-    ArgsNames = [ X || {X, _} <- lists:reverse(Env#env.vars) ],
-    SCode = dbg_scoped_vars(Env, ArgsNames, to_scode(Env, Body)),
+    %ArgsNames = [ X || {X, _} <- lists:reverse(Env#env.vars) ],
+    %SCode = dbg_scoped_vars(Env, ArgsNames, to_scode(Env, Body)),
+    SCode = to_scode(Env, Body),
     {Attrs, {ArgTypes, ResType1}, SCode}.
 
 get_variables_registers() ->
