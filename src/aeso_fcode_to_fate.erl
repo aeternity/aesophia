@@ -767,11 +767,9 @@ dbg_loc(Env, Ann) ->
                        F       -> F
                    end,
             Line = proplists:get_value(line, Ann),
-            Col  = proplists:get_value(col, Ann),
-            case {Line, Col} of
-                {undefined, _} -> [];
-                {_, undefined} -> [];
-                {_, _}         -> [{'DBG_LOC', {immediate, File}, {immediate, Line}, {immediate, Col}}]
+            case Line of
+                undefined -> [];
+                _         -> [{'DBG_LOC', {immediate, File}, {immediate, Line}}]
             end
     end.
 
@@ -955,7 +953,7 @@ attributes(I) ->
         loop                                  -> Impure(pc, []);
         switch_body                           -> Pure(none, []);
         'RETURN'                              -> Impure(pc, []);
-        {'DBG_LOC', _, _, _}                  -> Pure(none, []);
+        {'DBG_LOC', _, _}                     -> Pure(none, []);
         {'DBG_DEF', _, _}                     -> Pure(none, []);
         {'DBG_UNDEF', _, _}                   -> Pure(none, []);
         {'RETURNR', A}                        -> Impure(pc, A);
