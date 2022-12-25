@@ -320,49 +320,49 @@ to_scode(Env, T) ->
     end.
 
 to_scode1(Env, {lit, Ann, L}) ->
-    [ dbgloc(Env, Ann), push(?i(lit_to_fate(Env, L))) ];
+    [ dbg_loc(Env, Ann), push(?i(lit_to_fate(Env, L))) ];
 
 to_scode1(Env, {nil, Ann}) ->
-    [ dbgloc(Env, Ann), aeb_fate_ops:nil(?a) ];
+    [ dbg_loc(Env, Ann), aeb_fate_ops:nil(?a) ];
 
 to_scode1(Env, {var, Ann, X}) ->
-    [ dbgloc(Env, Ann), push(lookup_var(Env, X)) ];
+    [ dbg_loc(Env, Ann), push(lookup_var(Env, X)) ];
 
 to_scode1(Env, {con, Ann, Ar, I, As}) ->
     N = length(As),
-    [ dbgloc(Env, Ann),
+    [ dbg_loc(Env, Ann),
       [to_scode(notail(Env), A) || A <- As],
       aeb_fate_ops:variant(?a, ?i(Ar), ?i(I), ?i(N)) ];
 
 to_scode1(Env, {tuple, Ann, As}) ->
     N = length(As),
-    [ dbgloc(Env, Ann),
+    [ dbg_loc(Env, Ann),
       [ to_scode(notail(Env), A) || A <- As ],
       tuple(N) ];
 
 to_scode1(Env, {proj, Ann, E, I}) ->
-    [ dbgloc(Env, Ann),
+    [ dbg_loc(Env, Ann),
       to_scode(notail(Env), E),
       aeb_fate_ops:element_op(?a, ?i(I), ?a) ];
 
 to_scode1(Env, {set_proj, Ann, R, I, E}) ->
-    [ dbgloc(Env, Ann),
+    [ dbg_loc(Env, Ann),
       to_scode(notail(Env), E),
       to_scode(notail(Env), R),
       aeb_fate_ops:setelement(?a, ?i(I), ?a, ?a) ];
 
 to_scode1(Env, {op, Ann, Op, Args}) ->
-    [ dbgloc(Env, Ann) | call_to_scode(Env, op_to_scode(Op), Args) ];
+    [ dbg_loc(Env, Ann) | call_to_scode(Env, op_to_scode(Op), Args) ];
 
 to_scode1(Env, {'let', Ann, X, {var, _, Y}, Body}) ->
     Env1 = bind_var(X, lookup_var(Env, Y), Env),
-    [ dbgloc(Env, Ann) | dbg_scoped_var(Env1, X, to_scode(Env1, Body)) ];
+    [ dbg_loc(Env, Ann) | dbg_scoped_var(Env1, X, to_scode(Env1, Body)) ];
 to_scode1(Env, {'let', Ann, X, Expr, Body}) ->
     {I, Env1} = bind_local(X, Env),
     SCode = [ to_scode(notail(Env), Expr),
               aeb_fate_ops:store({var, I}, {stack, 0}),
               to_scode(Env1, Body) ],
-    [ dbgloc(Env, Ann) | dbg_scoped_var(Env1, X, SCode) ];
+    [ dbg_loc(Env, Ann) | dbg_scoped_var(Env1, X, SCode) ];
 
 to_scode1(Env = #env{ current_function = Fun, tailpos = true }, {def, Ann, Fun, Args}) ->
     %% Tail-call to current function, f(e0..en). Compile to
@@ -377,7 +377,7 @@ to_scode1(Env = #env{ current_function = Fun, tailpos = true }, {def, Ann, Fun, 
                                 aeb_fate_ops:store({var, I}, ?a)],
                         {[I | Is], Acc1, Env2}
                     end, {[], [], Env}, Args),
-    [ dbgloc(Env, Ann),
+    [ dbg_loc(Env, Ann),
       Code,
       [ aeb_fate_ops:store({arg, I}, {var, J})
         || {I, J} <- lists:zip(lists:seq(0, length(Vars) - 1),
@@ -386,12 +386,12 @@ to_scode1(Env = #env{ current_function = Fun, tailpos = true }, {def, Ann, Fun, 
 to_scode1(Env, {def, Ann, Fun, Args}) ->
     FName = make_function_id(Fun),
     Lbl   = aeb_fate_data:make_string(FName),
-    [ dbgloc(Env, Ann) | call_to_scode(Env, local_call(Env, ?i(Lbl)), Args) ];
+    [ dbg_loc(Env, Ann) | call_to_scode(Env, local_call(Env, ?i(Lbl)), Args) ];
 to_scode1(Env, {funcall, Ann, Fun, Args}) ->
-    [ dbgloc(Env, Ann) | call_to_scode(Env, [to_scode(Env, Fun), local_call(Env, ?a)], Args) ];
+    [ dbg_loc(Env, Ann) | call_to_scode(Env, [to_scode(Env, Fun), local_call(Env, ?a)], Args) ];
 
 to_scode1(Env, {builtin, Ann, B, Args}) ->
-    [ dbgloc(Env, Ann) | builtin_to_scode(Env, B, Args) ];
+    [ dbg_loc(Env, Ann) | builtin_to_scode(Env, B, Args) ];
 
 to_scode1(Env, {remote, Ann, ArgsT, RetT, Ct, Fun, [Gas, Value, Protected | Args]}) ->
     Lbl = make_function_id(Fun),
@@ -415,18 +415,18 @@ to_scode1(Env, {remote, Ann, ArgsT, RetT, Ct, Fun, [Gas, Value, Protected | Args
             Call = aeb_fate_ops:call_pgr(?a, Lbl, ArgType, RetType, ?a, ?a, ?a),
             call_to_scode(Env, Call, [Ct, Value, Gas, Protected | Args])
     end,
-    [ dbgloc(Env, Ann) | SCode ];
+    [ dbg_loc(Env, Ann) | SCode ];
 
 to_scode1(Env, {get_state, Ann, Reg}) ->
-    [ dbgloc(Env, Ann), push(?s(Reg)) ];
+    [ dbg_loc(Env, Ann), push(?s(Reg)) ];
 to_scode1(Env, {set_state, Ann, Reg, Val}) ->
-    [ dbgloc(Env, Ann) | call_to_scode(Env, [{'STORE', ?s(Reg), ?a}, tuple(0)], [Val]) ];
+    [ dbg_loc(Env, Ann) | call_to_scode(Env, [{'STORE', ?s(Reg), ?a}, tuple(0)], [Val]) ];
 
 to_scode1(Env, {closure, Ann, Fun, FVs}) ->
     to_scode(Env, {tuple, Ann, [{lit, Ann, {string, make_function_id(Fun)}}, FVs]});
 
 to_scode1(Env, {switch, Ann, Case}) ->
-    [ dbgloc(Env, Ann) | split_to_scode(Env, Case) ].
+    [ dbg_loc(Env, Ann) | split_to_scode(Env, Case) ].
 
 local_call( Env, Fun) when Env#env.tailpos -> aeb_fate_ops:call_t(Fun);
 local_call(_Env, Fun)                      -> aeb_fate_ops:call(Fun).
@@ -758,7 +758,7 @@ push(A) -> {'STORE', ?a, A}.
 tuple(0) -> push(?i({tuple, {}}));
 tuple(N) -> aeb_fate_ops:tuple(?a, N).
 
-dbgloc(Env, Ann) ->
+dbg_loc(Env, Ann) ->
     case proplists:get_value(debug_info, Env#env.options, false) of
         false -> [];
         true  ->
@@ -771,7 +771,7 @@ dbgloc(Env, Ann) ->
             case {Line, Col} of
                 {undefined, _} -> [];
                 {_, undefined} -> [];
-                {_, _}         -> [{'DBGLOC', {immediate, File}, {immediate, Line}, {immediate, Col}}]
+                {_, _}         -> [{'DBG_LOC', {immediate, File}, {immediate, Line}, {immediate, Col}}]
             end
     end.
 
@@ -955,7 +955,7 @@ attributes(I) ->
         loop                                  -> Impure(pc, []);
         switch_body                           -> Pure(none, []);
         'RETURN'                              -> Impure(pc, []);
-        {'DBGLOC', _, _, _}                   -> Pure(none, []);
+        {'DBG_LOC', _, _, _}                  -> Pure(none, []);
         {'DBG_DEF', _, _}                     -> Pure(none, []);
         {'DBG_UNDEF', _, _}                   -> Pure(none, []);
         {'RETURNR', A}                        -> Impure(pc, A);
