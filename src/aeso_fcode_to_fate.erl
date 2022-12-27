@@ -1675,7 +1675,23 @@ bb(_Name, Code) ->
     Blocks  = lists:flatmap(fun split_calls/1, Blocks1),
     Labels  = maps:from_list([ {Ref, I} || {I, {Ref, _}} <- with_ixs(Blocks) ]),
     BBs     = [ set_labels(Labels, B) || B <- Blocks ],
-    maps:from_list(BBs).
+    maps:from_list(dbg_loc_filter(BBs)).
+
+%% Filter DBG_LOC instructions to keep one instruction per line
+dbg_loc_filter(BBs) ->
+    dbg_loc_filter(BBs, [], [], sets:new()).
+
+dbg_loc_filter([], _, AllBlocks, _) ->
+    lists:reverse(AllBlocks);
+dbg_loc_filter([{I, []} | Rest], AllOps, AllBlocks, DbgLocs) ->
+    dbg_loc_filter(Rest, [], [{I, lists:reverse(AllOps)} | AllBlocks], DbgLocs);
+dbg_loc_filter([{I, [Op = {'DBG_LOC', _, _} | Ops]} | Rest], AllOps, AllBlocks, DbgLocs) ->
+    case sets:is_element(Op, DbgLocs) of
+        true  -> dbg_loc_filter([{I, Ops} | Rest], AllOps, AllBlocks, DbgLocs);
+        false -> dbg_loc_filter([{I, Ops} | Rest], [Op | AllOps], AllBlocks, sets:add_element(Op, DbgLocs))
+    end;
+dbg_loc_filter([{I, [Op | Ops]} | Rest], AllOps, AllBlocks, DbgLocs) ->
+    dbg_loc_filter([{I, Ops} | Rest], [Op | AllOps], AllBlocks, DbgLocs).
 
 %% -- Break up scode into basic blocks --
 
