@@ -359,8 +359,11 @@ exprAtom() ->
         , ?RULE(tok('['), Expr, binop('..'), Expr, tok(']'), _3(_2, _4))
         , ?RULE(keyword('('), comma_sep(Expr), tok(')'), tuple_e(_1, _2))
         , letpat()
+        , hole()
         ])
     end).
+
+hole() -> ?RULE(token('???'), {id, get_ann(_1), "???"}).
 
 comprehension_exp() ->
     ?LAZY_P(choice(
