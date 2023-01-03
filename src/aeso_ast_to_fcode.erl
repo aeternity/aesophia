@@ -58,7 +58,7 @@
               | {contract_code, string()} %% for CREATE, by name
               | {typerep, ftype()}.
 
--type fann() :: [ {file, aeso_syntax:ann_file()} | {line, aeso_syntax:ann_line()} | {col, aeso_syntax:ann_col()} ].
+-type fann() :: [ {file, aeso_syntax:ann_file()} | {line, aeso_syntax:ann_line()} ].
 
 -type fexpr() :: {lit, fann(), flit()}
                | {nil, fann()}
@@ -391,8 +391,7 @@ to_fcode(Env, [{namespace, _, {con, _, Con}, Decls} | Code]) ->
 to_fann(Ann) ->
     File = proplists:lookup_all(file, Ann),
     Line = proplists:lookup_all(line, Ann),
-    Col  = proplists:lookup_all(col, Ann),
-    lists:flatten([File, Line, Col]).
+    lists:flatten([File, Line]).
 
 -spec get_fann(fexpr()) -> fann().
 get_fann(FExpr) -> element(2, FExpr).
