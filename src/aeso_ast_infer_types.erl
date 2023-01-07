@@ -2912,6 +2912,12 @@ unify1(_Env, {uvar, _, R}, {uvar, _, R}, _Variance, _When) ->
     true;
 unify1(_Env, {uvar, _, _}, {fun_t, _, _, var_args, _}, _Variance, When) ->
     type_error({unify_varargs, When});
+unify1(_Env, {id, Ann, "hole"}, B, _Variance, _When) ->
+    type_error({hole_found, Ann, B}),
+    true;
+unify1(_Env, A, {id, Ann, "hole"}, _Variance, _When) ->
+    type_error({hole_found, Ann, A}),
+    true;
 unify1(Env, {uvar, A, R}, T, _Variance, When) ->
     case occurs_check(R, T) of
         true ->
@@ -2940,12 +2946,6 @@ unify1(_Env, _A, {id, _, "void"}, Variance, _When)
     true;
 unify1(_Env, {id, _, "void"}, _B, Variance, _When)
   when Variance == contravariant orelse Variance == bivariant ->
-    true;
-unify1(_Env, {id, Ann, "hole"}, B, _Variance, _When) ->
-    type_error({hole_found, Ann, B}),
-    true;
-unify1(_Env, A, {id, Ann, "hole"}, _Variance, _When) ->
-    type_error({hole_found, Ann, A}),
     true;
 unify1(_Env, {id, _, Name}, {id, _, Name}, _Variance, _When) ->
     true;
