@@ -1264,10 +1264,7 @@ failing_contracts() ->
                   [<<?Pos(2,9)
                      "The name of the compile-time constant cannot have pattern matching">>,
                    <<?Pos(3,9)
-                     "The name of the compile-time constant cannot have pattern matching">>,
-                   <<?Pos(4,20)
-                     "Cannot unify `string` and `bool`\n"
-                     "when checking the type of the expression `\"str\" : string` against the expected type `bool`">>
+                     "The name of the compile-time constant cannot have pattern matching">>
                   ])
     ].
 
