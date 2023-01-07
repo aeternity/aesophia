@@ -1182,6 +1182,16 @@ failing_contracts() ->
     , ?TYPE_ERROR(using_contract_as_namespace,
                   [<<?Pos(5,3)
                      "Cannot use undefined namespace F">>])
+    , ?TYPE_ERROR(hole_expression,
+                  [<<?Pos(5,13)
+                     "Found a hole of type `bool`">>,
+                   <<?Pos(6,17)
+                     "Found a hole of type `string`">>,
+                   <<?Pos(9,37)
+                     "Found a hole of type `(int) => int`">>,
+                   <<?Pos(13,20)
+                     "Found a hole of type `'a`">>
+                  ])
     ].
 
 validation_test_() ->

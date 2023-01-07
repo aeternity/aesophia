@@ -1,0 +1,13 @@
+include "List.aes"
+
+contract C =
+    entrypoint f() =
+        let ??? = true
+        let v = ???
+        let q = v == "str"
+        let xs = [1, 2, 3, 4]
+        switch (List.first(List.map(???, xs)))
+            Some(x) => x + 1
+            None    => 0
+
+    function g() = ???
