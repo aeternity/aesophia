@@ -238,6 +238,7 @@ Expr ::= '(' LamArgs ')' '=>' Block(Stmt)   // Anonymous function    (x) => x + 
        | Int | Bytes | String | Char        // Literals              123, 0xff, #00abc123, "foo", '%'
        | AccountAddress | ContractAddress   // Chain identifiers
        | OracleAddress | OracleQueryId      // Chain identifiers
+       | '???'                              // Hole expression       1 + ???
 
 Generator ::= Pattern '<-' Expr   // Generator
             | 'if' '(' Expr ')'   // Guard
