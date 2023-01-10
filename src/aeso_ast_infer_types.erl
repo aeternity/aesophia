@@ -1844,7 +1844,9 @@ infer_expr(_Env, Body={contract_pubkey, As, _}) ->
 infer_expr(_Env, Body={id, As, "_"}) ->
     {typed, As, Body, fresh_uvar(As)};
 infer_expr(_Env, Body={id, As, "???"}) ->
-    {typed, As, Body, {id, As, "hole"}};
+    T = fresh_uvar(As),
+    type_error({hole_found, As, T}),
+    {typed, As, Body, T};
 infer_expr(Env, Id = {Tag, As, _}) when Tag == id; Tag == qid ->
     {QName, Type} = lookup_name(Env, As, Id),
     {typed, As, QName, Type};
@@ -2912,12 +2914,6 @@ unify1(_Env, {uvar, _, R}, {uvar, _, R}, _Variance, _When) ->
     true;
 unify1(_Env, {uvar, _, _}, {fun_t, _, _, var_args, _}, _Variance, When) ->
     type_error({unify_varargs, When});
-unify1(_Env, {id, Ann, "hole"}, B, _Variance, _When) ->
-    type_error({hole_found, Ann, B}),
-    true;
-unify1(_Env, A, {id, Ann, "hole"}, _Variance, _When) ->
-    type_error({hole_found, Ann, A}),
-    true;
 unify1(Env, {uvar, A, R}, T, _Variance, When) ->
     case occurs_check(R, T) of
         true ->
