@@ -560,6 +560,19 @@ Sophia has the following types:
 | oracle_query('a, 'b) | `oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY`                                                                             |
 | contract             | `ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ`                                                                              |
 
+## Hole expression
+
+Hole expressions, written as `???`, are expressions that are used as a placeholder. During compilation, the compiler will generate a type error indication the type of the hole expression.
+
+```
+include "List.aes"
+contract C =
+    entrypoint f() =
+        List.sum(List.map(???, [1,2,3]))
+```
+
+The hole expression found on the last line of the above example will generate the error `` Found a hole of type `(int) => int` ``. Meaning that a function from `int` to `int` should be used instead of the `???` placeholder.
+
 ## Arithmetic
 
 Sophia integers (`int`) are represented by arbitrary-sized signed words and support the following
