@@ -1843,6 +1843,10 @@ infer_expr(_Env, Body={contract_pubkey, As, _}) ->
     {typed, As, Body, Con};
 infer_expr(_Env, Body={id, As, "_"}) ->
     {typed, As, Body, fresh_uvar(As)};
+infer_expr(_Env, Body={id, As, "???"}) ->
+    T = fresh_uvar(As),
+    type_error({hole_found, As, T}),
+    {typed, As, Body, T};
 infer_expr(Env, Id = {Tag, As, _}) when Tag == id; Tag == qid ->
     {QName, Type} = lookup_name(Env, As, Id),
     {typed, As, QName, Type};
@@ -3396,6 +3400,9 @@ mk_error({cannot_unify, A, B, Cxt, When}) ->
                         [pp(instantiate(A)), pp(instantiate(B))]),
     {Pos, Ctxt} = pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
+mk_error({hole_found, Ann, Type}) ->
+    Msg = io_lib:format("Found a hole of type `~s`", [pp(instantiate(Type))]),
+    mk_t_err(pos(Ann), Msg);
 mk_error({unbound_variable, Id}) ->
     Msg = io_lib:format("Unbound variable `~s`", [pp(Id)]),
     case Id of
