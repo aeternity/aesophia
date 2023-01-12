@@ -571,7 +571,7 @@ contract C =
         List.sum(List.map(???, [1,2,3]))
 ```
 
-The hole expression found on the last line of the above example will generate the error `` Found a hole of type `(int) => int` ``. Meaning that a function from `int` to `int` should be used instead of the `???` placeholder.
+A hole expression found in the example above will generate the error `` Found a hole of type `(int) => int` ``. This says that the compiler expects a function from `int` to `int` in place of the `???` placeholder.
 
 ## Arithmetic
 
