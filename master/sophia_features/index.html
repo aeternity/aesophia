@@ -426,6 +426,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#hole-expression" class="md-nav__link">
+    Hole expression
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#arithmetic" class="md-nav__link">
     Arithmetic
   </a>
@@ -823,6 +830,13 @@
         <li class="md-nav__item">
   <a href="#literals" class="md-nav__link">
     Literals
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hole-expression" class="md-nav__link">
+    Hole expression
   </a>
   
 </li>
@@ -1665,6 +1679,14 @@ Others like <code>List</code>, <code>Frac</code>, <code>Option</code> need to be
 </tr>
 </tbody>
 </table>
+<h2 id="hole-expression">Hole expression</h2>
+<p>Hole expressions, written as <code>???</code>, are expressions that are used as a placeholder. During compilation, the compiler will generate a type error indication the type of the hole expression.</p>
+<div class="highlight"><pre><span></span><code>include &quot;List.aes&quot;
+contract C =
+    entrypoint f() =
+        List.sum(List.map(???, [1,2,3]))
+</code></pre></div>
+<p>A hole expression found in the example above will generate the error <code>Found a hole of type `(int) =&gt; int`</code>. This says that the compiler expects a function from <code>int</code> to <code>int</code> in place of the <code>???</code> placeholder.</p>
 <h2 id="arithmetic">Arithmetic</h2>
 <p>Sophia integers (<code>int</code>) are represented by arbitrary-sized signed words and support the following
 arithmetic operations:
