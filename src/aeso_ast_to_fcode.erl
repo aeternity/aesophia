@@ -120,7 +120,7 @@
                | any
                | {tvar, var_name()}.
 
--type fun_def() :: #{ attrs  := [attribute()],
+-type fun_def() :: #{ attrs  := [attribute() | fann()],
                       args   := [{var_name(), ftype()}],
                       return := ftype(),
                       body   := fexpr() }.
@@ -408,8 +408,11 @@ decls_to_fcode(Env, Decls) ->
 decl_to_fcode(Env, {fun_decl, _, _, _})  -> Env;
 decl_to_fcode(Env, {type_def, _Ann, Name, Args, Def}) ->
     typedef_to_fcode(Env, Name, Args, Def);
-decl_to_fcode(Env = #{ functions := Funs }, {letfun, Ann, {id, _, Name}, Args, Ret, [{guarded, _, [], Body}]}) ->
-    Attrs = get_attributes(Ann),
+decl_to_fcode(Env = #{ functions := Funs, options := Options }, {letfun, Ann, {id, _, Name}, Args, Ret, [{guarded, _, [], Body}]}) ->
+    Attrs = case proplists:get_value(debug_info, Options, false) of
+                true  -> get_attributes_debug(Ann);
+                false -> get_attributes(Ann)
+            end,
     FName = lookup_fun(Env, qname(Env, Name)),
     FArgs = args_to_fcode(Env, Args),
     FRet  = type_to_fcode(Env, Ret),
@@ -2198,6 +2201,10 @@ get_attributes(Ann) ->
     [stateful || proplists:get_value(stateful, Ann, false)] ++
     [payable  || proplists:get_value(payable, Ann, false)] ++
     [private  || not proplists:get_value(entrypoint, Ann, false)].
+
+-spec get_attributes_debug(aeso_syntax:ann()) -> [stateful | payable | private | fann()].
+get_attributes_debug(Ann) ->
+    get_attributes(Ann) ++ to_fann(Ann).
 
 %% -- Basic utilities --
 
