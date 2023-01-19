@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API functions for encoding/decoding Sophia values to/from FATE.
 ### Changed
 ### Removed
+- Remove the mapping from variables to FATE registers from the compilation output.
 ### Fixed
 - Warning about unused include when there is no include.
 
