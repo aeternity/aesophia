@@ -256,10 +256,10 @@ datatype bi('a) = Bi // bi is bivariant on 'a
 
 The following facts apply here:
 
-- `co('a)` is a subtype of `co('b) when `'a` is a subtype of `'b`
-- `ct('a)` is a subtype of `ct('b) when `'b` is a subtype of `'a`
-- `in('a)` is a subtype of `in('b) when `'a` is equal to `'b`
-- `bi('a)` is a subtype of `bi('b) always
+- `co('a)` is a subtype of `co('b)` when `'a` is a subtype of `'b`
+- `ct('a)` is a subtype of `ct('b)` when `'b` is a subtype of `'a`
+- `in('a)` is a subtype of `in('b)` when `'a` is equal to `'b`
+- `bi('a)` is a subtype of `bi('b)` always
 
 That altogether induce the following rules of subtyping in Sophia:
 
