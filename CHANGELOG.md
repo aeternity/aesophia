@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+### Changed
+### Removed
+### Fixed
+
+## [7.1.0]
+### Added
 - Options to enable/disable certain optimizations.
 - The ability to call a different instance of the current contract
   ```
@@ -20,7 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Check contracts and entrypoints modifiers when implementing interfaces.
 - Contracts can no longer be used as namespaces.
 - Do not show unused stateful warning for functions that call other contracts with a non-zero value argument.
-### Removed
 ### Fixed
 - Typechecker crashes if Chain.create or Chain.clone are used without arguments.
 
@@ -375,7 +380,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v7.0.1...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v7.1.0...HEAD
+[7.1.0]: https://github.com/aeternity/aesophia/compare/v7.0.1...v7.1.0
 [7.0.1]: https://github.com/aeternity/aesophia/compare/v7.0.0...v7.0.1
 [7.0.0]: https://github.com/aeternity/aesophia/compare/v6.1.0...v7.0.0
 [6.1.0]: https://github.com/aeternity/aesophia/compare/v6.0.2...v6.1.0
