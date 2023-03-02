@@ -266,7 +266,10 @@ namespace Chain =
 Auth.tx_hash : option(hash)
 ```
 
-Gets the transaction hash during authentication.
+Gets the transaction hash during authentication. Note: `Auth.tx_hash`
+computation differs between protocol versions (changed in Ceres!), see
+[aeserialisation](https://github.com/aeternity/protocol/blob/master/serializations.md)
+specification for details.
 
 
 ### Bits
