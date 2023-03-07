@@ -1940,11 +1940,9 @@ infer_expr(Env, {list, As, Elems}) ->
     NewElems = [check_expr(Env, X, ElemType) || X <- Elems],
     {typed, As, {list, As, NewElems}, {app_t, As, {id, As, "list"}, [ElemType]}};
 infer_expr(Env, {list_comp, As, Yield, []}) ->
-    ban_when_const(Env),
     {typed, _, _, Type} = TypedYield = infer_expr(Env, Yield),
     {typed, As, {list_comp, As, TypedYield, []}, {app_t, As, {id, As, "list"}, [Type]}};
 infer_expr(Env, {list_comp, As, Yield, [{comprehension_bind, Pat, BExpr}|Rest]}) ->
-    ban_when_const(Env),
     TypedBind = {typed, As2, _, TypeBExpr} = infer_expr(Env, BExpr),
     {NewE, TypedPat = {typed, _, _, PatType}} = infer_pattern(Env, Pat),
     unify( Env
@@ -1958,7 +1956,6 @@ infer_expr(Env, {list_comp, As, Yield, [{comprehension_bind, Pat, BExpr}|Rest]})
     , {list_comp, As, TypedYield, [{comprehension_bind, TypedPat, TypedBind}|TypedRest]}
     , ResType};
 infer_expr(Env, {list_comp, AttrsL, Yield, [{comprehension_if, AttrsIF, Cond}|Rest]}) ->
-    ban_when_const(Env),
     NewCond = check_expr(Env, Cond, {id, AttrsIF, "bool"}),
     {typed, _, {list_comp, _, TypedYield, TypedRest}, ResType} =
         infer_expr(Env, {list_comp, AttrsL, Yield, Rest}),
@@ -1967,7 +1964,6 @@ infer_expr(Env, {list_comp, AttrsL, Yield, [{comprehension_if, AttrsIF, Cond}|Re
     , {list_comp, AttrsL, TypedYield, [{comprehension_if, AttrsIF, NewCond}|TypedRest]}
     , ResType};
 infer_expr(Env, {list_comp, AsLC, Yield, [{letval, AsLV, Pattern, E}|Rest]}) ->
-    ban_when_const(Env),
     NewE = {typed, _, _, PatType} = infer_expr(Env, E),
     BlockType = fresh_uvar(AsLV),
     {'case', _, NewPattern, [{guarded, _, [], NewRest}]} =
@@ -1984,7 +1980,6 @@ infer_expr(Env, {list_comp, AsLC, Yield, [{letval, AsLV, Pattern, E}|Rest]}) ->
     , ResType
     };
 infer_expr(Env, {list_comp, AsLC, Yield, [Def={letfun, AsLF, _, _, _, _}|Rest]}) ->
-    ban_when_const(Env),
     {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
     FunT = typesig_to_fun_t(TypeSig),
     NewE = bind_var({id, AsLF, Name}, FunT, Env),
@@ -2007,9 +2002,6 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
         prefix ->
             infer_op(Env, Ann, Fun, Args, fun infer_prefix/1);
         _ ->
-            %% Applications of data constructors are allowed in constants
-            lists:member(element(1, Fun), [con, qcon]) orelse ban_when_const(Env),
-
             NamedArgsVar = fresh_uvar(Ann),
             NamedArgs1 = [ infer_named_arg(Env, NamedArgsVar, Arg) || Arg <- NamedArgs ],
             NewFun0 = infer_expr(Env, Fun),
@@ -2035,14 +2027,12 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
             {typed, Ann, {app, Ann, NewFun1, NamedArgs1 ++ NewArgs}, dereference(ResultType)}
     end;
 infer_expr(Env, {'if', Attrs, Cond, Then, Else}) ->
-    ban_when_const(Env),
     NewCond = check_expr(Env, Cond, {id, Attrs, "bool"}),
     NewThen = {typed, _, _, ThenType} = infer_expr(Env, Then),
     NewElse = {typed, _, _, ElseType} = infer_expr(Env, Else),
     unify(Env, ThenType, ElseType, {if_branches, Then, ThenType, Else, ElseType}),
     {typed, Attrs, {'if', Attrs, NewCond, NewThen, NewElse}, ThenType};
 infer_expr(Env, {switch, Attrs, Expr, Cases}) ->
-    ban_when_const(Env),
     NewExpr = {typed, _, _, ExprType} = infer_expr(Env, Expr),
     SwitchType = fresh_uvar(Attrs),
     NewCases = [infer_case(Env, As, Pattern, ExprType, GuardedBranches, SwitchType)
@@ -2068,7 +2058,6 @@ infer_expr(Env, {record, Attrs, Fields}) ->
                     end || {Fld, {field, _, LV, {typed, _, _, T}}} <- lists:zip(Fields, NewFields)]),
     {typed, Attrs, {record, Attrs, NewFields}, RecordType};
 infer_expr(Env, {record, Attrs, Record, Update}) ->
-    ban_when_const(Env),
     NewRecord = {typed, _, _, RecordType} = infer_expr(Env, Record),
     NewUpdate = [ check_record_update(Env, RecordType, Fld) || Fld <- Update ],
     {typed, Attrs, {record, Attrs, NewRecord, NewUpdate}, RecordType};
@@ -2084,7 +2073,6 @@ infer_expr(Env, {proj, Attrs, Record, FieldName}) ->
     {typed, Attrs, {proj, Attrs, NewRecord, FieldName}, FieldType};
 %% Maps
 infer_expr(Env, {map_get, Attrs, Map, Key}) ->  %% map lookup
-    ban_when_const(Env),
     KeyType = fresh_uvar(Attrs),
     ValType = fresh_uvar(Attrs),
     MapType = map_t(Attrs, KeyType, ValType),
@@ -2092,7 +2080,6 @@ infer_expr(Env, {map_get, Attrs, Map, Key}) ->  %% map lookup
     Key1 = check_expr(Env, Key, KeyType),
     {typed, Attrs, {map_get, Attrs, Map1, Key1}, ValType};
 infer_expr(Env, {map_get, Attrs, Map, Key, Val}) ->  %% map lookup with default
-    ban_when_const(Env),
     KeyType = fresh_uvar(Attrs),
     ValType = fresh_uvar(Attrs),
     MapType = map_t(Attrs, KeyType, ValType),
@@ -2107,7 +2094,6 @@ infer_expr(Env, {map, Attrs, KVs}) ->   %% map construction
              || {K, V} <- KVs ],
     {typed, Attrs, {map, Attrs, KVs1}, map_t(Attrs, KeyType, ValType)};
 infer_expr(Env, {map, Attrs, Map, Updates}) -> %% map update
-    ban_when_const(Env),
     KeyType  = fresh_uvar(Attrs),
     ValType  = fresh_uvar(Attrs),
     MapType  = map_t(Attrs, KeyType, ValType),
@@ -2115,7 +2101,6 @@ infer_expr(Env, {map, Attrs, Map, Updates}) -> %% map update
     Updates1 = [ check_map_update(Env, Upd, KeyType, ValType) || Upd <- Updates ],
     {typed, Attrs, {map, Attrs, Map1, Updates1}, MapType};
 infer_expr(Env, {block, Attrs, Stmts}) ->
-    ban_when_const(Env),
     BlockType = fresh_uvar(Attrs),
     NewStmts = infer_block(Env, Attrs, Stmts, BlockType),
     {typed, Attrs, {block, Attrs, NewStmts}, BlockType};
@@ -2124,15 +2109,12 @@ infer_expr(_Env, {record_or_map_error, Attrs, Fields}) ->
     Type = fresh_uvar(Attrs),
     {typed, Attrs, {record, Attrs, []}, Type};
 infer_expr(Env, {record_or_map_error, Attrs, Expr, []}) ->
-    ban_when_const(Env),
     type_error({empty_record_or_map_update, {record, Attrs, Expr, []}}),
     infer_expr(Env, Expr);
 infer_expr(Env, {record_or_map_error, Attrs, Expr, Fields}) ->
-    ban_when_const(Env),
     type_error({mixed_record_and_map, {record, Attrs, Expr, Fields}}),
     infer_expr(Env, Expr);
 infer_expr(Env, {lam, Attrs, Args, Body}) ->
-    ban_when_const(Env),
     ArgTypes = [fresh_uvar(As) || {arg, As, _, _} <- Args],
     ArgPatterns = [{typed, As, Pat, check_type(Env, T)} || {arg, As, Pat, T} <- Args],
     ResultType = fresh_uvar(Attrs),
@@ -2141,20 +2123,89 @@ infer_expr(Env, {lam, Attrs, Args, Body}) ->
     NewArgs = [{arg, As, NewPat, NewT} || {typed, As, NewPat, NewT} <- NewArgPatterns],
     {typed, Attrs, {lam, Attrs, NewArgs, NewBody}, {fun_t, Attrs, [], ArgTypes, ResultType}};
 infer_expr(Env, {letpat, Attrs, Id, Pattern}) ->
-    ban_when_const(Env),
     NewPattern = {typed, _, _, PatType} = infer_expr(Env, Pattern),
     {typed, Attrs, {letpat, Attrs, check_expr(Env, Id, PatType), NewPattern}, PatType};
 infer_expr(Env, Let = {letval, Attrs, _, _}) ->
-    ban_when_const(Env),
     type_error({missing_body_for_let, Attrs}),
     infer_expr(Env, {block, Attrs, [Let, abort_expr(Attrs, "missing body")]});
 infer_expr(Env, Let = {letfun, Attrs, _, _, _, _}) ->
-    ban_when_const(Env),
     type_error({missing_body_for_let, Attrs}),
     infer_expr(Env, {block, Attrs, [Let, abort_expr(Attrs, "missing body")]}).
 
-ban_when_const(#env{ current_const = none }) -> ok;
-ban_when_const(#env{ current_const = Id   }) -> type_error({invalid_const_expr, Id}).
+check_valid_const_expr({bool, _, _}) ->
+    true;
+check_valid_const_expr({int, _, _}) ->
+    true;
+check_valid_const_expr({char, _, _}) ->
+    true;
+check_valid_const_expr({string, _, _}) ->
+    true;
+check_valid_const_expr({bytes, _, _}) ->
+    true;
+check_valid_const_expr({account_pubkey, _, _}) ->
+    true;
+check_valid_const_expr({oracle_pubkey, _, _}) ->
+    true;
+check_valid_const_expr({oracle_query_id, _, _}) ->
+    true;
+check_valid_const_expr({contract_pubkey, _, _}) ->
+    true;
+check_valid_const_expr({id, _, "_"}) ->
+    true;
+check_valid_const_expr({Tag, _, _}) when Tag == id; Tag == qid; Tag == con; Tag == qcon ->
+    true;
+check_valid_const_expr({tuple, _, Cpts}) ->
+    lists:all(fun(X) -> X end, [ check_valid_const_expr(C) || C <- Cpts ]);
+check_valid_const_expr({list, _, Elems}) ->
+    lists:all(fun(X) -> X end, [ check_valid_const_expr(Elem) || Elem <- Elems ]);
+check_valid_const_expr({list_comp, _, _, _}) ->
+    false;
+check_valid_const_expr({typed, _, Body, _}) ->
+    check_valid_const_expr(Body);
+check_valid_const_expr({app, Ann, Fun, Args0}) ->
+    {_, Args} = split_args(Args0),
+    case aeso_syntax:get_ann(format, Ann) of
+        infix ->
+            lists:all(fun(X) -> X end, [ check_valid_const_expr(Arg) || Arg <- Args ]);
+        prefix ->
+            lists:all(fun(X) -> X end, [ check_valid_const_expr(Arg) || Arg <- Args ]);
+        _ ->
+            %% Applications of data constructors are allowed in constants
+            lists:member(element(1, Fun), [con, qcon])
+    end;
+check_valid_const_expr({'if', _, _, _, _}) ->
+    false;
+check_valid_const_expr({switch, _, _, _}) ->
+    false;
+check_valid_const_expr({record, _, Fields}) ->
+    lists:all(fun(X) -> X end, [ check_valid_const_expr(Expr) || {field, _, _, Expr} <- Fields ]);
+check_valid_const_expr({record, _, _, _}) ->
+    false;
+check_valid_const_expr({proj, _, Record, _}) ->
+    check_valid_const_expr(Record);
+% Maps
+check_valid_const_expr({map_get, _, _, _}) ->  %% map lookup
+    false;
+check_valid_const_expr({map_get, _, _, _, _}) ->  %% map lookup with default
+    false;
+check_valid_const_expr({map, _, KVs}) ->   %% map construction
+    lists:all(fun(X) -> X end, [ check_valid_const_expr(K) andalso check_valid_const_expr(V) || {K, V} <- KVs ]);
+check_valid_const_expr({map, _, _, _}) -> %% map update
+    false;
+check_valid_const_expr({block, _, _}) ->
+    false;
+check_valid_const_expr({record_or_map_error, _, Fields}) ->
+    lists:all(fun(X) -> X end, [ check_valid_const_expr(Expr) || {field, _, _, Expr} <- Fields ]);
+check_valid_const_expr({record_or_map_error, _, _, _}) ->
+    false;
+check_valid_const_expr({lam, _, _, _}) ->
+    false;
+check_valid_const_expr({letpat, _, _, _}) ->
+    false;
+check_valid_const_expr({letval, _, _, _}) ->
+    false;
+check_valid_const_expr({letfun, _, _, _, _, _}) ->
+    false.
 
 infer_var_args_fun(Env, {typed, Ann, Fun, FunType0}, NamedArgs, ArgTypes) ->
     FunType =
@@ -2322,9 +2373,11 @@ infer_block(Env, Attrs, [E|Rest], BlockType) ->
     [NewE|infer_block(Env, Attrs, Rest, BlockType)].
 
 infer_const(Env, {letval, Ann, TypedId = {typed, _, Id = {id, _, _}, Type}, Expr}) ->
+    check_valid_const_expr(Expr) orelse type_error({invalid_const_expr, Id}),
     NewExpr = check_expr(Env#env{ current_const = Id }, Expr, Type),
     {letval, Ann, TypedId, NewExpr};
 infer_const(Env, {letval, Ann, Id = {id, AnnId, _}, Expr}) ->
+    check_valid_const_expr(Expr) orelse type_error({invalid_const_expr, Id}),
     create_constraints(),
     NewExpr = {typed, _, _, Type} = infer_expr(Env#env{ current_const = Id }, Expr),
     solve_then_destroy_and_report_unsolved_constraints(Env),
