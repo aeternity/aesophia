@@ -115,13 +115,7 @@ functions_to_scode(ChildContracts, ContractName, Functions, SavedFreshNames, Opt
 
 function_to_scode(ChildContracts, ContractName, Functions, Name, Attrs0, Args, Body, ResType, SavedFreshNames, Options) ->
     {ArgTypes, ResType1} = typesig_to_scode(Args, ResType),
-    FilterAttrs =
-        fun(stateful)  -> false;  %% Only track private and payable from here
-           ({file, _}) -> false;  %% This is useful only for DBG_LOC op
-           ({line, _}) -> false;  %% This is useful only for DBG_LOC op
-           (_)         -> true
-        end,
-    Attrs = lists:filter(FilterAttrs, Attrs0),
+    Attrs = [ A || A <- Attrs0, A == private orelse A == payable ],
     Env = init_env(ChildContracts, ContractName, Functions, Name, Args, SavedFreshNames, Options),
     ArgsNames = [ X || {X, _} <- lists:reverse(Env#env.vars) ],
     SCode = dbg_scoped_vars(Env, ArgsNames, dbg_loc(Env, Attrs0) ++ to_scode(Env, Body)),
