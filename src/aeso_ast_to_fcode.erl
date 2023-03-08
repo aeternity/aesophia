@@ -1728,13 +1728,21 @@ bind_var(Env = #{ vars := Vars }, X) -> Env#{ vars := [X | Vars] }.
 resolve_var(#{ vars := Vars } = Env, [X]) ->
     case lists:member(X, Vars) of
         true  -> {var, X};
-        false -> resolve_const(Env, [X])
+        false ->
+            case resolve_const(Env, [X]) of
+                false -> resolve_fun(Env, [X]);
+                Const -> Const
+            end
     end;
-resolve_var(Env, Q) -> resolve_const(Env, Q).
+resolve_var(Env, Q) ->
+    case resolve_const(Env, Q) of
+        false -> resolve_fun(Env, Q);
+        Const -> Const
+    end.
 
-resolve_const(#{ consts := Consts } = Env, Q) ->
+resolve_const(#{ consts := Consts }, Q) ->
     case maps:get(Q, Consts, not_found) of
-        not_found -> resolve_fun(Env, Q);
+        not_found -> false;
         Val       -> Val
     end.
 
