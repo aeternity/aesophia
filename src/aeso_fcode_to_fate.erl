@@ -738,11 +738,11 @@ dbg_loc(Env, Ann) ->
     case proplists:get_value(debug_info, Env#env.options, false) of
         false -> [];
         true  ->
-            File = case proplists:get_value(file, Ann) of
+            File = case proplists:get_value(file, Ann, no_file) of
                        no_file -> "";
                        F       -> F
                    end,
-            Line = proplists:get_value(line, Ann),
+            Line = proplists:get_value(line, Ann, undefined),
             case Line of
                 undefined -> [];
                 _         -> [{'DBG_LOC', {immediate, File}, {immediate, Line}}]
