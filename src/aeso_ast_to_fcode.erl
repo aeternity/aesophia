@@ -389,9 +389,9 @@ to_fcode(Env, [{namespace, _, {con, _, Con}, Decls} | Code]) ->
 
 -spec to_fann(aeso_syntax:ann()) -> fann().
 to_fann(Ann) ->
-    File = proplists:lookup_all(file, Ann),
-    Line = proplists:lookup_all(line, Ann),
-    lists:flatten([File, Line]).
+    File = proplists:lookup(file, Ann),
+    Line = proplists:lookup(line, Ann),
+    [ X || X <- [File, Line], X =/= none ].
 
 -spec get_fann(fexpr()) -> fann().
 get_fann(FExpr) -> element(2, FExpr).
