@@ -923,9 +923,9 @@ attributes(I) ->
         loop                                  -> Impure(pc, []);
         switch_body                           -> Pure(none, []);
         'RETURN'                              -> Impure(pc, []);
-        {'DBG_LOC', _, _}                     -> Pure(none, []);
-        {'DBG_DEF', _, _}                     -> Pure(none, []);
-        {'DBG_UNDEF', _, _}                   -> Pure(none, []);
+        {'DBG_LOC', _, _}                     -> Impure(none, []);
+        {'DBG_DEF', _, _}                     -> Impure(none, []);
+        {'DBG_UNDEF', _, _}                   -> Impure(none, []);
         {'RETURNR', A}                        -> Impure(pc, A);
         {'CALL', A}                           -> Impure(?a, [A]);
         {'CALL_R', A, _, B, C, D}             -> Impure(?a, [A, B, C, D]);
