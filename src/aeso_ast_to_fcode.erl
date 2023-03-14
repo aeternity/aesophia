@@ -760,7 +760,7 @@ expr_to_fcode(Env, _, {app, _, Fun = {typed, Ann, FunE, {fun_t, _, NamedArgsT, A
                     builtin_to_fcode(state_layout(Env), FAnn, chain_create, [{lit, FAnn, {contract_code, Contract}}, {lit, FAnn, FInitArgsT}|FArgs]);
                 {_, _} -> fcode_error({not_a_contract_type, Type})
             end;
-        {builtin_u, FAnn, B, _Ar}                    -> builtin_to_fcode(state_layout(Env), FAnn, B, FArgs);
+        {builtin_u, FAnn, B, _Ar}                 -> builtin_to_fcode(state_layout(Env), FAnn, B, FArgs);
         {def_u, FAnn, F, _Ar}                     -> {def, FAnn, F, FArgs};
         {remote_u, FAnn, RArgsT, RRetT, Ct, RFun} -> {remote, FAnn, RArgsT, RRetT, Ct, RFun, FArgs};
         FFun ->
