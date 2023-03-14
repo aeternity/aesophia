@@ -576,9 +576,9 @@ expr_to_fcode(_Env, _Type, {oracle_query_id, Ann, K}) -> {lit, to_fann(Ann), {or
 expr_to_fcode(_Env, _Type, {bytes,           Ann, B}) -> {lit, to_fann(Ann), {bytes, B}};
 
 %% Variables
-expr_to_fcode(Env, _Type, {id, _, X})  -> resolve_var(Env, [X]);
-expr_to_fcode(Env, Type, {qid, _, X}) ->
-    case resolve_var(Env, X) of
+expr_to_fcode(Env, _Type, {id, Ann, X})  -> resolve_var(Env, Ann, [X]);
+expr_to_fcode(Env, Type, {qid, Ann, X}) ->
+    case resolve_var(Env, Ann, X) of
         {builtin_u, FAnn, B, Ar} when B =:= oracle_query;
                                       B =:= oracle_get_question;
                                       B =:= oracle_get_answer;
@@ -674,8 +674,8 @@ expr_to_fcode(Env, _Type, {list, Ann, Es}) ->
     lists:foldr(fun(E, L) -> {op, to_fann(aeso_syntax:get_ann(E)), '::', [expr_to_fcode(Env, E), L]} end,
                 {nil, to_fann(Ann)}, Es);
 
-expr_to_fcode(Env, _Type, {app, _, {'..', _}, [A, B]}) ->
-    {def_u, FAnn, FromTo, _} = resolve_fun(Env, ["ListInternal", "from_to"]),
+expr_to_fcode(Env, _Type, {app, As, {'..', _}, [A, B]}) ->
+    {def_u, FAnn, FromTo, _} = resolve_fun(Env, As, ["ListInternal", "from_to"]),
     {def, FAnn, FromTo, [expr_to_fcode(Env, A), expr_to_fcode(Env, B)]};
 
 expr_to_fcode(Env, _Type, {list_comp, As, Yield, []}) ->
@@ -686,7 +686,7 @@ expr_to_fcode(Env, _Type, {list_comp, As, Yield, [{comprehension_bind, Pat = {ty
     Bind = {lam, to_fann(As), [Arg], expr_to_fcode(Env1, {switch, As, {typed, As, {id, As, Arg}, PatType},
                                                              [{'case', As, Pat, [{guarded, As, [], {list_comp, As, Yield, Rest}}]},
                                                               {'case', As, {id, As, "_"}, [{guarded, As, [], {list, As, []}}]}]})},
-    {def_u, FAnn, FlatMap, _} = resolve_fun(Env, ["ListInternal", "flat_map"]),
+    {def_u, FAnn, FlatMap, _} = resolve_fun(Env, As, ["ListInternal", "flat_map"]),
     {def, FAnn, FlatMap, [Bind, expr_to_fcode(Env, BindExpr)]};
 expr_to_fcode(Env, Type, {list_comp, As, Yield, [{comprehension_if, _, Cond}|Rest]}) ->
     make_if(expr_to_fcode(Env, Cond),
@@ -742,7 +742,7 @@ expr_to_fcode(Env, _, {app, _, Fun = {typed, Ann, FunE, {fun_t, _, NamedArgsT, A
     Args1 = get_named_args(NamedArgsT, Args),
     FArgs = [expr_to_fcode(Env, Arg) || Arg <- Args1],
     case expr_to_fcode(Env, Fun) of
-        {builtin_u, _, B, _Ar, TypeArgs} -> builtin_to_fcode(state_layout(Env), B, FArgs ++ TypeArgs);
+        {builtin_u, FAnn, B, _Ar, TypeArgs} -> builtin_to_fcode(state_layout(Env), FAnn, B, FArgs ++ TypeArgs);
         {builtin_u, FAnn, chain_clone, _Ar} ->
             case ArgsT of
                 var_args -> fcode_error({var_args_not_set, FunE});
@@ -750,17 +750,17 @@ expr_to_fcode(Env, _, {app, _, Fun = {typed, Ann, FunE, {fun_t, _, NamedArgsT, A
                     %% Here we little cheat on the typechecker, but this inconsistency
                     %% is to be solved in `aeso_fcode_to_fate:type_to_scode/1`
                     FInitArgsT = aeb_fate_data:make_typerep([type_to_fcode(Env, T) || T <- ArgsT]),
-                    builtin_to_fcode(state_layout(Env), chain_clone, [{lit, FAnn, FInitArgsT}|FArgs])
+                    builtin_to_fcode(state_layout(Env), FAnn, chain_clone, [{lit, FAnn, FInitArgsT}|FArgs])
             end;
         {builtin_u, FAnn, chain_create, _Ar} ->
             case {ArgsT, Type} of
                 {var_args, _} -> fcode_error({var_args_not_set, FunE});
                 {_, {con, _, Contract}} ->
                     FInitArgsT = aeb_fate_data:make_typerep([type_to_fcode(Env, T) || T <- ArgsT]),
-                    builtin_to_fcode(state_layout(Env), chain_create, [{lit, FAnn, {contract_code, Contract}}, {lit, FAnn, FInitArgsT}|FArgs]);
+                    builtin_to_fcode(state_layout(Env), FAnn, chain_create, [{lit, FAnn, {contract_code, Contract}}, {lit, FAnn, FInitArgsT}|FArgs]);
                 {_, _} -> fcode_error({not_a_contract_type, Type})
             end;
-        {builtin_u, _, B, _Ar}                    -> builtin_to_fcode(state_layout(Env), B, FArgs);
+        {builtin_u, FAnn, B, _Ar}                    -> builtin_to_fcode(state_layout(Env), FAnn, B, FArgs);
         {def_u, FAnn, F, _Ar}                     -> {def, FAnn, F, FArgs};
         {remote_u, FAnn, RArgsT, RRetT, Ct, RFun} -> {remote, FAnn, RArgsT, RRetT, Ct, RFun, FArgs};
         FFun ->
@@ -1168,48 +1168,44 @@ op_builtins() ->
      mcl_bls12_381_int_to_fr, mcl_bls12_381_int_to_fp, mcl_bls12_381_fr_to_int, mcl_bls12_381_fp_to_int
     ].
 
--spec set_state(state_layout(), fexpr()) -> fexpr().
-set_state({reg, R}, Val) ->
-    {set_state, get_fann(Val), R, Val};
-set_state({tuple, Ls}, Val) ->
+-spec set_state(state_layout(), fann(), fexpr()) -> fexpr().
+set_state({reg, R}, FAnn, Val) ->
+    {set_state, FAnn, R, Val};
+set_state({tuple, Ls}, FAnn, Val) ->
     ?make_let(X, Val,
     lists:foldr(fun({I, L}, Code) ->
-                    {'let', get_fann(Val), "_", set_state(L, {proj, get_fann(Val), X, I - 1}), Code}
-                end, {tuple, get_fann(Val), []}, indexed(Ls))).
+                    {'let', FAnn, "_", set_state(L, FAnn, {proj, FAnn, X, I - 1}), Code}
+                end, {tuple, FAnn, []}, indexed(Ls))).
 
--spec get_state(state_layout()) -> fexpr().
-get_state({reg, R}) ->
-    {get_state, [], R};
-get_state({tuple, Ls}) ->
-    {tuple, [], [get_state(L) || L <- Ls]}.
+-spec get_state(state_layout(), fann()) -> fexpr().
+get_state({reg, R}, FAnn) ->
+    {get_state, FAnn, R};
+get_state({tuple, Ls}, FAnn) ->
+    {tuple, FAnn, [get_state(L, FAnn) || L <- Ls]}.
 
--spec builtin_to_fcode(state_layout(), BuiltinFun, [fexpr()]) -> fexpr() when
+-spec builtin_to_fcode(state_layout(), fann(), BuiltinFun, [fexpr()]) -> fexpr() when
       BuiltinFun :: atom().  %% No need to mention all of them
-builtin_to_fcode(Layout, set_state, [Val]) ->
-    set_state(Layout, Val);
-builtin_to_fcode(Layout, get_state, []) ->
-    get_state(Layout);
-builtin_to_fcode(_Layout, require, [Cond, Msg]) ->
-    make_if(Cond, {tuple, get_fann(Cond), []}, {builtin, get_fann(Cond), abort, [Msg]});
-builtin_to_fcode(_Layout, chain_event, [Event]) ->
-    {def, get_fann(Event), event, [Event]};
-builtin_to_fcode(_Layout, map_delete, [Key, Map]) ->
-    {op, get_fann(Map), map_delete, [Map, Key]};
-builtin_to_fcode(_Layout, map_member, [Key, Map]) ->
-    {op, get_fann(Map), map_member, [Map, Key]};
-builtin_to_fcode(_Layout, map_lookup, [Key0, Map0]) ->
+builtin_to_fcode(Layout, FAnn, set_state, [Val]) ->
+    set_state(Layout, FAnn, Val);
+builtin_to_fcode(Layout, FAnn, get_state, []) ->
+    get_state(Layout, FAnn);
+builtin_to_fcode(_Layout, FAnn, require, [Cond, Msg]) ->
+    make_if(Cond, {tuple, FAnn, []}, {builtin, FAnn, abort, [Msg]});
+builtin_to_fcode(_Layout, FAnn, chain_event, [Event]) ->
+    {def, FAnn, event, [Event]};
+builtin_to_fcode(_Layout, FAnn, map_delete, [Key, Map]) ->
+    {op, FAnn, map_delete, [Map, Key]};
+builtin_to_fcode(_Layout, FAnn, map_member, [Key, Map]) ->
+    {op, FAnn, map_member, [Map, Key]};
+builtin_to_fcode(_Layout, FAnn, map_lookup, [Key0, Map0]) ->
     ?make_let(Key, Key0,
     ?make_let(Map, Map0,
-     make_if({op, get_fann(Map), map_member, [Map, Key]},
-             {con, get_fann(Map), [0, 1], 1, [{op, get_fann(Map), map_get, [Map, Key]}]},
-             {con, get_fann(Map), [0, 1], 0, []})));
-builtin_to_fcode(_Layout, map_lookup_default, [Key, Map, Def]) ->
-    {op, get_fann(Map), map_get_d, [Map, Key, Def]};
-builtin_to_fcode(_Layout, Builtin, Args) ->
-    FAnn = case Args of
-               [Arg | _] -> to_fann(aeso_syntax:get_ann(Arg));
-               _         -> []
-           end,
+     make_if({op, FAnn, map_member, [Map, Key]},
+             {con, FAnn, [0, 1], 1, [{op, FAnn, map_get, [Map, Key]}]},
+             {con, FAnn, [0, 1], 0, []})));
+builtin_to_fcode(_Layout, FAnn, map_lookup_default, [Key, Map, Def]) ->
+    {op, FAnn, map_get_d, [Map, Key, Def]};
+builtin_to_fcode(_Layout, FAnn, Builtin, Args) ->
     case lists:member(Builtin, op_builtins()) of
         true  -> {op, FAnn, Builtin, Args};
         false -> {builtin, FAnn, Builtin, Args}
@@ -1226,7 +1222,7 @@ add_init_function(Env, Funs0) ->
             InitName = {entrypoint, <<"init">>},
             InitFun  = #{ body := InitBody} = maps:get(InitName, Funs),
             Funs1 = Funs#{ InitName => InitFun#{ return => {tuple, []},
-                                                 body   => builtin_to_fcode(state_layout(Env), set_state, [InitBody]) } },
+                                                 body   => builtin_to_fcode(state_layout(Env), [], set_state, [InitBody]) } },
             Funs1
     end.
 
@@ -1342,7 +1338,7 @@ lambda_lift_expr(Layout, UExpr) when element(1, UExpr) == def_u; element(1, UExp
     Xs   = [ lists:concat(["arg", I]) || I <- lists:seq(1, Ar) ],
     Args = [{var, get_fann(UExpr), X} || X <- Xs] ++ ExtraArgs,
     Body = case Tag of
-               builtin_u -> builtin_to_fcode(Layout, F, Args);
+               builtin_u -> builtin_to_fcode(Layout, get_fann(UExpr), F, Args);
                def_u     -> {def, get_fann(UExpr), F, Args}
            end,
     make_closure([], Xs, Body);
@@ -1843,19 +1839,19 @@ bind_vars(Env, Xs) ->
 -spec bind_var(env(), var_name()) -> env().
 bind_var(Env = #{ vars := Vars }, X) -> Env#{ vars := [X | Vars] }.
 
--spec resolve_var(env(), [aeso_syntax:name()]) -> fexpr().
-resolve_var(#{ vars := Vars } = Env, [X]) ->
+-spec resolve_var(env(), aeso_syntax:ann(), [aeso_syntax:name()]) -> fexpr().
+resolve_var(#{ vars := Vars } = Env, Ann, [X]) ->
     case lists:member(X, Vars) of
-        true  -> {var, [], X};
+        true  -> {var, to_fann(Ann), X};
         false ->
             case resolve_const(Env, [X]) of
-                false -> resolve_fun(Env, [X]);
+                false -> resolve_fun(Env, Ann, [X]);
                 Const -> Const
             end
     end;
-resolve_var(Env, Q) ->
+resolve_var(Env, Ann, Q) ->
     case resolve_const(Env, Q) of
-        false -> resolve_fun(Env, Q);
+        false -> resolve_fun(Env, Ann, Q);
         Const -> Const
     end.
 
@@ -1865,13 +1861,13 @@ resolve_const(#{ consts := Consts }, Q) ->
         Val       -> Val
     end.
 
--spec resolve_fun(env(), [aeso_syntax:name()]) -> fexpr().
-resolve_fun(#{ fun_env := Funs, builtins := Builtin } = Env, Q) ->
+-spec resolve_fun(env(), aeso_syntax:ann(), [aeso_syntax:name()]) -> fexpr().
+resolve_fun(#{ fun_env := Funs, builtins := Builtin } = Env, Ann, Q) ->
     case {maps:get(Q, Funs, not_found), maps:get(Q, Builtin, not_found)} of
         {not_found, not_found} -> internal_error({unbound_variable, Q});
-        {_, {B, none}}         -> builtin_to_fcode(state_layout(Env), B, []);
-        {_, {B, Ar}}           -> {builtin_u, [], B, Ar};
-        {{Fun, Ar}, _}         -> {def_u, [], Fun, Ar}
+        {_, {B, none}}         -> builtin_to_fcode(state_layout(Env), to_fann(Ann), B, []);
+        {_, {B, Ar}}           -> {builtin_u, to_fann(Ann), B, Ar};
+        {{Fun, Ar}, _}         -> {def_u, to_fann(Ann), Fun, Ar}
     end.
 
 -spec init_fresh_names([option()]) -> term().
