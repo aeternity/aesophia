@@ -118,8 +118,12 @@ function_to_scode(ChildContracts, ContractName, Functions, Name, Attrs0, Args, B
     Attrs = [ A || A <- Attrs0, A == private orelse A == payable ],
     Env = init_env(ChildContracts, ContractName, Functions, Name, Args, SavedFreshNames, Options),
     ArgsNames = [ X || {X, _} <- lists:reverse(Env#env.vars) ],
-    SCode = dbg_scoped_vars(Env, ArgsNames, dbg_loc(Env, Attrs0) ++ to_scode(Env, Body)),
-    {Attrs, {ArgTypes, ResType1}, SCode}.
+
+    %% DBG_LOC is added before the function body to make it possible to break
+    %% at the function signature
+    SCode = dbg_loc(Env, Attrs0) ++ to_scode(Env, Body),
+    ScopedSCode = dbg_scoped_vars(Env, ArgsNames, SCode),
+    {Attrs, {ArgTypes, ResType1}, ScopedSCode}.
 
 -define(tvars, '$tvars').
 
