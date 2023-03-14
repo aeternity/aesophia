@@ -397,7 +397,7 @@ to_scode1(Env, {set_state, Ann, Reg, Val}) ->
     [ dbg_loc(Env, Ann) | call_to_scode(Env, [{'STORE', ?s(Reg), ?a}, tuple(0)], [Val]) ];
 
 to_scode1(Env, {closure, Ann, Fun, FVs}) ->
-    [ dbg_loc(Env, Ann) | to_scode(Env, {tuple, Ann, [{lit, Ann, {string, make_function_id(Fun)}}, FVs]}) ];
+    [ to_scode(Env, {tuple, Ann, [{lit, Ann, {string, make_function_id(Fun)}}, FVs]}) ];
 
 to_scode1(Env, {switch, Ann, Case}) ->
     [ dbg_loc(Env, Ann) | split_to_scode(Env, Case) ].
