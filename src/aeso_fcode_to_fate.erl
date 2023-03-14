@@ -288,7 +288,9 @@ term_to_fate(_GlobEnv, _Env, _) ->
 
 to_scode(Env, T) ->
     try term_to_fate(Env, T) of
-        V -> [push(?i(V))]
+        V ->
+            FAnn = element(2, T),
+            [dbg_loc(Env, FAnn), push(?i(V))]
     catch throw:not_a_fate_value ->
         to_scode1(Env, T)
     end.
