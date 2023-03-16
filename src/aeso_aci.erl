@@ -221,15 +221,40 @@ do_render_aci_json(Json) ->
         case Json of
             JArray when is_list(JArray)  -> JArray;
             JObject when is_map(JObject) -> [JObject];
-            JText when is_binary(JText)  ->
-                case jsx:decode(Json, [{labels, atom}, return_maps]) of
-                    JArray when is_list(JArray)  -> JArray;
-                    JObject when is_map(JObject) -> [JObject];
-                    _                            -> error(bad_aci_json)
-                end
+            JText when is_binary(JText)  -> decode(JText)
         end,
     DecodedContracts = [ decode_contract(C) || C <- Contracts ],
     {ok, list_to_binary(string:join(DecodedContracts, "\n"))}.
+
+
+decode(JSON) ->
+    case code:is_loaded(jsx) of
+        {file, _} ->
+            case jsx:decode(JSON, [{labels, atom}, return_maps]) of
+                JArray when is_list(JArray)  -> JArray;
+                JObject when is_map(JObject) -> [JObject];
+                _                            -> error(bad_aci_json)
+            end;
+        false ->
+            case zj:binary_decode(JSON) of
+                {ok, Decoded} when is_list(Decoded) -> atomize(Decoded);
+                {ok, Decoded} when is_map(Decoded)  -> [atomize(Decoded)];
+                _                                   -> error(bad_aci_json)
+            end
+    end.
+
+atomize(T) when is_map(T) ->
+    maps:fold(fun atomize/3, #{}, T);
+atomize(T) when is_list(T) ->
+    lists:map(fun atomize/1, T);
+atomize(T) ->
+    T.
+
+atomize(K, V, M) when is_binary(K) ->
+    maps:put(binary_to_atom(K), atomize(V), M);
+atomize(K, V, M) ->
+    maps:put(K, V, M).
+
 
 decode_contract(#{contract := #{name := Name,
                                 kind := Kind,

@@ -1,0 +1,20 @@
+{a_email,[]}.
+{author,"Aeternity Foundation"}.
+{c_email,[]}.
+{copyright,"Aeternity Foundation"}.
+{deps,[{"otpr","aebytecode",{3,2,0}},
+       {"otpr","getopt",{1,0,2}},
+       {"otpr","eblake2",{1,0,0}},
+       {"otpr","zj",{1,1,0}}]}.
+{desc,"The Sophia contract language compiler for Aeternity."}.
+{file_exts,[]}.
+{key_name,none}.
+{license,skip}.
+{modules,[]}.
+{name,"AE Sophia Compiler"}.
+{package_id,{"otpr","aesophia",{7,1,0}}}.
+{prefix,none}.
+{repo_url,"https://github.com/aeternity/aesophia"}.
+{tags,["aeternity","blockchain","sophia","crypto","ae","compiler"]}.
+{type,lib}.
+{ws_url,[]}.
