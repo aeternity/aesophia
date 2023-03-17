@@ -1892,8 +1892,7 @@ tweak_returns(Code) -> Code.
 
 %% -- Split basic blocks at CALL instructions --
 %%  Calls can only return to a new basic block. Also splits at JUMPIF instructions.
-%%  Split at CALL_T and JUMP only when DBG_RETURN op is enabled
- 
+
 split_calls({Ref, Code}) ->
     split_calls(Ref, Code, [], []).
 
@@ -1906,11 +1905,9 @@ split_calls(Ref, [I | Code], Acc, Blocks) when element(1, I) == 'CALL';
                                                element(1, I) == 'CREATE';
                                                element(1, I) == 'CLONE';
                                                element(1, I) == 'CLONE_G';
-                                               element(1, I) == 'jumpif' ->
-    split_calls(make_ref(), Code, [], [{Ref, lists:reverse([I | Acc])} | Blocks]);
-split_calls(Ref, [I | Code = ['DBG_RETURN' | _]], Acc, Blocks)
-  when element(1, I) == 'CALL_T';
-       I             == loop ->
+                                               element(1, I) == 'jumpif';
+                                               element(1, I) == 'CALL_T' andalso Code =/= [];
+                                               I             == loop     andalso Code =/= [] ->
     split_calls(make_ref(), Code, [], [{Ref, lists:reverse([I | Acc])} | Blocks]);
 split_calls(Ref, [{'ABORT', _} = I | _Code], Acc, Blocks) ->
     lists:reverse([{Ref, lists:reverse([I | Acc])} | Blocks]);
