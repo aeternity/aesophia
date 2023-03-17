@@ -96,6 +96,7 @@ make_function_id(X) ->
     aeb_fate_code:symbol_identifier(make_function_name(X)).
 
 make_function_name(event)              -> <<"Chain.event">>;
+make_function_name(lambda)             -> <<"?lambda">>;
 make_function_name({entrypoint, Name}) -> Name;
 make_function_name({local_fun, Xs})    -> list_to_binary("." ++ string:join(Xs, ".")).
 
@@ -353,18 +354,21 @@ to_scode1(Env = #env{ current_function = Fun, tailpos = true }, {def, Ann, Fun, 
                                 aeb_fate_ops:store({var, I}, ?a)],
                         {[I | Is], Acc1, Env2}
                     end, {[], [], Env}, Args),
-    [ dbg_loc(Env, Ann),
-      Code,
-      [ aeb_fate_ops:store({arg, I}, {var, J})
-        || {I, J} <- lists:zip(lists:seq(0, length(Vars) - 1),
-                               lists:reverse(Vars)) ],
-      loop ];
+    SCode = [ dbg_loc(Env, Ann),
+              Code,
+              [ aeb_fate_ops:store({arg, I}, {var, J})
+                  || {I, J} <- lists:zip(lists:seq(0, length(Vars) - 1),
+                                      lists:reverse(Vars)) ],
+              loop ],
+    dbg_call_return(Env, dbg_call(Fun, true), SCode);
 to_scode1(Env, {def, Ann, Fun, Args}) ->
     FName = make_function_id(Fun),
     Lbl   = aeb_fate_data:make_string(FName),
-    [ dbg_loc(Env, Ann) | call_to_scode(Env, local_call(Env, ?i(Lbl)), Args) ];
+    SCode = call_to_scode(Env, local_call(Env, ?i(Lbl)), Args),
+    [ dbg_loc(Env, Ann) | dbg_call_return(Env, dbg_call(Fun, false), SCode) ];
 to_scode1(Env, {funcall, Ann, Fun, Args}) ->
-    [ dbg_loc(Env, Ann) | call_to_scode(Env, [to_scode(Env, Fun), local_call(Env, ?a)], Args) ];
+    SCode = call_to_scode(Env, [to_scode(Env, Fun), local_call(Env, ?a)], Args),
+    [ dbg_loc(Env, Ann) | dbg_call_return(Env, dbg_call(lambda, false), SCode) ];
 
 to_scode1(Env, {builtin, Ann, B, Args}) ->
     [ dbg_loc(Env, Ann) | builtin_to_scode(Env, B, Args) ];
@@ -391,7 +395,7 @@ to_scode1(Env, {remote, Ann, ArgsT, RetT, Ct, Fun, [Gas, Value, Protected | Args
             Call = aeb_fate_ops:call_pgr(?a, Lbl, ArgType, RetType, ?a, ?a, ?a),
             call_to_scode(Env, Call, [Ct, Value, Gas, Protected | Args])
     end,
-    [ dbg_loc(Env, Ann) | SCode ];
+    [ dbg_loc(Env, Ann) | dbg_call_return(Env, dbg_call_r(?a, Fun), SCode) ];
 
 to_scode1(Env, {get_state, Ann, Reg}) ->
     [ dbg_loc(Env, Ann), push(?s(Reg)) ];
@@ -780,8 +784,16 @@ dbg_undef(Undef, {switch, Arg, Type, Alts, Catch}) ->
     NewCatch  = dbg_undef(Undef, Catch),
     NewSwitch = {switch, Arg, Type, NewAlts, NewCatch},
     NewSwitch;
+dbg_undef(Undef, []) ->
+    [Undef];
 dbg_undef(Undef, SCode) when is_list(SCode) ->
-    lists:droplast(SCode) ++ [dbg_undef(Undef, lists:last(SCode))];
+    FlatSCode = lists:flatten(SCode),
+    case lists:last(FlatSCode) of
+        'DBG_RETURN' ->
+            dbg_undef(Undef, lists:droplast(FlatSCode)) ++ ['DBG_RETURN'];
+        _ ->
+            lists:droplast(FlatSCode) ++ [dbg_undef(Undef, lists:last(FlatSCode))]
+    end;
 dbg_undef(Undef, SCode) when is_tuple(SCode); is_atom(SCode) ->
     [Mnemonic | _] =
         case is_tuple(SCode) of
@@ -793,6 +805,22 @@ dbg_undef(Undef, SCode) when is_tuple(SCode); is_atom(SCode) ->
         true  -> [Undef, SCode];
         false -> [SCode, Undef]
     end.
+
+dbg_call_return(Env, Call, SCode) ->
+    case proplists:get_value(debug_info, Env#env.options, false) of
+        false -> SCode;
+        true  ->
+            Flat = flatten(SCode),
+            lists:droplast(Flat) ++ [Call, lists:last(Flat), 'DBG_RETURN']
+    end.
+
+dbg_call(Fun, IsTailCall) ->
+    Name = binary_to_list(make_function_name(Fun)),
+    [{'DBG_CALL', {immediate, Name}, {immediate, IsTailCall}}].
+
+dbg_call_r(PK, Fun) ->
+    Name = binary_to_list(make_function_name(Fun)),
+    [{'DBG_CALL_R', PK, {immediate, Name}}].
 
 %% -- Phase II ---------------------------------------------------------------
 %%  Optimize
@@ -932,6 +960,9 @@ attributes(I) ->
         {'DBG_LOC', _, _}                     -> Impure(none, []);
         {'DBG_DEF', _, _}                     -> Impure(none, []);
         {'DBG_UNDEF', _, _}                   -> Impure(none, []);
+        {'DBG_CALL', _, _}                    -> Impure(none, []);
+        {'DBG_CALL_R', _, _}                  -> Impure(none, []);
+        'DBG_RETURN'                          -> Impure(none, []);
         {'RETURNR', A}                        -> Impure(pc, A);
         {'CALL', A}                           -> Impure(?a, [A]);
         {'CALL_R', A, _, B, C, D}             -> Impure(?a, [A, B, C, D]);
@@ -1874,7 +1905,9 @@ split_calls(Ref, [I | Code], Acc, Blocks) when element(1, I) == 'CALL';
                                                element(1, I) == 'CREATE';
                                                element(1, I) == 'CLONE';
                                                element(1, I) == 'CLONE_G';
-                                               element(1, I) == 'jumpif' ->
+                                               element(1, I) == 'jumpif';
+                                               element(1, I) == 'CALL_T' andalso Code =/= [];
+                                               I             == loop     andalso Code =/= [] ->
     split_calls(make_ref(), Code, [], [{Ref, lists:reverse([I | Acc])} | Blocks]);
 split_calls(Ref, [{'ABORT', _} = I | _Code], Acc, Blocks) ->
     lists:reverse([{Ref, lists:reverse([I | Acc])} | Blocks]);
