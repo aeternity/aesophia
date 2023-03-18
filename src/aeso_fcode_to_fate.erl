@@ -52,7 +52,8 @@
                tailpos           = true,
                child_contracts   = #{},
                saved_fresh_names = #{},
-               options           = [] }).
+               options           = [],
+               debug             = false }).
 
 %% -- Debugging --------------------------------------------------------------
 
@@ -177,7 +178,8 @@ init_env(ChildContracts, ContractName, FunNames, Name, Args, SavedFreshNames, Op
           current_function = Name,
           options = Options,
           tailpos   = true,
-          saved_fresh_names = SavedFreshNames }.
+          saved_fresh_names = SavedFreshNames,
+          debug = proplists:get_value(debug_info, Options, false) }.
 
 next_var(#env{ vars = Vars }) ->
     1 + lists:max([-1 | [J || {_, {var, J}} <- Vars]]).
@@ -340,7 +342,7 @@ to_scode1(Env, {'let', Ann, X, Expr, Body}) ->
               to_scode(Env1, Body) ],
     [ dbg_loc(Env, Ann) | dbg_scoped_var(Env1, X, SCode) ];
 
-to_scode1(Env = #env{ current_function = Fun, tailpos = true }, {def, Ann, Fun, Args}) ->
+to_scode1(Env = #env{ current_function = Fun, tailpos = true, debug = false }, {def, Ann, Fun, Args}) ->
     %% Tail-call to current function, f(e0..en). Compile to
     %%      [ let xi = ei ]
     %%      [ STORE argi xi ]
@@ -404,7 +406,7 @@ to_scode1(Env, {closure, Ann, Fun, FVs}) ->
 to_scode1(Env, {switch, Ann, Case}) ->
     [ dbg_loc(Env, Ann) | split_to_scode(Env, Case) ].
 
-local_call( Env, Fun) when Env#env.tailpos -> aeb_fate_ops:call_t(Fun);
+local_call( Env = #env{debug = false}, Fun) when Env#env.tailpos -> aeb_fate_ops:call_t(Fun);
 local_call(_Env, Fun)                      -> aeb_fate_ops:call(Fun).
 
 split_to_scode(Env, {nosplit, Expr}) ->
