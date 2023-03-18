@@ -53,7 +53,7 @@
                child_contracts   = #{},
                saved_fresh_names = #{},
                options           = [],
-               debug             = false }).
+               debug_info        = false }).
 
 %% -- Debugging --------------------------------------------------------------
 
@@ -171,15 +171,15 @@ types_to_scode(Ts) -> lists:map(fun type_to_scode/1, Ts).
 %% -- Environment functions --
 
 init_env(ChildContracts, ContractName, FunNames, Name, Args, SavedFreshNames, Options) ->
-    #env{ vars      = [ {X, {arg, I}} || {I, {X, _}} <- with_ixs(Args) ],
-          contract  = ContractName,
-          child_contracts = ChildContracts,
-          locals    = FunNames,
-          current_function = Name,
-          options = Options,
-          tailpos   = true,
+    #env{ vars              = [ {X, {arg, I}} || {I, {X, _}} <- with_ixs(Args) ],
+          contract          = ContractName,
+          child_contracts   = ChildContracts,
+          locals            = FunNames,
+          current_function  = Name,
+          options           = Options,
+          tailpos           = true,
           saved_fresh_names = SavedFreshNames,
-          debug = proplists:get_value(debug_info, Options, false) }.
+          debug_info        = proplists:get_value(debug_info, Options, false) }.
 
 next_var(#env{ vars = Vars }) ->
     1 + lists:max([-1 | [J || {_, {var, J}} <- Vars]]).
@@ -342,7 +342,7 @@ to_scode1(Env, {'let', Ann, X, Expr, Body}) ->
               to_scode(Env1, Body) ],
     [ dbg_loc(Env, Ann) | dbg_scoped_var(Env1, X, SCode) ];
 
-to_scode1(Env = #env{ current_function = Fun, tailpos = true, debug = false }, {def, Ann, Fun, Args}) ->
+to_scode1(Env = #env{ current_function = Fun, tailpos = true, debug_info = false }, {def, Ann, Fun, Args}) ->
     %% Tail-call to current function, f(e0..en). Compile to
     %%      [ let xi = ei ]
     %%      [ STORE argi xi ]
@@ -406,8 +406,8 @@ to_scode1(Env, {closure, Ann, Fun, FVs}) ->
 to_scode1(Env, {switch, Ann, Case}) ->
     [ dbg_loc(Env, Ann) | split_to_scode(Env, Case) ].
 
-local_call( Env = #env{debug = false}, Fun) when Env#env.tailpos -> aeb_fate_ops:call_t(Fun);
-local_call(_Env, Fun)                      -> aeb_fate_ops:call(Fun).
+local_call( Env = #env{debug_info = false}, Fun) when Env#env.tailpos -> aeb_fate_ops:call_t(Fun);
+local_call(_Env, Fun)                                                 -> aeb_fate_ops:call(Fun).
 
 split_to_scode(Env, {nosplit, Expr}) ->
     [switch_body, to_scode(Env, Expr)];
@@ -736,39 +736,39 @@ push(A) -> {'STORE', ?a, A}.
 tuple(0) -> push(?i({tuple, {}}));
 tuple(N) -> aeb_fate_ops:tuple(?a, N).
 
-dbg_loc(Env, Ann) ->
-    case proplists:get_value(debug_info, Env#env.options, false) of
-        false -> [];
-        true  ->
-            File = case proplists:get_value(file, Ann, no_file) of
-                       no_file -> "";
-                       F       -> F
-                   end,
-            Line = proplists:get_value(line, Ann, undefined),
-            case Line of
-                undefined -> [];
-                _         -> [{'DBG_LOC', {immediate, File}, {immediate, Line}}]
-            end
+%% -- Debug info functions --
+
+dbg_loc(#env{debug_info = false}, _) ->
+    [];
+dbg_loc(_Env, Ann) ->
+    File = case proplists:get_value(file, Ann, no_file) of
+                no_file -> "";
+                F       -> F
+            end,
+    Line = proplists:get_value(line, Ann, undefined),
+    case Line of
+        undefined -> [];
+        _         -> [{'DBG_LOC', {immediate, File}, {immediate, Line}}]
     end.
 
+dbg_scoped_vars(#env{debug_info = false}, _, SCode) ->
+    SCode;
 dbg_scoped_vars(_Env, [], SCode) ->
     SCode;
 dbg_scoped_vars(Env, [Var | Rest], SCode) ->
     dbg_scoped_vars(Env, Rest, dbg_scoped_var(Env, Var, SCode)).
 
+dbg_scoped_var(#env{debug_info = false}, _, SCode) ->
+    SCode;
 dbg_scoped_var(Env = #env{saved_fresh_names = SavedFreshNames}, Var, SCode) ->
-    case proplists:get_value(debug_info, Env#env.options, false) of
-        false -> SCode;
-        true  ->
-            case maps:get(Var, SavedFreshNames, Var) of
-                "%" ++ _ -> SCode;
-                "_"      -> SCode;
-                VarName  ->
-                    Register = lookup_var(Env, Var),
-                    Def      = [{'DBG_DEF',   {immediate, VarName}, Register}],
-                    Undef    = [{'DBG_UNDEF', {immediate, VarName}, Register}],
-                    Def ++ dbg_undef(Undef, SCode)
-            end
+    case maps:get(Var, SavedFreshNames, Var) of
+        "%" ++ _ -> SCode;
+        "_"      -> SCode;
+        VarName  ->
+            Register = lookup_var(Env, Var),
+            Def      = [{'DBG_DEF',   {immediate, VarName}, Register}],
+            Undef    = [{'DBG_UNDEF', {immediate, VarName}, Register}],
+            Def ++ dbg_undef(Undef, SCode)
     end.
 
 dbg_undef(_Undef, missing) ->
