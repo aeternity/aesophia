@@ -122,7 +122,7 @@ function_to_scode(ChildContracts, ContractName, Functions, Name, Attrs0, Args, B
 
     %% DBG_LOC is added before the function body to make it possible to break
     %% at the function signature
-    SCode = dbg_loc(Env, Attrs0) ++ to_scode(Env, Body),
+    SCode = dbg_contract(Env) ++ dbg_loc(Env, Attrs0) ++ to_scode(Env, Body),
     ScopedSCode = dbg_scoped_vars(Env, ArgsNames, SCode),
     {Attrs, {ArgTypes, ResType1}, ScopedSCode}.
 
@@ -738,6 +738,11 @@ tuple(N) -> aeb_fate_ops:tuple(?a, N).
 
 %% -- Debug info functions --
 
+dbg_contract(#env{debug_info = false}) ->
+    [];
+dbg_contract(#env{contract = Contract}) ->
+    [{'DBG_CONTRACT', {immediate, Contract}}].
+
 dbg_loc(#env{debug_info = false}, _) ->
     [];
 dbg_loc(_Env, Ann) ->
@@ -934,6 +939,7 @@ attributes(I) ->
         {'DBG_LOC', _, _}                     -> Impure(none, []);
         {'DBG_DEF', _, _}                     -> Impure(none, []);
         {'DBG_UNDEF', _, _}                   -> Impure(none, []);
+        {'DBG_CONTRACT', _}                   -> Impure(none, []);
         {'RETURNR', A}                        -> Impure(pc, A);
         {'CALL', A}                           -> Impure(?a, [A]);
         {'CALL_R', A, _, B, C, D}             -> Impure(?a, [A, B, C, D]);
