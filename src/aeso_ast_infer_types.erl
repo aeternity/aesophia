@@ -3207,9 +3207,14 @@ when_warning(Warn, Do) ->
 %% Warnings (Unused includes)
 
 potential_unused_include(Ann, SrcFile) ->
-    case aeso_syntax:get_ann(file, Ann, no_file) of
-        no_file -> ok;
-        File -> ets_insert(warnings, {unused_include, File, SrcFile})
+    IsIncluded = aeso_syntax:get_ann(include_type, Ann, none) =/= none,
+    case IsIncluded of
+        false -> ok;
+        true  ->
+            case aeso_syntax:get_ann(file, Ann, no_file) of
+                no_file -> ok;
+                File    -> ets_insert(warnings, {unused_include, File, SrcFile})
+            end
     end.
 
 used_include(Ann) ->
