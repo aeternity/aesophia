@@ -178,6 +178,12 @@ AENSv2.preclaim(owner : address, commitment_hash : hash, <signature : signature>
 The [signature](./sophia_features.md#delegation-signature) should be over
 `network id` + `owner address` + `Contract.address` (concatenated as byte arrays).
 
+From Ceres (i.e. FATE VM version 3) the
+[signature](./sophia_features.md#delegation-signature) can also be generic
+(allowing _all_, existing and future, names to be delegated with one
+signature), i.e. over `network id` + `owner address` + `string "AENS"` +
+`Contract.address`.
+
 
 ##### claim
 ```
@@ -185,9 +191,14 @@ AENSv2.claim(owner : address, name : string, salt : int, name_fee : int, <signat
 ```
 
 The [signature](./sophia_features.md#delegation-signature) should be over
-`network id` + `owner address` + `name_hash` + `Contract.address`
-(concatenated as byte arrays)
-using the private key of the `owner` account for signing.
+`network id` + `owner address` + `name_hash` + `Contract.address` (concatenated
+as byte arrays) using the private key of the `owner` account for signing.
+
+From Ceres (i.e. FATE VM version 3) the
+[signature](./sophia_features.md#delegation-signature) can also be generic
+(allowing _all_, existing and future, names to be delegated with one
+signature), i.e. over `network id` + `owner address` + `string "AENS"` +
+`Contract.address`.
 
 
 ##### transfer
@@ -202,6 +213,12 @@ The [signature](./sophia_features.md#delegation-signature) should be over
 (concatenated as byte arrays)
 using the private key of the `owner` account for signing.
 
+From Ceres (i.e. FATE VM version 3) the
+[signature](./sophia_features.md#delegation-signature) can also be generic
+(allowing _all_, existing and future, names to be delegated with one
+signature), i.e. over `network id` + `owner address` + `string "AENS"` +
+`Contract.address`.
+
 
 ##### revoke
 ```
@@ -214,6 +231,12 @@ The [signature](./sophia_features.md#delegation-signature) should be over
 `network id` + `owner address` + `name_hash` + `Contract.address`
 (concatenated as byte arrays)
 using the private key of the `owner` account for signing.
+
+From Ceres (i.e. FATE VM version 3) the
+[signature](./sophia_features.md#delegation-signature) can also be generic
+(allowing _all_, existing and future, names to be delegated with one
+signature), i.e. over `network id` + `owner address` + `string "AENS"` +
+`Contract.address`.
 
 
 ##### update
