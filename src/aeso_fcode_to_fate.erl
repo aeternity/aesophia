@@ -766,15 +766,21 @@ dbg_scoped_vars(Env, [Var | Rest], SCode) ->
 dbg_scoped_var(#env{debug_info = false}, _, SCode) ->
     SCode;
 dbg_scoped_var(Env = #env{saved_fresh_names = SavedFreshNames}, Var, SCode) ->
-    case maps:get(Var, SavedFreshNames, Var) of
-        "%" ++ _ -> SCode;
-        "_"      -> SCode;
-        VarName  ->
+    VarName = maps:get(Var, SavedFreshNames, Var),
+    case VarName == "_" orelse is_fresh_name(VarName) of
+        true ->
+            SCode;
+        false ->
             Register = lookup_var(Env, Var),
             Def      = [{'DBG_DEF',   {immediate, VarName}, Register}],
             Undef    = [{'DBG_UNDEF', {immediate, VarName}, Register}],
             Def ++ dbg_undef(Undef, SCode)
     end.
+
+is_fresh_name([$% | _]) ->
+    true;
+is_fresh_name(_) ->
+    false.
 
 dbg_undef(_Undef, missing) ->
     missing;
