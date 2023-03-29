@@ -122,9 +122,9 @@ function_to_scode(ChildContracts, ContractName, Functions, Name, Attrs0, Args, B
 
     %% DBG_LOC is added before the function body to make it possible to break
     %% at the function signature
-    SCode = dbg_contract(Env) ++ dbg_loc(Env, Attrs0) ++ to_scode(Env, Body),
-    ScopedSCode = dbg_scoped_vars(Env, ArgsNames, SCode),
-    {Attrs, {ArgTypes, ResType1}, ScopedSCode}.
+    SCode = to_scode(Env, Body),
+    DbgSCode = dbg_contract(Env) ++ dbg_loc(Env, Attrs0) ++ dbg_scoped_vars(Env, ArgsNames, SCode),
+    {Attrs, {ArgTypes, ResType1}, DbgSCode}.
 
 -define(tvars, '$tvars').
 
