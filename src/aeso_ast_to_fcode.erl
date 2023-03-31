@@ -1009,19 +1009,19 @@ split_alt(I, {'case', Pats, Body}) ->
     {SPat, {'case', Pats0 ++ InnerPats ++ Pats1, Body}}.
 
 -spec split_pat(fpat()) -> {fsplit_pat(), [fpat()]}.
-split_pat(P = {var, _}) -> {{var, fresh_name()}, [P]};
+split_pat(P = {var, _}) -> {{var, fresh_name_save_fpat(P)}, [P]};
 split_pat({bool, B})    -> {{bool, B}, []};
 split_pat({int, N})     -> {{int, N}, []};
 split_pat({string, N})  -> {{string, N}, []};
 split_pat(nil)          -> {nil, []};
-split_pat({'::', P, Q}) -> {{'::', fresh_name(), fresh_name()}, [P, Q]};
+split_pat({'::', P, Q}) -> {{'::', fresh_name_save_fpat(P), fresh_name_save_fpat(Q)}, [P, Q]};
 split_pat({con, As, I, Pats}) ->
-    Xs = [fresh_name() || _ <- Pats],
+    Xs = [fresh_name_save_fpat(P) || P <- Pats],
     {{con, As, I, Xs}, Pats};
 split_pat({assign, X = {var, _}, P}) ->
-    {{assign, fresh_name(), fresh_name()}, [X, P]};
+    {{assign, fresh_name_save_fpat(X), fresh_name_save_fpat(P)}, [X, P]};
 split_pat({tuple, Pats}) ->
-    Xs = [fresh_name() || _ <- Pats],
+    Xs = [fresh_name_save_fpat(P) || P <- Pats],
     {{tuple, Xs}, Pats}.
 
 -spec split_vars(fsplit_pat(), ftype()) -> [{var_name(), ftype()}].
@@ -1896,6 +1896,13 @@ fresh_name_save(Name) ->
         Old       -> put(saved_fresh_names, Old#{Fresh => Name})
     end,
     Fresh.
+
+-spec fresh_name_save_fpat(fpat()) -> var_name().
+fresh_name_save_fpat({var, Name}) ->
+    fresh_name_save(Name);
+fresh_name_save_fpat(FPat) ->
+    [fresh_name_save(Name) || Name <- pat_vars(FPat)],
+    fresh_name().
 
 -spec fresh_name() -> var_name().
 fresh_name() -> fresh_name("%").
