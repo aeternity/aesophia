@@ -1554,7 +1554,7 @@ simplify(Env, {proj, _, Var = {var, _, _}, I} = Expr) ->
     end;
 
 simplify(Env, {switch, FAnn, Split}) ->
-    case simpl_switch(Env, [], Split) of
+    case simpl_switch(Env, FAnn, [], Split) of
         nomatch -> {builtin, FAnn, abort, [{lit, FAnn, {string, <<"Incomplete patterns">>}}]};
         Expr    -> Expr
     end;
@@ -1605,11 +1605,11 @@ nest_catchalls([C = {'case', {var, _}, {nosplit, _}} | _]) -> C;
 nest_catchalls([{'case', P = {var, _}, {split, Type, X, Alts}} | Catchalls]) ->
     {'case', P, {split, Type, X, add_catchalls(Alts, Catchalls)}}.
 
--spec simpl_switch(expr_env(), [fcase()], fsplit()) -> fexpr() | nomatch.
-simpl_switch(_Env, _, {nosplit, E}) -> E;
-simpl_switch(Env, Catchalls, {split, Type, X, Alts}) ->
+-spec simpl_switch(expr_env(), fann(), [fcase()], fsplit()) -> fexpr() | nomatch.
+simpl_switch(_Env, _FAnn, _, {nosplit, E}) -> E;
+simpl_switch(Env, FAnn, Catchalls, {split, Type, X, Alts}) ->
     Alts1 = add_catchalls(Alts, Catchalls),
-    Stuck = {switch, [], {split, Type, X, Alts1}},
+    Stuck = {switch, FAnn, {split, Type, X, Alts1}},
     case constructor_form(Env, {var, [], X}) of
         false -> Stuck;
         E     -> simpl_case(Env, E, Alts1)
@@ -1622,7 +1622,7 @@ simpl_case(Env, E, [{'case', Pat, Body} | Alts]) ->
         false -> simpl_case(Env, E, Alts);
         Binds ->
             Env1 = maps:merge(Env, maps:from_list(Binds)),
-            case simpl_switch(Env1, get_catchalls(Alts), Body) of
+            case simpl_switch(Env1, get_fann(E), get_catchalls(Alts), Body) of
                 nomatch -> simpl_case(Env, E, Alts);
                 Body1   -> let_bind(Binds, Body1)
             end
