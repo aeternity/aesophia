@@ -29,11 +29,10 @@
 -include("aeso_utils.hrl").
 
 
--type option() :: pp_sophia_code
-                | pp_ast
+-type option() :: pp_ast
                 | pp_types
                 | pp_typed_ast
-                | pp_assembler
+                | pp_fate
                 | no_code
                 | keep_included
                 | debug_mode
@@ -118,7 +117,7 @@ from_string1(ContractString, Options) ->
     #{ child_con_env := ChildContracts } = FCodeEnv,
     SavedFreshNames = maps:get(saved_fresh_names, FCodeEnv, #{}),
     {FateCode, VarsRegs} = aeso_fcode_to_fate:compile(ChildContracts, FCode, SavedFreshNames, Options),
-    pp_assembler(FateCode, Options),
+    pp_fate(FateCode, Options),
     ByteCode = aeb_fate_code:serialize(FateCode, []),
     {ok, Version} = version(),
     Res = #{byte_code => ByteCode,
@@ -150,7 +149,6 @@ maybe_generate_aci(Result, FoldedTypedAst, Options) ->
 -spec string_to_code(string(), options()) -> map().
 string_to_code(ContractString, Options) ->
     Ast = parse(ContractString, Options),
-    pp_sophia_code(Ast, Options),
     pp_ast(Ast, Options),
     {TypeEnv, FoldedTypedAst, UnfoldedTypedAst, Warnings} = aeso_ast_infer_types:infer(Ast, [return_env | Options]),
     pp_typed_ast(UnfoldedTypedAst, Options),
@@ -365,21 +363,22 @@ get_decode_type(FunName, [_ | Contracts]) ->
     %% The __decode should be in the final contract
     get_decode_type(FunName, Contracts).
 
-pp_sophia_code(C, Opts)->  pp(C, Opts, pp_sophia_code, fun(Code) ->
-                                io:format("~s\n", [prettypr:format(aeso_pretty:decls(Code))])
-                            end).
-pp_ast(C, Opts)      ->  pp(C, Opts, pp_ast, fun aeso_ast:pp/1).
-pp_typed_ast(C, Opts)->  pp(C, Opts, pp_typed_ast, fun aeso_ast:pp_typed/1).
+pp_ast(C, Opts) ->
+    [ io:format("AST:\n~s\n",
+                [prettypr:format(aeso_pretty:decls(Ast, []))])
+      || true <- proplists:get_value(pp_ast, Opts)
+    ].
 
-pp_assembler(C, Opts) ->  pp(C, Opts, pp_assembler, fun(Asm) -> io:format("~s", [aeb_fate_asm:pp(Asm)]) end).
+pp_typed_ast(C, Opts) ->
+    [ io:format("Typed AST:\n~s\n",
+                [prettypr:format(aeso_pretty:decls(Ast, [show_generated]))])
+      || true <- proplists:get_value(pp_typed_ast, Opts)
+    ].
 
-pp(Code, Options, Option, PPFun) ->
-    case proplists:lookup(Option, Options) of
-        {Option1, true} when Option1 =:= Option ->
-            PPFun(Code);
-        none ->
-            ok
-    end.
+pp_fate(C, Opts) ->
+    [ io:format("FATE:\n~s\n", [aeb_fate_asm:pp(Asm)])
+      || true <- proplists:get_value(pp_fate, Opts)
+    ].
 
 %% -- Byte code validation ---------------------------------------------------
 

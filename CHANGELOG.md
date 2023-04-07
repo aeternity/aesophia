@@ -4,10 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
 ## [Unreleased]
 ### Added
 ### Changed
 ### Removed
+### Fixed
+
+## [8.x.x]
+### Added
+### Changed
+- `pp_assembler` option to `pp_fate` as it is more specific.
+### Removed
+- `pp_sophia_code` option as it was a duplicate of `pp_ast`.
+- `aeso_ast` module as it was unused.
 ### Fixed
 - Warning about unused include when there is no include.
 

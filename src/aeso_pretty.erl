@@ -526,4 +526,3 @@ get_elifs(If = {'if', Ann, Cond, Then, Else}, Elifs) ->
         _    -> {lists:reverse(Elifs), If}
     end;
 get_elifs(Else, Elifs) -> {lists:reverse(Elifs), {else, Else}}.
-
