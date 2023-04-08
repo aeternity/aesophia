@@ -334,13 +334,13 @@ to_scode1(Env, {op, Ann, Op, Args}) ->
 
 to_scode1(Env, {'let', Ann, X, {var, _, Y}, Body}) ->
     Env1 = bind_var(X, lookup_var(Env, Y), Env),
-    [ dbg_loc(Env, Ann) | dbg_scoped_var(Env1, X, to_scode(Env1, Body)) ];
+    [ dbg_loc(Env, Ann) | dbg_scoped_vars(Env1, [X], to_scode(Env1, Body)) ];
 to_scode1(Env, {'let', Ann, X, Expr, Body}) ->
     {I, Env1} = bind_local(X, Env),
     SCode = [ to_scode(notail(Env), Expr),
               aeb_fate_ops:store({var, I}, {stack, 0}),
               to_scode(Env1, Body) ],
-    [ dbg_loc(Env, Ann) | dbg_scoped_var(Env1, X, SCode) ];
+    [ dbg_loc(Env, Ann) | dbg_scoped_vars(Env1, [X], SCode) ];
 
 to_scode1(Env = #env{ current_function = Fun, tailpos = true, debug_info = false }, {def, Ann, Fun, Args}) ->
     %% Tail-call to current function, f(e0..en). Compile to
@@ -409,8 +409,8 @@ to_scode1(Env, {switch, Ann, Case}) ->
 local_call( Env = #env{debug_info = false}, Fun) when Env#env.tailpos -> aeb_fate_ops:call_t(Fun);
 local_call(_Env, Fun)                                                 -> aeb_fate_ops:call(Fun).
 
-split_to_scode(Env, {nosplit, Expr}) ->
-    [switch_body, to_scode(Env, Expr)];
+split_to_scode(Env, {nosplit, Renames, Expr}) ->
+    [switch_body, dbg_scoped_vars(Env, Renames, to_scode(Env, Expr))];
 split_to_scode(Env, {split, {tuple, _}, X, Alts}) ->
     {Def, Alts1} = catchall_to_scode(Env, X, Alts),
     Arg = lookup_var(Env, X),
@@ -760,20 +760,20 @@ dbg_scoped_vars(#env{debug_info = false}, _, SCode) ->
     SCode;
 dbg_scoped_vars(_Env, [], SCode) ->
     SCode;
-dbg_scoped_vars(Env, [Var | Rest], SCode) ->
-    dbg_scoped_vars(Env, Rest, dbg_scoped_var(Env, Var, SCode)).
+dbg_scoped_vars(Env, [{SavedVarName, Var} | Rest], SCode) ->
+    dbg_scoped_vars(Env, Rest, dbg_scoped_var(Env, SavedVarName, Var, SCode));
+dbg_scoped_vars(Env = #env{saved_fresh_names = SavedFreshNames}, [Var | Rest], SCode) ->
+    SavedVarName = maps:get(Var, SavedFreshNames, Var),
+    dbg_scoped_vars(Env, Rest, dbg_scoped_var(Env, SavedVarName, Var, SCode)).
 
-dbg_scoped_var(#env{debug_info = false}, _, SCode) ->
-    SCode;
-dbg_scoped_var(Env = #env{saved_fresh_names = SavedFreshNames}, Var, SCode) ->
-    VarName = maps:get(Var, SavedFreshNames, Var),
-    case VarName == "_" orelse is_fresh_name(VarName) of
+dbg_scoped_var(Env, SavedVarName, Var, SCode) ->
+    case SavedVarName == "_" orelse is_fresh_name(SavedVarName) of
         true ->
             SCode;
         false ->
             Register = lookup_var(Env, Var),
-            Def      = [{'DBG_DEF',   {immediate, VarName}, Register}],
-            Undef    = [{'DBG_UNDEF', {immediate, VarName}, Register}],
+            Def      = [{'DBG_DEF',   {immediate, SavedVarName}, Register}],
+            Undef    = [{'DBG_UNDEF', {immediate, SavedVarName}, Register}],
             Def ++ dbg_undef(Undef, SCode)
     end.
 

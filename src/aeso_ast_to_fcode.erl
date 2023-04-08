@@ -87,7 +87,7 @@
                | {lam, fann(), [var_name()], fexpr()}.
 
 -type fsplit() :: {split, ftype(), var_name(), [fcase()]}
-                | {nosplit, fexpr()}.
+                | {nosplit, [rename()], fexpr()}.  %% Renames are needed to add DBG_DEF for switch pattern vars
 
 -type fcase() :: {'case', fsplit_pat(), fsplit()}.
 
@@ -821,8 +821,8 @@ expr_to_fcode(_Env, Type, Expr) ->
 -spec make_if(fexpr(), fexpr(), fexpr()) -> fexpr().
 make_if({var, FAnn, X}, Then, Else) ->
     {switch, FAnn, {split, boolean, X,
-        [{'case', {bool, false}, {nosplit, Else}},
-         {'case', {bool, true},  {nosplit, Then}}]}};
+        [{'case', {bool, false}, {nosplit, [], Else}},
+         {'case', {bool, true},  {nosplit, [], Then}}]}};
 make_if(Cond, Then, Else) ->
     X = fresh_name(),
     FAnn = get_fann(Cond),
@@ -831,7 +831,7 @@ make_if(Cond, Then, Else) ->
 -spec make_if_no_else(fexpr(), fexpr()) -> fexpr().
 make_if_no_else({var, FAnn, X}, Then) ->
     {switch, FAnn, {split, boolean, X,
-        [{'case', {bool, true},  {nosplit, Then}}]}};
+        [{'case', {bool, true},  {nosplit, [], Then}}]}};
 make_if_no_else(Cond, Then) ->
     X = fresh_name(),
     FAnn = get_fann(Cond),
@@ -927,7 +927,7 @@ split_tree(Env, Vars, Alts = [{'case', Pats, Body} | _]) ->
             Ys  = [ Y || {var, Y} <- Pats ],
             Ren = [ {Y, X} || {Y, X} <- lists:zip(Ys, Xs), X /= Y, Y /= "_" ],
             %% TODO: Unreachable clauses error
-            {nosplit, rename(Ren, Body)};
+            {nosplit, Ren, rename(Ren, Body)};
         I when is_integer(I) ->
             {Vars0, [{X, Type} | Vars1]} = lists:split(I - 1, Vars),
             Type1 = strip_singleton_tuples(Type),
@@ -1123,8 +1123,8 @@ decision_tree_to_fcode({atom, B}) -> B;
 decision_tree_to_fcode({'if', A, Then, Else}) ->
     X = fresh_name(),
     {'let', get_fann(A), X, A,
-        {switch, get_fann(A), {split, boolean, X, [{'case', {bool, false}, {nosplit, decision_tree_to_fcode(Else)}},
-                                                  {'case', {bool, true},  {nosplit, decision_tree_to_fcode(Then)}}]}}}.
+        {switch, get_fann(A), {split, boolean, X, [{'case', {bool, false}, {nosplit, [], decision_tree_to_fcode(Else)}},
+                                                  {'case', {bool, true},  {nosplit, [], decision_tree_to_fcode(Then)}}]}}}.
 
 %% -- Statements --
 
@@ -1262,7 +1262,7 @@ event_function(_Env = #{event_type := {variant_t, EventCons}}, EventType = {vari
                     end,
                 Indices = [ {var, [], V} || {indexed, V} <- IVars ],
                 Body = {builtin, [], chain_event, [Payload, Hash | Indices]},
-                {'case', {con, [], Arities, Tag, Vars}, {nosplit, Body}}
+                {'case', {con, [], Arities, Tag, Vars}, {nosplit, [], Body}}
            end,
     #{ attrs  => [private],
        args   => [{"e", EventType}],
@@ -1369,7 +1369,7 @@ lambda_lift_expr(Layout, Expr) ->
         {get_state, _, _}         -> Expr;
         {switch, FAnn, S}         -> {switch, FAnn, lambda_lift_expr(Layout, S)};
         {split, Type, X, Alts}    -> {split, Type, X, lambda_lift_exprs(Layout, Alts)};
-        {nosplit, A}              -> {nosplit, lambda_lift_expr(Layout, A)};
+        {nosplit, Rens, A}        -> {nosplit, Rens, lambda_lift_expr(Layout, A)};
         {'case', P, S}            -> {'case', P, lambda_lift_expr(Layout, S)}
     end.
 
@@ -1601,12 +1601,12 @@ add_catchalls(Alts, Catchalls) ->
     end.
 
 -spec nest_catchalls([fcase()]) -> fcase().
-nest_catchalls([C = {'case', {var, _}, {nosplit, _}} | _]) -> C;
+nest_catchalls([C = {'case', {var, _}, {nosplit, _, _}} | _]) -> C;
 nest_catchalls([{'case', P = {var, _}, {split, Type, X, Alts}} | Catchalls]) ->
     {'case', P, {split, Type, X, add_catchalls(Alts, Catchalls)}}.
 
 -spec simpl_switch(expr_env(), fann(), [fcase()], fsplit()) -> fexpr() | nomatch.
-simpl_switch(_Env, _FAnn, _, {nosplit, E}) -> E;
+simpl_switch(_Env, _FAnn, _, {nosplit, _, E}) -> E;
 simpl_switch(Env, FAnn, Catchalls, {split, Type, X, Alts}) ->
     Alts1 = add_catchalls(Alts, Catchalls),
     Stuck = {switch, FAnn, {split, Type, X, Alts1}},
@@ -1708,7 +1708,7 @@ read_only({remote, _, _, _, _, _, _}) -> false;
 read_only({builtin, _, _, _})         -> false; %% TODO: some builtins are
 read_only({switch, _, Split})         -> read_only(Split);
 read_only({split, _, _, Cases})       -> read_only(Cases);
-read_only({nosplit, E})               -> read_only(E);
+read_only({nosplit, _, E})            -> read_only(E);
 read_only({'case', _, Split})         -> read_only(Split);
 read_only({'let', _, _, A, B})        -> read_only([A, B]);
 read_only({funcall, _, _, _})         -> false;
@@ -1960,7 +1960,7 @@ free_vars(Expr) ->
         {closure, _, _, A}      -> free_vars(A);
         {switch, _, A}          -> free_vars(A);
         {split, _, X, As}       -> free_vars([{var, [], X} | As]);
-        {nosplit, A}            -> free_vars(A);
+        {nosplit, _, A}         -> free_vars(A);
         {'case', P, A}          -> free_vars(A) -- lists:sort(fsplit_pat_vars(P))
     end.
 
@@ -1992,7 +1992,7 @@ used_defs(Expr) ->
         {closure, _, F, A}      -> lists:umerge([F], used_defs(A));
         {switch, _, A}          -> used_defs(A);
         {split, _, _, As}       -> used_defs(As);
-        {nosplit, A}            -> used_defs(A);
+        {nosplit, _, A}         -> used_defs(A);
         {'case', _, A}          -> used_defs(A)
     end.
 
@@ -2040,7 +2040,7 @@ bottom_up(F, Env, Expr) ->
                     {'let', FAnn, X, E1, bottom_up(F, Env1, Body)}
             end;
         {split, Type, X, Cases}          -> {split, Type, X, [bottom_up(F, Env, Case) || Case <- Cases]};
-        {nosplit, E}                     -> {nosplit, bottom_up(F, Env, E)};
+        {nosplit, Rens, E}               -> {nosplit, Rens, bottom_up(F, Env, E)};
         {'case', Pat, Split}             -> {'case', Pat, bottom_up(F, Env, Split)}
     end).
 
@@ -2164,7 +2164,7 @@ rename_spat(Ren, {assign, X, P}) ->
 -spec rename_split(rename(), fsplit()) -> fsplit().
 rename_split(Ren, {split, Type, X, Cases}) ->
     {split, Type, rename_var(Ren, X), [rename_case(Ren, C) || C <- Cases]};
-rename_split(Ren, {nosplit, E}) -> {nosplit, rename(Ren, E)}.
+rename_split(Ren, {nosplit, Rens, E}) -> {nosplit, Rens, rename(Ren, E)}.
 
 -spec rename_case(rename(), fcase()) -> fcase().
 rename_case(Ren, {'case', Pat, Split}) ->
@@ -2406,7 +2406,7 @@ pp_ftype({variant, Cons}) ->
                    end || {I, Args} <- indexed(Cons)])).
 
 -spec pp_split(fsplit()) -> prettypr:document().
-pp_split({nosplit, E}) -> pp_fexpr(E);
+pp_split({nosplit, _, E}) -> pp_fexpr(E);
 pp_split({split, Type, X, Alts}) ->
     pp_above([pp_beside([pp_text("switch("), pp_text(X), pp_text(" : "), pp_ftype(Type), pp_text(")")])] ++
              [prettypr:nest(2, pp_case(Alt)) || Alt <- Alts]).
