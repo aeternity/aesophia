@@ -460,7 +460,7 @@ split_to_scode(Env, {split, {variant, Cons}, X, Alts}) ->
     {Def, Alts1} = catchall_to_scode(Env, X, Alts),
     Arg = lookup_var(Env, X),
     GetAlt = fun(I) ->
-                case [{Xs, S} || {'case', {con, _, _, J, Xs}, S} <- Alts1, I == J] of
+                case [{Xs, S} || {'case', {con, _, J, Xs}, S} <- Alts1, I == J] of
                     [] -> missing;
                     [{Xs, S} | _] ->
                         {Code, Env1} = match_variant(Env, Arg, Xs),
