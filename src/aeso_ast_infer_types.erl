@@ -124,15 +124,18 @@
 
 -type variance() :: invariant | covariant | contravariant | bivariant.
 
--type fun_info()  :: {aeso_syntax:ann(), typesig() | type()}.
--type type_info() :: {aeso_syntax:ann(), typedef()}.
--type var_info()  :: {aeso_syntax:ann(), utype()}.
+-type fun_info()   :: {aeso_syntax:ann(), typesig() | type()}.
+-type type_info()  :: {aeso_syntax:ann(), typedef()}.
+-type const_info() :: {aeso_syntax:ann(), type()}.
+-type var_info()   :: {aeso_syntax:ann(), utype()}.
 
--type fun_env()  :: [{name(), fun_info()}].
--type type_env() :: [{name(), type_info()}].
+-type fun_env()   :: [{name(), fun_info()}].
+-type type_env()  :: [{name(), type_info()}].
+-type const_env() :: [{name(), const_info()}].
 
 -record(scope, { funs   = [] :: fun_env()
                , types  = [] :: type_env()
+               , consts = [] :: const_env()
                , access = public :: access()
                , kind   = namespace :: namespace | contract
                , ann    = [{origin, system}] :: aeso_syntax:ann()
@@ -152,6 +155,7 @@
     , in_guard         = false              :: boolean()
     , stateful         = false              :: boolean()
     , unify_throws     = true               :: boolean()
+    , current_const    = none               :: none | aeso_syntax:id()
     , current_function = none               :: none | aeso_syntax:id()
     , what             = top                :: top | namespace | contract | contract_interface
     }).
@@ -183,9 +187,13 @@ pop_scope(Env) ->
 get_scope(#env{ scopes = Scopes }, Name) ->
     maps:get(Name, Scopes, false).
 
+-spec get_current_scope(env()) -> scope().
+get_current_scope(#env{ namespace = NS, scopes = Scopes }) ->
+    maps:get(NS, Scopes).
+
 -spec on_current_scope(env(), fun((scope()) -> scope())) -> env().
 on_current_scope(Env = #env{ namespace = NS, scopes = Scopes }, Fun) ->
-    Scope = maps:get(NS, Scopes),
+    Scope = get_current_scope(Env),
     Env#env{ scopes = Scopes#{ NS => Fun(Scope) } }.
 
 -spec on_scopes(env(), fun((scope()) -> scope())) -> env().
@@ -193,8 +201,8 @@ on_scopes(Env = #env{ scopes = Scopes }, Fun) ->
     Env#env{ scopes = maps:map(fun(_, Scope) -> Fun(Scope) end, Scopes) }.
 
 -spec bind_var(aeso_syntax:id(), utype(), env()) -> env().
-bind_var({id, Ann, X}, T, Env = #env{ vars = Vars }) ->
-    when_warning(warn_shadowing, fun() -> warn_potential_shadowing(Ann, X, Vars) end),
+bind_var({id, Ann, X}, T, Env) ->
+    when_warning(warn_shadowing, fun() -> warn_potential_shadowing(Env, Ann, X) end),
     Env#env{ vars = [{X, {Ann, T}} | Env#env.vars] }.
 
 -spec bind_vars([{aeso_syntax:id(), utype()}], env()) -> env().
@@ -246,6 +254,37 @@ bind_type(X, Ann, Def, Env) ->
     on_current_scope(Env, fun(Scope = #scope{ types = Types }) ->
                             Scope#scope{ types = [{X, {Ann, Def}} | Types] }
                           end).
+
+-spec bind_const(name(), aeso_syntax:ann(), type(), env()) -> env().
+bind_const(X, Ann, Type, Env) ->
+    case lookup_env(Env, term, Ann, [X]) of
+        false ->
+            on_current_scope(Env, fun(Scope = #scope{ consts = Consts }) ->
+                                    Scope#scope{ consts = [{X, {Ann, Type}} | Consts] }
+                                end);
+        _ ->
+            type_error({duplicate_definition, X, [Ann, aeso_syntax:get_ann(Type)]}),
+            Env
+    end.
+
+-spec bind_consts(env(), #{ name() => aeso_syntax:decl() }, [{acyclic, name()} | {cyclic, [name()]}], [aeso_syntax:decl()]) ->
+        {env(), [aeso_syntax:decl()]}.
+bind_consts(Env, _Consts, [], Acc) ->
+    {Env, lists:reverse(Acc)};
+bind_consts(Env, Consts, [{cyclic, Xs} | _SCCs], _Acc) ->
+    ConstDecls = [ maps:get(X, Consts) || X <- Xs ],
+    type_error({mutually_recursive_constants, lists:reverse(ConstDecls)}),
+    {Env, []};
+bind_consts(Env, Consts, [{acyclic, X} | SCCs], Acc) ->
+    case maps:get(X, Consts, undefined) of
+        Const = {letval, Ann, Id, _} ->
+            NewConst = {letval, _, {typed, _, _, Type}, _} = infer_const(Env, Const),
+            NewEnv = bind_const(name(Id), Ann, Type, Env),
+            bind_consts(NewEnv, Consts, SCCs, [NewConst | Acc]);
+        undefined ->
+            %% When a used id is not a letval, a type error will be thrown
+            bind_consts(Env, Consts, SCCs, Acc)
+    end.
 
 %% Bind state primitives
 -spec bind_state(env()) -> env().
@@ -431,21 +470,30 @@ lookup_env1(#env{ namespace = Current, used_namespaces = UsedNamespaces, scopes 
     %% Get the scope
     case maps:get(Qual, Scopes, false) of
         false -> false; %% TODO: return reason for not in scope
-        #scope{ funs = Funs, types = Types } ->
+        #scope{ funs = Funs, types = Types, consts = Consts, kind = ScopeKind } ->
             Defs = case Kind of
                      type -> Types;
                      term -> Funs
                    end,
             %% Look up the unqualified name
             case proplists:get_value(Name, Defs, false) of
-                false -> false;
+                false ->
+                    case proplists:get_value(Name, Consts, false) of
+                        false ->
+                            false;
+                        Const when AllowPrivate; ScopeKind == namespace ->
+                            {QName, Const};
+                        Const ->
+                            type_error({contract_treated_as_namespace_constant, Ann, QName}),
+                            {QName, Const}
+                    end;
                 {reserved_init, Ann1, Type} ->
                     type_error({cannot_call_init_function, Ann}),
                     {QName, {Ann1, Type}};  %% Return the type to avoid an extra not-in-scope error
                 {contract_fun, Ann1, Type} when AllowPrivate orelse QNameIsEvent ->
                     {QName, {Ann1, Type}};
                 {contract_fun, Ann1, Type} ->
-                    type_error({contract_treated_as_namespace, Ann, QName}),
+                    type_error({contract_treated_as_namespace_entrypoint, Ann, QName}),
                     {QName, {Ann1, Type}};
                 {Ann1, _} = E ->
                     %% Check that it's not private (or we can see private funs)
@@ -486,8 +534,11 @@ qname({qid,  _, Xs}) -> Xs;
 qname({con,  _, X})  -> [X];
 qname({qcon, _, Xs}) -> Xs.
 
--spec name(aeso_syntax:id() | aeso_syntax:con()) -> name().
-name({_, _, X}) -> X.
+-spec name(Named | {typed, _, Named, _}) -> name() when
+      Named :: aeso_syntax:id() | aeso_syntax:con().
+name({typed, _, X, _}) -> name(X);
+name({id, _, X}) -> X;
+name({con, _, X}) -> X.
 
 -spec qid(aeso_syntax:ann(), qname()) -> aeso_syntax:id() | aeso_syntax:qid().
 qid(Ann, [X]) -> {id, Ann, X};
@@ -1054,6 +1105,7 @@ infer_contract(Env0, What, Defs0, Options) ->
               ({fun_clauses, _, _, _, _}) -> function;
               ({fun_decl, _, _, _})       -> prototype;
               ({using, _, _, _, _})       -> using;
+              ({letval, _, _, _})         -> constant;
               (_)                         -> unexpected
            end,
     Get = fun(K, In) -> [ Def || Def <- In, Kind(Def) == K ] end,
@@ -1069,11 +1121,12 @@ infer_contract(Env0, What, Defs0, Options) ->
             contract_interface -> Env1;
             contract           -> bind_state(Env1)   %% bind state and put
         end,
-    {ProtoSigs, Decls} = lists:unzip([ check_fundecl(Env1, Decl) || Decl <- Get(prototype, Defs) ]),
+    {Env2C, Consts} = check_constants(Env2, Get(constant, Defs)),
+    {ProtoSigs, Decls} = lists:unzip([ check_fundecl(Env2C, Decl) || Decl <- Get(prototype, Defs) ]),
     [ type_error({missing_definition, Id}) || {fun_decl, _, Id, _} <- Decls,
                                               What =:= contract,
                                               get_option(no_code, false) =:= false ],
-    Env3      = bind_funs(ProtoSigs, Env2),
+    Env3      = bind_funs(ProtoSigs, Env2C),
     Functions = Get(function, Defs),
     %% Check for duplicates in Functions (we turn it into a map below)
     FunBind   = fun({letfun, Ann, {id, _, Fun}, _, _, _})   -> {Fun, {tuple_t, Ann, []}};
@@ -1093,7 +1146,7 @@ infer_contract(Env0, What, Defs0, Options) ->
     check_entrypoints(Defs1),
     destroy_and_report_type_errors(Env4),
     %% Add inferred types of definitions
-    {Env5, TypeDefs ++ Decls ++ Defs1}.
+    {Env5, TypeDefs ++ Decls ++ Consts ++ Defs1}.
 
 %% Restructure blocks into multi-clause fundefs (`fun_clauses`).
 -spec process_blocks([aeso_syntax:decl()]) -> [aeso_syntax:decl()].
@@ -1242,6 +1295,21 @@ opposite_variance(invariant) -> invariant;
 opposite_variance(covariant) -> contravariant;
 opposite_variance(contravariant) -> covariant;
 opposite_variance(bivariant) -> bivariant.
+
+-spec check_constants(env(), [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
+check_constants(Env = #env{ what = What }, Consts) ->
+    HasValidId = fun({letval, _, {id, _, _}, _})                -> true;
+                    ({letval, _, {typed, _, {id, _, _}, _}, _}) -> true;
+                    (_)                                         -> false
+                 end,
+    {Valid, Invalid} = lists:partition(HasValidId, Consts),
+    [ type_error({invalid_const_id, aeso_syntax:get_ann(Pat)}) || {letval, _, Pat, _} <- Invalid ],
+    [ type_error({illegal_const_in_interface, Ann}) || {letval, Ann, _, _} <- Valid, What == contract_interface ],
+    when_warning(warn_unused_constants, fun() -> potential_unused_constants(Env, Valid) end),
+    ConstMap = maps:from_list([ {name(Id), Const} || Const = {letval, _, Id, _} <- Valid ]),
+    DepGraph = maps:map(fun(_, Const) -> aeso_syntax_utils:used_ids(Const) end, ConstMap),
+    SCCs = aeso_utils:scc(DepGraph),
+    bind_consts(Env, ConstMap, SCCs, []).
 
 check_usings(Env, []) ->
     Env;
@@ -1687,9 +1755,19 @@ lookup_name(Env = #env{ namespace = NS, current_function = CurFn }, As, Id, Opti
             type_error({unbound_variable, Id}),
             {Id, fresh_uvar(As)};
         {QId, {_, Ty}} ->
-            when_warning(warn_unused_variables, fun() -> used_variable(NS, name(CurFn), QId) end),
-            when_warning(warn_unused_functions,
-                         fun() -> register_function_call(NS ++ qname(CurFn), QId) end),
+            %% Variables and functions cannot be used when CurFn is `none`.
+            %% i.e. they cannot be used in toplevel constants
+            [ begin
+                when_warning(
+                    warn_unused_variables,
+                    fun() -> used_variable(NS, name(CurFn), QId) end),
+                when_warning(
+                    warn_unused_functions,
+                    fun() -> register_function_call(NS ++ qname(CurFn), QId) end)
+              end || CurFn =/= none ],
+
+            when_warning(warn_unused_constants, fun() -> used_constant(NS, QId) end),
+
             Freshen = proplists:get_value(freshen, Options, false),
             check_stateful(Env, Id, Ty),
             Ty1 = case Ty of
@@ -2054,6 +2132,81 @@ infer_expr(Env, Let = {letfun, Attrs, _, _, _, _}) ->
     type_error({missing_body_for_let, Attrs}),
     infer_expr(Env, {block, Attrs, [Let, abort_expr(Attrs, "missing body")]}).
 
+check_valid_const_expr({bool, _, _}) ->
+    true;
+check_valid_const_expr({int, _, _}) ->
+    true;
+check_valid_const_expr({char, _, _}) ->
+    true;
+check_valid_const_expr({string, _, _}) ->
+    true;
+check_valid_const_expr({bytes, _, _}) ->
+    true;
+check_valid_const_expr({account_pubkey, _, _}) ->
+    true;
+check_valid_const_expr({oracle_pubkey, _, _}) ->
+    true;
+check_valid_const_expr({oracle_query_id, _, _}) ->
+    true;
+check_valid_const_expr({contract_pubkey, _, _}) ->
+    true;
+check_valid_const_expr({id, _, "_"}) ->
+    true;
+check_valid_const_expr({Tag, _, _}) when Tag == id; Tag == qid; Tag == con; Tag == qcon ->
+    true;
+check_valid_const_expr({tuple, _, Cpts}) ->
+    lists:all(fun(X) -> X end, [ check_valid_const_expr(C) || C <- Cpts ]);
+check_valid_const_expr({list, _, Elems}) ->
+    lists:all(fun(X) -> X end, [ check_valid_const_expr(Elem) || Elem <- Elems ]);
+check_valid_const_expr({list_comp, _, _, _}) ->
+    false;
+check_valid_const_expr({typed, _, Body, _}) ->
+    check_valid_const_expr(Body);
+check_valid_const_expr({app, Ann, Fun, Args0}) ->
+    {_, Args} = split_args(Args0),
+    case aeso_syntax:get_ann(format, Ann) of
+        infix ->
+            lists:all(fun(X) -> X end, [ check_valid_const_expr(Arg) || Arg <- Args ]);
+        prefix ->
+            lists:all(fun(X) -> X end, [ check_valid_const_expr(Arg) || Arg <- Args ]);
+        _ ->
+            %% Applications of data constructors are allowed in constants
+            lists:member(element(1, Fun), [con, qcon])
+    end;
+check_valid_const_expr({'if', _, _, _, _}) ->
+    false;
+check_valid_const_expr({switch, _, _, _}) ->
+    false;
+check_valid_const_expr({record, _, Fields}) ->
+    lists:all(fun(X) -> X end, [ check_valid_const_expr(Expr) || {field, _, _, Expr} <- Fields ]);
+check_valid_const_expr({record, _, _, _}) ->
+    false;
+check_valid_const_expr({proj, _, Record, _}) ->
+    check_valid_const_expr(Record);
+% Maps
+check_valid_const_expr({map_get, _, _, _}) ->  %% map lookup
+    false;
+check_valid_const_expr({map_get, _, _, _, _}) ->  %% map lookup with default
+    false;
+check_valid_const_expr({map, _, KVs}) ->   %% map construction
+    lists:all(fun(X) -> X end, [ check_valid_const_expr(K) andalso check_valid_const_expr(V) || {K, V} <- KVs ]);
+check_valid_const_expr({map, _, _, _}) -> %% map update
+    false;
+check_valid_const_expr({block, _, _}) ->
+    false;
+check_valid_const_expr({record_or_map_error, _, Fields}) ->
+    lists:all(fun(X) -> X end, [ check_valid_const_expr(Expr) || {field, _, _, Expr} <- Fields ]);
+check_valid_const_expr({record_or_map_error, _, _, _}) ->
+    false;
+check_valid_const_expr({lam, _, _, _}) ->
+    false;
+check_valid_const_expr({letpat, _, _, _}) ->
+    false;
+check_valid_const_expr({letval, _, _, _}) ->
+    false;
+check_valid_const_expr({letfun, _, _, _, _, _}) ->
+    false.
+
 infer_var_args_fun(Env, {typed, Ann, Fun, FunType0}, NamedArgs, ArgTypes) ->
     FunType =
         case Fun of
@@ -2178,9 +2331,14 @@ infer_pattern(Env, Pattern) ->
     NewPattern = infer_expr(NewEnv, Pattern),
     {NewEnv#env{ in_pattern = Env#env.in_pattern }, NewPattern}.
 
-infer_case(Env = #env{ namespace = NS, current_function = {id, _, Fun} }, Attrs, Pattern, ExprType, GuardedBranches, SwitchType) ->
+infer_case(Env = #env{ namespace = NS, current_function = FunId }, Attrs, Pattern, ExprType, GuardedBranches, SwitchType) ->
     {NewEnv, NewPattern = {typed, _, _, PatType}} = infer_pattern(Env, Pattern),
-    when_warning(warn_unused_variables, fun() -> potential_unused_variables(NS, Fun, free_vars(Pattern)) end),
+
+    %% Make sure we are inside a function before warning about potentially unused var
+    [ when_warning(warn_unused_variables,
+                   fun() -> potential_unused_variables(NS, Fun, free_vars(Pattern)) end)
+      || {id, _, Fun} <- [FunId] ],
+
     InferGuardedBranches = fun({guarded, Ann, Guards, Branch}) ->
         NewGuards = lists:map(fun(Guard) ->
                                   check_expr(NewEnv#env{ in_guard = true }, Guard, {id, Attrs, "bool"})
@@ -2213,6 +2371,19 @@ infer_block(Env, Attrs, [E|Rest], BlockType) ->
     NewE = infer_expr(Env, E),
     when_warning(warn_unused_return_value, fun() -> potential_unused_return_value(NewE) end),
     [NewE|infer_block(Env, Attrs, Rest, BlockType)].
+
+infer_const(Env, {letval, Ann, TypedId = {typed, _, Id = {id, _, _}, Type}, Expr}) ->
+    check_valid_const_expr(Expr) orelse type_error({invalid_const_expr, Id}),
+    NewExpr = check_expr(Env#env{ current_const = Id }, Expr, Type),
+    {letval, Ann, TypedId, NewExpr};
+infer_const(Env, {letval, Ann, Id = {id, AnnId, _}, Expr}) ->
+    check_valid_const_expr(Expr) orelse type_error({invalid_const_expr, Id}),
+    create_constraints(),
+    NewExpr = {typed, _, _, Type} = infer_expr(Env#env{ current_const = Id }, Expr),
+    solve_then_destroy_and_report_unsolved_constraints(Env),
+    IdType = setelement(2, Type, AnnId),
+    NewId = {typed, aeso_syntax:get_ann(Id), Id, IdType},
+    instantiate({letval, Ann, NewId, NewExpr}).
 
 infer_infix({BoolOp, As})
   when BoolOp =:= '&&'; BoolOp =:= '||' ->
@@ -3177,6 +3348,7 @@ all_warnings() ->
     [ warn_unused_includes
     , warn_unused_stateful
     , warn_unused_variables
+    , warn_unused_constants
     , warn_unused_typedefs
     , warn_unused_return_value
     , warn_unused_functions
@@ -3254,6 +3426,17 @@ used_variable(Namespace, Fun, [VarName]) ->
     ets_match_delete(warnings, {unused_variable, '_', Namespace, Fun, VarName});
 used_variable(_, _, _) -> ok.
 
+%% Warnings (Unused constants)
+
+potential_unused_constants(#env{ what = namespace }, _Consts) ->
+    [];
+potential_unused_constants(#env{ namespace = Namespace }, Consts) ->
+    [ ets_insert(warnings, {unused_constant, Ann, Namespace, Name}) || {letval, _, {id, Ann, Name}, _} <- Consts ].
+
+used_constant(Namespace = [Contract], [Contract, ConstName]) ->
+    ets_match_delete(warnings, {unused_constant, '_', Namespace, ConstName});
+used_constant(_, _) -> ok.
+
 %% Warnings (Unused return value)
 
 potential_unused_return_value({typed, Ann, {app, _, {typed, _, _, {fun_t, _, _, _, {id, _, Type}}}, _}, _}) when Type /= "unit" ->
@@ -3299,9 +3482,11 @@ destroy_and_report_unused_functions() ->
 
 %% Warnings (Shadowing)
 
-warn_potential_shadowing(_, "_", _) -> ok;
-warn_potential_shadowing(Ann, Name, Vars) ->
-    case proplists:get_value(Name, Vars, false) of
+warn_potential_shadowing(_, _, "_") -> ok;
+warn_potential_shadowing(Env = #env{ vars = Vars }, Ann, Name) ->
+    CurrentScope = get_current_scope(Env),
+    Consts = CurrentScope#scope.consts,
+    case proplists:get_value(Name, Vars ++ Consts, false) of
         false -> ok;
         {AnnOld, _} -> ets_insert(warnings, {shadowing, Ann, Name, AnnOld})
     end.
@@ -3543,10 +3728,6 @@ mk_error({type_decl, _, {id, Pos, Name}, _}) ->
     Msg = io_lib:format("Empty type declarations are not supported. Type `~s` lacks a definition",
                         [Name]),
     mk_t_err(pos(Pos), Msg);
-mk_error({letval, _Pos, {id, Pos, Name}, _Def}) ->
-    Msg = io_lib:format("Toplevel \"let\" definitions are not supported. Value `~s` could be replaced by 0-argument function.",
-                        [Name]),
-    mk_t_err(pos(Pos), Msg);
 mk_error({stateful_not_allowed, Id, Fun}) ->
     Msg = io_lib:format("Cannot reference stateful function `~s` in the definition of non-stateful function `~s`.",
                         [pp(Id), pp(Fun)]),
@@ -3630,9 +3811,13 @@ mk_error({cannot_call_init_function, Ann}) ->
     Msg = "The 'init' function is called exclusively by the create contract transaction "
           "and cannot be called from the contract code.",
     mk_t_err(pos(Ann), Msg);
-mk_error({contract_treated_as_namespace, Ann, [Con, Fun] = QName}) ->
+mk_error({contract_treated_as_namespace_entrypoint, Ann, [Con, Fun] = QName}) ->
     Msg = io_lib:format("Invalid call to contract entrypoint `~s`.", [string:join(QName, ".")]),
     Cxt = io_lib:format("It must be called as `c.~s` for some `c : ~s`.", [Fun, Con]),
+    mk_t_err(pos(Ann), Msg, Cxt);
+mk_error({contract_treated_as_namespace_constant, Ann, QName}) ->
+    Msg = io_lib:format("Invalid use of the contract constant `~s`.", [string:join(QName, ".")]),
+    Cxt = "Toplevel contract constants can only be used in the contracts where they are defined.",
     mk_t_err(pos(Ann), Msg, Cxt);
 mk_error({bad_top_level_decl, Decl}) ->
     What = case element(1, Decl) of
@@ -3794,6 +3979,23 @@ mk_error({unpreserved_payablity, Kind, ContractCon, InterfaceCon}) ->
     Msg = io_lib:format("Non-payable ~s `~s` cannot implement payable interface `~s`",
                         [KindStr, name(ContractCon), name(InterfaceCon)]),
     mk_t_err(pos(ContractCon), Msg);
+mk_error({mutually_recursive_constants, Consts}) ->
+    Msg = [ "Mutual recursion detected between the constants",
+            [ io_lib:format("\n  - `~s` at ~s", [name(Id), pp_loc(Ann)])
+                || {letval, Ann, Id, _} <- Consts ] ],
+    [{letval, Ann, _, _} | _] = Consts,
+    mk_t_err(pos(Ann), Msg);
+mk_error({invalid_const_id, Ann}) ->
+    Msg = "The name of the compile-time constant cannot have pattern matching",
+    mk_t_err(pos(Ann), Msg);
+mk_error({invalid_const_expr, ConstId}) ->
+    Msg = io_lib:format("Invalid expression in the definition of the constant `~s`", [name(ConstId)]),
+    Cxt = "You can only use the following expressions as constants: "
+          "literals, lists, tuples, maps, and other constants",
+    mk_t_err(pos(aeso_syntax:get_ann(ConstId)), Msg, Cxt);
+mk_error({illegal_const_in_interface, Ann}) ->
+    Msg = "Cannot define toplevel constants inside a contract interface",
+    mk_t_err(pos(Ann), Msg);
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),
     mk_t_err(pos(0, 0), Msg).
@@ -3806,6 +4008,9 @@ mk_warning({unused_stateful, Ann, FunName}) ->
     aeso_warnings:new(pos(Ann), Msg);
 mk_warning({unused_variable, Ann, _Namespace, _Fun, VarName}) ->
     Msg = io_lib:format("The variable `~s` is defined but never used.", [VarName]),
+    aeso_warnings:new(pos(Ann), Msg);
+mk_warning({unused_constant, Ann, _Namespace, ConstName}) ->
+    Msg = io_lib:format("The constant `~s` is defined but never used.", [ConstName]),
     aeso_warnings:new(pos(Ann), Msg);
 mk_warning({unused_typedef, Ann, QName, _Arity}) ->
     Msg = io_lib:format("The type `~s` is defined but never used.", [lists:last(QName)]),

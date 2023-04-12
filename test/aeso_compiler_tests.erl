@@ -222,6 +222,7 @@ compilable_contracts() ->
      "unapplied_contract_call",
      "unapplied_named_arg_builtin",
      "resolve_field_constraint_by_arity",
+     "toplevel_constants",
      "test" % Custom general-purpose test file. Keep it last on the list.
     ].
 
@@ -286,7 +287,11 @@ warnings() ->
       <<?PosW(48, 5)
         "Unused return value.">>,
       <<?PosW(60, 5)
-        "The function `dec` is defined but never used.">>
+        "The function `dec` is defined but never used.">>,
+      <<?PosW(73, 9)
+        "The definition of `const` shadows an older definition at line 70, column 3.">>,
+      <<?PosW(84, 7)
+        "The constant `c` is defined but never used.">>
      ]).
 
 failing_contracts() ->
@@ -658,10 +663,6 @@ failing_contracts() ->
          [<<?Pos(5, 28)
             "Invalid call to contract entrypoint `Foo.foo`.\n"
             "It must be called as `c.foo` for some `c : Foo`.">>])
-    , ?TYPE_ERROR(toplevel_let,
-                  [<<?Pos(2, 7)
-                     "Toplevel \"let\" definitions are not supported. "
-                     "Value `this_is_illegal` could be replaced by 0-argument function.">>])
     , ?TYPE_ERROR(empty_typedecl,
                   [<<?Pos(2, 8)
                      "Empty type declarations are not supported. "
@@ -859,7 +860,11 @@ failing_contracts() ->
                    <<?Pos(48, 5)
                      "Unused return value.">>,
                    <<?Pos(60, 5)
-                     "The function `dec` is defined but never used.">>
+                     "The function `dec` is defined but never used.">>,
+                   <<?Pos(73, 9)
+                     "The definition of `const` shadows an older definition at line 70, column 3.">>,
+                   <<?Pos(84, 7)
+                     "The constant `c` is defined but never used.">>
                   ])
     , ?TYPE_ERROR(polymorphism_contract_interface_recursive,
                   [<<?Pos(1,24)
@@ -1192,6 +1197,74 @@ failing_contracts() ->
                      "Found a hole of type `(int) => int`">>,
                    <<?Pos(13,20)
                      "Found a hole of type `'a`">>
+                  ])
+    , ?TYPE_ERROR(toplevel_constants_contract_as_namespace,
+                  [<<?Pos(5,13)
+                     "Invalid use of the contract constant `G.const`.\n"
+                     "Toplevel contract constants can only be used in the contracts where they are defined.">>,
+                   <<?Pos(10,11)
+                     "Record type `G` does not have field `const`">>,
+                   <<?Pos(10,11)
+                     "Unbound field const">>,
+                   <<?Pos(11,11)
+                     "Record type `G` does not have field `const`">>,
+                   <<?Pos(11,11)
+                     "Unbound field const">>
+                  ])
+    , ?TYPE_ERROR(toplevel_constants_cycles,
+                  [<<?Pos(2,21)
+                     "Unbound variable `selfcycle`">>,
+                   <<?Pos(4,5)
+                     "Mutual recursion detected between the constants\n"
+                     "  - `cycle1` at line 4, column 5\n"
+                     "  - `cycle2` at line 5, column 5\n"
+                     "  - `cycle3` at line 6, column 5">>
+                  ])
+    , ?TYPE_ERROR(toplevel_constants_in_interface,
+                  [<<?Pos(2,10)
+                     "The name of the compile-time constant cannot have pattern matching">>,
+                   <<?Pos(3,5)
+                     "Cannot define toplevel constants inside a contract interface">>,
+                   <<?Pos(4,5)
+                     "Cannot define toplevel constants inside a contract interface">>
+                  ])
+    , ?TYPE_ERROR(toplevel_constants_invalid_expr,
+                  [<<?Pos(10,9)
+                     "Invalid expression in the definition of the constant `c01`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>,
+                   <<?Pos(11,9)
+                     "Invalid expression in the definition of the constant `c02`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>,
+                   <<?Pos(12,9)
+                     "Invalid expression in the definition of the constant `c03`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>,
+                   <<?Pos(13,9)
+                     "Invalid expression in the definition of the constant `c04`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>,
+                   <<?Pos(14,9)
+                     "Invalid expression in the definition of the constant `c05`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>,
+                   <<?Pos(17,9)
+                     "Invalid expression in the definition of the constant `c07`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>,
+                   <<?Pos(18,9)
+                     "Invalid expression in the definition of the constant `c08`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>,
+                   <<?Pos(19,9)
+                     "Invalid expression in the definition of the constant `c09`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>,
+                   <<?Pos(20,9)
+                     "Invalid expression in the definition of the constant `c10`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>,
+                   <<?Pos(21,9)
+                     "Invalid expression in the definition of the constant `c11`\n"
+                     "You can only use the following expressions as constants: literals, lists, tuples, maps, and other constants">>
+                  ])
+    , ?TYPE_ERROR(toplevel_constants_invalid_id,
+                  [<<?Pos(2,9)
+                     "The name of the compile-time constant cannot have pattern matching">>,
+                   <<?Pos(3,9)
+                     "The name of the compile-time constant cannot have pattern matching">>
                   ])
     ].
 

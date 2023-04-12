@@ -104,6 +104,7 @@ Implement ::= ':' Sep1(Con, ',')
 Decl ::= 'type'     Id ['(' TVar* ')'] '=' TypeAlias
        | 'record'   Id ['(' TVar* ')'] '=' RecordType
        | 'datatype' Id ['(' TVar* ')'] '=' DataType
+       | 'let'      Id [':' Type]      '=' Expr
        | (EModifier* 'entrypoint' | FModifier* 'function') Block(FunDecl)
        | Using
 

@@ -1,0 +1,21 @@
+main contract C =
+    record account = { name    : string,
+                       balance : int }
+
+    let one = 1
+    let opt = Some(5)
+    let acc = { name = "str", balance = 100000 }
+    let mpp = {["foo"] = 19, ["bar"] = 42}
+
+    let c01 = [x | x <- [1,2,3,4,5]]
+    let c02 = [x + k | x <- [1,2,3,4,5], let k = x*x]
+    let c03 = [x + y | x <- [1,2,3,4,5], let k = x*x, if (k > 5), y <- [k, k+1, k+2]]
+    let c04 = if (one > 2) 3 else 4
+    let c05 = switch (opt)
+                 Some(x) => x
+                 None => 2
+    let c07 = acc{ balance = one }
+    let c08 = mpp["foo"]
+    let c09 = mpp["non" = 10]
+    let c10 = mpp{["foo"] = 20}
+    let c11 = (x) => x + 1
