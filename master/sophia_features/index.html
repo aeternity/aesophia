@@ -450,6 +450,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#constants" class="md-nav__link">
+    Constants
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#arithmetic" class="md-nav__link">
     Arithmetic
   </a>
@@ -853,6 +860,13 @@
         <li class="md-nav__item">
   <a href="#hole-expression" class="md-nav__link">
     Hole expression
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#constants" class="md-nav__link">
+    Constants
   </a>
   
 </li>
@@ -1706,6 +1720,23 @@ contract C =
         List.sum(List.map(???, [1,2,3]))
 </code></pre></div>
 <p>A hole expression found in the example above will generate the error <code>Found a hole of type `(int) =&gt; int`</code>. This says that the compiler expects a function from <code>int</code> to <code>int</code> in place of the <code>???</code> placeholder.</p>
+<h2 id="constants">Constants</h2>
+<p>Constants in Sophia are contract-level bindings that can be used in either contracts or namespaces. The value of a constant can be a literal, another constant, or arithmetic operations applied to other constants. Lists, tuples, maps, and records can also be used to define a constant as long as their elements are also constants.</p>
+<p>The following visibility rules apply to constants:
+*  Constants defined inside a contract are private in that contract. Thus, cannot be accessed through instances of their defining contract.
+* Constants defined inside a namespace are public. Thus, can be used in other contracts or namespaces.
+* Constants cannot be defined inside a contract interface.</p>
+<p>When a constant is shadowed, it can be accessed using its qualified name:</p>
+<div class="highlight"><pre><span></span><code>contract C =
+  let c = 1
+  entrypoint f() =
+    let c = 2
+    c + C.c  // the result is 3
+</code></pre></div>
+<p>The name of the constant must be an id; therefore, no pattern matching is allowed when defining a constant:</p>
+<div class="highlight"><pre><span></span><code>contract C
+  let x::y::_ = [1,2,3]  // this will result in an error
+</code></pre></div>
 <h2 id="arithmetic">Arithmetic</h2>
 <p>Sophia integers (<code>int</code>) are represented by arbitrary-sized signed words and support the following
 arithmetic operations:
