@@ -1,6 +1,11 @@
 -module(aeso_ast_types_env).
 
-%% Unifiable type. Similar to type, but includes `uvar`.
+
+%% -----------------------------------------------------------------------------
+%% TYPES
+%% -----------------------------------------------------------------------------
+
+%% Unifiable type
 -type utype() :: {fun_t, aeso_syntax:ann(), named_args_t(), [utype()] | var_args, utype()}
                | {app_t, aeso_syntax:ann(), utype(), [utype()]}
                | {tuple_t, aeso_syntax:ann(), [utype()]}
@@ -15,6 +20,10 @@
 
 -type named_args_t() :: uvar() | #{aeso_syntax:name() => {ann(), utype(), aeso_syntax:expr()}}.
 
+-type name_id() :: aeso_syntax:id() | aeso_syntax:qid().
+-define(is_name_id(T), element(1, T) =:= id orelse
+                       element(1, T) =:= qid orelse).
+
 -type type_id() :: aeso_syntax:id() | aeso_syntax:qid() | aeso_syntax:con() | aeso_syntax:qcon().
 
 -define(is_type_id(T), element(1, T) =:= id orelse
@@ -22,11 +31,14 @@
                        element(1, T) =:= con orelse
                        element(1, T) =:= qcon).
 
+%%% ----------------------------------------------------------------------------
+%%% CONSTRAINTS
+%%% ----------------------------------------------------------------------------
+
+%% TODO define context
 -type why_record() :: aeso_syntax:field(aeso_syntax:expr())
                     | {var_args, aeso_syntax:ann(), aeso_syntax:expr()}
                     | {proj, aeso_syntax:ann(), aeso_syntax:expr(), aeso_syntax:id()}.
-
--type pos() :: aeso_errors:pos().
 
 -record(named_argument_constraint,
     {args :: named_args_t(),
@@ -80,6 +92,10 @@
     , field_t  :: utype()
     , record_t :: utype()
     , kind     :: contract | record }).
+
+%%% ----------------------------------------------------------------------------
+%%% TYPE ENV
+%%% ----------------------------------------------------------------------------
 
 -type field_info() :: #field_info{}.
 
@@ -135,9 +151,6 @@
 
 -type env() :: #env{}.
 
-
-%% -- Environment manipulation -----------------------------------------------
-
 -spec switch_scope(qname(), env()) -> env().
 switch_scope(Scope, Env) ->
     Env#env{namespace = Scope}.
@@ -168,7 +181,6 @@ on_scopes(Env = #env{ scopes = Scopes }, Fun) ->
 
 -spec bind_var(aeso_syntax:id(), utype(), env()) -> env().
 bind_var({id, Ann, X}, T, Env = #env{ vars = Vars }) ->
-    when_warning(warn_shadowing, fun() -> warn_potential_shadowing(Ann, X, Vars) end),
     Env#env{ vars = [{X, {Ann, T}} | Env#env.vars] }.
 
 -spec bind_vars([{aeso_syntax:id(), utype()}], env()) -> env().
@@ -342,72 +354,57 @@ visible_in_used_namespaces(UsedNamespaces, QName) ->
             lists:any(IsVisible, Namespaces)
     end.
 
-lookup_name(Env, As, Name) ->
-    lookup_name(Env, As, Name, []).
+-spec split_qual(qname()) -> {qname(), name()}.
+split_qual(QName) ->
+    {lists:droplast(QName), lists:last(QName)}.
 
-lookup_name(Env = #env{ namespace = NS, current_function = CurFn }, As, Id, Options) ->
-    case lookup_env(Env, term, As, qname(Id)) of
-        false ->
-            type_error({unbound_variable, Id}),
-            {Id, fresh_uvar(As)};
-        {QId, {_, Ty}} ->
-            when_warning(warn_unused_variables, fun() -> used_variable(NS, name(CurFn), QId) end),
-            when_warning(warn_unused_functions,
-                         fun() -> register_function_call(NS ++ qname(CurFn), QId) end),
-            Freshen = proplists:get_value(freshen, Options, false),
-            check_stateful(Env, Id, Ty),
-            Ty1 = case Ty of
-                    {type_sig, _, _, _, _, _} -> freshen_type_sig(As, Ty);
-                    _ when Freshen            -> freshen_type(As, Ty);
-                    _                         -> Ty
-                  end,
-            {set_qname(QId, Id), Ty1}
+%% Find all scopes that are described by the qualification
+-spec lookup_scope(env(), qname()) -> [{qname(), scope()}].
+lookup_scope(#env{ namespace = Current, used_namespaces = UsedNamespaces, scopes = Scopes }, Qual) ->
+    MatchingQuals =
+        case lists:filter(fun(X) -> element(2, X) == Qual end, UsedNamespaces) of
+            [] ->
+                [Qual];
+            Namespaces ->
+                lists:map(fun(X) -> element(1, X) end, Namespaces)
+        end,
+    Ret1 = [ lists:sublist(Current, I) ++ Q || I <- lists:seq(0, length(Current)), Q <- NewQuals ],
+    Ret2 = [ Namespace ++ Q || {Namespace, none, _} <- UsedNamespaces, Q <- NewQuals ],
+    [{Q, maps:get(Q, Scopes)} || Q <- lists:usort(Ret1 ++ Ret2)].
+
+-spec lookup_name(env(), name_id()) -> [{qname(), {aeso_syntax:ann(), typesig() | utype()}}].
+lookup_name(Env, Id) when is_name_id(Id) ->
+    {Qual, Name} = split_qual(qname(Id)),
+    case Qual of
+        [] -> case proplists:get_value(Name, Env#env.vars, false) of
+                  false -> [];
+                  {Ann, T} -> {Ann, T}
+              end;
+        _ ->
+            .
     end.
 
--spec lookup_type(env(), type_id()) -> false | {qname(), type_info()}.
+-spec lookup_type(env(), type_id()) -> [{qname(), type_info()}].
 lookup_type(Env, Id) ->
     lookup_env(Env, type, aeso_syntax:get_ann(Id), qname(Id)).
 
 -spec lookup_env(env(), term, aeso_syntax:ann(), qname()) -> false | {qname(), fun_info()};
                 (env(), type, aeso_syntax:ann(), qname()) -> false | {qname(), type_info()}.
 lookup_env(Env, Kind, Ann, Name) ->
-    Var = case Name of
-            [X] when Kind == term -> proplists:get_value(X, Env#env.vars, false);
-            _                     -> false
-          end,
-    case Var of
-        {Ann1, Type} -> {Name, {Ann1, Type}};
-        false ->
-            Names = [ Qual ++ [lists:last(Name)] || Qual <- possible_scopes(Env, Name) ],
-            case [ Res || QName <- Names, Res <- [lookup_env1(Env, Kind, Ann, QName)], Res /= false] of
-                []    -> false;
-                [Res = {_, {AnnR, _}}] ->
-                    when_warning(warn_unused_includes,
-                                 fun() ->
-                                         %% If a file is used from a different file, we
-                                         %% can then mark it as used
-                                         F1 = proplists:get_value(file, Ann, no_file),
-                                         F2 = proplists:get_value(file, AnnR, no_file),
-                                         if
-                                             F1 /= F2 ->
-                                                 used_include(AnnR);
-                                             true ->
-                                                 ok
-                                         end
-                                 end),
-                    Res;
-                Many  ->
-                    type_error({ambiguous_name, qid(Ann, Name), [{qid, A, Q} || {Q, {A, _}} <- Many]}),
-                    false
-            end
+    Names = [ Qual ++ [lists:last(Name)] || Qual <- possible_scopes(Env, Name) ],
+    case [ Res || QName <- Names, Res <- [lookup_env1(Env, Kind, Ann, QName)], Res /= false] of
+        []    -> false;
+        [Res = {_, {AnnR, _}}] ->
+            Res;
+        Many  ->
+            type_error({ambiguous_name, qid(Ann, Name), [{qid, A, Q} || {Q, {A, _}} <- Many]}),
+            false
     end.
 
 -spec lookup_env1(env(), type | term, aeso_syntax:ann(), qname()) -> false | {qname(), fun_info() | type_info()}.
 lookup_env1(#env{ namespace = Current, used_namespaces = UsedNamespaces, scopes = Scopes }, Kind, Ann, QName) ->
     Qual = lists:droplast(QName),
     Name = lists:last(QName),
-    QNameIsEvent = lists:suffix(["Chain", "event"], QName),
-    AllowPrivate = lists:prefix(Qual, Current),
     %% Get the scope
     case maps:get(Qual, Scopes, false) of
         false -> false; %% TODO: return reason for not in scope
@@ -418,25 +415,9 @@ lookup_env1(#env{ namespace = Current, used_namespaces = UsedNamespaces, scopes 
                    end,
             %% Look up the unqualified name
             case proplists:get_value(Name, Defs, false) of
-                false -> false;
-                {reserved_init, Ann1, Type} ->
-                    type_error({cannot_call_init_function, Ann}),
-                    {QName, {Ann1, Type}};  %% Return the type to avoid an extra not-in-scope error
-                {contract_fun, Ann1, Type} when AllowPrivate orelse QNameIsEvent ->
-                    {QName, {Ann1, Type}};
-                {contract_fun, Ann1, Type} ->
-                    type_error({contract_treated_as_namespace, Ann, QName}),
-                    {QName, {Ann1, Type}};
                 {Ann1, _} = E ->
                     %% Check that it's not private (or we can see private funs)
-                    case not is_private(Ann1) orelse AllowPrivate of
-                        true  ->
-                            case visible_in_used_namespaces(UsedNamespaces, QName) of
-                                true -> {QName, E};
-                                false -> false
-                            end;
-                        false -> false
-                    end
+                    {QName, E};
             end
     end.
 
@@ -819,9 +800,6 @@ ets_init() ->
     create_options(Options),
     ets_new(defined_contracts, [bag]),
     ets_new(type_vars, [set]),
-    ets_new(warnings, [bag]),
-    ets_new(functions_to_implement, [set]),
-    when_warning(warn_unused_functions, fun() -> create_unused_functions() end),
     check_modifiers(Env, Contracts),
     create_type_var_variance(),
     create_type_errors(),
@@ -1087,7 +1065,6 @@ unfold_types_in_type(Env, {app_t, Ann, Id = {id, _, "map"}, Args = [KeyType0, _]
     [ type_error({map_in_map_key, Ann1, KeyType0}) || has_maps(KeyType) ],
     {app_t, Ann, Id, Args1};
 unfold_types_in_type(Env, {app_t, Ann, Id, Args}, Options) when ?is_type_id(Id) ->
-    when_warning(warn_unused_typedefs, fun() -> used_typedef(Id, length(Args)) end),
     UnfoldRecords  = proplists:get_value(unfold_record_types, Options, false),
     UnfoldVariants = proplists:get_value(unfold_variant_types, Options, false),
     case lookup_type(Env, Id) of
@@ -1108,7 +1085,6 @@ unfold_types_in_type(Env, {app_t, Ann, Id, Args}, Options) when ?is_type_id(Id) 
     end;
 unfold_types_in_type(Env, Id, Options) when ?is_type_id(Id) ->
     %% Like the case above, but for types without parameters.
-    when_warning(warn_unused_typedefs, fun() -> used_typedef(Id, 0) end),
     UnfoldRecords = proplists:get_value(unfold_record_types, Options, false),
     UnfoldVariants = proplists:get_value(unfold_variant_types, Options, false),
     case lookup_type(Env, Id) of
