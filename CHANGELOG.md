@@ -1,17 +1,13 @@
 # Changelog
-All notable changes to this project will be documented in this file.
+All notable changes to this project shall be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+and this project adheres to [Semantic
+Versioning](https://semver.org/spec/v2.0.0.html). One deviation from _Keep a
+Changelog_ is that "Unreleased" may suggest a specific version bump in case of
+breaking changes.
 
-
-## [Unreleased]
-### Added
-### Changed
-### Removed
-### Fixed
-
-## [8.x.x]
+## [Unreleased] [8.x.x]
 ### Added
 ### Changed
 - `pp_assembler` option to `pp_fate` as it is more specific.

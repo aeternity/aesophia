@@ -13,19 +13,20 @@
 -export_type([ann_line/0, ann_col/0, ann_origin/0, ann_format/0, ann/0]).
 -export_type([name/0, id/0, con/0, qid/0, qcon/0, tvar/0, op/0]).
 -export_type([bin_op/0, un_op/0]).
--export_type([decl/0, letbind/0, typedef/0, pragma/0, fundecl/0]).
+-export_type([top_decl/0, decl/0, letbind/0, typedef/0, pragma/0, fundecl/0]).
 -export_type([arg/0, field_t/0, constructor_t/0, named_arg_t/0]).
 -export_type([type/0, constant/0, expr/0, arg_expr/0, field/1, stmt/0, alt/0, lvalue/0, elim/0, pat/0]).
 -export_type([ast/0]).
 
--type ast() :: [decl()].
+-type ast() :: [top_decl()].
 
 -type ann_line()   :: integer().
 -type ann_col()    :: integer().
 -type ann_origin() :: system | user.
 -type ann_format() :: '?:' | hex | infix | prefix | elif.
 
--type ann() :: [ {line, ann_line()} | {col, ann_col()} | {format, ann_format()} | {origin, ann_origin()}
+-type ann() :: [ {line, ann_line()} | {col, ann_col()} | {file, ann_file()}
+               | {format, ann_format()} | {origin, ann_origin()}
                | stateful | private | payable | main | interface | entrypoint].
 
 -type name() :: string().
@@ -38,20 +39,31 @@
 -type namespace_alias() :: none | con().
 -type namespace_parts() :: none | {for, [id()]} | {hiding, [id()]}.
 
--type decl() :: {contract_main, ann(), con(), [con()], [decl()]}
-              | {contract_child, ann(), con(), [con()], [decl()]}
-              | {contract_interface, ann(), con(), [con()], [decl()]}
-              | {namespace, ann(), con(), [decl()]}
-              | {include, ann(), {string, ann(), string()}}
-              | {pragma, ann(), pragma()}
-              | {type_decl, ann(), id(), [tvar()]} % Only for error msgs
-              | {type_def, ann(), id(), [tvar()], typedef()}
-              | {fun_clauses, ann(), id(), type(), [letfun() | fundecl()]}
-              | {block, ann(), [decl()]}
-              | {using, ann(), con(), namespace_alias(), namespace_parts()}
-              | fundecl()
-              | letfun()
-              | letval(). % Only for error msgs
+% Can't be toplevel
+-type scoped_decl()
+ :: {contract_decl, ann(), con()}
+  | {namespace_decl, ann(), con()}
+  | {type_decl, ann(), id(), [tvar()]} % Only for error msgs
+  | {type_def, ann(), id(), [tvar()], typedef()}
+  | {fun_clauses, ann(), id(), type(), [letfun() | fundecl()]}
+  | {block, ann(), [scoped_decl()]}
+  | fundecl()
+  | letfun()
+  | letval() % Only for error msgs
+  | decl().
+
+% Toplevel, can be nested
+-type decl()
+:: {contract_main, ann(), con(), [con()], [scoped_decl()]}
+ | {contract_child, ann(), con(), [con()], [scoped_decl()]}
+ | {contract_interface, ann(), con(), [con()], [scoped_decl()]}
+ | {namespace, ann(), con(), [scoped_decl()]}
+ | {using, ann(), con(), namespace_alias(), namespace_parts()}.
+
+% Toplevel only
+-type top_decl()
+ :: {pragma, ann(), pragma()}
+  | decl().
 
 -type compiler_version() :: [non_neg_integer()].
 

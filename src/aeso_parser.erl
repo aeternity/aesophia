@@ -8,22 +8,17 @@
 -export([string/1,
          string/2,
          string/3,
-         auto_imports/1,
-         hash_include/2,
          decl/0,
          type/0,
          body/0,
          maybe_block/1,
-         run_parser/2,
-         run_parser/3]).
+         run_parser/2]).
 
 -include("aeso_parse_lib.hrl").
 -import(aeso_parse_lib, [current_file/0, set_current_file/1,
                          current_include_type/0, set_current_include_type/1]).
 
--type parse_result() :: aeso_syntax:ast() | {aeso_syntax:ast(), sets:set(include_hash())} | none().
-
--type include_hash() :: {string(), binary()}.
+-type parse_result() :: aeso_syntax:ast() | none().
 
 
 escape_errors({ok, Ok}) ->
@@ -31,32 +26,21 @@ escape_errors({ok, Ok}) ->
 escape_errors({error, Err}) ->
     parse_error(Err).
 
--spec string(string()) -> parse_result().
-string(String) ->
-    string(String, sets:new(), []).
+-spec module(string()) -> parse_result().
+module(String) ->
+    module(String, []).
 
--spec string(string(), aeso_compiler:options()) -> parse_result().
-string(String, Opts) ->
-    case lists:keyfind(src_file, 1, Opts) of
-        {src_file, File} -> string(String, sets:add_element(File, sets:new()), Opts);
-        false -> string(String, sets:new(), Opts)
-    end.
-
--spec string(string(), sets:set(include_hash()), aeso_compiler:options()) -> parse_result().
-string(String, Included, Opts) ->
+-spec module(string(), aeso_compiler:options()) -> parse_result().
+module(String, Opts) ->
     AST = run_parser(file(), String, Opts),
-    case expand_includes(AST, Included, Opts) of
-        {ok, AST1}   -> AST1;
-        {error, Err} -> parse_error(Err)
-    end.
-
+    add_auto_imports(AST).
 
 run_parser(P, Inp) ->
-    escape_errors(parse_and_scan(P, Inp, [])).
+    escape_errors(scan_and_parse(P, Inp, [])).
 run_parser(P, Inp, Opts) ->
-    escape_errors(parse_and_scan(P, Inp, Opts)).
+    escape_errors(scan_and_parse(P, Inp, Opts)).
 
-parse_and_scan(P, S, Opts) ->
+scan_and_parse(P, S, Opts) ->
     set_current_file(proplists:get_value(src_file, Opts, no_file)),
     set_current_include_type(proplists:get_value(include_type, Opts, none)),
     case aeso_scan:scan(S) of
@@ -560,6 +544,9 @@ pos_ann(Line, Col) ->
     , {line, Line}
     , {col, Col} ].
 
+top_ann() ->
+    pos_ann(0, 0).
+
 ann_pos(Ann) ->
     {proplists:get_value(file, Ann),
      proplists:get_value(line, Ann),
@@ -681,107 +668,13 @@ bad_expr_err(Reason, E) ->
 
 %% -- Helper functions -------------------------------------------------------
 
-expand_includes(AST, Included, Opts) ->
+add_auto_imports(AST) ->
     Ann  = [{origin, system}],
-    AST1 = [ {include, Ann, {string, Ann, File}}
-             || File <- lists:usort(auto_imports(AST)) ] ++ AST,
-    expand_includes(AST1, Included, [], Opts).
+    [ {using, Ann, {con, Ann, Import}}
+      || Import <- lists:usort(auto_imports(AST)) ] ++ AST.
 
-expand_includes([], Included, Acc, Opts) ->
-    case lists:member(keep_included, Opts) of
-        false ->
-            {ok, lists:reverse(Acc)};
-        true ->
-            {ok, {lists:reverse(Acc), Included}}
-    end;
-expand_includes([{include, Ann, {string, _SAnn, File}} | AST], Included, Acc, Opts) ->
-    case get_include_code(File, Ann, Opts) of
-        {ok, Code} ->
-            Hashed = hash_include(File, Code),
-            case sets:is_element(Hashed, Included) of
-                false ->
-                    SrcFile = proplists:get_value(src_file, Opts, no_file),
-                    IncludeType = case proplists:get_value(file, Ann) of
-                                      SrcFile -> direct;
-                                      _       -> indirect
-                                  end,
-                    Opts1 = lists:keystore(src_file, 1, Opts, {src_file, File}),
-                    Opts2 = lists:keystore(include_type, 1, Opts1, {include_type, IncludeType}),
-                    Included1 = sets:add_element(Hashed, Included),
-                    case parse_and_scan(file(), Code, Opts2) of
-                        {ok, AST1} ->
-                            expand_includes(AST1 ++ AST, Included1, Acc, Opts);
-                        Err = {error, _} ->
-                            Err
-                    end;
-                true ->
-                    expand_includes(AST, Included, Acc, Opts)
-            end;
-        Err = {error, _} ->
-            Err
-    end;
-expand_includes([E | AST], Included, Acc, Opts) ->
-    expand_includes(AST, Included, [E | Acc], Opts).
-
-read_file(File, Opts) ->
-    case proplists:get_value(include, Opts, {explicit_files, #{}}) of
-        {file_system, Paths} ->
-            CandidateNames = [ filename:join(Dir, File) || Dir <- Paths ],
-            lists:foldr(fun(F, {error, _}) -> file:read_file(F);
-                           (_F, OK) -> OK end, {error, not_found}, CandidateNames);
-        {explicit_files, Files} ->
-            case maps:get(binary_to_list(File), Files, not_found) of
-                not_found -> {error, not_found};
-                Src       -> {ok, Src}
-            end;
-        escript ->
-            try
-                Escript        = escript:script_name(),
-                {ok, Sections} = escript:extract(Escript, []),
-                Archive        = proplists:get_value(archive, Sections),
-                FileName       = binary_to_list(filename:join([aesophia, priv, stdlib, File])),
-                case zip:extract(Archive, [{file_list, [FileName]}, memory]) of
-                    {ok, [{_, Src}]} -> {ok, Src};
-                    _                -> {error, not_found}
-                end
-            catch _:_ ->
-                {error, not_found}
-            end
-    end.
-
-stdlib_options() ->
-    StdLibDir = aeso_stdlib:stdlib_include_path(),
-    case filelib:is_dir(StdLibDir) of
-        true  -> [{include, {file_system, [StdLibDir]}}];
-        false -> [{include, escript}]
-    end.
-
-get_include_code(File, Ann, Opts) ->
-    case {read_file(File, Opts), read_file(File, stdlib_options())} of
-        {{ok, Bin}, {ok, _}} ->
-            case filename:basename(File) == File of
-                true -> { error
-                        , fail( ann_pos(Ann)
-                              , "Illegal redefinition of standard library " ++ binary_to_list(File))};
-                %% If a path is provided then the stdlib takes lower priority
-                false -> {ok, binary_to_list(Bin)}
-            end;
-        {_, {ok, Bin}} ->
-            {ok, binary_to_list(Bin)};
-        {{ok, Bin}, _} ->
-            {ok, binary_to_list(Bin)};
-        {_, _} ->
-            {error, {ann_pos(Ann), include_error, File}}
-    end.
-
--spec hash_include(string() | binary(), string()) -> include_hash().
-hash_include(File, Code) when is_binary(File) ->
-    hash_include(binary_to_list(File), Code);
-hash_include(File, Code) when is_list(File) ->
-    {filename:basename(File), crypto:hash(sha256, Code)}.
-
-auto_imports({comprehension_bind, _, _}) -> [<<"ListInternal.aes">>];
-auto_imports({'..', _})                  -> [<<"ListInternal.aes">>];
+auto_imports({comprehension_bind, _, _}) -> ["ListInternal"];
+auto_imports({'..', _})                  -> ["ListInternal"];
 auto_imports(L) when is_list(L) ->
     lists:flatmap(fun auto_imports/1, L);
 auto_imports(T) when is_tuple(T) ->

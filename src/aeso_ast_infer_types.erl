@@ -834,61 +834,45 @@ global_env() ->
 option_t(As, T) -> {app_t, As, {id, As, "option"}, [T]}.
 map_t(As, K, V) -> {app_t, As, {id, As, "map"}, [K, V]}.
 
--spec infer(aeso_syntax:ast()) -> {aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]} | {env(), aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]}.
-infer(Contracts) ->
-    infer(Contracts, []).
-
 -type option() :: return_env | dont_unfold | no_code | debug_mode | term().
+
+init_ets(Options) ->
 
 -spec init_env(list(option())) -> env().
 init_env(_Options) -> global_env().
 
--spec infer(aeso_syntax:ast(), list(option())) ->
-  {aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]} | {env(), aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]}.
-infer([], Options) ->
-    create_type_errors(),
-    type_error({no_decls, proplists:get_value(src_file, Options, no_file)}),
-    destroy_and_report_type_errors(init_env(Options));
-infer(Contracts, Options) ->
-    ets_init(), %% Init the ETS table state
-    try
-        Env = init_env(Options),
-        create_options(Options),
-        ets_new(defined_contracts, [bag]),
-        ets_new(type_vars, [set]),
-        ets_new(warnings, [bag]),
-        ets_new(type_vars_variance, [set]),
-        ets_new(functions_to_implement, [set]),
-        %% Set the variance for builtin types
-        ets_insert(type_vars_variance, {"list", [covariant]}),
-        ets_insert(type_vars_variance, {"option", [covariant]}),
-        ets_insert(type_vars_variance, {"map", [covariant, covariant]}),
-        ets_insert(type_vars_variance, {"oracle", [contravariant, covariant]}),
-        ets_insert(type_vars_variance, {"oracle_query", [covariant, covariant]}),
+-spec infer([aeso_syntax:ast()]) -> {aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]} | {env(), aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]}.
+infer(Modules) ->
+    infer(Modules, []).
 
-        when_warning(warn_unused_functions, fun() -> create_unused_functions() end),
-        check_modifiers(Env, Contracts),
-        create_type_errors(),
-        Contracts1 = identify_main_contract(Contracts, Options),
-        destroy_and_report_type_errors(Env),
-        {Env1, Decls} = infer1(Env, Contracts1, [], Options),
+infer(Modules, Options) ->
+    infer(init_env(Options), Modules, Options).
+
+infer(Env, Modules, Options) ->
+    ets_init(),
+    try
+        {Env1, Modules1} = infer(Env, Modules, [], Options),
         when_warning(warn_unused_functions, fun() -> destroy_and_report_unused_functions() end),
         when_option(warn_error, fun() -> destroy_and_report_warnings_as_type_errors() end),
         WarningsUnsorted = lists:map(fun mk_warning/1, ets_tab2list(warnings)),
         Warnings = aeso_warnings:sort_warnings(WarningsUnsorted),
-        {Env2, DeclsFolded, DeclsUnfolded} =
-            case proplists:get_value(dont_unfold, Options, false) of
-                true  -> {Env1, Decls, Decls};
-                false -> E = on_scopes(Env1, fun(Scope) -> unfold_record_types(Env1, Scope) end),
-                         {E, Decls, unfold_record_types(E, Decls)}
-            end,
-        case proplists:get_value(return_env, Options, false) of
-            false -> {DeclsFolded, DeclsUnfolded, Warnings};
-            true  -> {Env2, DeclsFolded, DeclsUnfolded, Warnings}
+        {Env1, Modules1, Warnings}
         end
     after
         clean_up_ets()
     end.
+
+-spec infer(aeso_syntax:ast(), list(option())) ->
+  {aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]} | {env(), aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]}.
+infer(Env, [[]|Rest], Acc, Options) ->
+    type_error({no_decls, proplists:get_value(src_file, Options, no_file)}),
+    infer(Env, Rest, Acc, Options);
+infer(Env, [Module|Rest], Acc, Options) ->
+    {Env1, Modules1} = infer1(Env, Module, [], Options),
+    infer(Env1, Rest, [Module1|Acc], Options);
+infer(Env, [], Acc, _) ->
+    Modules = lists:reverse(Acc),
+    {Env, Modules}.
 
 -spec infer1(env(), [aeso_syntax:decl()], [aeso_syntax:decl()], list(option())) ->
     {env(), [aeso_syntax:decl()]}.
@@ -2308,7 +2292,17 @@ clean_up_ets() ->
 %% The interface functions behave as the standard ETS interface.
 
 ets_init() ->
-    put(aeso_ast_infer_types, #{}).
+    put(aeso_ast_infer_types, #{}),
+    create_options(Options),
+    ets_new(defined_contracts, [bag]),
+    ets_new(type_vars, [set]),
+    ets_new(warnings, [bag]),
+    ets_new(functions_to_implement, [set]),
+    when_warning(warn_unused_functions, fun() -> create_unused_functions() end),
+    check_modifiers(Env, Contracts),
+    create_type_var_variance(),
+    create_type_errors(),
+    ok.
 
 ets_tab_exists(Name) ->
     Tabs = get(aeso_ast_infer_types),
@@ -3347,6 +3341,16 @@ destroy_and_report_warnings_as_type_errors() ->
     Errors = lists:map(fun mk_t_err_from_warn/1, Warnings),
     aeso_errors:throw(Errors).  %% No-op if Warnings == []
 
+create_type_vars_variance() ->
+    ets_new(type_vars_variance, [set]),
+    %% Set the variance for builtin types
+    ets_insert(type_vars_variance, {"list", [covariant]}),
+    ets_insert(type_vars_variance, {"option", [covariant]}),
+    ets_insert(type_vars_variance, {"map", [covariant, covariant]}),
+    ets_insert(type_vars_variance, {"oracle", [contravariant, covariant]}),
+    ets_insert(type_vars_variance, {"oracle_query", [covariant, covariant]}),
+    ok.
+
 %% Strip current namespace from error message for nicer printing.
 unqualify(#env{ namespace = NS }, {qid, Ann, Xs}) ->
     qid(Ann, unqualify1(NS, Xs));
@@ -4151,4 +4155,3 @@ updates_key(Name, Updates) ->
 
 indexed(I, Xs) ->
     lists:zip(lists:seq(I, I + length(Xs) - 1), Xs).
-
