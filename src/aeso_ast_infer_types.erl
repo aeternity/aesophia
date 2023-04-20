@@ -660,7 +660,7 @@ global_env() ->
                                                 {typed, Ann,
                                                  {app, Ann,
                                                   {typed, Ann, {qid, Ann, ["Call","gas_left"]},
-                                                   typesig_to_fun_t(Fun([], Int))
+                                                   aeso_type_utils:typesig_to_fun_t(Fun([], Int))
                                                   },
                                                   []}, Int
                                                 }}
@@ -1642,9 +1642,6 @@ check_special_funs(Env, {{"init", Type}, _}) ->
     unify(Env, Res, State, {checking_init_type, Ann});
 check_special_funs(_, _) -> ok.
 
-typesig_to_fun_t({type_sig, Ann, _Constr, Named, Args, Res}) ->
-    {fun_t, Ann, Named, Args, Res}.
-
 infer_letrec(Env, Defs) ->
     create_constraints(),
     Funs = lists:map(fun({letfun, _, {id, Ann, Name}, _, _, _})   -> {Name, fresh_uvar(Ann)};
@@ -1656,7 +1653,7 @@ infer_letrec(Env, Defs) ->
             Res    = {{Name, TypeSig}, LetFun} = infer_letfun(ExtendEnv, LF),
             register_implementation(get_letfun_id(LetFun), TypeSig),
             Got    = proplists:get_value(Name, Funs),
-            Expect = typesig_to_fun_t(TypeSig),
+            Expect = aeso_type_utils:typesig_to_fun_t(TypeSig),
             unify(Env, Got, Expect, {check_typesig, Name, Got, Expect}),
             solve_constraints(Env),
             ?PRINT_TYPES("Checked ~s : ~s\n",
@@ -1677,7 +1674,7 @@ infer_letfun(Env = #env{ namespace = Namespace }, {fun_clauses, Ann, Fun = {id, 
     {NameSigs, Clauses1} = lists:unzip([ infer_letfun1(Env, Clause) || Clause <- Clauses ]),
     {_, Sigs = [Sig | _]} = lists:unzip(NameSigs),
     _ = [ begin
-            ClauseT = typesig_to_fun_t(ClauseSig),
+            ClauseT = aeso_type_utils:typesig_to_fun_t(ClauseSig),
             unify(Env, ClauseT, Type1, {check_typesig, Name, ClauseT, Type1})
           end || ClauseSig <- Sigs ],
     {{Name, Sig}, desugar_clauses(Ann, Fun, Sig, Clauses1)};
@@ -1981,7 +1978,7 @@ infer_expr(Env, {list_comp, AsLC, Yield, [{letval, AsLV, Pattern, E}|Rest]}) ->
     };
 infer_expr(Env, {list_comp, AsLC, Yield, [Def={letfun, AsLF, _, _, _, _}|Rest]}) ->
     {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
-    FunT = typesig_to_fun_t(TypeSig),
+    FunT = aeso_type_utils:typesig_to_fun_t(TypeSig),
     NewE = bind_var({id, AsLF, Name}, FunT, Env),
     {typed, _, {list_comp, _, TypedYield, TypedRest}, ResType} =
         infer_expr(NewE, {list_comp, AsLC, Yield, Rest}),
@@ -2357,7 +2354,7 @@ infer_block(Env, _, [E], BlockType) ->
     [check_expr(Env, E, BlockType)];
 infer_block(Env, Attrs, [Def={letfun, Ann, _, _, _, _}|Rest], BlockType) ->
     {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
-    FunT = typesig_to_fun_t(TypeSig),
+    FunT = aeso_type_utils:typesig_to_fun_t(TypeSig),
     NewE = bind_var({id, Ann, Name}, FunT, Env),
     [LetFun|infer_block(NewE, Attrs, Rest, BlockType)];
 infer_block(Env, _, [{letval, Attrs, Pattern, E}|Rest], BlockType) ->
@@ -3189,7 +3186,7 @@ freshen(_, X) ->
     X.
 
 freshen_type_sig(Ann, TypeSig = {type_sig, _, Constr, _, _, _}) ->
-    FunT = freshen_type(Ann, typesig_to_fun_t(TypeSig)),
+    FunT = freshen_type(Ann, aeso_type_utils:typesig_to_fun_t(TypeSig)),
     apply_typesig_constraint(Ann, Constr, FunT),
     FunT.
 
@@ -4057,7 +4054,7 @@ if_branches(If = {'if', Ann, _, Then, Else}) ->
     end;
 if_branches(E) -> [E].
 
-pp_typed(Label, E, T = {type_sig, _, _, _, _, _}) -> pp_typed(Label, E, typesig_to_fun_t(T));
+pp_typed(Label, E, T = {type_sig, _, _, _, _, _}) -> pp_typed(Label, E, aeso_type_utils:typesig_to_fun_t(T));
 pp_typed(Label, {typed, _, Expr, _}, Type) ->
     pp_typed(Label, Expr, Type);
 pp_typed(Label, Expr, Type) ->
@@ -4098,7 +4095,7 @@ plural(No, _Yes, [_]) -> No;
 plural(_No, Yes, _)   -> Yes.
 
 pp(T = {type_sig, _, _, _, _, _}) ->
-    pp(typesig_to_fun_t(T));
+    pp(aeso_type_utils:typesig_to_fun_t(T));
 pp([]) ->
     "";
 pp([T]) ->
