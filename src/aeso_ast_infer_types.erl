@@ -106,8 +106,6 @@
 
 -type field_info() :: #field_info{}.
 
--type access() :: public | private | internal.
-
 -type typedef() :: {[aeso_syntax:tvar()], aeso_syntax:typedef() | {contract_t, [aeso_syntax:field_t()]}}
                  | {builtin, non_neg_integer()}.
 
@@ -136,7 +134,6 @@
 -record(scope, { funs   = [] :: fun_env()
                , types  = [] :: type_env()
                , consts = [] :: const_env()
-               , access = public :: access()
                , kind   = namespace :: namespace | contract
                , ann    = [{origin, system}] :: aeso_syntax:ann()
                }).
