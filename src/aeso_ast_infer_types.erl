@@ -18,7 +18,11 @@
         , unfold_types_in_type/3
         , switch_scope/2
         , lookup_env1/4
-        , get_env_namespace/1  %% TODO: Newly added
+          %% TODO: Newly added
+        , get_env_namespace/1
+        , get_named_argument_constraint_name/1
+        , get_named_argument_constraint_args/1
+        , get_named_argument_constraint_type/1
         ]).
 
 -include("aeso_utils.hrl").
@@ -185,6 +189,9 @@ pp_loc(A) -> aeso_tc_pp:pp_loc(A).
 %% -- New functions ----------------------------------------------------------
 
 get_env_namespace(#env{namespace = Namespace}) -> Namespace.
+get_named_argument_constraint_name(#named_argument_constraint{name = Name}) -> Name.
+get_named_argument_constraint_args(#named_argument_constraint{args = Args}) -> Args.
+get_named_argument_constraint_type(#named_argument_constraint{type = Type}) -> Type.
 
 %% -- Environment manipulation -----------------------------------------------
 

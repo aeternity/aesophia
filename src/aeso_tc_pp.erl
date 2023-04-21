@@ -16,11 +16,6 @@
                     | {var_args, aeso_syntax:ann(), aeso_syntax:expr()}
                     | {proj, aeso_syntax:ann(), aeso_syntax:expr(), aeso_syntax:id()}.
 
--record(named_argument_constraint,
-    {args :: aeso_ast_infer_types:named_args_t(),  %% TODO: Unexported type
-     name :: aeso_syntax:id(),
-     type :: aeso_ast_infer_types:utype()}).  %% TODO: Unexported type
-
 %% -- Moved functions --------------------------------------------------------
 
 pos(A) -> aeso_tc_ann_manip:pos(A).
@@ -137,10 +132,10 @@ pp_when({list_comp, BindExpr, Inferred0, Expected0}) ->
      io_lib:format("when checking rvalue of list comprehension binding `~s` against type `~s`",
                    [pp_typed("", BindExpr, Inferred), pp_type(Expected)])};
 pp_when({check_named_arg_constraint, C}) ->
-    {id, _, Name} = Arg = C#named_argument_constraint.name,
-    [Type | _] = [ Type || {named_arg_t, _, {id, _, Name1}, Type, _} <- C#named_argument_constraint.args, Name1 == Name ],
+    {id, _, Name} = Arg = aeso_ast_infer_types:get_named_argument_constraint_name(C),
+    [Type | _] = [ Type || {named_arg_t, _, {id, _, Name1}, Type, _} <- aeso_ast_infer_types:get_named_argument_constraint_args(C), Name1 == Name ],
     Err = io_lib:format("when checking named argument `~s` against inferred type `~s`",
-                        [pp_typed("", Arg, Type), pp_type(C#named_argument_constraint.type)]),
+                        [pp_typed("", Arg, Type), pp_type(aeso_ast_infer_types:get_named_argument_constraint_type(C))]),
     {pos(Arg), Err};
 pp_when({checking_init_args, Ann, Con0, ArgTypes0}) ->
     Con = aeso_type_utils:instantiate(Con0),

@@ -8,13 +8,6 @@
         , destroy_and_report_type_errors/1
         ]).
 
-%% -- Duplicated types -------------------------------------------------------
-
--record(named_argument_constraint,
-    {args :: aeso_ast_infer_types:named_args_t(),  %% TODO: Unexported type
-     name :: aeso_syntax:id(),
-     type :: aeso_ast_infer_types:utype()}).  %% TODO: Unexported type
-
 %% -- Moved functions --------------------------------------------------------
 
 name(A) -> aeso_tc_name_manip:name(A).
@@ -217,7 +210,9 @@ mk_error({bad_named_argument, Args, Name}) ->
                         [ io_lib:format("\n  - `~s`", [pp_typed("", Arg, Type)])
                           || {named_arg_t, _, Arg, Type, _} <- Args ]]),
     mk_t_err(pos(Name), Msg);
-mk_error({unsolved_named_argument_constraint, #named_argument_constraint{name = Name, type = Type}}) ->
+mk_error({unsolved_named_argument_constraint, C}) ->
+    Name = aeso_ast_infer_types:get_named_argument_constraint_name(C),
+    Type = aeso_ast_infer_types:get_named_argument_constraint_type(C),
     Msg = io_lib:format("Named argument ~s supplied to function with unknown named arguments.",
                         [pp_typed("", Name, Type)]),
     mk_t_err(pos(Name), Msg);
