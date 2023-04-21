@@ -19,8 +19,6 @@
         , switch_scope/2
         , pp_type/2
         , lookup_env1/4
-        , name/1
-        , qname/1
         ]).
 
 -include("aeso_utils.hrl").
@@ -162,6 +160,20 @@
 -define(PRINT_TYPES(Fmt, Args),
         when_option(pp_types, fun () -> io:format(Fmt, Args) end)).
 -define(CONSTRUCTOR_MOCK_NAME, "#__constructor__#").
+
+%% -- Moved functions --------------------------------------------------------
+
+name(A) -> aeso_tc_name_manip:name(A).
+qname(A) -> aeso_tc_name_manip:qname(A).
+qid(A, B) -> aeso_tc_name_manip:qid(A, B).
+qcon(A, B) -> aeso_tc_name_manip:qcon(A, B).
+set_qname(A, B) -> aeso_tc_name_manip:set_qname(A, B).
+
+%% -------
+
+pos(A) -> aeso_tc_ann_manip:pos(A).
+pos(A, B) -> aeso_tc_ann_manip:pos(A, B).
+loc(A) -> aeso_tc_ann_manip:loc(A).
 
 %% -- Environment manipulation -----------------------------------------------
 
@@ -522,34 +534,6 @@ lookup_record_field_arity(Env, FieldName, Arity, Kind) ->
     Fields = lookup_record_field(Env, FieldName, Kind),
     [ Fld || Fld = #field_info{ field_t = FldType } <- Fields,
              fun_arity(aeso_type_utils:dereference_deep(FldType)) == Arity ].
-
-%% -- Name manipulation ------------------------------------------------------
-
--spec qname(type_id()) -> qname().
-qname({id,   _, X})  -> [X];
-qname({qid,  _, Xs}) -> Xs;
-qname({con,  _, X})  -> [X];
-qname({qcon, _, Xs}) -> Xs.
-
--spec name(Named | {typed, _, Named, _}) -> name() when
-      Named :: aeso_syntax:id() | aeso_syntax:con().
-name({typed, _, X, _}) -> name(X);
-name({id, _, X}) -> X;
-name({con, _, X}) -> X.
-
--spec qid(aeso_syntax:ann(), qname()) -> aeso_syntax:id() | aeso_syntax:qid().
-qid(Ann, [X]) -> {id, Ann, X};
-qid(Ann, Xs)  -> {qid, Ann, Xs}.
-
--spec qcon(aeso_syntax:ann(), qname()) -> aeso_syntax:con() | aeso_syntax:qcon().
-qcon(Ann, [X]) -> {con, Ann, X};
-qcon(Ann, Xs)  -> {qcon, Ann, Xs}.
-
--spec set_qname(qname(), type_id()) -> type_id().
-set_qname(Xs, {id,   Ann, _}) -> qid(Ann, Xs);
-set_qname(Xs, {qid,  Ann, _}) -> qid(Ann, Xs);
-set_qname(Xs, {con,  Ann, _}) -> qcon(Ann, Xs);
-set_qname(Xs, {qcon, Ann, _}) -> qcon(Ann, Xs).
 
 is_private(Ann) -> proplists:get_value(private, Ann, false).
 
@@ -4066,17 +4050,6 @@ pp_type(Type) ->
     pp_type("", Type).
 pp_type(Label, Type) ->
     prettypr:format(prettypr:beside(prettypr:text(Label), aeso_pretty:type(Type, [show_generated])), 80, 80).
-
-src_file(T)      -> aeso_syntax:get_ann(file, T, no_file).
-include_type(T)  -> aeso_syntax:get_ann(include_type, T, none).
-line_number(T)   -> aeso_syntax:get_ann(line, T, 0).
-column_number(T) -> aeso_syntax:get_ann(col, T, 0).
-
-pos(T)    -> aeso_errors:pos(src_file(T), line_number(T), column_number(T)).
-pos(L, C) -> aeso_errors:pos(L, C).
-
-loc(T) ->
-    {src_file(T), include_type(T), line_number(T), column_number(T)}.
 
 pp_loc(T) ->
     {File, IncludeType, Line, Col} = loc(T),
