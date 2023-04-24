@@ -582,7 +582,7 @@ lookup_record_field(Env, FieldName, Kind) ->
 lookup_record_field_arity(Env, FieldName, Arity, Kind) ->
     Fields = lookup_record_field(Env, FieldName, Kind),
     [ Fld || Fld = #field_info{ field_t = FldType } <- Fields,
-             fun_arity(aeso_type_utils:dereference_deep(FldType)) == Arity ].
+             fun_arity(aeso_tc_type_utils:dereference_deep(FldType)) == Arity ].
 
 is_private(Ann) -> proplists:get_value(private, Ann, false).
 
@@ -690,7 +690,7 @@ global_env() ->
                                                 {typed, Ann,
                                                  {app, Ann,
                                                   {typed, Ann, {qid, Ann, ["Call","gas_left"]},
-                                                   aeso_type_utils:typesig_to_fun_t(Fun([], Int))
+                                                   aeso_tc_type_utils:typesig_to_fun_t(Fun([], Int))
                                                   },
                                                   []}, Int
                                                 }}
@@ -931,21 +931,21 @@ infer([], Options) ->
     type_error({no_decls, proplists:get_value(src_file, Options, no_file)}),
     destroy_and_report_type_errors(init_env(Options));
 infer(Contracts, Options) ->
-    aeso_ets_manager:ets_init(), %% Init the ETS table state
+    aeso_tc_ets_manager:ets_init(), %% Init the ETS table state
     try
         Env = init_env(Options),
         create_options(Options),
-        aeso_ets_manager:ets_new(defined_contracts, [bag]),
-        aeso_ets_manager:ets_new(type_vars, [set]),
-        aeso_ets_manager:ets_new(warnings, [bag]),
-        aeso_ets_manager:ets_new(type_vars_variance, [set]),
-        aeso_ets_manager:ets_new(functions_to_implement, [set]),
+        aeso_tc_ets_manager:ets_new(defined_contracts, [bag]),
+        aeso_tc_ets_manager:ets_new(type_vars, [set]),
+        aeso_tc_ets_manager:ets_new(warnings, [bag]),
+        aeso_tc_ets_manager:ets_new(type_vars_variance, [set]),
+        aeso_tc_ets_manager:ets_new(functions_to_implement, [set]),
         %% Set the variance for builtin types
-        aeso_ets_manager:ets_insert(type_vars_variance, {"list", [covariant]}),
-        aeso_ets_manager:ets_insert(type_vars_variance, {"option", [covariant]}),
-        aeso_ets_manager:ets_insert(type_vars_variance, {"map", [covariant, covariant]}),
-        aeso_ets_manager:ets_insert(type_vars_variance, {"oracle", [contravariant, covariant]}),
-        aeso_ets_manager:ets_insert(type_vars_variance, {"oracle_query", [covariant, covariant]}),
+        aeso_tc_ets_manager:ets_insert(type_vars_variance, {"list", [covariant]}),
+        aeso_tc_ets_manager:ets_insert(type_vars_variance, {"option", [covariant]}),
+        aeso_tc_ets_manager:ets_insert(type_vars_variance, {"map", [covariant, covariant]}),
+        aeso_tc_ets_manager:ets_insert(type_vars_variance, {"oracle", [contravariant, covariant]}),
+        aeso_tc_ets_manager:ets_insert(type_vars_variance, {"oracle_query", [covariant, covariant]}),
 
         when_warning(warn_unused_functions, fun() -> create_unused_functions() end),
         check_modifiers(Env, Contracts),
@@ -955,7 +955,7 @@ infer(Contracts, Options) ->
         {Env1, Decls} = infer1(Env, Contracts1, [], Options),
         when_warning(warn_unused_functions, fun() -> destroy_and_report_unused_functions() end),
         when_option(warn_error, fun() -> destroy_and_report_warnings_as_type_errors() end),
-        WarningsUnsorted = lists:map(fun mk_warning/1, aeso_ets_manager:ets_tab2list(warnings)),
+        WarningsUnsorted = lists:map(fun mk_warning/1, aeso_tc_ets_manager:ets_tab2list(warnings)),
         Warnings = aeso_warnings:sort_warnings(WarningsUnsorted),
         {Env2, DeclsFolded, DeclsUnfolded} =
             case proplists:get_value(dont_unfold, Options, false) of
@@ -968,7 +968,7 @@ infer(Contracts, Options) ->
             true  -> {Env2, DeclsFolded, DeclsUnfolded, Warnings}
         end
     after
-        aeso_ets_manager:clean_up_ets()
+        aeso_tc_ets_manager:clean_up_ets()
     end.
 
 -spec infer1(env(), [aeso_syntax:decl()], [aeso_syntax:decl()], list(option())) ->
@@ -987,7 +987,7 @@ infer1(Env0, [Contract0 = {Contract, Ann, ConName, Impls, Code} | Rest], Acc, Op
                contract_interface -> contract_interface
            end,
     case What of
-        contract -> aeso_ets_manager:ets_insert(defined_contracts, {qname(ConName)});
+        contract -> aeso_tc_ets_manager:ets_insert(defined_contracts, {qname(ConName)});
         contract_interface -> ok
     end,
     check_contract_preserved_payability(Env, ConName, Ann, Impls, Acc, What),
@@ -1041,7 +1041,7 @@ check_contract_preserved_payability(Env, ContractName, ContractAnn, Impls, Defin
 report_unimplemented_functions(Env, ContractName) ->
     create_type_errors(),
     [ type_error({unimplemented_interface_function, ContractName, name(I), FunName})
-      || {FunName, I, _} <- aeso_ets_manager:ets_tab2list(functions_to_implement) ],
+      || {FunName, I, _} <- aeso_tc_ets_manager:ets_tab2list(functions_to_implement) ],
     destroy_and_report_type_errors(Env).
 
 %% Return a list of all function declarations to be implemented, given the list
@@ -1076,8 +1076,8 @@ functions_to_implement(Impls, DefinedContracts) ->
 populate_functions_to_implement(Env, ContractName, Impls, DefinedContracts) ->
     create_type_errors(),
     [ begin
-        Inserted = aeso_ets_manager:ets_insert_new(functions_to_implement, {name(Id), I, Decl}),
-        [{_, I2, _}] = aeso_ets_manager:ets_lookup(functions_to_implement, name(Id)),
+        Inserted = aeso_tc_ets_manager:ets_insert_new(functions_to_implement, {name(Id), I, Decl}),
+        [{_, I2, _}] = aeso_tc_ets_manager:ets_lookup(functions_to_implement, name(Id)),
         Inserted orelse type_error({interface_implementation_conflict, ContractName, I, I2, Id})
       end || {I, Decl = {fun_decl, _, Id, _}} <- functions_to_implement(Impls, DefinedContracts) ],
     destroy_and_report_type_errors(Env).
@@ -1250,14 +1250,14 @@ check_typedef_sccs(Env, TypeMap, [{acyclic, Name} | SCCs], Acc) ->
                     type_error({empty_record_definition, Ann, Name}),
                     check_typedef_sccs(Env1, TypeMap, SCCs, Acc1);
                 {record_t, Fields} ->
-                    aeso_ets_manager:ets_insert(type_vars_variance, {Env#env.namespace ++ qname(D),
+                    aeso_tc_ets_manager:ets_insert(type_vars_variance, {Env#env.namespace ++ qname(D),
                                                     infer_type_vars_variance(Xs, Fields)}),
                     %% check_type to get qualified name
                     RecTy = check_type(Env1, app_t(Ann, D, Xs)),
                     Env2 = check_fields(Env1, TypeMap, RecTy, Fields),
                     check_typedef_sccs(Env2, TypeMap, SCCs, Acc1);
                 {variant_t, Cons} ->
-                    aeso_ets_manager:ets_insert(type_vars_variance, {Env#env.namespace ++ qname(D),
+                    aeso_tc_ets_manager:ets_insert(type_vars_variance, {Env#env.namespace ++ qname(D),
                                                     infer_type_vars_variance(Xs, Cons)}),
                     Target   = check_type(Env1, app_t(Ann, D, Xs)),
                     ConType  = fun([]) -> Target; (Args) -> {type_sig, Ann, none, [], Args, Target} end,
@@ -1306,7 +1306,7 @@ infer_type_vars_variance(Types)
   when is_list(Types) ->
     lists:flatten([infer_type_vars_variance(T) || T <- Types]);
 infer_type_vars_variance({app_t, _, Type, Args}) ->
-    Variances = case aeso_ets_manager:ets_lookup(type_vars_variance, qname(Type)) of
+    Variances = case aeso_tc_ets_manager:ets_lookup(type_vars_variance, qname(Type)) of
                     [{_, Vs}] -> Vs;
                     _ -> lists:duplicate(length(Args), covariant)
                 end,
@@ -1625,7 +1625,7 @@ check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type}) ->
       FunSig :: typesig().
 register_implementation(Id, Sig) ->
     Name = name(Id),
-    case aeso_ets_manager:ets_lookup(functions_to_implement, Name) of
+    case aeso_tc_ets_manager:ets_lookup(functions_to_implement, Name) of
         [{Name, Interface, Decl = {fun_decl, _, DeclId, _}}] ->
             DeclStateful   = aeso_syntax:get_ann(stateful,   Decl, false),
             DeclPayable    = aeso_syntax:get_ann(payable,    Decl, false),
@@ -1643,7 +1643,7 @@ register_implementation(Id, Sig) ->
             [ type_error({entrypoint_must_be_payable, Id, DeclId, Interface})
                 || not SigPayable andalso DeclPayable ],
 
-            aeso_ets_manager:ets_delete(functions_to_implement, Name);
+            aeso_tc_ets_manager:ets_delete(functions_to_implement, Name);
         [] ->
             true;
         _ ->
@@ -1656,7 +1656,7 @@ infer_nonrec(Env, LetFun) ->
     check_special_funs(Env, NewLetFun),
     register_implementation(get_letfun_id(LetFun), Sig),
     solve_then_destroy_and_report_unsolved_constraints(Env),
-    Result = {TypeSig, _} = aeso_type_utils:instantiate(NewLetFun),
+    Result = {TypeSig, _} = aeso_tc_type_utils:instantiate(NewLetFun),
     print_typesig(TypeSig),
     Result.
 
@@ -1683,16 +1683,16 @@ infer_letrec(Env, Defs) ->
             Res    = {{Name, TypeSig}, LetFun} = infer_letfun(ExtendEnv, LF),
             register_implementation(get_letfun_id(LetFun), TypeSig),
             Got    = proplists:get_value(Name, Funs),
-            Expect = aeso_type_utils:typesig_to_fun_t(TypeSig),
+            Expect = aeso_tc_type_utils:typesig_to_fun_t(TypeSig),
             unify(Env, Got, Expect, {check_typesig, Name, Got, Expect}),
             solve_constraints(Env),
             ?PRINT_TYPES("Checked ~s : ~s\n",
-                         [Name, pp(aeso_type_utils:dereference_deep(Got))]),
+                         [Name, pp(aeso_tc_type_utils:dereference_deep(Got))]),
             Res
           end || LF <- Defs ],
     solve_then_destroy_and_report_unsolved_constraints(Env),
-    TypeSigs = aeso_type_utils:instantiate([Sig || {Sig, _} <- Inferred]),
-    NewDefs  = aeso_type_utils:instantiate([D || {_, D} <- Inferred]),
+    TypeSigs = aeso_tc_type_utils:instantiate([Sig || {Sig, _} <- Inferred]),
+    NewDefs  = aeso_tc_type_utils:instantiate([D || {_, D} <- Inferred]),
     [print_typesig(S) || S <- TypeSigs],
     {TypeSigs, NewDefs}.
 
@@ -1704,7 +1704,7 @@ infer_letfun(Env = #env{ namespace = Namespace }, {fun_clauses, Ann, Fun = {id, 
     {NameSigs, Clauses1} = lists:unzip([ infer_letfun1(Env, Clause) || Clause <- Clauses ]),
     {_, Sigs = [Sig | _]} = lists:unzip(NameSigs),
     _ = [ begin
-            ClauseT = aeso_type_utils:typesig_to_fun_t(ClauseSig),
+            ClauseT = aeso_tc_type_utils:typesig_to_fun_t(ClauseSig),
             unify(Env, ClauseT, Type1, {check_typesig, Name, ClauseT, Type1})
           end || ClauseSig <- Sigs ],
     {{Name, Sig}, desugar_clauses(Ann, Fun, Sig, Clauses1)};
@@ -1987,7 +1987,7 @@ infer_expr(Env, {list_comp, AsLC, Yield, [{letval, AsLV, Pattern, E}|Rest]}) ->
     };
 infer_expr(Env, {list_comp, AsLC, Yield, [Def={letfun, AsLF, _, _, _, _}|Rest]}) ->
     {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
-    FunT = aeso_type_utils:typesig_to_fun_t(TypeSig),
+    FunT = aeso_tc_type_utils:typesig_to_fun_t(TypeSig),
     NewE = bind_var({id, AsLF, Name}, FunT, Env),
     {typed, _, {list_comp, _, TypedYield, TypedRest}, ResType} =
         infer_expr(NewE, {list_comp, AsLC, Yield, Rest}),
@@ -2030,7 +2030,7 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
                                           general_type = GeneralResultType,
                                           specialized_type = ResultType,
                                           context = {check_return, App} }),
-            {typed, Ann, {app, Ann, NewFun1, NamedArgs1 ++ NewArgs}, aeso_type_utils:dereference(ResultType)}
+            {typed, Ann, {app, Ann, NewFun1, NamedArgs1 ++ NewArgs}, aeso_tc_type_utils:dereference(ResultType)}
     end;
 infer_expr(Env, {'if', Attrs, Cond, Then, Else}) ->
     NewCond = check_expr(Env, Cond, {id, Attrs, "bool"}),
@@ -2363,7 +2363,7 @@ infer_block(Env, _, [E], BlockType) ->
     [check_expr(Env, E, BlockType)];
 infer_block(Env, Attrs, [Def={letfun, Ann, _, _, _, _}|Rest], BlockType) ->
     {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
-    FunT = aeso_type_utils:typesig_to_fun_t(TypeSig),
+    FunT = aeso_tc_type_utils:typesig_to_fun_t(TypeSig),
     NewE = bind_var({id, Ann, Name}, FunT, Env),
     [LetFun|infer_block(NewE, Attrs, Rest, BlockType)];
 infer_block(Env, _, [{letval, Attrs, Pattern, E}|Rest], BlockType) ->
@@ -2389,7 +2389,7 @@ infer_const(Env, {letval, Ann, Id = {id, AnnId, _}, Expr}) ->
     solve_then_destroy_and_report_unsolved_constraints(Env),
     IdType = setelement(2, Type, AnnId),
     NewId = {typed, aeso_syntax:get_ann(Id), Id, IdType},
-    aeso_type_utils:instantiate({letval, Ann, NewId, NewExpr}).
+    aeso_tc_type_utils:instantiate({letval, Ann, NewId, NewExpr}).
 
 infer_infix({BoolOp, As})
   when BoolOp =:= '&&'; BoolOp =:= '||' ->
@@ -2464,13 +2464,13 @@ free_vars(L) when is_list(L) ->
 %% Options
 
 create_options(Options) ->
-    aeso_ets_manager:ets_new(options, [set]),
+    aeso_tc_ets_manager:ets_new(options, [set]),
     Tup = fun(Opt) when is_atom(Opt) -> {Opt, true};
              (Opt) when is_tuple(Opt) -> Opt end,
-    aeso_ets_manager:ets_insert(options, lists:map(Tup, Options)).
+    aeso_tc_ets_manager:ets_insert(options, lists:map(Tup, Options)).
 
 get_option(Key, Default) ->
-    case aeso_ets_manager:ets_lookup(options, Key) of
+    case aeso_tc_ets_manager:ets_lookup(options, Key) of
         [{Key, Val}] -> Val;
         _            -> Default
     end.
@@ -2481,17 +2481,17 @@ when_option(Opt, Do) ->
 %% -- Constraints --
 
 create_constraints() ->
-    aeso_ets_manager:ets_new(constraints, [ordered_set]).
+    aeso_tc_ets_manager:ets_new(constraints, [ordered_set]).
 
 -spec add_constraint(constraint() | [constraint()]) -> true.
 add_constraint(Constraint) ->
-    aeso_ets_manager:ets_insert_ordered(constraints, Constraint).
+    aeso_tc_ets_manager:ets_insert_ordered(constraints, Constraint).
 
 get_constraints() ->
-    aeso_ets_manager:ets_tab2list_ordered(constraints).
+    aeso_tc_ets_manager:ets_tab2list_ordered(constraints).
 
 destroy_constraints() ->
-    aeso_ets_manager:ets_delete(constraints).
+    aeso_tc_ets_manager:ets_delete(constraints).
 
 -spec solve_constraints(env()) -> ok.
 solve_constraints(Env) ->
@@ -2503,7 +2503,7 @@ solve_constraints(Env) ->
                field_t  = FieldType,
                kind     = Kind,
                context  = When }) ->
-                Arity = fun_arity(aeso_type_utils:dereference_deep(FieldType)),
+                Arity = fun_arity(aeso_tc_type_utils:dereference_deep(FieldType)),
                 FieldInfos = case Arity of
                                  none -> lookup_record_field(Env, FieldName, Kind);
                                  _    -> lookup_record_field_arity(Env, FieldName, Arity, Kind)
@@ -2578,7 +2578,7 @@ destroy_and_report_unsolved_constraints(Env) ->
                            (_)                   -> false
                         end, OtherCs5),
 
-    Unsolved = [ S || S <- [ solve_constraint(Env, aeso_type_utils:dereference_deep(C)) || C <- NamedArgCs ],
+    Unsolved = [ S || S <- [ solve_constraint(Env, aeso_tc_type_utils:dereference_deep(C)) || C <- NamedArgCs ],
                       S == unsolved ],
     [ type_error({unsolved_named_argument_constraint, C}) || C <- Unsolved ],
 
@@ -2630,8 +2630,8 @@ check_named_argument_constraint(Env,
                                     general_type = GenType,
                                     specialized_type = SpecType,
                                     context = {check_return, App} }) ->
-    NamedArgsT = aeso_type_utils:dereference(NamedArgsT0),
-    case aeso_type_utils:dereference(NamedArgsT0) of
+    NamedArgsT = aeso_tc_type_utils:dereference(NamedArgsT0),
+    case aeso_tc_type_utils:dereference(NamedArgsT0) of
         [_ | _] = NamedArgsT ->
             GetVal = fun(Name, Default) ->
                         hd([ Val || {named_arg, _, {id, _, N}, Val} <- NamedArgs, N == Name] ++
@@ -2646,7 +2646,7 @@ check_named_argument_constraint(Env,
     end.
 
 specialize_dependent_type(Env, Type) ->
-    case aeso_type_utils:dereference(Type) of
+    case aeso_tc_type_utils:dereference(Type) of
         {if_t, _, {id, _, Arg}, Then, Else} ->
             Val = maps:get(Arg, Env),
             case Val of
@@ -2687,7 +2687,7 @@ solve_constraint(Env, C = #field_constraint{record_t = RecType,
                     C
             end;
         _ ->
-            type_error({not_a_record_type, aeso_type_utils:instantiate(RecType), When}),
+            type_error({not_a_record_type, aeso_tc_type_utils:instantiate(RecType), When}),
             not_solved
     end;
 solve_constraint(Env, C = #dependent_type_constraint{}) ->
@@ -2696,9 +2696,9 @@ solve_constraint(Env, C = #named_argument_constraint{}) ->
     check_named_argument_constraint(Env, C);
 solve_constraint(_Env, {is_bytes, _}) -> ok;
 solve_constraint(Env, {add_bytes, Ann, _, A0, B0, C0}) ->
-    A = unfold_types_in_type(Env, aeso_type_utils:dereference(A0)),
-    B = unfold_types_in_type(Env, aeso_type_utils:dereference(B0)),
-    C = unfold_types_in_type(Env, aeso_type_utils:dereference(C0)),
+    A = unfold_types_in_type(Env, aeso_tc_type_utils:dereference(A0)),
+    B = unfold_types_in_type(Env, aeso_tc_type_utils:dereference(B0)),
+    C = unfold_types_in_type(Env, aeso_tc_type_utils:dereference(C0)),
     case {A, B, C} of
         {{bytes_t, _, M}, {bytes_t, _, N}, _} -> unify(Env, {bytes_t, Ann, M + N}, C, {at, Ann});
         {{bytes_t, _, M}, _, {bytes_t, _, R}} when R >= M -> unify(Env, {bytes_t, Ann, R - M}, B, {at, Ann});
@@ -2718,16 +2718,16 @@ check_bytes_constraints(Env, Constraints) ->
     [ check_bytes_constraint(Env, C) || C <- Constraints, not Skip(C) ].
 
 check_bytes_constraint(Env, {is_bytes, Type}) ->
-    Type1 = unfold_types_in_type(Env, aeso_type_utils:instantiate(Type)),
+    Type1 = unfold_types_in_type(Env, aeso_tc_type_utils:instantiate(Type)),
     case Type1 of
         {bytes_t, _, _} -> ok;
         _               ->
             type_error({unknown_byte_length, Type})
     end;
 check_bytes_constraint(Env, {add_bytes, Ann, Fun, A0, B0, C0}) ->
-    A = unfold_types_in_type(Env, aeso_type_utils:instantiate(A0)),
-    B = unfold_types_in_type(Env, aeso_type_utils:instantiate(B0)),
-    C = unfold_types_in_type(Env, aeso_type_utils:instantiate(C0)),
+    A = unfold_types_in_type(Env, aeso_tc_type_utils:instantiate(A0)),
+    B = unfold_types_in_type(Env, aeso_tc_type_utils:instantiate(B0)),
+    C = unfold_types_in_type(Env, aeso_tc_type_utils:instantiate(C0)),
     case {A, B, C} of
         {{bytes_t, _, _M}, {bytes_t, _, _N}, {bytes_t, _, _R}} ->
             ok; %% If all are solved we checked M + N == R in solve_constraint.
@@ -2737,7 +2737,7 @@ check_bytes_constraint(Env, {add_bytes, Ann, Fun, A0, B0, C0}) ->
 check_aens_resolve_constraints(_Env, []) ->
     ok;
 check_aens_resolve_constraints(Env, [{aens_resolve_type, Type} | Rest]) ->
-    Type1 = unfold_types_in_type(Env, aeso_type_utils:instantiate(Type)),
+    Type1 = unfold_types_in_type(Env, aeso_tc_type_utils:instantiate(Type)),
     {app_t, _, {id, _, "option"}, [Type2]} = Type1,
     case Type2 of
         {id, _, "string"} -> ok;
@@ -2752,7 +2752,7 @@ check_aens_resolve_constraints(Env, [{aens_resolve_type, Type} | Rest]) ->
 check_oracle_type_constraints(_Env, []) ->
     ok;
 check_oracle_type_constraints(Env, [{oracle_type, Ann, OType} | Rest]) ->
-    Type = unfold_types_in_type(Env, aeso_type_utils:instantiate(OType)),
+    Type = unfold_types_in_type(Env, aeso_tc_type_utils:instantiate(OType)),
     {app_t, _, {id, _, "oracle"}, [QType, RType]} = Type,
     ensure_monomorphic(QType, {invalid_oracle_type, polymorphic,  query,    Ann, Type}),
     ensure_monomorphic(RType, {invalid_oracle_type, polymorphic,  response, Ann, Type}),
@@ -2768,7 +2768,7 @@ check_record_create_constraints(Env, [C | Cs]) ->
         record_t = Type,
         fields   = Fields,
         context  = When } = C,
-    Type1 = unfold_types_in_type(Env, aeso_type_utils:instantiate(Type)),
+    Type1 = unfold_types_in_type(Env, aeso_tc_type_utils:instantiate(Type)),
     try lookup_type(Env, record_type_name(Type1)) of
         {_QId, {_Ann, {_Args, {record_t, RecFields}}}} ->
             ActualNames = [ Fld || {field_t, _, {id, _, Fld}, _} <- RecFields ],
@@ -2785,12 +2785,12 @@ check_record_create_constraints(Env, [C | Cs]) ->
     check_record_create_constraints(Env, Cs).
 
 is_contract_defined(C) ->
-    aeso_ets_manager:ets_lookup(defined_contracts, qname(C)) =/= [].
+    aeso_tc_ets_manager:ets_lookup(defined_contracts, qname(C)) =/= [].
 
 check_is_contract_constraints(_Env, []) -> ok;
 check_is_contract_constraints(Env, [C | Cs]) ->
     #is_contract_constraint{ contract_t = Type, context = Cxt, force_def = ForceDef } = C,
-    Type1 = unfold_types_in_type(Env, aeso_type_utils:instantiate(Type)),
+    Type1 = unfold_types_in_type(Env, aeso_tc_type_utils:instantiate(Type)),
     TypeName = record_type_name(Type1),
     case lookup_type(Env, TypeName) of
         {_, {_Ann, {[], {contract_t, _}}}} ->
@@ -2819,10 +2819,10 @@ solve_unknown_record_types(Env, Unknown) ->
 -spec solve_known_record_types(env(), [constraint()]) -> [field_constraint()].
 solve_known_record_types(Env, Constraints) ->
     DerefConstraints = lists:map(fun(C = #field_constraint{record_t = RecordType}) ->
-                                        C#field_constraint{record_t = aeso_type_utils:dereference(RecordType)};
-                                    (C) -> aeso_type_utils:dereference_deep(C)
+                                        C#field_constraint{record_t = aeso_tc_type_utils:dereference(RecordType)};
+                                    (C) -> aeso_tc_type_utils:dereference_deep(C)
                                  end, Constraints),
-    SolvedConstraints = lists:map(fun(C) -> solve_constraint(Env, aeso_type_utils:dereference_deep(C)) end, DerefConstraints),
+    SolvedConstraints = lists:map(fun(C) -> solve_constraint(Env, aeso_tc_type_utils:dereference_deep(C)) end, DerefConstraints),
     Unsolved = DerefConstraints--SolvedConstraints,
     lists:filter(fun(#field_constraint{}) -> true; (_) -> false end, Unsolved).
 
@@ -2997,8 +2997,8 @@ unify0(Env, A, B, Variance, When) ->
             {check_expr, E, _, _} -> [{ann, aeso_syntax:get_ann(E)}];
             _                     -> []
         end,
-    A1 = aeso_type_utils:dereference(unfold_types_in_type(Env, A, Options)),
-    B1 = aeso_type_utils:dereference(unfold_types_in_type(Env, B, Options)),
+    A1 = aeso_tc_type_utils:dereference(unfold_types_in_type(Env, A, Options)),
+    B1 = aeso_tc_type_utils:dereference(unfold_types_in_type(Env, B, Options)),
     unify1(Env, A1, B1, Variance, When).
 
 unify1(_Env, {uvar, _, R}, {uvar, _, R}, _Variance, _When) ->
@@ -3016,7 +3016,7 @@ unify1(Env, {uvar, A, R}, T, _Variance, When) ->
             end,
             false;
         false ->
-            aeso_ets_manager:ets_insert(type_vars, {R, T}),
+            aeso_tc_ets_manager:ets_insert(type_vars, {R, T}),
             true
     end;
 unify1(Env, T, {uvar, A, R}, Variance, When) ->
@@ -3075,7 +3075,7 @@ unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result
     unify0(Env, Result1, Result2, Variance, When);
 unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, Variance, When)
   when length(Args1) == length(Args2), Tag == id orelse Tag == qid ->
-    Variances = case aeso_ets_manager:ets_lookup(type_vars_variance, F) of
+    Variances = case aeso_tc_ets_manager:ets_lookup(type_vars_variance, F) of
                     [{_, Vs}] ->
                         case Variance of
                             contravariant -> lists:map(fun opposite_variance/1, Vs);
@@ -3131,7 +3131,7 @@ is_subtype(Env, Child, Base) ->
     end.
 
 occurs_check(R, T) ->
-    occurs_check1(R, aeso_type_utils:dereference(T)).
+    occurs_check1(R, aeso_tc_type_utils:dereference(T)).
 
 occurs_check1(R, {uvar, _, R1}) -> R == R1;
 occurs_check1(_, {id, _, _}) -> false;
@@ -3162,10 +3162,10 @@ fresh_uvar(Attrs) ->
     {uvar, Attrs, make_ref()}.
 
 create_freshen_tvars() ->
-    aeso_ets_manager:ets_new(freshen_tvars, [set]).
+    aeso_tc_ets_manager:ets_new(freshen_tvars, [set]).
 
 destroy_freshen_tvars() ->
-    aeso_ets_manager:ets_delete(freshen_tvars).
+    aeso_tc_ets_manager:ets_delete(freshen_tvars).
 
 freshen_type(Ann, Type) ->
     create_freshen_tvars(),
@@ -3177,11 +3177,11 @@ freshen(Type) ->
     freshen(aeso_syntax:get_ann(Type), Type).
 
 freshen(Ann, {tvar, _, Name}) ->
-    NewT = case aeso_ets_manager:ets_lookup(freshen_tvars, Name) of
+    NewT = case aeso_tc_ets_manager:ets_lookup(freshen_tvars, Name) of
                []          -> fresh_uvar(Ann);
                [{Name, T}] -> T
            end,
-    aeso_ets_manager:ets_insert(freshen_tvars, {Name, NewT}),
+    aeso_tc_ets_manager:ets_insert(freshen_tvars, {Name, NewT}),
     NewT;
 freshen(Ann, {bytes_t, _, any}) ->
     X = fresh_uvar(Ann),
@@ -3195,7 +3195,7 @@ freshen(_, X) ->
     X.
 
 freshen_type_sig(Ann, TypeSig = {type_sig, _, Constr, _, _, _}) ->
-    FunT = freshen_type(Ann, aeso_type_utils:typesig_to_fun_t(TypeSig)),
+    FunT = freshen_type(Ann, aeso_tc_type_utils:typesig_to_fun_t(TypeSig)),
     apply_typesig_constraint(Ann, Constr, FunT),
     FunT.
 
@@ -3218,7 +3218,7 @@ when_warning(Warn, Do) ->
             type_error({unknown_warning, Warn}),
             destroy_and_report_type_errors(global_env());
         true ->
-            case aeso_ets_manager:ets_tab_exists(warnings) of
+            case aeso_tc_ets_manager:ets_tab_exists(warnings) of
                 true ->
                     IsEnabled = get_option(Warn, false),
                     IsAll = get_option(warn_all, false) andalso lists:member(Warn, all_warnings()),

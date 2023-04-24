@@ -40,10 +40,10 @@ pp_when({check_typesig, Name, Inferred, Given}) ->
      io_lib:format("when checking the definition of `~s`\n"
                    "  inferred type: `~s`\n"
                    "  given type:    `~s`",
-         [Name, pp(aeso_type_utils:instantiate(Inferred)), pp(aeso_type_utils:instantiate(Given))])};
+         [Name, pp(aeso_tc_type_utils:instantiate(Inferred)), pp(aeso_tc_type_utils:instantiate(Given))])};
 pp_when({infer_app, Fun, NamedArgs, Args, Inferred0, ArgTypes0}) ->
-    Inferred = aeso_type_utils:instantiate(Inferred0),
-    ArgTypes = aeso_type_utils:instantiate(ArgTypes0),
+    Inferred = aeso_tc_type_utils:instantiate(Inferred0),
+    ArgTypes = aeso_tc_type_utils:instantiate(ArgTypes0),
     {pos(Fun),
      io_lib:format("when checking the application of\n"
                    "  `~s`\n"
@@ -53,8 +53,8 @@ pp_when({infer_app, Fun, NamedArgs, Args, Inferred0, ArgTypes0}) ->
                     [ ["\n  ", "`" ++ pp_typed("", Arg, ArgT) ++ "`"]
                        || {Arg, ArgT} <- lists:zip(Args, ArgTypes) ] ])};
 pp_when({field_constraint, FieldType0, InferredType0, Fld}) ->
-    FieldType    = aeso_type_utils:instantiate(FieldType0),
-    InferredType = aeso_type_utils:instantiate(InferredType0),
+    FieldType    = aeso_tc_type_utils:instantiate(FieldType0),
+    InferredType = aeso_tc_type_utils:instantiate(InferredType0),
     {pos(Fld),
      case Fld of
          {var_args, _Ann, _Fun} ->
@@ -78,8 +78,8 @@ pp_when({field_constraint, FieldType0, InferredType0, Fld}) ->
                   pp_type("  ", InferredType)])
      end};
 pp_when({record_constraint, RecType0, InferredType0, Fld}) ->
-    RecType      = aeso_type_utils:instantiate(RecType0),
-    InferredType = aeso_type_utils:instantiate(InferredType0),
+    RecType      = aeso_tc_type_utils:instantiate(RecType0),
+    InferredType = aeso_tc_type_utils:instantiate(InferredType0),
     {Pos, WhyRec} = pp_why_record(Fld),
     case Fld of
         {var_args, _Ann, _Fun} ->
@@ -106,20 +106,20 @@ pp_when({record_constraint, RecType0, InferredType0, Fld}) ->
                   pp_type("  ", RecType), WhyRec])}
     end;
 pp_when({if_branches, Then, ThenType0, Else, ElseType0}) ->
-    {ThenType, ElseType} = aeso_type_utils:instantiate({ThenType0, ElseType0}),
+    {ThenType, ElseType} = aeso_tc_type_utils:instantiate({ThenType0, ElseType0}),
     Branches = [ {Then, ThenType} | [ {B, ElseType} || B <- if_branches(Else) ] ],
     {pos(element(1, hd(Branches))),
      io_lib:format("when comparing the types of the if-branches\n"
                    "~s", [ [ io_lib:format("~s (at ~s)\n", [pp_typed("  - ", B, BType), pp_loc(B)])
                            || {B, BType} <- Branches ] ])};
 pp_when({case_pat, Pat, PatType0, ExprType0}) ->
-    {PatType, ExprType} = aeso_type_utils:instantiate({PatType0, ExprType0}),
+    {PatType, ExprType} = aeso_tc_type_utils:instantiate({PatType0, ExprType0}),
     {pos(Pat),
      io_lib:format("when checking the type of the pattern `~s` against the expected type `~s`",
                    [pp_typed("", Pat, PatType),
                     pp_type(ExprType)])};
 pp_when({check_expr, Expr, Inferred0, Expected0}) ->
-    {Inferred, Expected} = aeso_type_utils:instantiate({Inferred0, Expected0}),
+    {Inferred, Expected} = aeso_tc_type_utils:instantiate({Inferred0, Expected0}),
     {pos(Expr),
      io_lib:format("when checking the type of the expression `~s` against the expected type `~s`",
                    [pp_typed("", Expr, Inferred), pp_type(Expected)])};
@@ -127,7 +127,7 @@ pp_when({checking_init_type, Ann}) ->
     {pos(Ann),
      io_lib:format("when checking that `init` returns a value of type `state`", [])};
 pp_when({list_comp, BindExpr, Inferred0, Expected0}) ->
-    {Inferred, Expected} = aeso_type_utils:instantiate({Inferred0, Expected0}),
+    {Inferred, Expected} = aeso_tc_type_utils:instantiate({Inferred0, Expected0}),
     {pos(BindExpr),
      io_lib:format("when checking rvalue of list comprehension binding `~s` against type `~s`",
                    [pp_typed("", BindExpr, Inferred), pp_type(Expected)])};
@@ -138,14 +138,14 @@ pp_when({check_named_arg_constraint, C}) ->
                         [pp_typed("", Arg, Type), pp_type(aeso_ast_infer_types:get_named_argument_constraint_type(C))]),
     {pos(Arg), Err};
 pp_when({checking_init_args, Ann, Con0, ArgTypes0}) ->
-    Con = aeso_type_utils:instantiate(Con0),
-    ArgTypes = aeso_type_utils:instantiate(ArgTypes0),
+    Con = aeso_tc_type_utils:instantiate(Con0),
+    ArgTypes = aeso_tc_type_utils:instantiate(ArgTypes0),
     {pos(Ann),
      io_lib:format("when checking arguments of `~s`'s init entrypoint to match\n(~s)",
                    [pp_type(Con), string:join([pp_type(A) || A <- ArgTypes], ", ")])
     };
 pp_when({return_contract, App, Con0}) ->
-    Con = aeso_type_utils:instantiate(Con0),
+    Con = aeso_tc_type_utils:instantiate(Con0),
     {pos(App)
     , io_lib:format("when checking that expression returns contract of type `~s`", [pp_type(Con)])
     };
@@ -178,7 +178,7 @@ pp_why_record({proj, _Ann, Rec, FldName}) ->
      io_lib:format("arising from the projection of the field `~s`",
          [pp(FldName)])}.
 
-pp_typed(Label, E, T = {type_sig, _, _, _, _, _}) -> pp_typed(Label, E, aeso_type_utils:typesig_to_fun_t(T));
+pp_typed(Label, E, T = {type_sig, _, _, _, _, _}) -> pp_typed(Label, E, aeso_tc_type_utils:typesig_to_fun_t(T));
 pp_typed(Label, {typed, _, Expr, _}, Type) ->
     pp_typed(Label, Expr, Type);
 pp_typed(Label, Expr, Type) ->
@@ -205,7 +205,7 @@ pp_loc(T) ->
     end.
 
 pp(T = {type_sig, _, _, _, _, _}) ->
-    pp(aeso_type_utils:typesig_to_fun_t(T));
+    pp(aeso_tc_type_utils:typesig_to_fun_t(T));
 pp([]) ->
     "";
 pp([T]) ->

@@ -37,15 +37,15 @@ cannot_unify(A, B, Cxt, When) ->
     type_error({cannot_unify, A, B, Cxt, When}).
 
 type_error(Err) ->
-    aeso_ets_manager:ets_insert(type_errors, Err).
+    aeso_tc_ets_manager:ets_insert(type_errors, Err).
 
 create_type_errors() ->
-    aeso_ets_manager:ets_new(type_errors, [bag]).
+    aeso_tc_ets_manager:ets_new(type_errors, [bag]).
 
 destroy_and_report_type_errors(Env) ->
-    Errors0 = lists:reverse(aeso_ets_manager:ets_tab2list(type_errors)),
+    Errors0 = lists:reverse(aeso_tc_ets_manager:ets_tab2list(type_errors)),
     %% io:format("Type errors now: ~p\n", [Errors0]),
-    aeso_ets_manager:ets_delete(type_errors),
+    aeso_tc_ets_manager:ets_delete(type_errors),
     Errors  = [ mk_error(unqualify(Env, Err)) || Err <- Errors0 ],
     aeso_errors:throw(Errors).  %% No-op if Errors == []
 
@@ -79,12 +79,12 @@ mk_error({mismatched_decl_in_funblock, Name, Decl}) ->
     mk_t_err(pos(Decl), Msg);
 mk_error({higher_kinded_typevar, T}) ->
     Msg = io_lib:format("Type `~s` is a higher kinded type variable "
-                        "(takes another type as an argument)", [pp(aeso_type_utils:instantiate(T))]
+                        "(takes another type as an argument)", [pp(aeso_tc_type_utils:instantiate(T))]
                        ),
     mk_t_err(pos(T), Msg);
 mk_error({wrong_type_arguments, X, ArityGiven, ArityReal}) ->
     Msg = io_lib:format("Arity for ~s doesn't match. Expected ~p, got ~p"
-                       , [pp(aeso_type_utils:instantiate(X)), ArityReal, ArityGiven]
+                       , [pp(aeso_tc_type_utils:instantiate(X)), ArityReal, ArityGiven]
                        ),
     mk_t_err(pos(X), Msg);
 mk_error({unnamed_map_update_with_default, Upd}) ->
@@ -93,7 +93,7 @@ mk_error({unnamed_map_update_with_default, Upd}) ->
 mk_error({fundecl_must_have_funtype, _Ann, Id, Type}) ->
     Msg = io_lib:format("`~s` was declared with an invalid type `~s`. "
                        "Entrypoints and functions must have functional types"
-                       , [pp(Id), pp(aeso_type_utils:instantiate(Type))]),
+                       , [pp(Id), pp(aeso_tc_type_utils:instantiate(Type))]),
     mk_t_err(pos(Id), Msg);
 mk_error({cannot_unify, A, B, Cxt, When}) ->
     VarianceContext = case Cxt of
@@ -101,11 +101,11 @@ mk_error({cannot_unify, A, B, Cxt, When}) ->
                           _    -> io_lib:format(" in a ~p context", [Cxt])
                       end,
     Msg = io_lib:format("Cannot unify `~s` and `~s`" ++ VarianceContext,
-                        [pp(aeso_type_utils:instantiate(A)), pp(aeso_type_utils:instantiate(B))]),
+                        [pp(aeso_tc_type_utils:instantiate(A)), pp(aeso_tc_type_utils:instantiate(B))]),
     {Pos, Ctxt} = pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
 mk_error({hole_found, Ann, Type}) ->
-    Msg = io_lib:format("Found a hole of type `~s`", [pp(aeso_type_utils:instantiate(Type))]),
+    Msg = io_lib:format("Found a hole of type `~s`", [pp(aeso_tc_type_utils:instantiate(Type))]),
     mk_t_err(pos(Ann), Msg);
 mk_error({unbound_variable, Id}) ->
     Msg = io_lib:format("Unbound variable `~s`", [pp(Id)]),
@@ -377,7 +377,7 @@ mk_error({mixed_record_and_map, Expr}) ->
 mk_error({named_argument_must_be_literal_bool, Name, Arg}) ->
     Msg = io_lib:format("Invalid `~s` argument `~s`. "
                         "It must be either `true` or `false`.",
-                        [Name, pp_expr(aeso_type_utils:instantiate(Arg))]),
+                        [Name, pp_expr(aeso_tc_type_utils:instantiate(Arg))]),
     mk_t_err(pos(Arg), Msg);
 mk_error({conflicting_updates_for_field, Upd, Key}) ->
     Msg = io_lib:format("Conflicting updates for field '~s'", [Key]),

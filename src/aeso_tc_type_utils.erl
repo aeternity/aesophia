@@ -1,4 +1,4 @@
--module(aeso_type_utils).
+-module(aeso_tc_type_utils).
 
 -export([ dereference/1
         , dereference_deep/1
@@ -10,7 +10,7 @@ typesig_to_fun_t({type_sig, Ann, _Constr, Named, Args, Res}) ->
     {fun_t, Ann, Named, Args, Res}.
 
 dereference(T = {uvar, _, R}) ->
-    case aeso_ets_manager:ets_lookup(type_vars, R) of
+    case aeso_tc_ets_manager:ets_lookup(type_vars, R) of
         [] ->
             T;
         [{R, Type}] ->
@@ -33,16 +33,16 @@ instantiate(E) ->
     instantiate1(dereference(E)).
 
 instantiate1({uvar, Attr, R}) ->
-    Next = proplists:get_value(next, aeso_ets_manager:ets_lookup(type_vars, next), 0),
+    Next = proplists:get_value(next, aeso_tc_ets_manager:ets_lookup(type_vars, next), 0),
     TVar = {tvar, Attr, "'" ++ integer_to_tvar(Next)},
-    aeso_ets_manager:ets_insert(type_vars, [{next, Next + 1}, {R, TVar}]),
+    aeso_tc_ets_manager:ets_insert(type_vars, [{next, Next + 1}, {R, TVar}]),
     TVar;
 instantiate1({fun_t, Ann, Named, Args, Ret}) ->
     case dereference(Named) of
         {uvar, _, R} ->
             %% Uninstantiated named args map to the empty list
             NoNames = [],
-            aeso_ets_manager:ets_insert(type_vars, [{R, NoNames}]),
+            aeso_tc_ets_manager:ets_insert(type_vars, [{R, NoNames}]),
             {fun_t, Ann, NoNames, instantiate(Args), instantiate(Ret)};
         Named1 ->
             {fun_t, Ann, instantiate1(Named1), instantiate(Args), instantiate(Ret)}

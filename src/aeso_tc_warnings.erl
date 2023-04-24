@@ -59,14 +59,14 @@ potential_unused_include(Ann, SrcFile) ->
         true  ->
             case aeso_syntax:get_ann(file, Ann, no_file) of
                 no_file -> ok;
-                File    -> aeso_ets_manager:ets_insert(warnings, {unused_include, File, SrcFile})
+                File    -> aeso_tc_ets_manager:ets_insert(warnings, {unused_include, File, SrcFile})
             end
     end.
 
 used_include(Ann) ->
     case aeso_syntax:get_ann(file, Ann, no_file) of
         no_file -> ok;
-        File    -> aeso_ets_manager:ets_match_delete(warnings, {unused_include, File, '_'})
+        File    -> aeso_tc_ets_manager:ets_match_delete(warnings, {unused_include, File, '_'})
     end.
 
 %% Warnings (Unused stateful)
@@ -74,30 +74,30 @@ used_include(Ann) ->
 potential_unused_stateful(Ann, Fun) ->
     case aeso_syntax:get_ann(stateful, Ann, false) of
         false -> ok;
-        true  -> aeso_ets_manager:ets_insert(warnings, {unused_stateful, Ann, Fun})
+        true  -> aeso_tc_ets_manager:ets_insert(warnings, {unused_stateful, Ann, Fun})
     end.
 
 used_stateful(Fun) ->
-    aeso_ets_manager:ets_match_delete(warnings, {unused_stateful, '_', Fun}).
+    aeso_tc_ets_manager:ets_match_delete(warnings, {unused_stateful, '_', Fun}).
 
 %% Warnings (Unused type defs)
 
 potential_unused_typedefs(Namespace, TypeDefs) ->
     lists:map(fun({type_def, Ann, Id, Args, _}) ->
-        aeso_ets_manager:ets_insert(warnings, {unused_typedef, Ann, Namespace ++ qname(Id), length(Args)}) end, TypeDefs).
+        aeso_tc_ets_manager:ets_insert(warnings, {unused_typedef, Ann, Namespace ++ qname(Id), length(Args)}) end, TypeDefs).
 
 used_typedef(TypeAliasId, Arity) ->
-    aeso_ets_manager:ets_match_delete(warnings, {unused_typedef, '_', qname(TypeAliasId), Arity}).
+    aeso_tc_ets_manager:ets_match_delete(warnings, {unused_typedef, '_', qname(TypeAliasId), Arity}).
 
 %% Warnings (Unused variables)
 
 potential_unused_variables(Namespace, Fun, Vars0) ->
     Vars = [ Var || Var = {id, _, VarName} <- Vars0, VarName /= "_" ],
     lists:map(fun({id, Ann, VarName}) ->
-        aeso_ets_manager:ets_insert(warnings, {unused_variable, Ann, Namespace, Fun, VarName}) end, Vars).
+        aeso_tc_ets_manager:ets_insert(warnings, {unused_variable, Ann, Namespace, Fun, VarName}) end, Vars).
 
 used_variable(Namespace, Fun, [VarName]) ->
-    aeso_ets_manager:ets_match_delete(warnings, {unused_variable, '_', Namespace, Fun, VarName});
+    aeso_tc_ets_manager:ets_match_delete(warnings, {unused_variable, '_', Namespace, Fun, VarName});
 used_variable(_, _, _) -> ok.
 
 %% Warnings (Unused constants)
@@ -106,39 +106,39 @@ potential_unused_constants(Env, Consts) ->
     case aeso_ast_infer_types:get_env_what(Env) of
         namespace -> [];
         _ ->
-            [ aeso_ets_manager:ets_insert(warnings, {unused_constant, Ann, aeso_ast_infer_types:get_env_namespace(Env), Name}) || {letval, _, {id, Ann, Name}, _} <- Consts ]
+            [ aeso_tc_ets_manager:ets_insert(warnings, {unused_constant, Ann, aeso_ast_infer_types:get_env_namespace(Env), Name}) || {letval, _, {id, Ann, Name}, _} <- Consts ]
     end.
 
 used_constant(Namespace = [Contract], [Contract, ConstName]) ->
-    aeso_ets_manager:ets_match_delete(warnings, {unused_constant, '_', Namespace, ConstName});
+    aeso_tc_ets_manager:ets_match_delete(warnings, {unused_constant, '_', Namespace, ConstName});
 used_constant(_, _) -> ok.
 
 %% Warnings (Unused return value)
 
 potential_unused_return_value({typed, Ann, {app, _, {typed, _, _, {fun_t, _, _, _, {id, _, Type}}}, _}, _}) when Type /= "unit" ->
-    aeso_ets_manager:ets_insert(warnings, {unused_return_value, Ann});
+    aeso_tc_ets_manager:ets_insert(warnings, {unused_return_value, Ann});
 potential_unused_return_value(_) -> ok.
 
 %% Warnings (Unused functions)
 
 create_unused_functions() ->
-    aeso_ets_manager:ets_new(function_calls, [bag]),
-    aeso_ets_manager:ets_new(all_functions, [set]).
+    aeso_tc_ets_manager:ets_new(function_calls, [bag]),
+    aeso_tc_ets_manager:ets_new(all_functions, [set]).
 
 register_function_call(Caller, Callee) ->
-    aeso_ets_manager:ets_insert(function_calls, {Caller, Callee}).
+    aeso_tc_ets_manager:ets_insert(function_calls, {Caller, Callee}).
 
 potential_unused_function(Env, Ann, FunQName, FunId) ->
     case aeso_ast_infer_types:get_env_what(Env) of
         namespace ->
-            aeso_ets_manager:ets_insert(all_functions, {Ann, FunQName, FunId, not aeso_syntax:get_ann(private, Ann, false)});
+            aeso_tc_ets_manager:ets_insert(all_functions, {Ann, FunQName, FunId, not aeso_syntax:get_ann(private, Ann, false)});
         _ ->
-            aeso_ets_manager:ets_insert(all_functions, {Ann, FunQName, FunId, aeso_syntax:get_ann(entrypoint, Ann, false)})
+            aeso_tc_ets_manager:ets_insert(all_functions, {Ann, FunQName, FunId, aeso_syntax:get_ann(entrypoint, Ann, false)})
     end.
 
 remove_used_funs(All) ->
     {Used, Unused} = lists:partition(fun({_, _, _, IsUsed}) -> IsUsed end, All),
-    CallsByUsed = lists:flatmap(fun({_, F, _, _}) -> aeso_ets_manager:ets_lookup(function_calls, F) end, Used),
+    CallsByUsed = lists:flatmap(fun({_, F, _, _}) -> aeso_tc_ets_manager:ets_lookup(function_calls, F) end, Used),
     CalledFuns = sets:from_list(lists:map(fun({_, Callee}) -> Callee end, CallsByUsed)),
     MarkUsedFun = fun(Fun, Acc) ->
                       case lists:keyfind(Fun, 2, Acc) of
@@ -153,11 +153,11 @@ remove_used_funs(All) ->
     end.
 
 destroy_and_report_unused_functions() ->
-    AllFuns = aeso_ets_manager:ets_tab2list(all_functions),
-    lists:map(fun({Ann, _, FunId, _}) -> aeso_ets_manager:ets_insert(warnings, {unused_function, Ann, name(FunId)}) end,
+    AllFuns = aeso_tc_ets_manager:ets_tab2list(all_functions),
+    lists:map(fun({Ann, _, FunId, _}) -> aeso_tc_ets_manager:ets_insert(warnings, {unused_function, Ann, name(FunId)}) end,
               remove_used_funs(AllFuns)),
-    aeso_ets_manager:ets_delete(all_functions),
-    aeso_ets_manager:ets_delete(function_calls).
+    aeso_tc_ets_manager:ets_delete(all_functions),
+    aeso_tc_ets_manager:ets_delete(function_calls).
 
 %% Warnings (Shadowing)
 
@@ -167,14 +167,14 @@ warn_potential_shadowing(Env, Ann, Name) ->
     Consts = aeso_ast_infer_types:get_current_scope_consts(Env),
     case proplists:get_value(Name, Vars ++ Consts, false) of
         false -> ok;
-        {AnnOld, _} -> aeso_ets_manager:ets_insert(warnings, {shadowing, Ann, Name, AnnOld})
+        {AnnOld, _} -> aeso_tc_ets_manager:ets_insert(warnings, {shadowing, Ann, Name, AnnOld})
     end.
 
 %% Warnings (Division by zero)
 
 warn_potential_division_by_zero(Ann, Op, Args) ->
     case {Op, Args} of
-        {{'/', _}, [_, {int, _, 0}]} -> aeso_ets_manager:ets_insert(warnings, {division_by_zero, Ann});
+        {{'/', _}, [_, {int, _, 0}]} -> aeso_tc_ets_manager:ets_insert(warnings, {division_by_zero, Ann});
         _ -> ok
     end.
 
@@ -184,12 +184,12 @@ warn_potential_negative_spend(Ann, Fun, Args) ->
     case {Fun, Args} of
         { {typed, _, {qid, _, ["Chain", "spend"]}, _}
         , [_, {typed, _, {app, _, {'-', _}, [{typed, _, {int, _, X}, _}]}, _}]} when X > 0 ->
-            aeso_ets_manager:ets_insert(warnings, {negative_spend, Ann});
+            aeso_tc_ets_manager:ets_insert(warnings, {negative_spend, Ann});
         _ -> ok
     end.
 
 destroy_and_report_warnings_as_type_errors() ->
-    Warnings = [ mk_warning(Warn) || Warn <- aeso_ets_manager:ets_tab2list(warnings) ],
+    Warnings = [ mk_warning(Warn) || Warn <- aeso_tc_ets_manager:ets_tab2list(warnings) ],
     Errors = lists:map(fun mk_t_err_from_warn/1, Warnings),
     aeso_errors:throw(Errors).  %% No-op if Warnings == []
 

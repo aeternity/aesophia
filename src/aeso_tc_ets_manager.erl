@@ -1,4 +1,4 @@
--module(aeso_ets_manager).
+-module(aeso_tc_ets_manager).
 
 -export([ ets_init/0
         , ets_new/2
