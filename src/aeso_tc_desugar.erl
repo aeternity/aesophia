@@ -2,6 +2,7 @@
 
 -export([ desugar/1
         , desugar_clauses/4
+        , process_blocks/1
         ]).
 
 %% -- Moved functions --------------------------------------------------------
@@ -9,6 +10,30 @@
 type_error(A) -> aeso_tc_errors:type_error(A).
 
 %% ---------------------------------------------------------------------------
+
+%% Restructure blocks into multi-clause fundefs (`fun_clauses`).
+-spec process_blocks([aeso_syntax:decl()]) -> [aeso_syntax:decl()].
+process_blocks(Decls) ->
+    lists:flatmap(
+      fun({block, Ann, Ds}) -> process_block(Ann, Ds);
+         (Decl)             -> [Decl] end, Decls).
+
+-spec process_block(aeso_syntax:ann(), [aeso_syntax:decl()]) -> [aeso_syntax:decl()].
+process_block(_, []) -> [];
+process_block(_, [Decl]) -> [Decl];
+process_block(_Ann, [Decl | Decls]) ->
+    IsThis = fun(Name) -> fun({letfun, _, {id, _, Name1}, _, _, _}) -> Name == Name1;
+                             (_) -> false end end,
+    case Decl of
+        {fun_decl, Ann1, Id = {id, _, Name}, Type} ->
+            {Clauses, Rest} = lists:splitwith(IsThis(Name), Decls),
+            [type_error({mismatched_decl_in_funblock, Name, D1}) || D1 <- Rest],
+            [{fun_clauses, Ann1, Id, Type, Clauses}];
+        {letfun, Ann1, Id = {id, _, Name}, _, _, _} ->
+            {Clauses, Rest} = lists:splitwith(IsThis(Name), [Decl | Decls]),
+            [type_error({mismatched_decl_in_funblock, Name, D1}) || D1 <- Rest],
+            [{fun_clauses, Ann1, Id, {id, [{origin, system} | Ann1], "_"}, Clauses}]
+    end.
 
 desugar_clauses(Ann, Fun, {type_sig, _, _, _, ArgTypes, RetType}, Clauses) ->
     NeedDesugar =

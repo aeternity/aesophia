@@ -212,6 +212,7 @@ all_warnings() -> aeso_tc_warnings:all_warnings().
 
 desugar(A) -> aeso_tc_desugar:desugar(A).
 desugar_clauses(A, B, C, D) -> aeso_tc_desugar:desugar_clauses(A, B, C, D).
+process_blocks(A) -> aeso_tc_desugar:process_blocks(A).
 
 
 %% -- New functions ----------------------------------------------------------
@@ -1177,30 +1178,6 @@ infer_contract(Env0, What, Defs0, Options) ->
     destroy_and_report_type_errors(Env4),
     %% Add inferred types of definitions
     {Env5, TypeDefs ++ Decls ++ Consts ++ Defs1}.
-
-%% Restructure blocks into multi-clause fundefs (`fun_clauses`).
--spec process_blocks([aeso_syntax:decl()]) -> [aeso_syntax:decl()].
-process_blocks(Decls) ->
-    lists:flatmap(
-      fun({block, Ann, Ds}) -> process_block(Ann, Ds);
-         (Decl)             -> [Decl] end, Decls).
-
--spec process_block(aeso_syntax:ann(), [aeso_syntax:decl()]) -> [aeso_syntax:decl()].
-process_block(_, []) -> [];
-process_block(_, [Decl]) -> [Decl];
-process_block(_Ann, [Decl | Decls]) ->
-    IsThis = fun(Name) -> fun({letfun, _, {id, _, Name1}, _, _, _}) -> Name == Name1;
-                             (_) -> false end end,
-    case Decl of
-        {fun_decl, Ann1, Id = {id, _, Name}, Type} ->
-            {Clauses, Rest} = lists:splitwith(IsThis(Name), Decls),
-            [type_error({mismatched_decl_in_funblock, Name, D1}) || D1 <- Rest],
-            [{fun_clauses, Ann1, Id, Type, Clauses}];
-        {letfun, Ann1, Id = {id, _, Name}, _, _, _} ->
-            {Clauses, Rest} = lists:splitwith(IsThis(Name), [Decl | Decls]),
-            [type_error({mismatched_decl_in_funblock, Name, D1}) || D1 <- Rest],
-            [{fun_clauses, Ann1, Id, {id, [{origin, system} | Ann1], "_"}, Clauses}]
-    end.
 
 %% Turns private stuff into public stuff
 expose_internals(Defs, What) ->
