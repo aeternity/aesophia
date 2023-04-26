@@ -225,6 +225,64 @@ get_named_argument_constraint_name(#named_argument_constraint{name = Name}) -> N
 get_named_argument_constraint_args(#named_argument_constraint{args = Args}) -> Args.
 get_named_argument_constraint_type(#named_argument_constraint{type = Type}) -> Type.
 
+%% -- Env getters ------------------------------------------------------------
+
+tc_env_contract_parents(#env{contract_parents = ContractParents}) ->
+    ContractParents.
+
+tc_env_unify_throws(#env{unify_throws = UnifyThrows}) ->
+    UnifyThrows.
+
+tc_env_namespace(#env{namespace = Namespace}) ->
+    Namespace.
+
+tc_env_current_function(#env{current_function = CurrentFunction}) ->
+    CurrentFunction.
+
+tc_env_in_pattern(#env{in_pattern = InPattern}) ->
+    InPattern.
+
+tc_env_in_guard(#env{in_guard = InGuard}) ->
+    InGuard.
+
+tc_env_stateful(#env{stateful = Stateful}) ->
+    Stateful.
+
+tc_env_used_namespaces(#env{used_namespaces = UsedNamespaces}) ->
+    UsedNamespaces.
+
+tc_env_what(#env{what = What}) ->
+    What.
+
+tc_env_typevars(#env{typevars = Typevars}) ->
+    Typevars.
+
+%% -- Env setters ------------------------------------------------------------
+
+tc_env_set_in_pattern(InPattern, Env) ->
+    Env#env{in_pattern = InPattern}.
+
+tc_env_set_in_guard(InGuard, Env) ->
+    Env#env{in_guard = InGuard}.
+
+tc_env_set_used_namespaces(UsedNamespaces, Env) ->
+    Env#env{used_namespaces = UsedNamespaces}.
+
+tc_env_set_current_const(CurrentConst, Env) ->
+    Env#env{current_const = CurrentConst}.
+
+tc_env_set_current_function(CurrentFunction, Env) ->
+    Env#env{current_function = CurrentFunction}.
+
+tc_env_set_stateful(Stateful, Env) ->
+    Env#env{stateful = Stateful}.
+
+tc_env_set_what(What, Env) ->
+    Env#env{what = What}.
+
+tc_env_set_contract_parents(ContractParents, Env) ->
+    Env#env{contract_parents = ContractParents}.
+
 %% -- Environment manipulation -----------------------------------------------
 
 -spec switch_scope(qname(), env()) -> env().
@@ -272,14 +330,6 @@ bind_vars([{X, T} | Vars], Env) ->
 -spec bind_tvars([aeso_syntax:tvar()], env()) -> env().
 bind_tvars(Xs, Env) ->
     Env#env{ typevars = [X || {tvar, _, X} <- Xs] }.
-
--spec check_tvar(env(), aeso_syntax:tvar()) -> aeso_syntax:tvar() | no_return().
-check_tvar(#env{ typevars = TVars}, T = {tvar, _, X}) ->
-    case TVars == unrestricted orelse lists:member(X, TVars) of
-        true  -> ok;
-        false -> type_error({unbound_type, T})
-    end,
-    T.
 
 -spec bind_fun(name(), type() | typesig(), env()) -> env().
 bind_fun(X, Type, Env) ->
@@ -588,6 +638,9 @@ lookup_record_field_arity(Env, FieldName, Arity, Kind) ->
 is_private(Ann) -> proplists:get_value(private, Ann, false).
 
 %% -- The rest ---------------------------------------------------------------
+
+-spec empty_env() -> env().
+empty_env() -> #env{}.
 
 %% Environment containing language primitives
 -spec global_env() -> env().
@@ -978,9 +1031,10 @@ infer1(Env, [], Acc, _Options) -> {Env, lists:reverse(Acc)};
 infer1(Env0, [Contract0 = {Contract, Ann, ConName, Impls, Code} | Rest], Acc, Options)
   when ?IS_CONTRACT_HEAD(Contract) ->
     %% do type inference on each contract independently.
-    Env = Env0#env{ contract_parents = maps:put(name(ConName),
-                                                [name(Impl) || Impl <- Impls],
-                                                Env0#env.contract_parents) },
+    Parents = maps:put(name(ConName),
+                       [name(Impl) || Impl <- Impls],
+                       tc_env_contract_parents(Env0)),
+    Env = tc_env_set_contract_parents(Parents, Env0),
     check_scope_name_clash(Env, contract, ConName),
     What = case Contract of
                contract_main -> contract;
@@ -1130,7 +1184,7 @@ infer_contract(Env0, What, Defs0, Options) ->
                false -> Defs01
            end,
     destroy_and_report_type_errors(Env0),
-    Env  = Env0#env{ what = What },
+    Env  = tc_env_set_what(What, Env0),
     Kind = fun({type_def, _, _, _, _})    -> type;
               ({letfun, _, _, _, _, _})   -> function;
               ({fun_clauses, _, _, _, _}) -> function;
@@ -1140,10 +1194,10 @@ infer_contract(Env0, What, Defs0, Options) ->
               (_)                         -> unexpected
            end,
     Get = fun(K, In) -> [ Def || Def <- In, Kind(Def) == K ] end,
-    OldUsedNamespaces = Env#env.used_namespaces,
+    OldUsedNamespaces = tc_env_used_namespaces(Env),
     Env01 = check_usings(Env, Get(using, Defs)),
     {Env1, TypeDefs} = check_typedefs(Env01, Get(type, Defs)),
-    when_warning(warn_unused_typedefs, fun() -> potential_unused_typedefs(Env#env.namespace, TypeDefs) end),
+    when_warning(warn_unused_typedefs, fun() -> potential_unused_typedefs(tc_env_namespace(Env), TypeDefs) end),
     create_type_errors(),
     check_unexpected(Get(unexpected, Defs)),
     Env2 =
@@ -1163,14 +1217,14 @@ infer_contract(Env0, What, Defs0, Options) ->
     FunBind   = fun({letfun, Ann, {id, _, Fun}, _, _, _})   -> {Fun, {tuple_t, Ann, []}};
                    ({fun_clauses, Ann, {id, _, Fun}, _, _}) -> {Fun, {tuple_t, Ann, []}} end,
     FunName   = fun(Def) -> {Name, _} = FunBind(Def), Name end,
-    _         = bind_funs(lists:map(FunBind, Functions), #env{}),
+    _         = bind_funs(lists:map(FunBind, Functions), empty_env()),
     FunMap    = maps:from_list([ {FunName(Def), Def} || Def <- Functions ]),
     check_reserved_entrypoints(FunMap),
     DepGraph  = maps:map(fun(_, Def) -> aeso_syntax_utils:used_ids(Def) end, FunMap),
     SCCs      = aeso_utils:scc(DepGraph),
     {Env4, Defs1} = check_sccs(Env3, FunMap, SCCs, []),
     %% Remove namespaces used in the current namespace
-    Env5 = Env4#env{ used_namespaces = OldUsedNamespaces },
+    Env5 = tc_env_set_used_namespaces(OldUsedNamespaces, Env4),
     %% Check that `init` doesn't read or write the state and that `init` is not missing
     check_state(Env4, Defs1),
     %% Check that entrypoints have first-order arg types and return types
@@ -1199,11 +1253,11 @@ expose_internals(Defs, What) ->
     ].
 
 -spec check_typedefs(env(), [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
-check_typedefs(Env = #env{ namespace = Ns }, Defs) ->
+check_typedefs(Env, Defs) ->
     create_type_errors(),
     GetName  = fun({type_def, _, {id, _, Name}, _, _}) -> Name end,
     TypeMap  = maps:from_list([ {GetName(Def), Def} || Def <- Defs ]),
-    DepGraph = maps:map(fun(_, Def) -> aeso_syntax_utils:used_types(Ns, Def) end, TypeMap),
+    DepGraph = maps:map(fun(_, Def) -> aeso_syntax_utils:used_types(tc_env_namespace(Env), Def) end, TypeMap),
     SCCs     = aeso_utils:scc(DepGraph),
     {Env1, Defs1} = check_typedef_sccs(Env, TypeMap, SCCs, []),
     destroy_and_report_type_errors(Env),
@@ -1227,14 +1281,14 @@ check_typedef_sccs(Env, TypeMap, [{acyclic, Name} | SCCs], Acc) ->
                     type_error({empty_record_definition, Ann, Name}),
                     check_typedef_sccs(Env1, TypeMap, SCCs, Acc1);
                 {record_t, Fields} ->
-                    aeso_tc_ets_manager:ets_insert(type_vars_variance, {Env#env.namespace ++ qname(D),
+                    aeso_tc_ets_manager:ets_insert(type_vars_variance, {tc_env_namespace(Env) ++ qname(D),
                                                     infer_type_vars_variance(Xs, Fields)}),
                     %% check_type to get qualified name
                     RecTy = check_type(Env1, app_t(Ann, D, Xs)),
                     Env2 = check_fields(Env1, TypeMap, RecTy, Fields),
                     check_typedef_sccs(Env2, TypeMap, SCCs, Acc1);
                 {variant_t, Cons} ->
-                    aeso_tc_ets_manager:ets_insert(type_vars_variance, {Env#env.namespace ++ qname(D),
+                    aeso_tc_ets_manager:ets_insert(type_vars_variance, {tc_env_namespace(Env) ++ qname(D),
                                                     infer_type_vars_variance(Xs, Cons)}),
                     Target   = check_type(Env1, app_t(Ann, D, Xs)),
                     ConType  = fun([]) -> Target; (Args) -> {type_sig, Ann, none, [], Args, Target} end,
@@ -1304,14 +1358,14 @@ opposite_variance(contravariant) -> covariant;
 opposite_variance(bivariant) -> bivariant.
 
 -spec check_constants(env(), [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
-check_constants(Env = #env{ what = What }, Consts) ->
+check_constants(Env, Consts) ->
     HasValidId = fun({letval, _, {id, _, _}, _})                -> true;
                     ({letval, _, {typed, _, {id, _, _}, _}, _}) -> true;
                     (_)                                         -> false
                  end,
     {Valid, Invalid} = lists:partition(HasValidId, Consts),
     [ type_error({invalid_const_id, aeso_syntax:get_ann(Pat)}) || {letval, _, Pat, _} <- Invalid ],
-    [ type_error({illegal_const_in_interface, Ann}) || {letval, Ann, _, _} <- Valid, What == contract_interface ],
+    [ type_error({illegal_const_in_interface, Ann}) || {letval, Ann, _, _} <- Valid, tc_env_what(Env) == contract_interface ],
     when_warning(warn_unused_constants, fun() -> potential_unused_constants(Env, Valid) end),
     ConstMap = maps:from_list([ {name(Id), Const} || Const = {letval, _, Id, _} <- Valid ]),
     DepGraph = maps:map(fun(_, Const) -> aeso_syntax_utils:used_ids(Const) end, ConstMap),
@@ -1320,7 +1374,7 @@ check_constants(Env = #env{ what = What }, Consts) ->
 
 check_usings(Env, []) ->
     Env;
-check_usings(Env = #env{ used_namespaces = UsedNamespaces }, [{using, Ann, Con, Alias, Parts} | Rest]) ->
+check_usings(Env, [{using, Ann, Con, Alias, Parts} | Rest]) ->
     AliasName = case Alias of
                     none ->
                         none;
@@ -1354,7 +1408,7 @@ check_usings(Env = #env{ used_namespaces = UsedNamespaces }, [{using, Ann, Con, 
                                   destroy_and_report_type_errors(Env)
                           end
                   end,
-            check_usings(Env#env{ used_namespaces = UsedNamespaces ++ [Nsp] }, Rest)
+            check_usings(tc_env_set_used_namespaces(tc_env_used_namespaces(Env) ++ [Nsp], Env), Rest)
     end;
 check_usings(Env, Using = {using, _, _, _, _}) ->
     check_usings(Env, [Using]).
@@ -1476,6 +1530,15 @@ check_type(_Env, {args_t, Ann, Ts}, _) ->
     type_error({new_tuple_syntax, Ann, Ts}),
     {tuple_t, Ann, Ts}.
 
+-spec check_tvar(env(), aeso_syntax:tvar()) -> aeso_syntax:tvar() | no_return().
+check_tvar(Env, T = {tvar, _, X}) ->
+    TVars = tc_env_typevars(Env),
+    case TVars == unrestricted orelse lists:member(X, TVars) of
+        true  -> ok;
+        false -> type_error({unbound_type, T})
+    end,
+    T.
+
 ensure_base_type(Type, Arity) ->
     [ type_error({wrong_type_arguments, Type, Arity, 0}) || Arity /= 0 ],
     ok.
@@ -1564,7 +1627,7 @@ check_repeated_constructors(Cons) ->
 -spec check_sccs(env(), #{ name() => aeso_syntax:decl() }, [{acyclic, name()} | {cyclic, [name()]}], [aeso_syntax:decl()]) ->
         {env(), [aeso_syntax:decl()]}.
 check_sccs(Env, _, [], Acc) -> {Env, lists:reverse(Acc)};
-check_sccs(Env = #env{}, Funs, [{acyclic, X} | SCCs], Acc) ->
+check_sccs(Env, Funs, [{acyclic, X} | SCCs], Acc) ->
     case maps:get(X, Funs, undefined) of
         undefined ->    %% Previously defined function
             check_sccs(Env, Funs, SCCs, Acc);
@@ -1573,7 +1636,7 @@ check_sccs(Env = #env{}, Funs, [{acyclic, X} | SCCs], Acc) ->
             Env1 = bind_fun(X, TypeSig, Env),
             check_sccs(Env1, Funs, SCCs, [Def1 | Acc])
     end;
-check_sccs(Env = #env{}, Funs, [{cyclic, Xs} | SCCs], Acc) ->
+check_sccs(Env, Funs, [{cyclic, Xs} | SCCs], Acc) ->
     Defs = [ maps:get(X, Funs) || X <- Xs ],
     {TypeSigs, Defs1} = infer_letrec(Env, Defs),
     Env1 = bind_funs(TypeSigs, Env),
@@ -1673,10 +1736,10 @@ infer_letrec(Env, Defs) ->
     [print_typesig(S) || S <- TypeSigs],
     {TypeSigs, NewDefs}.
 
-infer_letfun(Env = #env{ namespace = Namespace }, {fun_clauses, Ann, Fun = {id, _, Name}, Type, Clauses}) ->
+infer_letfun(Env, {fun_clauses, Ann, Fun = {id, _, Name}, Type, Clauses}) ->
     when_warning(warn_unused_stateful, fun() -> potential_unused_stateful(Ann, Fun) end),
     when_warning(warn_unused_functions,
-                 fun() -> potential_unused_function(Env, Ann, Namespace ++ qname(Fun), Fun) end),
+                 fun() -> potential_unused_function(Env, Ann, tc_env_namespace(Env) ++ qname(Fun), Fun) end),
     Type1 = check_type(Env, Type),
     {NameSigs, Clauses1} = lists:unzip([ infer_letfun1(Env, Clause) || Clause <- Clauses ]),
     {_, Sigs = [Sig | _]} = lists:unzip(NameSigs),
@@ -1685,21 +1748,21 @@ infer_letfun(Env = #env{ namespace = Namespace }, {fun_clauses, Ann, Fun = {id, 
             unify(Env, ClauseT, Type1, {check_typesig, Name, ClauseT, Type1})
           end || ClauseSig <- Sigs ],
     {{Name, Sig}, desugar_clauses(Ann, Fun, Sig, Clauses1)};
-infer_letfun(Env = #env{ namespace = Namespace }, LetFun = {letfun, Ann, Fun, _, _, _}) ->
+infer_letfun(Env, LetFun = {letfun, Ann, Fun, _, _, _}) ->
     when_warning(warn_unused_stateful, fun() -> potential_unused_stateful(Ann, Fun) end),
-    when_warning(warn_unused_functions, fun() -> potential_unused_function(Env, Ann, Namespace ++ qname(Fun), Fun) end),
+    when_warning(warn_unused_functions, fun() -> potential_unused_function(Env, Ann, tc_env_namespace(Env) ++ qname(Fun), Fun) end),
     {{Name, Sig}, Clause} = infer_letfun1(Env, LetFun),
     {{Name, Sig}, desugar_clauses(Ann, Fun, Sig, [Clause])}.
 
-infer_letfun1(Env0 = #env{ namespace = NS }, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, GuardedBodies}) ->
-    Env = Env0#env{ stateful = aeso_syntax:get_ann(stateful, Attrib, false),
-                    current_function = Fun },
+infer_letfun1(Env0, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, GuardedBodies}) ->
+    Env1 = tc_env_set_stateful(aeso_syntax:get_ann(stateful, Attrib, false), Env0),
+    Env = tc_env_set_current_function(Fun, Env1),
     {NewEnv, {typed, _, {tuple, _, TypedArgs}, {tuple_t, _, ArgTypes}}} = infer_pattern(Env, {tuple, [{origin, system} | NameAttrib], Args}),
-    when_warning(warn_unused_variables, fun() -> potential_unused_variables(NS, Name, free_vars(Args)) end),
+    when_warning(warn_unused_variables, fun() -> potential_unused_variables(tc_env_namespace(Env0), Name, free_vars(Args)) end),
     ExpectedType = check_type(Env, arg_type(NameAttrib, What)),
     InferGuardedBodies = fun({guarded, Ann, Guards, Body}) ->
         NewGuards = lists:map(fun(Guard) ->
-                                  check_expr(NewEnv#env{ in_guard = true }, Guard, {id, Attrib, "bool"})
+                                  check_expr(tc_env_set_in_guard(true, NewEnv), Guard, {id, Attrib, "bool"})
                               end, Guards),
         NewBody = check_expr(NewEnv, Body, ExpectedType),
         {guarded, Ann, NewGuards, NewBody}
@@ -1761,29 +1824,38 @@ lookup_name(Env = #env{ namespace = NS, current_function = CurFn }, As, Id, Opti
             {set_qname(QId, Id), Ty1}
     end.
 
-check_stateful(#env{ in_guard = true }, Id, Type = {type_sig, _, _, _, _, _}) ->
-    case aeso_syntax:get_ann(stateful, Type, false) of
-        false -> ok;
-        true  ->
-            type_error({stateful_not_allowed_in_guards, Id})
-    end;
-check_stateful(#env{ stateful = false, current_function = Fun }, Id, Type = {type_sig, _, _, _, _, _}) ->
-    case aeso_syntax:get_ann(stateful, Type, false) of
-        false -> ok;
-        true  ->
-            type_error({stateful_not_allowed, Id, Fun})
-    end;
-check_stateful(#env { current_function = Fun }, _Id, _Type) ->
-    when_warning(warn_unused_stateful, fun() -> used_stateful(Fun) end),
+check_stateful(Env, Id, Type = {type_sig, _, _, _, _, _}) ->
+    IsStatefulType = aeso_syntax:get_ann(stateful, Type, false),
+    IsStatefulType andalso (check_stateful_not_in_guard(Env, Id) andalso check_stateful_in_stateful_fun(Env, Id)),
+    ok;
+check_stateful(Env, _Id, _Type) ->
+    when_warning(warn_unused_stateful, fun() -> used_stateful(tc_env_current_function(Env)) end),
     ok.
+
+check_stateful_not_in_guard(Env, Id) ->
+    case tc_env_in_guard(Env) of
+        false -> true;
+        true  ->
+            type_error({stateful_not_allowed_in_guards, Id}),
+            false
+    end.
+
+check_stateful_in_stateful_fun(Env, Id) ->
+    case tc_env_stateful(Env) of
+        true  -> true;
+        false ->
+            type_error({stateful_not_allowed, Id, tc_env_current_function(Env)}),
+            false
+    end.
 
 %% Hack: don't allow passing the 'value' named arg if not stateful. This only
 %% works since the user can't create functions with named arguments.
-check_stateful_named_arg(#env{ stateful = Stateful, current_function = Fun }, {id, _, "value"}, Default) ->
+check_stateful_named_arg(Env, {id, _, "value"}, Default) ->
     case Default of
         {int, _, 0} -> ok;
         _           ->
-            case Stateful of
+            Fun = tc_env_current_function(Env),
+            case tc_env_stateful(Env) of
                 true  -> when_warning(warn_unused_stateful, fun() -> used_stateful(Fun) end);
                 false -> type_error({value_arg_not_allowed, Default, Fun})
             end
@@ -1821,7 +1893,7 @@ is_monomorphic(Tup) when is_tuple(Tup) -> is_monomorphic(tuple_to_list(Tup));
 is_monomorphic(_)                      -> true.
 
 check_state_init(Env) ->
-    Top = Env#env.namespace,
+    Top = tc_env_namespace(Env),
     StateType = lookup_type(Env, {id, [{origin, system}], "state"}),
     case unfold_types_in_type(Env, StateType) of
         false  ->
@@ -1836,7 +1908,7 @@ check_state_init(Env) ->
 %% Check that `init` doesn't read or write the state and that `init` is defined
 %% when the state type is not unit
 check_state(Env, Defs) ->
-    Top       = Env#env.namespace,
+    Top       = tc_env_namespace(Env),
     GetState  = Top ++ ["state"],
     SetState  = Top ++ ["put"],
     Init      = Top ++ ["init"],
@@ -2029,7 +2101,7 @@ infer_expr(Env, {record, Attrs, Fields}) ->
     add_constraint([ #record_create_constraint{
                          record_t = RecordType1,
                          fields   = [ FieldName || {field, _, [{proj, _, FieldName}], _} <- Fields ],
-                         context  = Attrs } || not Env#env.in_pattern ] ++
+                         context  = Attrs } || not tc_env_in_pattern(Env) ] ++
                    [begin
                      [{proj, _, FieldName}] = LV,
                      #field_constraint{
@@ -2310,23 +2382,23 @@ infer_pattern(Env, Pattern) ->
         [] -> ok;
         Nonlinear -> type_error({non_linear_pattern, Pattern, lists:usort(Nonlinear)})
     end,
-    NewEnv = bind_vars([{Var, fresh_uvar(Ann1)} || Var = {id, Ann1, _} <- Vars], Env#env{ in_pattern = true }),
+    NewEnv = bind_vars([{Var, fresh_uvar(Ann1)} || Var = {id, Ann1, _} <- Vars], tc_env_set_in_pattern(true, Env)),
     NewPattern = infer_expr(NewEnv, Pattern),
-    {NewEnv#env{ in_pattern = Env#env.in_pattern }, NewPattern}.
+    {tc_env_set_in_pattern(tc_env_in_pattern(Env), NewEnv), NewPattern}.
 
-infer_case(Env = #env{ namespace = NS, current_function = FunId }, Attrs, Pattern, ExprType, GuardedBranches, SwitchType) ->
+infer_case(Env, Attrs, Pattern, ExprType, GuardedBranches, SwitchType) ->
     {NewEnv, NewPattern = {typed, _, _, PatType}} = infer_pattern(Env, Pattern),
 
     %% Make sure we are inside a function before warning about potentially unused var
     [ when_warning(warn_unused_variables,
-                   fun() -> potential_unused_variables(NS, Fun, free_vars(Pattern)) end)
-      || {id, _, Fun} <- [FunId] ],
+                   fun() -> potential_unused_variables(tc_env_namespace(Env), Fun, free_vars(Pattern)) end)
+      || {id, _, Fun} <- [tc_env_current_function(Env)] ],
 
     InferGuardedBranches = fun({guarded, Ann, Guards, Branch}) ->
         NewGuards = lists:map(fun(Guard) ->
-                                  check_expr(NewEnv#env{ in_guard = true }, Guard, {id, Attrs, "bool"})
+                                  check_expr(tc_env_set_in_guard(true, NewEnv), Guard, {id, Attrs, "bool"})
                               end, Guards),
-        NewBranch = check_expr(NewEnv#env{ in_pattern = false }, Branch, SwitchType),
+        NewBranch = check_expr(tc_env_set_in_pattern(false, NewEnv), Branch, SwitchType),
         {guarded, Ann, NewGuards, NewBranch}
     end,
     NewGuardedBranches = lists:map(InferGuardedBranches, GuardedBranches),
@@ -2357,12 +2429,12 @@ infer_block(Env, Attrs, [E|Rest], BlockType) ->
 
 infer_const(Env, {letval, Ann, TypedId = {typed, _, Id = {id, _, _}, Type}, Expr}) ->
     check_valid_const_expr(Expr) orelse type_error({invalid_const_expr, Id}),
-    NewExpr = check_expr(Env#env{ current_const = Id }, Expr, Type),
+    NewExpr = check_expr(tc_env_set_current_const(Id, Env), Expr, Type),
     {letval, Ann, TypedId, NewExpr};
 infer_const(Env, {letval, Ann, Id = {id, AnnId, _}, Expr}) ->
     check_valid_const_expr(Expr) orelse type_error({invalid_const_expr, Id}),
     create_constraints(),
-    NewExpr = {typed, _, _, Type} = infer_expr(Env#env{ current_const = Id }, Expr),
+    NewExpr = {typed, _, _, Type} = infer_expr(tc_env_set_current_const(Id, Env), Expr),
     solve_then_destroy_and_report_unsolved_constraints(Env),
     IdType = setelement(2, Type, AnnId),
     NewId = {typed, aeso_syntax:get_ann(Id), Id, IdType},
@@ -2985,10 +3057,10 @@ unify1(_Env, {uvar, _, _}, {fun_t, _, _, var_args, _}, _Variance, When) ->
 unify1(Env, {uvar, A, R}, T, _Variance, When) ->
     case occurs_check(R, T) of
         true ->
-            if
-                Env#env.unify_throws ->
-                    cannot_unify({uvar, A, R}, T, none, When);
+            case tc_env_unify_throws(Env) of
                 true ->
+                    cannot_unify({uvar, A, R}, T, none, When);
+                false ->
                     ok
             end,
             false;
@@ -3017,8 +3089,8 @@ unify1(Env, A = {con, _, NameA}, B = {con, _, NameB}, Variance, When) ->
     case is_subtype(Env, NameA, NameB, Variance) of
         true -> true;
         false ->
-            if
-                Env#env.unify_throws ->
+            case tc_env_unify_throws(Env) of
+                true ->
                     IsSubtype = is_subtype(Env, NameA, NameB, contravariant) orelse
                                 is_subtype(Env, NameA, NameB, covariant),
                     Cxt = case IsSubtype of
@@ -3026,7 +3098,7 @@ unify1(Env, A = {con, _, NameA}, B = {con, _, NameB}, Variance, When) ->
                               false -> none
                           end,
                     cannot_unify(A, B, Cxt, When);
-                true ->
+                false ->
                     ok
             end,
             false
@@ -3076,10 +3148,10 @@ unify1(Env, {app_t, _, T, []}, B, Variance, When) ->
 unify1(Env, A, {app_t, _, T, []}, Variance, When) ->
     unify0(Env, A, T, Variance, When);
 unify1(Env, A, B, _Variance, When) ->
-    if
-        Env#env.unify_throws ->
-            cannot_unify(A, B, none, When);
+    case tc_env_unify_throws(Env) of
         true ->
+            cannot_unify(A, B, none, When);
+        false ->
             ok
     end,
     false.
@@ -3094,7 +3166,7 @@ is_subtype(Env, NameA, NameB, bivariant) ->
     is_subtype(Env, NameA, NameB) orelse is_subtype(Env, NameB, NameA).
 
 is_subtype(Env, Child, Base) ->
-    Parents = maps:get(Child, Env#env.contract_parents, []),
+    Parents = maps:get(Child, tc_env_contract_parents(Env), []),
     if
         Child == Base ->
             true;
