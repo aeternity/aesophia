@@ -4287,7 +4287,7 @@ pp({tuple_t, _, []}) ->
     "unit";
 pp({tuple_t, _, Cpts}) ->
     ["(", string:join(lists:map(fun pp/1, Cpts), " * "), ")"];
-pp({bytes_t, _, any}) -> "bytes(_)";
+pp({bytes_t, _, any}) -> "bytes()";
 pp({bytes_t, _, Len}) ->
     ["bytes(", integer_to_list(Len), ")"];
 pp({app_t, _, T, []}) ->

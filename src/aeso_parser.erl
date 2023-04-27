@@ -264,10 +264,11 @@ type300() ->
 type400() ->
     choice(
     [?RULE(typeAtom(), optional(type_args()),
-          case _2 of
-            none       -> _1;
-            {ok, Args} -> {app_t, get_ann(_1), _1, Args}
-          end),
+          any_bytes(
+            case _2 of
+              none       -> _1;
+              {ok, Args} -> {app_t, get_ann(_1), _1, Args}
+            end)),
      ?RULE(id("bytes"), parens(token(int)),
            {bytes_t, get_ann(_1), element(3, _2)})
     ]).
@@ -792,3 +793,7 @@ auto_imports(L) when is_list(L) ->
 auto_imports(T) when is_tuple(T) ->
     auto_imports(tuple_to_list(T));
 auto_imports(_) -> [].
+
+any_bytes({id, Ann, "bytes"})                 -> {bytes_t, Ann, any};
+any_bytes({app_t, _, {id, Ann, "bytes"}, []}) -> {bytes_t, Ann, any};
+any_bytes(Type)                               -> Type.
