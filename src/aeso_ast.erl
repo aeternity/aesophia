@@ -1,5 +1,5 @@
 -module(aeso_ast).
--vsn("7.1.1").
+-vsn("7.1.2").
 
 -export([int/2,
          line/1,

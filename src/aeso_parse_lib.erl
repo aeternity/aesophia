@@ -7,7 +7,7 @@
 %%% @end
 %%%-------------------------------------------------------------------
 -module(aeso_parse_lib).
--vsn("7.1.1").
+-vsn("7.1.2").
 
 -export([parse/2,
          return/1, fail/0, fail/1, fail/2, map/2, bind/2,

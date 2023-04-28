@@ -9,10 +9,10 @@
 %%%-------------------------------------------------------------------
 
 -module(aeso_stdlib).
--vsn("7.1.1").
+-vsn("7.1.2").
 
 -export([stdlib_include_path/0]).
 
 stdlib_include_path() ->
-    filename:join([code:priv_dir(aesophia), "stdlib"]).
-
+    {file, Path} = code:is_loaded(?MODULE),
+    filename:join(filename:dirname(filename:dirname(Path)), "priv/stdlib").

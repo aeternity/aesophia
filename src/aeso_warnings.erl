@@ -1,5 +1,5 @@
 -module(aeso_warnings).
--vsn("7.1.1").
+-vsn("7.1.2").
 
 -record(warn, { pos     :: aeso_errors:pos()
               , message :: iolist()
