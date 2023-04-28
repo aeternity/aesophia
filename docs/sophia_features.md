@@ -573,6 +573,32 @@ contract C =
 
 A hole expression found in the example above will generate the error `` Found a hole of type `(int) => int` ``. This says that the compiler expects a function from `int` to `int` in place of the `???` placeholder.
 
+## Constants
+
+Constants in Sophia are contract-level bindings that can be used in either contracts or namespaces. The value of a constant can be a literal, another constant, or arithmetic operations applied to other constants. Lists, tuples, maps, and records can also be used to define a constant as long as their elements are also constants.
+
+The following visibility rules apply to constants:
+*  Constants defined inside a contract are private in that contract. Thus, cannot be accessed through instances of their defining contract.
+* Constants defined inside a namespace are public. Thus, can be used in other contracts or namespaces.
+* Constants cannot be defined inside a contract interface.
+
+When a constant is shadowed, it can be accessed using its qualified name:
+
+```
+contract C =
+  let c = 1
+  entrypoint f() =
+    let c = 2
+    c + C.c  // the result is 3
+```
+
+The name of the constant must be an id; therefore, no pattern matching is allowed when defining a constant:
+
+```
+contract C
+  let x::y::_ = [1,2,3]  // this will result in an error
+```
+
 ## Arithmetic
 
 Sophia integers (`int`) are represented by arbitrary-sized signed words and support the following

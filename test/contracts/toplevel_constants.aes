@@ -1,0 +1,64 @@
+namespace N0 =
+    let nsconst = 1
+
+namespace N =
+    let nsconst = N0.nsconst
+
+contract C =
+    datatype event = EventX(int, string)
+
+    record account = { name    : string,
+                       balance : int }
+
+    let c01 = 2425
+    let c02 = -5
+    let c03 = ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt
+    let c04 = true
+    let c05 = Bits.none
+    let c06 = #fedcba9876543210
+    let c07 = "str"
+    let c08 = [1, 2, 3]
+    let c09 = [(true, 24), (false, 19), (false, -42)]
+    let c10 = (42, "Foo", true)
+    let c11 = { name = "str", balance = 100000000 }
+    let c12 = {["foo"] = 19, ["bar"] = 42}
+    let c13 = Some(42)
+    let c14 = 11 : int
+    let c15 = EventX(0, "Hello")
+    let c16 = #000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f
+    let c17 = #000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f
+    let c18 = RelativeTTL(50)
+    let c19 = ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5
+    let c20 = oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY
+    let c21 = ct_Ez6MyeTMm17YnTnDdHTSrzMEBKmy7Uz2sXu347bTDPgVH2ifJ : C
+    let c22 = N.nsconst
+    let c23 = c01
+    let c24 = c11.name
+    let c25 : int = 1
+
+    entrypoint f01() = c01
+    entrypoint f02() = c02
+    entrypoint f03() = c03
+    entrypoint f04() = c04
+    entrypoint f05() = c05
+    entrypoint f06() = c06
+    entrypoint f07() = c07
+    entrypoint f08() = c08
+    entrypoint f09() = c09
+    entrypoint f10() = c10
+    entrypoint f11() = c11
+    entrypoint f12() = c12
+    entrypoint f13() = c13
+    entrypoint f14() = c14
+    entrypoint f15() = c15
+    entrypoint f16() = c16
+    entrypoint f17() = c17
+    entrypoint f18() = c18
+    entrypoint f19() = c19
+    entrypoint f20() = c20
+    entrypoint f21() = c21
+    entrypoint f22() = c22
+    entrypoint f23() = c23
+    entrypoint f24() = c24
+    entrypoint f25() = c25
+    entrypoint fqual() = C.c01

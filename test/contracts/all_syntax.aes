@@ -6,6 +6,7 @@
 namespace Ns =
   datatype d('a) = D | S(int) | M('a, list('a), int)
   private function fff() = 123
+  let const = 1
 
   stateful entrypoint
     f (1, x) = (_) => x
@@ -32,6 +33,8 @@ contract AllSyntax =
   type shakespeare('a) = goethe('a, 'a)
 
   type state = shakespeare(int)
+
+  let cc = "str"
 
   entrypoint init() = {
     johann = 1000,

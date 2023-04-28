@@ -1,0 +1,11 @@
+contract G =
+    let const = 1
+
+main contract C =
+    let c = G.const
+
+    stateful entrypoint f() =
+        let g = Chain.create() : G
+
+        g.const
+        g.const()

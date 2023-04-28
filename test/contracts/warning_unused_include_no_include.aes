@@ -1,0 +1,5 @@
+namespace N =
+    function nconst() = 1
+
+main contract C =
+    entrypoint f() = N.nconst()
