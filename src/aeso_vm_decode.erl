@@ -5,10 +5,11 @@
 %%%-------------------------------------------------------------------
 
 -module(aeso_vm_decode).
+-vsn("7.1.1").
 
 -export([ from_fate/2 ]).
 
--include_lib("aebytecode/include/aeb_fate_data.hrl").
+-include("$aebytecode_include/aeb_fate_data.hrl").
 
 -spec from_fate(aeso_syntax:type(), aeb_fate_data:fate_type()) -> aeso_syntax:expr().
 from_fate({id, _, "address"}, ?FATE_ADDRESS(Bin)) -> {account_pubkey, [], Bin};

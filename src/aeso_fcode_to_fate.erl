@@ -8,6 +8,7 @@
 %%%
 %%%-------------------------------------------------------------------
 -module(aeso_fcode_to_fate).
+-vsn("7.1.1").
 
 -export([compile/3, compile/4, term_to_fate/1, term_to_fate/2]).
 

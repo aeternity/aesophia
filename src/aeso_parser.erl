@@ -3,6 +3,7 @@
 %%% Description :
 %%% Created     : 1 Mar 2018 by Ulf Norell
 -module(aeso_parser).
+-vsn("7.1.1").
 -compile({no_auto_import,[map_get/2]}).
 
 -export([string/1,

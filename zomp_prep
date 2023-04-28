@@ -1,0 +1,19 @@
+#! /bin/bash
+
+# This is a small pre-packaging source generation and include correction script that should be
+# run before packaging this project for use with ZX/Zomp.
+
+rm -rf _build
+cd src
+for f in $(ls *.erl)
+do
+    echo "Updating includes in: $f"
+    sed -i 's/aebytecode\/include\///g' "$f"
+    sed -i 's/\.\.\/include\///g' "$f"
+    sed -i 's/include_lib/include/g' "$f"
+done
+sed -i 's/aeb_opcodes\.hrl/\$aebytecode_include\/aeb_opcodes\.hrl/' aeso_compiler.erl
+sed -i 's/aeb_fate_data\.hrl/\$aebytecode_include\/aeb_fate_data\.hrl/' aeso_vm_decode.erl
+cd ..
+rm -f ebin/*.beam
+rm -f rebar*

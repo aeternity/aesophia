@@ -7,6 +7,7 @@
 %%% Created : 12 Dec 2017
 %%%-------------------------------------------------------------------
 -module(aeso_compiler).
+-vsn("7.1.1").
 
 -export([ file/1
         , file/2
@@ -25,7 +26,7 @@
         , validate_byte_code/3
         ]).
 
--include_lib("aebytecode/include/aeb_opcodes.hrl").
+-include("$aebytecode_include/aeb_opcodes.hrl").
 -include("aeso_utils.hrl").
 
 

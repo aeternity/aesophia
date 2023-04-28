@@ -7,6 +7,7 @@
 %%%-------------------------------------------------------------------
 
 -module(aeso_syntax).
+-vsn("7.1.1").
 
 -export([get_ann/1, get_ann/2, get_ann/3, set_ann/2, qualify/2]).
 

@@ -11,6 +11,7 @@
 %%% instances of the compiler to be run in parallel.
 
 -module(aeso_ast_infer_types).
+-vsn("7.1.1").
 
 -export([ infer/1
         , infer/2

@@ -6,6 +6,7 @@
 %%% @end
 %%%-------------------------------------------------------------------
 -module(aeso_pretty).
+-vsn("7.1.1").
 
 -import(prettypr, [text/1, sep/1, above/2, beside/2, nest/2, empty/0]).
 

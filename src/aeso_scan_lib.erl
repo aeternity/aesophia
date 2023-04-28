@@ -5,6 +5,7 @@
 %%% @end
 %%%-------------------------------------------------------------------
 -module(aeso_scan_lib).
+-vsn("7.1.1").
 
 -export([compile/1, string/3,
          token/1, token/2, symbol/0, skip/0,

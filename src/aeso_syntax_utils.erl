@@ -5,6 +5,7 @@
 %%% @end
 %%%-------------------------------------------------------------------
 -module(aeso_syntax_utils).
+-vsn("7.1.1").
 
 -export([used_ids/1, used_types/2, used/1]).
 
