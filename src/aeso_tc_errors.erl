@@ -210,9 +210,7 @@ mk_error({bad_named_argument, Args, Name}) ->
                         [ io_lib:format("\n  - `~s`", [pp_typed("", Arg, Type)])
                           || {named_arg_t, _, Arg, Type, _} <- Args ]]),
     mk_t_err(pos(Name), Msg);
-mk_error({unsolved_named_argument_constraint, C}) ->
-    Name = aeso_ast_infer_types:get_named_argument_constraint_name(C),
-    Type = aeso_ast_infer_types:get_named_argument_constraint_type(C),
+mk_error({unsolved_named_argument_constraint, Name, Type}) ->
     Msg = io_lib:format("Named argument ~s supplied to function with unknown named arguments.",
                         [pp_typed("", Name, Type)]),
     mk_t_err(pos(Name), Msg);

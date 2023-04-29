@@ -5,6 +5,8 @@
         , instantiate/1
         , typesig_to_fun_t/1
         , fun_arity/1
+        , ensure_first_order/2
+        , ensure_monomorphic/2
         ]).
 
 typesig_to_fun_t({type_sig, Ann, _Constr, Named, Args, Res}) ->
@@ -62,3 +64,19 @@ integer_to_tvar(X) ->
 
 fun_arity({fun_t, _, _, Args, _}) -> length(Args);
 fun_arity(_)                      -> none.
+
+ensure_monomorphic(Type, Err) ->
+    is_monomorphic(Type) orelse aeso_tc_errors:type_error(Err).
+
+is_monomorphic({tvar, _, _})           -> false;
+is_monomorphic(Ts) when is_list(Ts)    -> lists:all(fun is_monomorphic/1, Ts);
+is_monomorphic(Tup) when is_tuple(Tup) -> is_monomorphic(tuple_to_list(Tup));
+is_monomorphic(_)                      -> true.
+
+ensure_first_order(Type, Err) ->
+    is_first_order(Type) orelse aeso_tc_errors:type_error(Err).
+
+is_first_order({fun_t, _, _, _, _})    -> false;
+is_first_order(Ts) when is_list(Ts)    -> lists:all(fun is_first_order/1, Ts);
+is_first_order(Tup) when is_tuple(Tup) -> is_first_order(tuple_to_list(Tup));
+is_first_order(_)                      -> true.

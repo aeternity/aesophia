@@ -131,11 +131,11 @@ pp_when({list_comp, BindExpr, Inferred0, Expected0}) ->
     {pos(BindExpr),
      io_lib:format("when checking rvalue of list comprehension binding `~s` against type `~s`",
                    [pp_typed("", BindExpr, Inferred), pp_type(Expected)])};
-pp_when({check_named_arg_constraint, C}) ->
-    {id, _, Name} = Arg = aeso_ast_infer_types:get_named_argument_constraint_name(C),
-    [Type | _] = [ Type || {named_arg_t, _, {id, _, Name1}, Type, _} <- aeso_ast_infer_types:get_named_argument_constraint_args(C), Name1 == Name ],
+pp_when({check_named_arg_constraint, CArgs, CName, CType}) ->
+    {id, _, Name} = Arg = CName,
+    [Type | _] = [ Type || {named_arg_t, _, {id, _, Name1}, Type, _} <- CArgs, Name1 == Name ],
     Err = io_lib:format("when checking named argument `~s` against inferred type `~s`",
-                        [pp_typed("", Arg, Type), pp_type(aeso_ast_infer_types:get_named_argument_constraint_type(C))]),
+                        [pp_typed("", Arg, Type), pp_type(CType)]),
     {pos(Arg), Err};
 pp_when({checking_init_args, Ann, Con0, ArgTypes0}) ->
     Con = aeso_tc_type_utils:instantiate(Con0),
