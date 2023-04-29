@@ -103,10 +103,10 @@ used_variable(_, _, _) -> ok.
 %% Warnings (Unused constants)
 
 potential_unused_constants(Env, Consts) ->
-    case aeso_ast_infer_types:get_env_what(Env) of
+    case aeso_tc_env:what(Env) of
         namespace -> [];
         _ ->
-            [ aeso_tc_ets_manager:ets_insert(warnings, {unused_constant, Ann, aeso_ast_infer_types:get_env_namespace(Env), Name}) || {letval, _, {id, Ann, Name}, _} <- Consts ]
+            [ aeso_tc_ets_manager:ets_insert(warnings, {unused_constant, Ann, aeso_tc_env:namespace(Env), Name}) || {letval, _, {id, Ann, Name}, _} <- Consts ]
     end.
 
 used_constant(Namespace = [Contract], [Contract, ConstName]) ->
@@ -129,7 +129,7 @@ register_function_call(Caller, Callee) ->
     aeso_tc_ets_manager:ets_insert(function_calls, {Caller, Callee}).
 
 potential_unused_function(Env, Ann, FunQName, FunId) ->
-    case aeso_ast_infer_types:get_env_what(Env) of
+    case aeso_tc_env:what(Env) of
         namespace ->
             aeso_tc_ets_manager:ets_insert(all_functions, {Ann, FunQName, FunId, not aeso_syntax:get_ann(private, Ann, false)});
         _ ->
@@ -163,8 +163,8 @@ destroy_and_report_unused_functions() ->
 
 warn_potential_shadowing(_, _, "_") -> ok;
 warn_potential_shadowing(Env, Ann, Name) ->
-    Vars = aeso_ast_infer_types:get_env_vars(Env),
-    Consts = aeso_ast_infer_types:get_current_scope_consts(Env),
+    Vars = aeso_tc_env:vars(Env),
+    Consts = aeso_tc_env:scope_consts(aeso_tc_env:get_current_scope(Env)),
     case proplists:get_value(Name, Vars ++ Consts, false) of
         false -> ok;
         {AnnOld, _} -> aeso_tc_ets_manager:ets_insert(warnings, {shadowing, Ann, Name, AnnOld})

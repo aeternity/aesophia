@@ -51,9 +51,9 @@ destroy_and_report_type_errors(Env) ->
 
 %% Strip current namespace from error message for nicer printing.
 unqualify(Env, {qid, Ann, Xs}) ->
-    qid(Ann, unqualify1(aeso_ast_infer_types:get_env_namespace(Env), Xs));
+    qid(Ann, unqualify1(aeso_tc_env:namespace(Env), Xs));
 unqualify(Env, {qcon, Ann, Xs}) ->
-    qcon(Ann, unqualify1(aeso_ast_infer_types:get_env_namespace(Env), Xs));
+    qcon(Ann, unqualify1(aeso_tc_env:namespace(Env), Xs));
 unqualify(Env, T) when is_tuple(T) ->
     list_to_tuple(unqualify(Env, tuple_to_list(T)));
 unqualify(Env, [H | T]) -> [unqualify(Env, H) | unqualify(Env, T)];

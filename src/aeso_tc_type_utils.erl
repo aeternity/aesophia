@@ -4,6 +4,7 @@
         , dereference_deep/1
         , instantiate/1
         , typesig_to_fun_t/1
+        , fun_arity/1
         ]).
 
 typesig_to_fun_t({type_sig, Ann, _Constr, Named, Args, Res}) ->
@@ -58,3 +59,6 @@ integer_to_tvar(X) when X < 26 ->
     [$a + X];
 integer_to_tvar(X) ->
     [integer_to_tvar(X div 26)] ++ [$a + (X rem 26)].
+
+fun_arity({fun_t, _, _, Args, _}) -> length(Args);
+fun_arity(_)                      -> none.

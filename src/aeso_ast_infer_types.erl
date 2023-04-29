@@ -16,19 +16,25 @@
         , infer/2
         , unfold_types_in_type/2
         , unfold_types_in_type/3
-        , switch_scope/2
-        , lookup_env1/4
           %% TODO: Newly added
-        , get_env_namespace/1
-        , get_env_what/1
-        , get_env_vars/1
-        , get_current_scope_consts/1
         , get_named_argument_constraint_name/1
         , get_named_argument_constraint_args/1
         , get_named_argument_constraint_type/1
         ]).
 
+%% Newly exported
+-export([ fresh_uvar/1
+        , freshen_type/2
+        , freshen_type_sig/2
+        , infer_const/2
+        ]).
+-export_type([ utype/0
+             , typesig/0
+             ]).
+
 -include("aeso_utils.hrl").
+
+-type env() :: aeso_tc_env:env().
 
 -type utype() :: {fun_t, aeso_syntax:ann(), named_args_t(), [utype()] | var_args, utype()}
                | {app_t, aeso_syntax:ann(), utype(), [utype()]}
@@ -42,8 +48,6 @@
 -type uvar() :: {uvar, aeso_syntax:ann(), reference()}.
 
 -type named_args_t() :: uvar() | [{named_arg_t, aeso_syntax:ann(), aeso_syntax:id(), utype(), aeso_syntax:expr()}].
-
--type type_id() :: aeso_syntax:id() | aeso_syntax:qid() | aeso_syntax:con() | aeso_syntax:qcon().
 
 -define(is_type_id(T), element(1, T) =:= id orelse
                        element(1, T) =:= qid orelse
@@ -101,66 +105,13 @@
 -type constraint() :: named_argument_constraint() | field_constraint() | byte_constraint()
                     | aens_resolve_constraint() | oracle_type_constraint().
 
--record(field_info,
-    { ann      :: aeso_syntax:ann()
-    , field_t  :: utype()
-    , record_t :: utype()
-    , kind     :: contract | record }).
-
--type field_info() :: #field_info{}.
-
--type typedef() :: {[aeso_syntax:tvar()], aeso_syntax:typedef() | {contract_t, [aeso_syntax:field_t()]}}
-                 | {builtin, non_neg_integer()}.
-
 -type type() :: aeso_syntax:type().
 -type name() :: string().
--type qname() :: [string()].
 -type typesig() :: {type_sig, aeso_syntax:ann(), type_constraints(), [aeso_syntax:named_arg_t()], [type()], type()}.
-
--type namespace_alias() :: none | name().
--type namespace_parts() :: none | {for, [name()]} | {hiding, [name()]}.
--type used_namespaces() :: [{qname(), namespace_alias(), namespace_parts()}].
 
 -type type_constraints() :: none | bytes_concat | bytes_split | address_to_contract | bytecode_hash.
 
 -type variance() :: invariant | covariant | contravariant | bivariant.
-
--type fun_info()   :: {aeso_syntax:ann(), typesig() | type()}.
--type type_info()  :: {aeso_syntax:ann(), typedef()}.
--type const_info() :: {aeso_syntax:ann(), type()}.
--type var_info()   :: {aeso_syntax:ann(), utype()}.
-
--type fun_env()   :: [{name(), fun_info()}].
--type type_env()  :: [{name(), type_info()}].
--type const_env() :: [{name(), const_info()}].
-
--record(scope, { funs   = [] :: fun_env()
-               , types  = [] :: type_env()
-               , consts = [] :: const_env()
-               , kind   = namespace :: namespace | contract
-               , ann    = [{origin, system}] :: aeso_syntax:ann()
-               }).
-
--type scope() :: #scope{}.
-
--record(env,
-    { scopes           = #{ [] => #scope{}} :: #{ qname() => scope() }
-    , vars             = []                 :: [{name(), var_info()}]
-    , typevars         = unrestricted       :: unrestricted | [name()]
-    , fields           = #{}                :: #{ name() => [field_info()] }    %% fields are global
-    , contract_parents = #{}                :: #{ name() => [name()] }
-    , namespace        = []                 :: qname()
-    , used_namespaces  = []                 :: used_namespaces()
-    , in_pattern       = false              :: boolean()
-    , in_guard         = false              :: boolean()
-    , stateful         = false              :: boolean()
-    , unify_throws     = true               :: boolean()
-    , current_const    = none               :: none | aeso_syntax:id()
-    , current_function = none               :: none | aeso_syntax:id()
-    , what             = top                :: top | namespace | contract | contract_interface
-    }).
-
--type env() :: #env{}.
 
 -define(PRINT_TYPES(Fmt, Args),
         when_option(pp_types, fun () -> io:format(Fmt, Args) end)).
@@ -170,7 +121,6 @@
 
 name(A) -> aeso_tc_name_manip:name(A).
 qname(A) -> aeso_tc_name_manip:qname(A).
-qid(A, B) -> aeso_tc_name_manip:qid(A, B).
 set_qname(A, B) -> aeso_tc_name_manip:set_qname(A, B).
 
 %% -------
@@ -186,8 +136,6 @@ pp(A) -> aeso_tc_pp:pp(A).
 
 %% -------
 
-warn_potential_shadowing(A, B, C) -> aeso_tc_warnings:warn_potential_shadowing(A, B, C).
-used_include(A) -> aeso_tc_warnings:used_include(A).
 create_unused_functions() -> aeso_tc_warnings:create_unused_functions().
 destroy_and_report_unused_functions() -> aeso_tc_warnings:destroy_and_report_unused_functions().
 destroy_and_report_warnings_as_type_errors() -> aeso_tc_warnings:destroy_and_report_warnings_as_type_errors().
@@ -198,15 +146,11 @@ potential_unused_stateful(A, B) -> aeso_tc_warnings:potential_unused_stateful(A,
 potential_unused_variables(A, B, C) -> aeso_tc_warnings:potential_unused_variables(A, B, C).
 potential_unused_function(A, B, C, D) -> aeso_tc_warnings:potential_unused_function(A, B, C, D).
 mk_warning(A) -> aeso_tc_warnings:mk_warning(A).
-used_variable(A, B, C) -> aeso_tc_warnings:used_variable(A, B, C).
-register_function_call(A, B) -> aeso_tc_warnings:register_function_call(A, B).
-used_constant(A, B) -> aeso_tc_warnings:used_constant(A, B).
 used_stateful(A) -> aeso_tc_warnings:used_stateful(A).
 warn_potential_negative_spend(A, B, C) -> aeso_tc_warnings:warn_potential_negative_spend(A, B, C).
 warn_potential_division_by_zero(A, B, C) -> aeso_tc_warnings:warn_potential_division_by_zero(A, B, C).
 potential_unused_return_value(A) -> aeso_tc_warnings:potential_unused_return_value(A).
 used_typedef(A, B) -> aeso_tc_warnings:used_typedef(A, B).
-all_warnings() -> aeso_tc_warnings:all_warnings().
 
 %% -------
 
@@ -214,759 +158,21 @@ desugar(A) -> aeso_tc_desugar:desugar(A).
 desugar_clauses(A, B, C, D) -> aeso_tc_desugar:desugar_clauses(A, B, C, D).
 process_blocks(A) -> aeso_tc_desugar:process_blocks(A).
 
+%% -------
+
+create_options(A) -> aeso_tc_options:create_options(A).
+get_option(A, B) -> aeso_tc_options:get_option(A, B).
+when_option(A, B) -> aeso_tc_options:when_option(A, B).
+when_warning(A, B) -> aeso_tc_options:when_warning(A, B).
 
 %% -- New functions ----------------------------------------------------------
 
-get_env_namespace(#env{namespace = Namespace}) -> Namespace.
-get_env_what(#env{what = What}) -> What.
-get_env_vars(#env{vars = Vars}) -> Vars.
-get_current_scope_consts(Env) -> Scope = get_current_scope(Env), Scope#scope.consts.
 get_named_argument_constraint_name(#named_argument_constraint{name = Name}) -> Name.
 get_named_argument_constraint_args(#named_argument_constraint{args = Args}) -> Args.
 get_named_argument_constraint_type(#named_argument_constraint{type = Type}) -> Type.
 
-%% -- Env getters ------------------------------------------------------------
-
-tc_env_contract_parents(#env{contract_parents = ContractParents}) ->
-    ContractParents.
-
-tc_env_unify_throws(#env{unify_throws = UnifyThrows}) ->
-    UnifyThrows.
-
-tc_env_namespace(#env{namespace = Namespace}) ->
-    Namespace.
-
-tc_env_current_function(#env{current_function = CurrentFunction}) ->
-    CurrentFunction.
-
-tc_env_in_pattern(#env{in_pattern = InPattern}) ->
-    InPattern.
-
-tc_env_in_guard(#env{in_guard = InGuard}) ->
-    InGuard.
-
-tc_env_stateful(#env{stateful = Stateful}) ->
-    Stateful.
-
-tc_env_used_namespaces(#env{used_namespaces = UsedNamespaces}) ->
-    UsedNamespaces.
-
-tc_env_what(#env{what = What}) ->
-    What.
-
-tc_env_typevars(#env{typevars = Typevars}) ->
-    Typevars.
-
-%% -- Env setters ------------------------------------------------------------
-
-tc_env_set_in_pattern(InPattern, Env) ->
-    Env#env{in_pattern = InPattern}.
-
-tc_env_set_in_guard(InGuard, Env) ->
-    Env#env{in_guard = InGuard}.
-
-tc_env_set_used_namespaces(UsedNamespaces, Env) ->
-    Env#env{used_namespaces = UsedNamespaces}.
-
-tc_env_set_current_const(CurrentConst, Env) ->
-    Env#env{current_const = CurrentConst}.
-
-tc_env_set_current_function(CurrentFunction, Env) ->
-    Env#env{current_function = CurrentFunction}.
-
-tc_env_set_stateful(Stateful, Env) ->
-    Env#env{stateful = Stateful}.
-
-tc_env_set_what(What, Env) ->
-    Env#env{what = What}.
-
-tc_env_set_contract_parents(ContractParents, Env) ->
-    Env#env{contract_parents = ContractParents}.
-
-%% -- Environment manipulation -----------------------------------------------
-
--spec switch_scope(qname(), env()) -> env().
-switch_scope(Scope, Env) ->
-    Env#env{namespace = Scope}.
-
--spec push_scope(namespace | contract, aeso_syntax:con(), env()) -> env().
-push_scope(Kind, Con, Env) ->
-    Ann  = aeso_syntax:get_ann(Con),
-    Name = name(Con),
-    New  = Env#env.namespace ++ [Name],
-    Env#env{ namespace = New, scopes = (Env#env.scopes)#{ New => #scope{ kind = Kind, ann = Ann } } }.
-
--spec pop_scope(env()) -> env().
-pop_scope(Env) ->
-    Env#env{ namespace = lists:droplast(Env#env.namespace) }.
-
--spec get_scope(env(), qname()) -> false | scope().
-get_scope(#env{ scopes = Scopes }, Name) ->
-    maps:get(Name, Scopes, false).
-
--spec get_current_scope(env()) -> scope().
-get_current_scope(#env{ namespace = NS, scopes = Scopes }) ->
-    maps:get(NS, Scopes).
-
--spec on_current_scope(env(), fun((scope()) -> scope())) -> env().
-on_current_scope(Env = #env{ namespace = NS, scopes = Scopes }, Fun) ->
-    Scope = get_current_scope(Env),
-    Env#env{ scopes = Scopes#{ NS => Fun(Scope) } }.
-
--spec on_scopes(env(), fun((scope()) -> scope())) -> env().
-on_scopes(Env = #env{ scopes = Scopes }, Fun) ->
-    Env#env{ scopes = maps:map(fun(_, Scope) -> Fun(Scope) end, Scopes) }.
-
--spec bind_var(aeso_syntax:id(), utype(), env()) -> env().
-bind_var({id, Ann, X}, T, Env) ->
-    when_warning(warn_shadowing, fun() -> warn_potential_shadowing(Env, Ann, X) end),
-    Env#env{ vars = [{X, {Ann, T}} | Env#env.vars] }.
-
--spec bind_vars([{aeso_syntax:id(), utype()}], env()) -> env().
-bind_vars([], Env) -> Env;
-bind_vars([{X, T} | Vars], Env) ->
-    bind_vars(Vars, bind_var(X, T, Env)).
-
--spec bind_tvars([aeso_syntax:tvar()], env()) -> env().
-bind_tvars(Xs, Env) ->
-    Env#env{ typevars = [X || {tvar, _, X} <- Xs] }.
-
--spec bind_fun(name(), type() | typesig(), env()) -> env().
-bind_fun(X, Type, Env) ->
-    case lookup_env(Env, term, [], [X]) of
-        false -> force_bind_fun(X, Type, Env);
-        {_QId, {Ann1, _}} ->
-            type_error({duplicate_definition, X, [Ann1, aeso_syntax:get_ann(Type)]}),
-            Env
-    end.
-
--spec force_bind_fun(name(), type() | typesig(), env()) -> env().
-force_bind_fun(X, Type, Env = #env{ what = What }) ->
-    Ann    = aeso_syntax:get_ann(Type),
-    NoCode = get_option(no_code, false),
-    Entry = if X == "init", What == contract, not NoCode ->
-                    {reserved_init, Ann, Type};
-               What == contract; What == contract_interface -> {contract_fun, Ann, Type};
-               true -> {Ann, Type}
-            end,
-    on_current_scope(Env, fun(Scope = #scope{ funs = Funs }) ->
-                            Scope#scope{ funs = [{X, Entry} | Funs] }
-                          end).
-
--spec bind_funs([{name(), type() | typesig()}], env()) -> env().
-bind_funs([], Env) -> Env;
-bind_funs([{Id, Type} | Rest], Env) ->
-    bind_funs(Rest, bind_fun(Id, Type, Env)).
-
--spec bind_type(name(), aeso_syntax:ann(), typedef(), env()) -> env().
-bind_type(X, Ann, Def, Env) ->
-    on_current_scope(Env, fun(Scope = #scope{ types = Types }) ->
-                            Scope#scope{ types = [{X, {Ann, Def}} | Types] }
-                          end).
-
--spec bind_const(name(), aeso_syntax:ann(), type(), env()) -> env().
-bind_const(X, Ann, Type, Env) ->
-    case lookup_env(Env, term, Ann, [X]) of
-        false ->
-            on_current_scope(Env, fun(Scope = #scope{ consts = Consts }) ->
-                                    Scope#scope{ consts = [{X, {Ann, Type}} | Consts] }
-                                end);
-        _ ->
-            type_error({duplicate_definition, X, [Ann, aeso_syntax:get_ann(Type)]}),
-            Env
-    end.
-
--spec bind_consts(env(), #{ name() => aeso_syntax:decl() }, [{acyclic, name()} | {cyclic, [name()]}], [aeso_syntax:decl()]) ->
-        {env(), [aeso_syntax:decl()]}.
-bind_consts(Env, _Consts, [], Acc) ->
-    {Env, lists:reverse(Acc)};
-bind_consts(Env, Consts, [{cyclic, Xs} | _SCCs], _Acc) ->
-    ConstDecls = [ maps:get(X, Consts) || X <- Xs ],
-    type_error({mutually_recursive_constants, lists:reverse(ConstDecls)}),
-    {Env, []};
-bind_consts(Env, Consts, [{acyclic, X} | SCCs], Acc) ->
-    case maps:get(X, Consts, undefined) of
-        Const = {letval, Ann, Id, _} ->
-            NewConst = {letval, _, {typed, _, _, Type}, _} = infer_const(Env, Const),
-            NewEnv = bind_const(name(Id), Ann, Type, Env),
-            bind_consts(NewEnv, Consts, SCCs, [NewConst | Acc]);
-        undefined ->
-            %% When a used id is not a letval, a type error will be thrown
-            bind_consts(Env, Consts, SCCs, Acc)
-    end.
-
-%% Bind state primitives
--spec bind_state(env()) -> env().
-bind_state(Env) ->
-    Ann   = [{origin, system}],
-    Unit  = {tuple_t, Ann, []},
-    State =
-        case lookup_type(Env, {id, Ann, "state"}) of
-            {S, _} -> {qid, Ann, S};
-            false  -> Unit
-        end,
-    Env1 = bind_funs([{"state", State},
-                      {"put", {type_sig, [stateful | Ann], none, [], [State], Unit}}], Env),
-
-    case lookup_type(Env, {id, Ann, "event"}) of
-        {E, _} ->
-            %% We bind Chain.event in a local 'Chain' namespace.
-            Event = {qid, Ann, E},
-            pop_scope(
-              bind_fun("event", {fun_t, Ann, [], [Event], Unit},
-              push_scope(namespace, {con, Ann, "Chain"}, Env1)));
-        false  -> Env1
-    end.
-
--spec bind_field_append(name(), field_info(), env()) -> env().
-bind_field_append(X, Info, Env = #env{ fields = Fields }) ->
-    Fields1 = maps:update_with(X, fun(Infos) -> [Info | Infos] end, [Info], Fields),
-    Env#env{ fields = Fields1 }.
-
--spec bind_field_update(name(), field_info(), env()) -> env().
-bind_field_update(X, Info, Env = #env{ fields = Fields }) ->
-    Fields1 = maps:update_with(X, fun([_ | Infos]) -> [Info | Infos]; ([]) -> [Info] end, [Info], Fields),
-    Env#env{ fields = Fields1 }.
-
--spec bind_fields([{name(), field_info()}], typed | untyped, env()) -> env().
-bind_fields([], _Typing, Env) -> Env;
-bind_fields([{Id, Info} | Rest], Typing, Env) ->
-    NewEnv = case Typing of
-                 untyped -> bind_field_append(Id, Info, Env);
-                 typed   -> bind_field_update(Id, Info, Env)
-             end,
-    bind_fields(Rest, Typing, NewEnv).
-
-%% Contract entrypoints take three named arguments
-%%  gas       : int  = Call.gas_left()
-%%  value     : int  = 0
-%%  protected : bool = false
-contract_call_type({fun_t, Ann, [], Args, Ret}) ->
-    Id    = fun(X) -> {id, Ann, X} end,
-    Int   = Id("int"),
-    Typed = fun(E, T) -> {typed, Ann, E, T} end,
-    Named = fun(Name, Default = {typed, _, _, T}) -> {named_arg_t, Ann, Id(Name), T, Default} end,
-    {fun_t, Ann, [Named("gas",   Typed({app, Ann, Typed({qid, Ann, ["Call", "gas_left"]},
-                                                        {fun_t, Ann, [], [], Int}),
-                                        []}, Int)),
-                  Named("value", Typed({int, Ann, 0}, Int)),
-                  Named("protected", Typed({bool, Ann, false}, Id("bool")))],
-     Args, {if_t, Ann, Id("protected"), {app_t, Ann, {id, Ann, "option"}, [Ret]}, Ret}}.
-
--spec bind_contract(typed | untyped, aeso_syntax:decl(), env()) -> env().
-bind_contract(Typing, {Contract, Ann, Id, _Impls, Contents}, Env)
-  when ?IS_CONTRACT_HEAD(Contract) ->
-    Key         = name(Id),
-    Sys         = [{origin, system}],
-    TypeOrFresh = fun({typed, _, _, Type}) -> Type; (_) -> fresh_uvar(Sys) end,
-    Fields      =
-        [ {field_t, AnnF, Entrypoint, contract_call_type(Type)}
-          || {fun_decl, AnnF, Entrypoint, Type = {fun_t, _, _, _, _}} <- Contents ] ++
-        [ {field_t, AnnF, Entrypoint,
-           contract_call_type(
-             {fun_t, AnnF, [], [TypeOrFresh(Arg) || Arg <- Args], TypeOrFresh(Ret)})
-          }
-          || {letfun, AnnF, Entrypoint = {id, _, Name}, Args, _Type, [{guarded, _, [], Ret}]} <- Contents,
-             Name =/= "init"
-        ] ++
-        %% Predefined fields
-        [ {field_t, Sys, {id, Sys, "address"}, {id, Sys, "address"}} ] ++
-        [ {field_t, Sys, {id, Sys, ?CONSTRUCTOR_MOCK_NAME},
-           contract_call_type(
-             case [ [TypeOrFresh(Arg) || Arg <- Args]
-                    || {letfun, AnnF, {id, _, "init"}, Args, _, _} <- Contents,
-                       aeso_syntax:get_ann(entrypoint, AnnF, false)]
-                 ++ [ Args
-                      || {fun_decl, AnnF, {id, _, "init"}, {fun_t, _, _, Args, _}} <- Contents,
-                         aeso_syntax:get_ann(entrypoint, AnnF, false)]
-                 ++ [ Args
-                      || {fun_decl, AnnF, {id, _, "init"}, {type_sig, _, _, _, Args, _}} <- Contents,
-                         aeso_syntax:get_ann(entrypoint, AnnF, false)]
-             of
-                 [] -> {fun_t, [stateful,payable|Sys], [], [], {id, Sys, "void"}};
-                 [Args] -> {fun_t, [stateful,payable|Sys], [], Args, {id, Sys, "void"}}
-             end
-            )
-          }
-        ],
-    FieldInfo = [ {Entrypoint, #field_info{ ann      = FieldAnn,
-                                            kind     = contract,
-                                            field_t  = Type,
-                                            record_t = Id }}
-                || {field_t, _, {id, FieldAnn, Entrypoint}, Type} <- Fields ],
-    bind_type(Key, Ann, {[], {contract_t, Fields}},
-        bind_fields(FieldInfo, Typing, Env)).
-
-%% What scopes could a given name come from?
--spec possible_scopes(env(), qname()) -> [qname()].
-possible_scopes(#env{ namespace = Current, used_namespaces = UsedNamespaces }, Name) ->
-    Qual = lists:droplast(Name),
-    NewQuals = case lists:filter(fun(X) -> element(2, X) == Qual end, UsedNamespaces) of
-                   [] ->
-                       [Qual];
-                   Namespaces ->
-                       lists:map(fun(X) -> element(1, X) end, Namespaces)
-               end,
-    Ret1 = [ lists:sublist(Current, I) ++ Q || I <- lists:seq(0, length(Current)), Q <- NewQuals ],
-    Ret2 = [ Namespace ++ Q || {Namespace, none, _} <- UsedNamespaces, Q <- NewQuals ],
-    lists:usort(Ret1 ++ Ret2).
-
--spec visible_in_used_namespaces(used_namespaces(), qname()) -> boolean().
-visible_in_used_namespaces(UsedNamespaces, QName) ->
-    Qual = lists:droplast(QName),
-    Name = lists:last(QName),
-    case lists:filter(fun({Ns, _, _}) -> Qual == Ns end, UsedNamespaces) of
-        [] ->
-            true;
-        Namespaces ->
-            IsVisible = fun(Namespace) ->
-                            case Namespace of
-                                {_, _, {for, Names}} ->
-                                    lists:member(Name, Names);
-                                {_, _, {hiding, Names}} ->
-                                    not lists:member(Name, Names);
-                                _ ->
-                                    true
-                            end
-                        end,
-            lists:any(IsVisible, Namespaces)
-    end.
-
--spec lookup_type(env(), type_id()) -> false | {qname(), type_info()}.
-lookup_type(Env, Id) ->
-    lookup_env(Env, type, aeso_syntax:get_ann(Id), qname(Id)).
-
--spec lookup_env(env(), term, aeso_syntax:ann(), qname()) -> false | {qname(), fun_info()};
-                (env(), type, aeso_syntax:ann(), qname()) -> false | {qname(), type_info()}.
-lookup_env(Env, Kind, Ann, Name) ->
-    Var = case Name of
-            [X] when Kind == term -> proplists:get_value(X, Env#env.vars, false);
-            _                     -> false
-          end,
-    case Var of
-        {Ann1, Type} -> {Name, {Ann1, Type}};
-        false ->
-            Names = [ Qual ++ [lists:last(Name)] || Qual <- possible_scopes(Env, Name) ],
-            case [ Res || QName <- Names, Res <- [lookup_env1(Env, Kind, Ann, QName)], Res /= false] of
-                []    -> false;
-                [Res = {_, {AnnR, _}}] ->
-                    when_warning(warn_unused_includes,
-                                 fun() ->
-                                         %% If a file is used from a different file, we
-                                         %% can then mark it as used
-                                         F1 = proplists:get_value(file, Ann, no_file),
-                                         F2 = proplists:get_value(file, AnnR, no_file),
-                                         if
-                                             F1 /= F2 ->
-                                                 used_include(AnnR);
-                                             true ->
-                                                 ok
-                                         end
-                                 end),
-                    Res;
-                Many  ->
-                    type_error({ambiguous_name, qid(Ann, Name), [{qid, A, Q} || {Q, {A, _}} <- Many]}),
-                    false
-            end
-    end.
-
--spec lookup_env1(env(), type | term, aeso_syntax:ann(), qname()) -> false | {qname(), fun_info() | type_info()}.
-lookup_env1(#env{ namespace = Current, used_namespaces = UsedNamespaces, scopes = Scopes }, Kind, Ann, QName) ->
-    Qual = lists:droplast(QName),
-    Name = lists:last(QName),
-    QNameIsEvent = lists:suffix(["Chain", "event"], QName),
-    AllowPrivate = lists:prefix(Qual, Current),
-    %% Get the scope
-    case maps:get(Qual, Scopes, false) of
-        false -> false; %% TODO: return reason for not in scope
-        #scope{ funs = Funs, types = Types, consts = Consts, kind = ScopeKind } ->
-            Defs = case Kind of
-                     type -> Types;
-                     term -> Funs
-                   end,
-            %% Look up the unqualified name
-            case proplists:get_value(Name, Defs, false) of
-                false ->
-                    case proplists:get_value(Name, Consts, false) of
-                        false ->
-                            false;
-                        Const when AllowPrivate; ScopeKind == namespace ->
-                            {QName, Const};
-                        Const ->
-                            type_error({contract_treated_as_namespace_constant, Ann, QName}),
-                            {QName, Const}
-                    end;
-                {reserved_init, Ann1, Type} ->
-                    type_error({cannot_call_init_function, Ann}),
-                    {QName, {Ann1, Type}};  %% Return the type to avoid an extra not-in-scope error
-                {contract_fun, Ann1, Type} when AllowPrivate orelse QNameIsEvent ->
-                    {QName, {Ann1, Type}};
-                {contract_fun, Ann1, Type} ->
-                    type_error({contract_treated_as_namespace_entrypoint, Ann, QName}),
-                    {QName, {Ann1, Type}};
-                {Ann1, _} = E ->
-                    %% Check that it's not private (or we can see private funs)
-                    case not is_private(Ann1) orelse AllowPrivate of
-                        true  ->
-                            case visible_in_used_namespaces(UsedNamespaces, QName) of
-                                true -> {QName, E};
-                                false -> false
-                            end;
-                        false -> false
-                    end
-            end
-    end.
-
-fun_arity({fun_t, _, _, Args, _}) -> length(Args);
-fun_arity(_)                      -> none.
-
--spec lookup_record_field(env(), name()) -> [field_info()].
-lookup_record_field(Env, FieldName) ->
-    maps:get(FieldName, Env#env.fields, []).
-
-%% For 'create' or 'update' constraints we don't consider contract types.
--spec lookup_record_field(env(), name(), create | project | update) -> [field_info()].
-lookup_record_field(Env, FieldName, Kind) ->
-    [ Fld || Fld = #field_info{ kind = K } <- lookup_record_field(Env, FieldName),
-             Kind == project orelse K /= contract ].
-
-lookup_record_field_arity(Env, FieldName, Arity, Kind) ->
-    Fields = lookup_record_field(Env, FieldName, Kind),
-    [ Fld || Fld = #field_info{ field_t = FldType } <- Fields,
-             fun_arity(aeso_tc_type_utils:dereference_deep(FldType)) == Arity ].
-
-is_private(Ann) -> proplists:get_value(private, Ann, false).
-
 %% -- The rest ---------------------------------------------------------------
 
--spec empty_env() -> env().
-empty_env() -> #env{}.
-
-%% Environment containing language primitives
--spec global_env() -> env().
-global_env() ->
-    Ann     = [{origin, system}],
-    Int     = {id, Ann, "int"},
-    Char    = {id, Ann, "char"},
-    Bool    = {id, Ann, "bool"},
-    String  = {id, Ann, "string"},
-    Address = {id, Ann, "address"},
-    Hash    = {id, Ann, "hash"},
-    Bits    = {id, Ann, "bits"},
-    Bytes   = fun(Len) -> {bytes_t, Ann, Len} end,
-    Oracle  = fun(Q, R) -> {app_t, Ann, {id, Ann, "oracle"}, [Q, R]} end,
-    Query   = fun(Q, R) -> {app_t, Ann, {id, Ann, "oracle_query"}, [Q, R]} end,
-    Unit    = {tuple_t, Ann, []},
-    List    = fun(T) -> {app_t, Ann, {id, Ann, "list"}, [T]} end,
-    Option  = fun(T) -> {app_t, Ann, {id, Ann, "option"}, [T]} end,
-    Map     = fun(A, B) -> {app_t, Ann, {id, Ann, "map"}, [A, B]} end,
-    Pair    = fun(A, B) -> {tuple_t, Ann, [A, B]} end,
-    FunC    = fun(C, Ts, T) -> {type_sig, Ann, C, [], Ts, T} end,
-    FunC1   = fun(C, S, T) -> {type_sig, Ann, C, [], [S], T} end,
-    Fun     = fun(Ts, T) -> FunC(none, Ts, T) end,
-    Fun1    = fun(S, T) -> Fun([S], T) end,
-    FunCN   = fun(C, Named, Normal, Ret) -> {type_sig, Ann, C, Named, Normal, Ret} end,
-    FunN    = fun(Named, Normal, Ret) -> FunCN(none, Named, Normal, Ret) end,
-    %% Lambda    = fun(Ts, T) -> {fun_t, Ann, [], Ts, T} end,
-    %% Lambda1   = fun(S, T) -> Lambda([S], T) end,
-    StateFun  = fun(Ts, T) -> {type_sig, [stateful|Ann], none, [], Ts, T} end,
-    TVar      = fun(X) -> {tvar, Ann, "'" ++ X} end,
-    SignId    = {id, Ann, "signature"},
-    SignDef   = {bytes, Ann, <<0:64/unit:8>>},
-    Signature = {named_arg_t, Ann, SignId, SignId, {typed, Ann, SignDef, SignId}},
-    SignFun   = fun(Ts, T) -> {type_sig, [stateful|Ann], none, [Signature], Ts, T} end,
-    TTL       = {qid, Ann, ["Chain", "ttl"]},
-    Pointee   = {qid, Ann, ["AENS", "pointee"]},
-    AENSName  = {qid, Ann, ["AENS", "name"]},
-    Fr        = {qid, Ann, ["MCL_BLS12_381", "fr"]},
-    Fp        = {qid, Ann, ["MCL_BLS12_381", "fp"]},
-    Fp2       = {tuple_t, Ann, [Fp, Fp]},
-    G1        = {tuple_t, Ann, [Fp, Fp, Fp]},
-    G2        = {tuple_t, Ann, [Fp2, Fp2, Fp2]},
-    GT        = {tuple_t, Ann, lists:duplicate(12, Fp)},
-    Tx        = {qid, Ann, ["Chain", "tx"]},
-    GAMetaTx  = {qid, Ann, ["Chain", "ga_meta_tx"]},
-    BaseTx    = {qid, Ann, ["Chain", "base_tx"]},
-    PayForTx  = {qid, Ann, ["Chain", "paying_for_tx"]},
-
-    FldT      = fun(Id, T) -> {field_t, Ann, {id, Ann, Id}, T} end,
-    TxFlds    = [{"paying_for", Option(PayForTx)}, {"ga_metas", List(GAMetaTx)},
-                 {"actor", Address}, {"fee", Int}, {"ttl", Int}, {"tx", BaseTx}],
-    TxType    = {record_t, [FldT(N, T) || {N, T} <- TxFlds ]},
-    Stateful  = fun(T) -> setelement(2, T, [stateful|element(2, T)]) end,
-
-    Fee       = Int,
-    [A, Q, R, K, V] = lists:map(TVar, ["a", "q", "r", "k", "v"]),
-
-    MkDefs = fun(Defs) -> [{X, {Ann, if is_integer(T) -> {builtin, T}; true -> T end}} || {X, T} <- Defs] end,
-
-    TopScope = #scope
-        { funs  = MkDefs(
-                     %% Option constructors
-                    [{"None", Option(A)},
-                     {"Some", Fun1(A, Option(A))},
-                     %% TTL constructors
-                     {"RelativeTTL", Fun1(Int, TTL)},
-                     {"FixedTTL",    Fun1(Int, TTL)},
-                     %% Abort/exit
-                     {"abort", Fun1(String, A)},
-                     {"exit", Fun1(String, A)},
-                     {"require", Fun([Bool, String], Unit)}])
-        , types = MkDefs(
-                    [{"int", 0}, {"bool", 0}, {"char", 0}, {"string", 0}, {"address", 0},
-                     {"void", 0},
-                     {"unit", {[], {alias_t, Unit}}},
-                     {"hash", {[], {alias_t, Bytes(32)}}},
-                     {"signature", {[], {alias_t, Bytes(64)}}},
-                     {"bits", 0},
-                     {"option", 1}, {"list", 1}, {"map", 2},
-                     {"oracle", 2}, {"oracle_query", 2}
-                     ]) },
-
-    ChainScope = #scope
-        { funs = MkDefs(
-                     %% Spend transaction.
-                    [{"spend",        StateFun([Address, Int], Unit)},
-                     %% Chain environment
-                     {"balance",      Fun1(Address, Int)},
-                     {"block_hash",   Fun1(Int, Option(Hash))},
-                     {"coinbase",     Address},
-                     {"timestamp",    Int},
-                     {"block_height", Int},
-                     {"difficulty",   Int},
-                     {"gas_limit",    Int},
-                     {"bytecode_hash",FunC1(bytecode_hash, A, Option(Hash))},
-                     {"create",       Stateful(
-                                        FunN([ {named_arg_t, Ann, {id, Ann, "value"}, Int, {typed, Ann, {int, Ann, 0}, Int}}
-                                             ], var_args, A))},
-                     {"clone",        Stateful(
-                                        FunN([ {named_arg_t, Ann, {id, Ann, "gas"}, Int,
-                                                {typed, Ann,
-                                                 {app, Ann,
-                                                  {typed, Ann, {qid, Ann, ["Call","gas_left"]},
-                                                   aeso_tc_type_utils:typesig_to_fun_t(Fun([], Int))
-                                                  },
-                                                  []}, Int
-                                                }}
-                                             , {named_arg_t, Ann, {id, Ann, "value"}, Int, {typed, Ann, {int, Ann, 0}, Int}}
-                                             , {named_arg_t, Ann, {id, Ann, "protected"}, Bool, {typed, Ann, {bool, Ann, false}, Bool}}
-                                             , {named_arg_t, Ann, {id, Ann, "ref"}, A, undefined}
-                                             ], var_args, A))},
-                     %% Tx constructors
-                     {"GAMetaTx",     Fun([Address, Int], GAMetaTx)},
-                     {"PayingForTx",  Fun([Address, Int], PayForTx)},
-                     {"SpendTx",      Fun([Address, Int, String], BaseTx)},
-                     {"OracleRegisterTx",       BaseTx},
-                     {"OracleQueryTx",          BaseTx},
-                     {"OracleResponseTx",       BaseTx},
-                     {"OracleExtendTx",         BaseTx},
-                     {"NamePreclaimTx",         BaseTx},
-                     {"NameClaimTx",            Fun([String], BaseTx)},
-                     {"NameUpdateTx",           Fun([Hash], BaseTx)},
-                     {"NameRevokeTx",           Fun([Hash], BaseTx)},
-                     {"NameTransferTx",         Fun([Address, Hash], BaseTx)},
-                     {"ChannelCreateTx",        Fun([Address], BaseTx)},
-                     {"ChannelDepositTx",       Fun([Address, Int], BaseTx)},
-                     {"ChannelWithdrawTx",      Fun([Address, Int], BaseTx)},
-                     {"ChannelForceProgressTx", Fun([Address], BaseTx)},
-                     {"ChannelCloseMutualTx",   Fun([Address], BaseTx)},
-                     {"ChannelCloseSoloTx",     Fun([Address], BaseTx)},
-                     {"ChannelSlashTx",         Fun([Address], BaseTx)},
-                     {"ChannelSettleTx",        Fun([Address], BaseTx)},
-                     {"ChannelSnapshotSoloTx",  Fun([Address], BaseTx)},
-                     {"ContractCreateTx",       Fun([Int], BaseTx)},
-                     {"ContractCallTx",         Fun([Address, Int], BaseTx)},
-                     {"GAAttachTx",             BaseTx}
-                    ])
-        , types = MkDefs([{"ttl", 0}, {"tx", {[], TxType}},
-                          {"base_tx", 0},
-                          {"paying_for_tx", 0}, {"ga_meta_tx", 0}]) },
-
-    ContractScope = #scope
-        { funs = MkDefs(
-                    [{"address", Address},
-                     {"creator", Address},
-                     {"balance", Int}]) },
-
-    CallScope = #scope
-        { funs = MkDefs(
-                    [{"origin",    Address},
-                     {"caller",    Address},
-                     {"value",     Int},
-                     {"gas_price", Int},
-                     {"fee",       Int},
-                     {"gas_left",  Fun([], Int)}])
-        },
-
-    OracleScope = #scope
-        { funs = MkDefs(
-                    [{"register",     SignFun([Address, Fee, TTL], Oracle(Q, R))},
-                     {"expiry",       Fun([Oracle(Q, R)], Fee)},
-                     {"query_fee",    Fun([Oracle(Q, R)], Fee)},
-                     {"query",        StateFun([Oracle(Q, R), Q, Fee, TTL, TTL], Query(Q, R))},
-                     {"get_question", Fun([Oracle(Q, R), Query(Q, R)], Q)},
-                     {"respond",      SignFun([Oracle(Q, R), Query(Q, R), R], Unit)},
-                     {"extend",       SignFun([Oracle(Q, R), TTL], Unit)},
-                     {"get_answer",   Fun([Oracle(Q, R), Query(Q, R)], option_t(Ann, R))},
-                     {"check",        Fun([Oracle(Q, R)], Bool)},
-                     {"check_query",  Fun([Oracle(Q,R), Query(Q, R)], Bool)}]) },
-
-    AENSScope = #scope
-        { funs = MkDefs(
-                     [{"resolve",  Fun([String, String], option_t(Ann, A))},
-                      {"preclaim", SignFun([Address, Hash], Unit)},
-                      {"claim",    SignFun([Address, String, Int, Int], Unit)},
-                      {"transfer", SignFun([Address, Address, String], Unit)},
-                      {"revoke",   SignFun([Address, String], Unit)},
-                      {"update",   SignFun([Address, String, Option(TTL), Option(Int), Option(Map(String, Pointee))], Unit)},
-                      {"lookup",   Fun([String], option_t(Ann, AENSName))},
-                      %% AENS pointee constructors
-                      {"AccountPt",  Fun1(Address, Pointee)},
-                      {"OraclePt",   Fun1(Address, Pointee)},
-                      {"ContractPt", Fun1(Address, Pointee)},
-                      {"ChannelPt",  Fun1(Address, Pointee)},
-                      %% Name object constructor
-                      {"Name",   Fun([Address, TTL, Map(String, Pointee)], AENSName)}
-                     ])
-        , types = MkDefs([{"pointee", 0}, {"name", 0}]) },
-
-    MapScope = #scope
-        { funs = MkDefs(
-                     [{"from_list",      Fun1(List(Pair(K, V)), Map(K, V))},
-                      {"to_list",        Fun1(Map(K, V), List(Pair(K, V)))},
-                      {"lookup",         Fun([K, Map(K, V)], Option(V))},
-                      {"lookup_default", Fun([K, Map(K, V), V], V)},
-                      {"delete",         Fun([K, Map(K, V)], Map(K, V))},
-                      {"member",         Fun([K, Map(K, V)], Bool)},
-                      {"size",           Fun1(Map(K, V), Int)}]) },
-
-    %% Crypto/Curve operations
-    CryptoScope = #scope
-        { funs = MkDefs(
-                     [{"verify_sig",           Fun([Hash, Address, SignId], Bool)},
-                      {"verify_sig_secp256k1", Fun([Hash, Bytes(64), SignId], Bool)},
-                      {"ecverify_secp256k1",   Fun([Hash, Bytes(20), Bytes(65)], Bool)},
-                      {"ecrecover_secp256k1",  Fun([Hash, Bytes(65)], Option(Bytes(20)))},
-                      {"sha3",     Fun1(A, Hash)},
-                      {"sha256",   Fun1(A, Hash)},
-                      {"blake2b",  Fun1(A, Hash)}]) },
-
-    %% Fancy BLS12-381 crypto operations
-    MCL_BLS12_381_Scope = #scope
-        { funs = MkDefs(
-                     [{"g1_neg",     Fun1(G1, G1)},
-                      {"g1_norm",    Fun1(G1, G1)},
-                      {"g1_valid",   Fun1(G1, Bool)},
-                      {"g1_is_zero", Fun1(G1, Bool)},
-                      {"g1_add",     Fun ([G1, G1], G1)},
-                      {"g1_mul",     Fun ([Fr, G1], G1)},
-
-                      {"g2_neg",     Fun1(G2, G2)},
-                      {"g2_norm",    Fun1(G2, G2)},
-                      {"g2_valid",   Fun1(G2, Bool)},
-                      {"g2_is_zero", Fun1(G2, Bool)},
-                      {"g2_add",     Fun ([G2, G2], G2)},
-                      {"g2_mul",     Fun ([Fr, G2], G2)},
-
-                      {"gt_inv",      Fun1(GT, GT)},
-                      {"gt_add",      Fun ([GT, GT], GT)},
-                      {"gt_mul",      Fun ([GT, GT], GT)},
-                      {"gt_pow",      Fun ([GT, Fr], GT)},
-                      {"gt_is_one",   Fun1(GT, Bool)},
-                      {"pairing",     Fun ([G1, G2], GT)},
-                      {"miller_loop", Fun ([G1, G2], GT)},
-                      {"final_exp",   Fun1(GT, GT)},
-
-                      {"int_to_fr", Fun1(Int, Fr)},
-                      {"int_to_fp", Fun1(Int, Fp)},
-                      {"fr_to_int", Fun1(Fr, Int)},
-                      {"fp_to_int", Fun1(Fp, Int)}
-                     ]),
-          types = MkDefs(
-                     [{"fr",  0}, {"fp",  0}]) },
-
-    %% Authentication
-    AuthScope = #scope
-        { funs = MkDefs(
-                     [{"tx_hash", Option(Hash)},
-                      {"tx",      Option(Tx)}  ]) },
-
-    %% Strings
-    StringScope = #scope
-        { funs = MkDefs(
-                     [{"length",    Fun1(String, Int)},
-                      {"concat",    Fun([String, String], String)},
-                      {"to_list",   Fun1(String, List(Char))},
-                      {"from_list", Fun1(List(Char), String)},
-                      {"to_upper",  Fun1(String, String)},
-                      {"to_lower",  Fun1(String, String)},
-                      {"sha3",      Fun1(String, Hash)},
-                      {"sha256",    Fun1(String, Hash)},
-                      {"blake2b",   Fun1(String, Hash)}
-                     ]) },
-
-    %% Chars
-    CharScope = #scope
-        { funs = MkDefs(
-                     [{"to_int",   Fun1(Char, Int)},
-                      {"from_int", Fun1(Int, Option(Char))}]) },
-
-    %% Bits
-    BitsScope = #scope
-        { funs = MkDefs(
-                     [{"set",          Fun([Bits, Int], Bits)},
-                      {"clear",        Fun([Bits, Int], Bits)},
-                      {"test",         Fun([Bits, Int], Bool)},
-                      {"sum",          Fun1(Bits, Int)},
-                      {"intersection", Fun([Bits, Bits], Bits)},
-                      {"union",        Fun([Bits, Bits], Bits)},
-                      {"difference",   Fun([Bits, Bits], Bits)},
-                      {"none",         Bits},
-                      {"all",          Bits}]) },
-
-    %% Bytes
-    BytesScope = #scope
-        { funs = MkDefs(
-                   [{"to_int", Fun1(Bytes(any), Int)},
-                    {"to_str", Fun1(Bytes(any), String)},
-                    {"concat", FunC(bytes_concat, [Bytes(any), Bytes(any)], Bytes(any))},
-                    {"split",  FunC(bytes_split, [Bytes(any)], Pair(Bytes(any), Bytes(any)))}
-                   ]) },
-
-    %% Conversion
-    IntScope     = #scope{ funs = MkDefs([{"to_str", Fun1(Int,     String)}]) },
-    AddressScope = #scope{ funs = MkDefs([{"to_str", Fun1(Address, String)},
-                                          {"to_contract", FunC(address_to_contract, [Address], A)},
-                                          {"is_oracle", Fun1(Address, Bool)},
-                                          {"is_contract", Fun1(Address, Bool)},
-                                          {"is_payable", Fun1(Address, Bool)}]) },
-
-
-    #env{ scopes =
-            #{ []           => TopScope
-             , ["Chain"]    => ChainScope
-             , ["Contract"] => ContractScope
-             , ["Call"]     => CallScope
-             , ["Oracle"]   => OracleScope
-             , ["AENS"]     => AENSScope
-             , ["Map"]      => MapScope
-             , ["Auth"]     => AuthScope
-             , ["Crypto"]   => CryptoScope
-             , ["MCL_BLS12_381"] => MCL_BLS12_381_Scope
-             , ["StringInternal"] => StringScope
-             , ["Char"]     => CharScope
-             , ["Bits"]     => BitsScope
-             , ["Bytes"]    => BytesScope
-             , ["Int"]      => IntScope
-             , ["Address"]  => AddressScope
-             }
-          , fields =
-             maps:from_list([{N, [#field_info{ ann = [], field_t = T, record_t = Tx, kind = record }]}
-                             || {N, T} <- TxFlds ])
-        }.
-
-
-option_t(As, T) -> {app_t, As, {id, As, "option"}, [T]}.
 map_t(As, K, V) -> {app_t, As, {id, As, "map"}, [K, V]}.
 
 -spec infer(aeso_syntax:ast()) -> {aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]} | {env(), aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]}.
@@ -975,19 +181,16 @@ infer(Contracts) ->
 
 -type option() :: return_env | dont_unfold | no_code | debug_mode | term().
 
--spec init_env(list(option())) -> env().
-init_env(_Options) -> global_env().
-
 -spec infer(aeso_syntax:ast(), list(option())) ->
   {aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]} | {env(), aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]}.
 infer([], Options) ->
     create_type_errors(),
     type_error({no_decls, proplists:get_value(src_file, Options, no_file)}),
-    destroy_and_report_type_errors(init_env(Options));
+    destroy_and_report_type_errors(aeso_tc_env:init_env(Options));
 infer(Contracts, Options) ->
     aeso_tc_ets_manager:ets_init(), %% Init the ETS table state
     try
-        Env = init_env(Options),
+        Env = aeso_tc_env:init_env(Options),
         create_options(Options),
         aeso_tc_ets_manager:ets_new(defined_contracts, [bag]),
         aeso_tc_ets_manager:ets_new(type_vars, [set]),
@@ -1014,7 +217,7 @@ infer(Contracts, Options) ->
         {Env2, DeclsFolded, DeclsUnfolded} =
             case proplists:get_value(dont_unfold, Options, false) of
                 true  -> {Env1, Decls, Decls};
-                false -> E = on_scopes(Env1, fun(Scope) -> unfold_record_types(Env1, Scope) end),
+                false -> E = aeso_tc_env:on_scopes(Env1, fun(Scope) -> unfold_record_types(Env1, Scope) end),
                          {E, Decls, unfold_record_types(E, Decls)}
             end,
         case proplists:get_value(return_env, Options, false) of
@@ -1033,8 +236,8 @@ infer1(Env0, [Contract0 = {Contract, Ann, ConName, Impls, Code} | Rest], Acc, Op
     %% do type inference on each contract independently.
     Parents = maps:put(name(ConName),
                        [name(Impl) || Impl <- Impls],
-                       tc_env_contract_parents(Env0)),
-    Env = tc_env_set_contract_parents(Parents, Env0),
+                       aeso_tc_env:contract_parents(Env0)),
+    Env = aeso_tc_env:set_contract_parents(Parents, Env0),
     check_scope_name_clash(Env, contract, ConName),
     What = case Contract of
                contract_main -> contract;
@@ -1047,13 +250,13 @@ infer1(Env0, [Contract0 = {Contract, Ann, ConName, Impls, Code} | Rest], Acc, Op
     end,
     check_contract_preserved_payability(Env, ConName, Ann, Impls, Acc, What),
     populate_functions_to_implement(Env, ConName, Impls, Acc),
-    Env1 = bind_contract(untyped, Contract0, Env),
-    {Env2, Code1} = infer_contract_top(push_scope(contract, ConName, Env1), What, Code, Options),
+    Env1 = aeso_tc_env:bind_contract(untyped, Contract0, Env),
+    {Env2, Code1} = infer_contract_top(aeso_tc_env:push_scope(contract, ConName, Env1), What, Code, Options),
     report_unimplemented_functions(Env1, ConName),
     Contract1 = {Contract, Ann, ConName, Impls, Code1},
-    Env3 = pop_scope(Env2),
+    Env3 = aeso_tc_env:pop_scope(Env2),
     %% Rebinding because the qualifications of types are added during type inference. Could we do better?
-    Env4 = bind_contract(typed, Contract1, Env3),
+    Env4 = aeso_tc_env:bind_contract(typed, Contract1, Env3),
     infer1(Env4, Rest, [Contract1 | Acc], Options);
 infer1(Env, [{namespace, Ann, Name, Code} | Rest], Acc, Options) ->
     when_warning(warn_unused_includes,
@@ -1062,9 +265,9 @@ infer1(Env, [{namespace, Ann, Name, Code} | Rest], Acc, Options) ->
                      potential_unused_include(Ann, SrcFile)
                  end),
     check_scope_name_clash(Env, namespace, Name),
-    {Env1, Code1} = infer_contract_top(push_scope(namespace, Name, Env), namespace, Code, Options),
+    {Env1, Code1} = infer_contract_top(aeso_tc_env:push_scope(namespace, Name, Env), namespace, Code, Options),
     Namespace1 = {namespace, Ann, Name, Code1},
-    infer1(pop_scope(Env1), Rest, [Namespace1 | Acc], Options);
+    infer1(aeso_tc_env:pop_scope(Env1), Rest, [Namespace1 | Acc], Options);
 infer1(Env, [Using = {using, _, _, _, _} | Rest], Acc, Options) ->
     infer1(check_usings(Env, Using), Rest, Acc, Options);
 infer1(Env, [{pragma, _, _} | Rest], Acc, Options) ->
@@ -1157,9 +360,11 @@ identify_main_contract(Contracts, Options) ->
     end.
 
 check_scope_name_clash(Env, Kind, Name) ->
-    case get_scope(Env, qname(Name)) of
+    case aeso_tc_env:get_scope(Env, qname(Name)) of
         false -> ok;
-        #scope{ kind = K, ann = Ann } ->
+        Scope ->
+            K   = aeso_tc_env:scope_kind(Scope),
+            Ann = aeso_tc_env:scope_ann(Scope),
             create_type_errors(),
             type_error({duplicate_scope, Kind, Name, K, Ann}),
             destroy_and_report_type_errors(Env)
@@ -1184,7 +389,7 @@ infer_contract(Env0, What, Defs0, Options) ->
                false -> Defs01
            end,
     destroy_and_report_type_errors(Env0),
-    Env  = tc_env_set_what(What, Env0),
+    Env  = aeso_tc_env:set_what(What, Env0),
     Kind = fun({type_def, _, _, _, _})    -> type;
               ({letfun, _, _, _, _, _})   -> function;
               ({fun_clauses, _, _, _, _}) -> function;
@@ -1194,37 +399,37 @@ infer_contract(Env0, What, Defs0, Options) ->
               (_)                         -> unexpected
            end,
     Get = fun(K, In) -> [ Def || Def <- In, Kind(Def) == K ] end,
-    OldUsedNamespaces = tc_env_used_namespaces(Env),
+    OldUsedNamespaces = aeso_tc_env:used_namespaces(Env),
     Env01 = check_usings(Env, Get(using, Defs)),
     {Env1, TypeDefs} = check_typedefs(Env01, Get(type, Defs)),
-    when_warning(warn_unused_typedefs, fun() -> potential_unused_typedefs(tc_env_namespace(Env), TypeDefs) end),
+    when_warning(warn_unused_typedefs, fun() -> potential_unused_typedefs(aeso_tc_env:namespace(Env), TypeDefs) end),
     create_type_errors(),
     check_unexpected(Get(unexpected, Defs)),
     Env2 =
         case What of
             namespace          -> Env1;
             contract_interface -> Env1;
-            contract           -> bind_state(Env1)   %% bind state and put
+            contract           -> aeso_tc_env:bind_state(Env1)   %% bind state and put
         end,
     {Env2C, Consts} = check_constants(Env2, Get(constant, Defs)),
     {ProtoSigs, Decls} = lists:unzip([ check_fundecl(Env2C, Decl) || Decl <- Get(prototype, Defs) ]),
     [ type_error({missing_definition, Id}) || {fun_decl, _, Id, _} <- Decls,
                                               What =:= contract,
                                               get_option(no_code, false) =:= false ],
-    Env3      = bind_funs(ProtoSigs, Env2C),
+    Env3      = aeso_tc_env:bind_funs(ProtoSigs, Env2C),
     Functions = Get(function, Defs),
     %% Check for duplicates in Functions (we turn it into a map below)
     FunBind   = fun({letfun, Ann, {id, _, Fun}, _, _, _})   -> {Fun, {tuple_t, Ann, []}};
                    ({fun_clauses, Ann, {id, _, Fun}, _, _}) -> {Fun, {tuple_t, Ann, []}} end,
     FunName   = fun(Def) -> {Name, _} = FunBind(Def), Name end,
-    _         = bind_funs(lists:map(FunBind, Functions), empty_env()),
+    _         = aeso_tc_env:bind_funs(lists:map(FunBind, Functions), aeso_tc_env:empty_env()),
     FunMap    = maps:from_list([ {FunName(Def), Def} || Def <- Functions ]),
     check_reserved_entrypoints(FunMap),
     DepGraph  = maps:map(fun(_, Def) -> aeso_syntax_utils:used_ids(Def) end, FunMap),
     SCCs      = aeso_utils:scc(DepGraph),
     {Env4, Defs1} = check_sccs(Env3, FunMap, SCCs, []),
     %% Remove namespaces used in the current namespace
-    Env5 = tc_env_set_used_namespaces(OldUsedNamespaces, Env4),
+    Env5 = aeso_tc_env:set_used_namespaces(OldUsedNamespaces, Env4),
     %% Check that `init` doesn't read or write the state and that `init` is not missing
     check_state(Env4, Defs1),
     %% Check that entrypoints have first-order arg types and return types
@@ -1257,7 +462,7 @@ check_typedefs(Env, Defs) ->
     create_type_errors(),
     GetName  = fun({type_def, _, {id, _, Name}, _, _}) -> Name end,
     TypeMap  = maps:from_list([ {GetName(Def), Def} || Def <- Defs ]),
-    DepGraph = maps:map(fun(_, Def) -> aeso_syntax_utils:used_types(tc_env_namespace(Env), Def) end, TypeMap),
+    DepGraph = maps:map(fun(_, Def) -> aeso_syntax_utils:used_types(aeso_tc_env:namespace(Env), Def) end, TypeMap),
     SCCs     = aeso_utils:scc(DepGraph),
     {Env1, Defs1} = check_typedef_sccs(Env, TypeMap, SCCs, []),
     destroy_and_report_type_errors(Env),
@@ -1272,23 +477,23 @@ check_typedef_sccs(Env, TypeMap, [{acyclic, Name} | SCCs], Acc) ->
         undefined -> check_typedef_sccs(Env, TypeMap, SCCs, Acc);    %% Builtin type
         {type_def, Ann, D, Xs, Def0} ->
             check_parameterizable(D, Xs),
-            Def  = check_event(Env, Name, Ann, check_typedef(bind_tvars(Xs, Env), Def0)),
+            Def  = check_event(Env, Name, Ann, check_typedef(aeso_tc_env:bind_tvars(Xs, Env), Def0)),
             Acc1 = [{type_def, Ann, D, Xs, Def} | Acc],
-            Env1 = bind_type(Name, Ann, {Xs, Def}, Env),
+            Env1 = aeso_tc_env:bind_type(Name, Ann, {Xs, Def}, Env),
             case Def of
                 {alias_t, _}  -> check_typedef_sccs(Env1, TypeMap, SCCs, Acc1);
                 {record_t, []} ->
                     type_error({empty_record_definition, Ann, Name}),
                     check_typedef_sccs(Env1, TypeMap, SCCs, Acc1);
                 {record_t, Fields} ->
-                    aeso_tc_ets_manager:ets_insert(type_vars_variance, {tc_env_namespace(Env) ++ qname(D),
+                    aeso_tc_ets_manager:ets_insert(type_vars_variance, {aeso_tc_env:namespace(Env) ++ qname(D),
                                                     infer_type_vars_variance(Xs, Fields)}),
                     %% check_type to get qualified name
                     RecTy = check_type(Env1, app_t(Ann, D, Xs)),
-                    Env2 = check_fields(Env1, TypeMap, RecTy, Fields),
+                    Env2 = aeso_tc_env:bind_fields_append(Env1, TypeMap, RecTy, Fields),
                     check_typedef_sccs(Env2, TypeMap, SCCs, Acc1);
                 {variant_t, Cons} ->
-                    aeso_tc_ets_manager:ets_insert(type_vars_variance, {tc_env_namespace(Env) ++ qname(D),
+                    aeso_tc_ets_manager:ets_insert(type_vars_variance, {aeso_tc_env:namespace(Env) ++ qname(D),
                                                     infer_type_vars_variance(Xs, Cons)}),
                     Target   = check_type(Env1, app_t(Ann, D, Xs)),
                     ConType  = fun([]) -> Target; (Args) -> {type_sig, Ann, none, [], Args, Target} end,
@@ -1298,7 +503,7 @@ check_typedef_sccs(Env, TypeMap, [{acyclic, Name} | SCCs], Acc) ->
                                  end || ConDef <- Cons ],
                     check_repeated_constructors([ {Con, ConType(Args)} || {constr_t, _, Con, Args} <- Cons ]),
                     [ check_constructor_overlap(Env1, Con, Target) || {constr_t, _, Con, _} <- Cons ],
-                    check_typedef_sccs(bind_funs(ConTypes, Env1), TypeMap, SCCs, Acc1)
+                    check_typedef_sccs(aeso_tc_env:bind_funs(ConTypes, Env1), TypeMap, SCCs, Acc1)
             end
     end;
 check_typedef_sccs(Env, TypeMap, [{cyclic, Names} | SCCs], Acc) ->
@@ -1365,12 +570,12 @@ check_constants(Env, Consts) ->
                  end,
     {Valid, Invalid} = lists:partition(HasValidId, Consts),
     [ type_error({invalid_const_id, aeso_syntax:get_ann(Pat)}) || {letval, _, Pat, _} <- Invalid ],
-    [ type_error({illegal_const_in_interface, Ann}) || {letval, Ann, _, _} <- Valid, tc_env_what(Env) == contract_interface ],
+    [ type_error({illegal_const_in_interface, Ann}) || {letval, Ann, _, _} <- Valid, aeso_tc_env:what(Env) == contract_interface ],
     when_warning(warn_unused_constants, fun() -> potential_unused_constants(Env, Valid) end),
     ConstMap = maps:from_list([ {name(Id), Const} || Const = {letval, _, Id, _} <- Valid ]),
     DepGraph = maps:map(fun(_, Const) -> aeso_syntax_utils:used_ids(Const) end, ConstMap),
     SCCs = aeso_utils:scc(DepGraph),
-    bind_consts(Env, ConstMap, SCCs, []).
+    aeso_tc_env:bind_consts(Env, ConstMap, SCCs, []).
 
 check_usings(Env, []) ->
     Env;
@@ -1381,34 +586,37 @@ check_usings(Env, [{using, Ann, Con, Alias, Parts} | Rest]) ->
                     _ ->
                         qname(Alias)
                 end,
-    case get_scope(Env, qname(Con)) of
+    case aeso_tc_env:get_scope(Env, qname(Con)) of
         false ->
             create_type_errors(),
             type_error({using_undefined_namespace, Ann, qname(Con)}),
             destroy_and_report_type_errors(Env);
-        #scope{kind = contract} ->
-            create_type_errors(),
-            type_error({using_undefined_namespace, Ann, qname(Con)}),
-            destroy_and_report_type_errors(Env);
         Scope ->
-            Nsp = case Parts of
-                      none ->
-                          {qname(Con), AliasName, none};
-                      {ForOrHiding, Ids} ->
-                          IsUndefined = fun(Id) ->
-                                            proplists:lookup(name(Id), Scope#scope.funs) == none
-                                        end,
-                          UndefinedIds = lists:filter(IsUndefined, Ids),
-                          case UndefinedIds of
-                              [] ->
-                                  {qname(Con), AliasName, {ForOrHiding, lists:map(fun name/1, Ids)}};
-                              _ ->
-                                  create_type_errors(),
-                                  type_error({using_undefined_namespace_parts, Ann, qname(Con), lists:map(fun qname/1, UndefinedIds)}),
-                                  destroy_and_report_type_errors(Env)
-                          end
-                  end,
-            check_usings(tc_env_set_used_namespaces(tc_env_used_namespaces(Env) ++ [Nsp], Env), Rest)
+            case aeso_tc_env:scope_kind(Scope) of
+                contract ->
+                    create_type_errors(),
+                    type_error({using_undefined_namespace, Ann, qname(Con)}),
+                    destroy_and_report_type_errors(Env);
+                _ ->
+                    Nsp = case Parts of
+                            none ->
+                                {qname(Con), AliasName, none};
+                            {ForOrHiding, Ids} ->
+                                IsUndefined = fun(Id) ->
+                                                    proplists:lookup(name(Id), aeso_tc_env:scope_funs(Scope)) == none
+                                                end,
+                                UndefinedIds = lists:filter(IsUndefined, Ids),
+                                case UndefinedIds of
+                                    [] ->
+                                        {qname(Con), AliasName, {ForOrHiding, lists:map(fun name/1, Ids)}};
+                                    _ ->
+                                        create_type_errors(),
+                                        type_error({using_undefined_namespace_parts, Ann, qname(Con), lists:map(fun qname/1, UndefinedIds)}),
+                                        destroy_and_report_type_errors(Env)
+                                end
+                        end,
+                    check_usings(aeso_tc_env:set_used_namespaces(aeso_tc_env:used_namespaces(Env) ++ [Nsp], Env), Rest)
+            end
     end;
 check_usings(Env, Using = {using, _, _, _, _}) ->
     check_usings(Env, [Using]).
@@ -1497,7 +705,7 @@ check_type(_Env, X = {id, Ann, "_"}, Arity) ->
     ensure_base_type(X, Arity),
     fresh_uvar(Ann);
 check_type(Env, X = {Tag, _, _}, Arity) when Tag == con; Tag == qcon; Tag == id; Tag == qid ->
-    case lookup_type(Env, X) of
+    case aeso_tc_env:lookup_type(Env, X) of
         {Q, {_, Def}} ->
             Arity1 = case Def of
                         {builtin, Ar} -> Ar;
@@ -1532,7 +740,7 @@ check_type(_Env, {args_t, Ann, Ts}, _) ->
 
 -spec check_tvar(env(), aeso_syntax:tvar()) -> aeso_syntax:tvar() | no_return().
 check_tvar(Env, T = {tvar, _, X}) ->
-    TVars = tc_env_typevars(Env),
+    TVars = aeso_tc_env:typevars(Env),
     case TVars == unrestricted orelse lists:member(X, TVars) of
         true  -> ok;
         false -> type_error({unbound_type, T})
@@ -1548,12 +756,6 @@ check_named_arg(Env, {named_arg_t, Ann, Id, Type, Default}) ->
     Type1 = check_type(Env, Type),
     {typed, _, Default1, _} = check_expr(Env, Default, Type1),
     {named_arg_t, Ann, Id, Type1, Default1}.
-
--spec check_fields(env(), #{ name() => aeso_syntax:decl() }, type(), [aeso_syntax:field_t()]) -> env().
-check_fields(Env, _TypeMap, _, []) -> Env;
-check_fields(Env, TypeMap, RecTy, [{field_t, Ann, Id, Type} | Fields]) ->
-    Env1 = bind_field_append(name(Id), #field_info{ ann = Ann, kind = record, field_t = Type, record_t = RecTy }, Env),
-    check_fields(Env1, TypeMap, RecTy, Fields).
 
 check_parameterizable({id, Ann, "event"}, [_ | _]) ->
     type_error({parameterized_event, Ann});
@@ -1606,7 +808,7 @@ is_string_type(_) -> false.
 
 -spec check_constructor_overlap(env(), aeso_syntax:con(), type()) -> ok | no_return().
 check_constructor_overlap(Env, Con = {con, Ann, Name}, NewType) ->
-    case lookup_env(Env, term, Ann, Name) of
+    case aeso_tc_env:lookup_env(Env, term, Ann, Name) of
         false -> ok;
         {_, {Ann, Type}} ->
             OldType = case Type of {type_sig, _, _, _, _, T} -> T;
@@ -1633,13 +835,13 @@ check_sccs(Env, Funs, [{acyclic, X} | SCCs], Acc) ->
             check_sccs(Env, Funs, SCCs, Acc);
         Def ->
             {{_, TypeSig}, Def1} = infer_nonrec(Env, Def),
-            Env1 = bind_fun(X, TypeSig, Env),
+            Env1 = aeso_tc_env:bind_fun(X, TypeSig, Env),
             check_sccs(Env1, Funs, SCCs, [Def1 | Acc])
     end;
 check_sccs(Env, Funs, [{cyclic, Xs} | SCCs], Acc) ->
     Defs = [ maps:get(X, Funs) || X <- Xs ],
     {TypeSigs, Defs1} = infer_letrec(Env, Defs),
-    Env1 = bind_funs(TypeSigs, Env),
+    Env1 = aeso_tc_env:bind_funs(TypeSigs, Env),
     check_sccs(Env1, Funs, SCCs, Defs1 ++ Acc).
 
 check_reserved_entrypoints(Funs) ->
@@ -1705,7 +907,7 @@ check_special_funs(Env, {{"init", Type}, _}) ->
     {type_sig, Ann, _Constr, _Named, _Args, Res} = Type,
     State =
         %% We might have implicit (no) state.
-        case lookup_type(Env, {id, [], "state"}) of
+        case aeso_tc_env:lookup_type(Env, {id, [], "state"}) of
             false  -> {tuple_t, [{origin, system}], []};
             {S, _} -> {qid, [], S}
         end,
@@ -1717,7 +919,7 @@ infer_letrec(Env, Defs) ->
     Funs = lists:map(fun({letfun, _, {id, Ann, Name}, _, _, _})   -> {Name, fresh_uvar(Ann)};
                         ({fun_clauses, _, {id, Ann, Name}, _, _}) -> {Name, fresh_uvar(Ann)}
                      end, Defs),
-    ExtendEnv = bind_funs(Funs, Env),
+    ExtendEnv = aeso_tc_env:bind_funs(Funs, Env),
     Inferred =
         [ begin
             Res    = {{Name, TypeSig}, LetFun} = infer_letfun(ExtendEnv, LF),
@@ -1739,7 +941,7 @@ infer_letrec(Env, Defs) ->
 infer_letfun(Env, {fun_clauses, Ann, Fun = {id, _, Name}, Type, Clauses}) ->
     when_warning(warn_unused_stateful, fun() -> potential_unused_stateful(Ann, Fun) end),
     when_warning(warn_unused_functions,
-                 fun() -> potential_unused_function(Env, Ann, tc_env_namespace(Env) ++ qname(Fun), Fun) end),
+                 fun() -> potential_unused_function(Env, Ann, aeso_tc_env:namespace(Env) ++ qname(Fun), Fun) end),
     Type1 = check_type(Env, Type),
     {NameSigs, Clauses1} = lists:unzip([ infer_letfun1(Env, Clause) || Clause <- Clauses ]),
     {_, Sigs = [Sig | _]} = lists:unzip(NameSigs),
@@ -1750,19 +952,19 @@ infer_letfun(Env, {fun_clauses, Ann, Fun = {id, _, Name}, Type, Clauses}) ->
     {{Name, Sig}, desugar_clauses(Ann, Fun, Sig, Clauses1)};
 infer_letfun(Env, LetFun = {letfun, Ann, Fun, _, _, _}) ->
     when_warning(warn_unused_stateful, fun() -> potential_unused_stateful(Ann, Fun) end),
-    when_warning(warn_unused_functions, fun() -> potential_unused_function(Env, Ann, tc_env_namespace(Env) ++ qname(Fun), Fun) end),
+    when_warning(warn_unused_functions, fun() -> potential_unused_function(Env, Ann, aeso_tc_env:namespace(Env) ++ qname(Fun), Fun) end),
     {{Name, Sig}, Clause} = infer_letfun1(Env, LetFun),
     {{Name, Sig}, desugar_clauses(Ann, Fun, Sig, [Clause])}.
 
 infer_letfun1(Env0, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, GuardedBodies}) ->
-    Env1 = tc_env_set_stateful(aeso_syntax:get_ann(stateful, Attrib, false), Env0),
-    Env = tc_env_set_current_function(Fun, Env1),
+    Env1 = aeso_tc_env:set_stateful(aeso_syntax:get_ann(stateful, Attrib, false), Env0),
+    Env = aeso_tc_env:set_current_function(Fun, Env1),
     {NewEnv, {typed, _, {tuple, _, TypedArgs}, {tuple_t, _, ArgTypes}}} = infer_pattern(Env, {tuple, [{origin, system} | NameAttrib], Args}),
-    when_warning(warn_unused_variables, fun() -> potential_unused_variables(tc_env_namespace(Env0), Name, free_vars(Args)) end),
+    when_warning(warn_unused_variables, fun() -> potential_unused_variables(aeso_tc_env:namespace(Env0), Name, free_vars(Args)) end),
     ExpectedType = check_type(Env, arg_type(NameAttrib, What)),
     InferGuardedBodies = fun({guarded, Ann, Guards, Body}) ->
         NewGuards = lists:map(fun(Guard) ->
-                                  check_expr(tc_env_set_in_guard(true, NewEnv), Guard, {id, Attrib, "bool"})
+                                  check_expr(aeso_tc_env:set_in_guard(true, NewEnv), Guard, {id, Attrib, "bool"})
                               end, Guards),
         NewBody = check_expr(NewEnv, Body, ExpectedType),
         {guarded, Ann, NewGuards, NewBody}
@@ -1792,70 +994,14 @@ arg_type(_, T) ->
 app_t(_Ann, Name, [])  -> Name;
 app_t(Ann, Name, Args) -> {app_t, Ann, Name, Args}.
 
-lookup_name(Env, As, Name) ->
-    lookup_name(Env, As, Name, []).
-
-lookup_name(Env = #env{ namespace = NS, current_function = CurFn }, As, Id, Options) ->
-    case lookup_env(Env, term, As, qname(Id)) of
-        false ->
-            type_error({unbound_variable, Id}),
-            {Id, fresh_uvar(As)};
-        {QId, {_, Ty}} ->
-            %% Variables and functions cannot be used when CurFn is `none`.
-            %% i.e. they cannot be used in toplevel constants
-            [ begin
-                when_warning(
-                    warn_unused_variables,
-                    fun() -> used_variable(NS, name(CurFn), QId) end),
-                when_warning(
-                    warn_unused_functions,
-                    fun() -> register_function_call(NS ++ qname(CurFn), QId) end)
-              end || CurFn =/= none ],
-
-            when_warning(warn_unused_constants, fun() -> used_constant(NS, QId) end),
-
-            Freshen = proplists:get_value(freshen, Options, false),
-            check_stateful(Env, Id, Ty),
-            Ty1 = case Ty of
-                    {type_sig, _, _, _, _, _} -> freshen_type_sig(As, Ty);
-                    _ when Freshen            -> freshen_type(As, Ty);
-                    _                         -> Ty
-                  end,
-            {set_qname(QId, Id), Ty1}
-    end.
-
-check_stateful(Env, Id, Type = {type_sig, _, _, _, _, _}) ->
-    IsStatefulType = aeso_syntax:get_ann(stateful, Type, false),
-    IsStatefulType andalso (check_stateful_not_in_guard(Env, Id) andalso check_stateful_in_stateful_fun(Env, Id)),
-    ok;
-check_stateful(Env, _Id, _Type) ->
-    when_warning(warn_unused_stateful, fun() -> used_stateful(tc_env_current_function(Env)) end),
-    ok.
-
-check_stateful_not_in_guard(Env, Id) ->
-    case tc_env_in_guard(Env) of
-        false -> true;
-        true  ->
-            type_error({stateful_not_allowed_in_guards, Id}),
-            false
-    end.
-
-check_stateful_in_stateful_fun(Env, Id) ->
-    case tc_env_stateful(Env) of
-        true  -> true;
-        false ->
-            type_error({stateful_not_allowed, Id, tc_env_current_function(Env)}),
-            false
-    end.
-
 %% Hack: don't allow passing the 'value' named arg if not stateful. This only
 %% works since the user can't create functions with named arguments.
 check_stateful_named_arg(Env, {id, _, "value"}, Default) ->
     case Default of
         {int, _, 0} -> ok;
         _           ->
-            Fun = tc_env_current_function(Env),
-            case tc_env_stateful(Env) of
+            Fun = aeso_tc_env:current_function(Env),
+            case aeso_tc_env:stateful(Env) of
                 true  -> when_warning(warn_unused_stateful, fun() -> used_stateful(Fun) end);
                 false -> type_error({value_arg_not_allowed, Default, Fun})
             end
@@ -1893,22 +1039,22 @@ is_monomorphic(Tup) when is_tuple(Tup) -> is_monomorphic(tuple_to_list(Tup));
 is_monomorphic(_)                      -> true.
 
 check_state_init(Env) ->
-    Top = tc_env_namespace(Env),
-    StateType = lookup_type(Env, {id, [{origin, system}], "state"}),
+    Top = aeso_tc_env:namespace(Env),
+    StateType = aeso_tc_env:lookup_type(Env, {id, [{origin, system}], "state"}),
     case unfold_types_in_type(Env, StateType) of
         false  ->
             ok;
         {_, {_, {_, {alias_t, {tuple_t, _, []}}}}} ->  %% type state = ()
             ok;
         _ ->
-            #scope{ ann = AnnCon } = get_scope(Env, Top),
+            AnnCon = aeso_tc_env:scope_ann(aeso_tc_env:get_scope(Env, Top)),
             type_error({missing_init_function, {con, AnnCon, lists:last(Top)}})
     end.
 
 %% Check that `init` doesn't read or write the state and that `init` is defined
 %% when the state type is not unit
 check_state(Env, Defs) ->
-    Top       = tc_env_namespace(Env),
+    Top       = aeso_tc_env:namespace(Env),
     GetState  = Top ++ ["state"],
     SetState  = Top ++ ["put"],
     Init      = Top ++ ["init"],
@@ -1981,10 +1127,10 @@ infer_expr(_Env, Body={id, As, "???"}) ->
     type_error({hole_found, As, T}),
     {typed, As, Body, T};
 infer_expr(Env, Id = {Tag, As, _}) when Tag == id; Tag == qid ->
-    {QName, Type} = lookup_name(Env, As, Id),
+    {QName, Type} = aeso_tc_env:lookup_name(Env, As, Id),
     {typed, As, QName, Type};
 infer_expr(Env, Id = {Tag, As, _}) when Tag == con; Tag == qcon ->
-    {QName, Type} = lookup_name(Env, As, Id, [freshen]),
+    {QName, Type} = aeso_tc_env:lookup_name(Env, As, Id, [freshen]),
     {typed, As, QName, Type};
 infer_expr(Env, {tuple, As, Cpts}) ->
     NewCpts = [infer_expr(Env, C) || C <- Cpts],
@@ -2037,7 +1183,7 @@ infer_expr(Env, {list_comp, AsLC, Yield, [{letval, AsLV, Pattern, E}|Rest]}) ->
 infer_expr(Env, {list_comp, AsLC, Yield, [Def={letfun, AsLF, _, _, _, _}|Rest]}) ->
     {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
     FunT = aeso_tc_type_utils:typesig_to_fun_t(TypeSig),
-    NewE = bind_var({id, AsLF, Name}, FunT, Env),
+    NewE = aeso_tc_env:bind_var({id, AsLF, Name}, FunT, Env),
     {typed, _, {list_comp, _, TypedYield, TypedRest}, ResType} =
         infer_expr(NewE, {list_comp, AsLC, Yield, Rest}),
     { typed
@@ -2101,7 +1247,7 @@ infer_expr(Env, {record, Attrs, Fields}) ->
     add_constraint([ #record_create_constraint{
                          record_t = RecordType1,
                          fields   = [ FieldName || {field, _, [{proj, _, FieldName}], _} <- Fields ],
-                         context  = Attrs } || not tc_env_in_pattern(Env) ] ++
+                         context  = Attrs } || not aeso_tc_env:in_pattern(Env) ] ++
                    [begin
                      [{proj, _, FieldName}] = LV,
                      #field_constraint{
@@ -2382,23 +1528,23 @@ infer_pattern(Env, Pattern) ->
         [] -> ok;
         Nonlinear -> type_error({non_linear_pattern, Pattern, lists:usort(Nonlinear)})
     end,
-    NewEnv = bind_vars([{Var, fresh_uvar(Ann1)} || Var = {id, Ann1, _} <- Vars], tc_env_set_in_pattern(true, Env)),
+    NewEnv = aeso_tc_env:bind_vars([{Var, fresh_uvar(Ann1)} || Var = {id, Ann1, _} <- Vars], aeso_tc_env:set_in_pattern(true, Env)),
     NewPattern = infer_expr(NewEnv, Pattern),
-    {tc_env_set_in_pattern(tc_env_in_pattern(Env), NewEnv), NewPattern}.
+    {aeso_tc_env:set_in_pattern(aeso_tc_env:in_pattern(Env), NewEnv), NewPattern}.
 
 infer_case(Env, Attrs, Pattern, ExprType, GuardedBranches, SwitchType) ->
     {NewEnv, NewPattern = {typed, _, _, PatType}} = infer_pattern(Env, Pattern),
 
     %% Make sure we are inside a function before warning about potentially unused var
     [ when_warning(warn_unused_variables,
-                   fun() -> potential_unused_variables(tc_env_namespace(Env), Fun, free_vars(Pattern)) end)
-      || {id, _, Fun} <- [tc_env_current_function(Env)] ],
+                   fun() -> potential_unused_variables(aeso_tc_env:namespace(Env), Fun, free_vars(Pattern)) end)
+      || {id, _, Fun} <- [aeso_tc_env:current_function(Env)] ],
 
     InferGuardedBranches = fun({guarded, Ann, Guards, Branch}) ->
         NewGuards = lists:map(fun(Guard) ->
-                                  check_expr(tc_env_set_in_guard(true, NewEnv), Guard, {id, Attrs, "bool"})
+                                  check_expr(aeso_tc_env:set_in_guard(true, NewEnv), Guard, {id, Attrs, "bool"})
                               end, Guards),
-        NewBranch = check_expr(tc_env_set_in_pattern(false, NewEnv), Branch, SwitchType),
+        NewBranch = check_expr(aeso_tc_env:set_in_pattern(false, NewEnv), Branch, SwitchType),
         {guarded, Ann, NewGuards, NewBranch}
     end,
     NewGuardedBranches = lists:map(InferGuardedBranches, GuardedBranches),
@@ -2413,7 +1559,7 @@ infer_block(Env, _, [E], BlockType) ->
 infer_block(Env, Attrs, [Def={letfun, Ann, _, _, _, _}|Rest], BlockType) ->
     {{Name, TypeSig}, LetFun} = infer_letfun(Env, Def),
     FunT = aeso_tc_type_utils:typesig_to_fun_t(TypeSig),
-    NewE = bind_var({id, Ann, Name}, FunT, Env),
+    NewE = aeso_tc_env:bind_var({id, Ann, Name}, FunT, Env),
     [LetFun|infer_block(NewE, Attrs, Rest, BlockType)];
 infer_block(Env, _, [{letval, Attrs, Pattern, E}|Rest], BlockType) ->
     NewE = {typed, _, _, PatType} = infer_expr(Env, E),
@@ -2429,12 +1575,12 @@ infer_block(Env, Attrs, [E|Rest], BlockType) ->
 
 infer_const(Env, {letval, Ann, TypedId = {typed, _, Id = {id, _, _}, Type}, Expr}) ->
     check_valid_const_expr(Expr) orelse type_error({invalid_const_expr, Id}),
-    NewExpr = check_expr(tc_env_set_current_const(Id, Env), Expr, Type),
+    NewExpr = check_expr(aeso_tc_env:set_current_const(Id, Env), Expr, Type),
     {letval, Ann, TypedId, NewExpr};
 infer_const(Env, {letval, Ann, Id = {id, AnnId, _}, Expr}) ->
     check_valid_const_expr(Expr) orelse type_error({invalid_const_expr, Id}),
     create_constraints(),
-    NewExpr = {typed, _, _, Type} = infer_expr(tc_env_set_current_const(Id, Env), Expr),
+    NewExpr = {typed, _, _, Type} = infer_expr(aeso_tc_env:set_current_const(Id, Env), Expr),
     solve_then_destroy_and_report_unsolved_constraints(Env),
     IdType = setelement(2, Type, AnnId),
     NewId = {typed, aeso_syntax:get_ann(Id), Id, IdType},
@@ -2510,23 +1656,6 @@ free_vars(L) when is_list(L) ->
     [V || Elem <- L,
           V <- free_vars(Elem)].
 
-%% Options
-
-create_options(Options) ->
-    aeso_tc_ets_manager:ets_new(options, [set]),
-    Tup = fun(Opt) when is_atom(Opt) -> {Opt, true};
-             (Opt) when is_tuple(Opt) -> Opt end,
-    aeso_tc_ets_manager:ets_insert(options, lists:map(Tup, Options)).
-
-get_option(Key, Default) ->
-    case aeso_tc_ets_manager:ets_lookup(options, Key) of
-        [{Key, Val}] -> Val;
-        _            -> Default
-    end.
-
-when_option(Opt, Do) ->
-    get_option(Opt, false) andalso Do().
-
 %% -- Constraints --
 
 create_constraints() ->
@@ -2552,16 +1681,18 @@ solve_constraints(Env) ->
                field_t  = FieldType,
                kind     = Kind,
                context  = When }) ->
-                Arity = fun_arity(aeso_tc_type_utils:dereference_deep(FieldType)),
+                Arity = aeso_tc_type_utils:fun_arity(aeso_tc_type_utils:dereference_deep(FieldType)),
                 FieldInfos = case Arity of
-                                 none -> lookup_record_field(Env, FieldName, Kind);
-                                 _    -> lookup_record_field_arity(Env, FieldName, Arity, Kind)
+                                 none -> aeso_tc_env:lookup_record_field(Env, FieldName, Kind);
+                                 _    -> aeso_tc_env:lookup_record_field_arity(Env, FieldName, Arity, Kind)
                              end,
                 case FieldInfos of
                     [] ->
                         type_error({undefined_field, Field}),
                         false;
-                    [#field_info{field_t = FldType, record_t = RecType}] ->
+                    [Fld] ->
+                        FldType = aeso_tc_env:field_info_field_t(Fld),
+                        RecType = aeso_tc_env:field_info_record_t(Fld),
                         create_freshen_tvars(),
                         FreshFldType = freshen(FldType),
                         FreshRecType = freshen(RecType),
@@ -2718,7 +1849,7 @@ solve_constraint(Env, C = #field_constraint{record_t = RecType,
                                             context  = When}) ->
     RecId = record_type_name(RecType),
     Attrs = aeso_syntax:get_ann(RecId),
-    case lookup_type(Env, RecId) of
+    case aeso_tc_env:lookup_type(Env, RecId) of
         {_, {_Ann, {Formals, {What, Fields}}}} when What =:= record_t; What =:= contract_t ->
             FieldTypes = [{Name, Type} || {field_t, _, {id, _, Name}, Type} <- Fields],
             {id, _, FieldString} = FieldName,
@@ -2818,7 +1949,7 @@ check_record_create_constraints(Env, [C | Cs]) ->
         fields   = Fields,
         context  = When } = C,
     Type1 = unfold_types_in_type(Env, aeso_tc_type_utils:instantiate(Type)),
-    try lookup_type(Env, record_type_name(Type1)) of
+    try aeso_tc_env:lookup_type(Env, record_type_name(Type1)) of
         {_QId, {_Ann, {_Args, {record_t, RecFields}}}} ->
             ActualNames = [ Fld || {field_t, _, {id, _, Fld}, _} <- RecFields ],
             GivenNames  = [ Fld || {id, _, Fld} <- Fields ],
@@ -2841,7 +1972,7 @@ check_is_contract_constraints(Env, [C | Cs]) ->
     #is_contract_constraint{ contract_t = Type, context = Cxt, force_def = ForceDef } = C,
     Type1 = unfold_types_in_type(Env, aeso_tc_type_utils:instantiate(Type)),
     TypeName = record_type_name(Type1),
-    case lookup_type(Env, TypeName) of
+    case aeso_tc_env:lookup_type(Env, TypeName) of
         {_, {_Ann, {[], {contract_t, _}}}} ->
             case not ForceDef orelse is_contract_defined(TypeName) of
                 true -> ok;
@@ -2891,8 +2022,8 @@ solve_for_uvar(Env, UVar = {uvar, Attrs, _}, Fields0) ->
     %% Does this set of fields uniquely identify a record type?
     FieldNames = [ Name || {_Kind, {id, _, Name}} <- Fields ],
     UniqueFields = lists:usort(FieldNames),
-    Candidates = [RecType || #field_info{record_t = RecType} <- lookup_record_field(Env, hd(FieldNames))],
-    TypesAndFields = [case lookup_type(Env, record_type_name(RecType)) of
+    Candidates = [aeso_tc_env:field_info_record_t(Fld) || Fld <- aeso_tc_env:lookup_record_field(Env, hd(FieldNames))],
+    TypesAndFields = [case aeso_tc_env:lookup_type(Env, record_type_name(RecType)) of
                         {_, {_, {_, {record_t, RecFields}}}} ->
                             {RecType, [Field || {field_t, _, {id, _, Field}, _} <- RecFields]};
                         {_, {_, {_, {contract_t, ConFields}}}} ->
@@ -2917,7 +2048,7 @@ solve_for_uvar(Env, UVar = {uvar, Attrs, _}, Fields0) ->
             end;
         {[RecType], _} ->
             RecName = record_type_name(RecType),
-            {_, {_, {Formals, {_RecOrCon, _}}}} = lookup_type(Env, RecName),
+            {_, {_, {Formals, {_RecOrCon, _}}}} = aeso_tc_env:lookup_type(Env, RecName),
             create_freshen_tvars(),
             FreshRecType = freshen(app_t(Attrs, RecName, Formals)),
             destroy_freshen_tvars(),
@@ -2969,7 +2100,7 @@ unfold_types_in_type(Env, {app_t, Ann, Id, Args}, Options) when ?is_type_id(Id) 
     when_warning(warn_unused_typedefs, fun() -> used_typedef(Id, length(Args)) end),
     UnfoldRecords  = proplists:get_value(unfold_record_types, Options, false),
     UnfoldVariants = proplists:get_value(unfold_variant_types, Options, false),
-    case lookup_type(Env, Id) of
+    case aeso_tc_env:lookup_type(Env, Id) of
         {_, {_, {Formals, {record_t, Fields}}}} when UnfoldRecords, length(Formals) == length(Args) ->
             {record_t,
              unfold_types_in_type(Env,
@@ -2990,7 +2121,7 @@ unfold_types_in_type(Env, Id, Options) when ?is_type_id(Id) ->
     when_warning(warn_unused_typedefs, fun() -> used_typedef(Id, 0) end),
     UnfoldRecords = proplists:get_value(unfold_record_types, Options, false),
     UnfoldVariants = proplists:get_value(unfold_variant_types, Options, false),
-    case lookup_type(Env, Id) of
+    case aeso_tc_env:lookup_type(Env, Id) of
         {_, {_, {[], {record_t, Fields}}}} when UnfoldRecords ->
             {record_t, unfold_types_in_type(Env, Fields, Options)};
         {_, {_, {[], {variant_t, Constrs}}}} when UnfoldVariants ->
@@ -3057,7 +2188,7 @@ unify1(_Env, {uvar, _, _}, {fun_t, _, _, var_args, _}, _Variance, When) ->
 unify1(Env, {uvar, A, R}, T, _Variance, When) ->
     case occurs_check(R, T) of
         true ->
-            case tc_env_unify_throws(Env) of
+            case aeso_tc_env:unify_throws(Env) of
                 true ->
                     cannot_unify({uvar, A, R}, T, none, When);
                 false ->
@@ -3089,7 +2220,7 @@ unify1(Env, A = {con, _, NameA}, B = {con, _, NameB}, Variance, When) ->
     case is_subtype(Env, NameA, NameB, Variance) of
         true -> true;
         false ->
-            case tc_env_unify_throws(Env) of
+            case aeso_tc_env:unify_throws(Env) of
                 true ->
                     IsSubtype = is_subtype(Env, NameA, NameB, contravariant) orelse
                                 is_subtype(Env, NameA, NameB, covariant),
@@ -3148,7 +2279,7 @@ unify1(Env, {app_t, _, T, []}, B, Variance, When) ->
 unify1(Env, A, {app_t, _, T, []}, Variance, When) ->
     unify0(Env, A, T, Variance, When);
 unify1(Env, A, B, _Variance, When) ->
-    case tc_env_unify_throws(Env) of
+    case aeso_tc_env:unify_throws(Env) of
         true ->
             cannot_unify(A, B, none, When);
         false ->
@@ -3166,7 +2297,7 @@ is_subtype(Env, NameA, NameB, bivariant) ->
     is_subtype(Env, NameA, NameB) orelse is_subtype(Env, NameB, NameA).
 
 is_subtype(Env, Child, Base) ->
-    Parents = maps:get(Child, tc_env_contract_parents(Env), []),
+    Parents = maps:get(Child, aeso_tc_env:contract_parents(Env), []),
     if
         Child == Base ->
             true;
@@ -3251,31 +2382,11 @@ freshen_type_sig(Ann, TypeSig = {type_sig, _, Constr, _, _, _}) ->
 apply_typesig_constraint(_Ann, none, _FunT) -> ok;
 apply_typesig_constraint(Ann, address_to_contract, {fun_t, _, [], [_], Type}) ->
     add_constraint([#is_contract_constraint{ contract_t = Type,
-                                        context    = {address_to_contract, Ann}}]);
+                                             context    = {address_to_contract, Ann}}]);
 apply_typesig_constraint(Ann, bytes_concat, {fun_t, _, [], [A, B], C}) ->
     add_constraint({add_bytes, Ann, concat, A, B, C});
 apply_typesig_constraint(Ann, bytes_split, {fun_t, _, [], [C], {tuple_t, _, [A, B]}}) ->
     add_constraint({add_bytes, Ann, split, A, B, C});
 apply_typesig_constraint(Ann, bytecode_hash, {fun_t, _, _, [Con], _}) ->
     add_constraint([#is_contract_constraint{ contract_t = Con,
-                                        context    = {bytecode_hash, Ann} }]).
-
-when_warning(Warn, Do) ->
-    case lists:member(Warn, all_warnings()) of
-        false ->
-            create_type_errors(),
-            type_error({unknown_warning, Warn}),
-            destroy_and_report_type_errors(global_env());
-        true ->
-            case aeso_tc_ets_manager:ets_tab_exists(warnings) of
-                true ->
-                    IsEnabled = get_option(Warn, false),
-                    IsAll = get_option(warn_all, false) andalso lists:member(Warn, all_warnings()),
-                    if
-                        IsEnabled orelse IsAll -> Do();
-                        true -> ok
-                    end;
-                false ->
-                    ok
-            end
-    end.
+                                             context    = {bytecode_hash, Ann} }]).
