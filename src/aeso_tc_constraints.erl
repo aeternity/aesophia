@@ -28,14 +28,6 @@
                        element(1, T) =:= con orelse
                        element(1, T) =:= qcon).
 
-%% -- Circular dependency ----------------------------------------------------
-
-fresh_uvar(A) -> aeso_ast_infer_types:fresh_uvar(A).
-freshen(A) -> aeso_ast_infer_types:freshen(A).
-create_freshen_tvars() -> aeso_ast_infer_types:create_freshen_tvars().
-destroy_freshen_tvars() -> aeso_ast_infer_types:destroy_freshen_tvars().
-app_t(A, B, C) -> aeso_ast_infer_types:app_t(A, B, C).
-
 %% -- Moved functions --------------------------------------------------------
 
 unify(A, B, C, D) -> aeso_tc_unify:unify(A, B, C, D).
@@ -56,6 +48,14 @@ type_error(A) -> aeso_tc_errors:type_error(A).
 
 ensure_monomorphic(A, B) -> aeso_tc_type_utils:ensure_monomorphic(A, B).
 ensure_first_order(A, B) -> aeso_tc_type_utils:ensure_first_order(A, B).
+app_t(A, B, C) -> aeso_tc_type_utils:app_t(A, B, C).
+
+%% -------
+
+fresh_uvar(A) -> aeso_tc_fresh:fresh_uvar(A).
+freshen(A) -> aeso_tc_fresh:freshen(A).
+create_freshen_tvars() -> aeso_tc_fresh:create_freshen_tvars().
+destroy_freshen_tvars() -> aeso_tc_fresh:destroy_freshen_tvars().
 
 %% ---------------------------------------------------------------------------
 

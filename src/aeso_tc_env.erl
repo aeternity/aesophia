@@ -128,9 +128,6 @@
 
 %% -- Circular dependency ----------------------------------------------------
 
-fresh_uvar(A) -> aeso_ast_infer_types:fresh_uvar(A).
-freshen_type(A, B) -> aeso_ast_infer_types:freshen_type(A, B).
-freshen_type_sig(A, B) -> aeso_ast_infer_types:freshen_type_sig(A, B).
 infer_const(A, B) -> aeso_ast_infer_types:infer_const(A, B).
 
 %% -- Duplicated types -------------------------------------------------------
@@ -169,6 +166,12 @@ used_constant(A, B) -> aeso_tc_warnings:used_constant(A, B).
 
 get_option(A, B) -> aeso_tc_options:get_option(A, B).
 when_warning(A, B) -> aeso_tc_options:when_warning(A, B).
+
+%% -------
+
+fresh_uvar(A) -> aeso_tc_fresh:fresh_uvar(A).
+freshen_type(A, B) -> aeso_tc_fresh:freshen_type(A, B).
+freshen_type_sig(A, B) -> aeso_tc_fresh:freshen_type_sig(A, B).
 
 %% -- Getters ------------------------------------------------------------
 

@@ -8,6 +8,7 @@
         , ensure_first_order/2
         , ensure_monomorphic/2
         , opposite_variance/1
+        , app_t/3
         ]).
 
 typesig_to_fun_t({type_sig, Ann, _Constr, Named, Args, Res}) ->
@@ -86,3 +87,6 @@ opposite_variance(invariant) -> invariant;
 opposite_variance(covariant) -> contravariant;
 opposite_variance(contravariant) -> covariant;
 opposite_variance(bivariant) -> bivariant.
+
+app_t(_Ann, Name, [])  -> Name;
+app_t(Ann, Name, Args) -> {app_t, Ann, Name, Args}.

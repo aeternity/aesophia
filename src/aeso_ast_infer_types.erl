@@ -17,15 +17,7 @@
         ]).
 
 %% Newly exported
--export([ fresh_uvar/1
-        , freshen_type/2
-        , freshen_type_sig/2
-        , infer_const/2
-        , app_t/3
-        , create_freshen_tvars/0
-        , destroy_freshen_tvars/0
-        , freshen/1
-        , opposite_variance/1
+-export([ infer_const/2
         ]).
 -export_type([ utype/0
              , typesig/0
@@ -47,11 +39,6 @@
 -type uvar() :: {uvar, aeso_syntax:ann(), reference()}.
 
 -type named_args_t() :: uvar() | [{named_arg_t, aeso_syntax:ann(), aeso_syntax:id(), utype(), aeso_syntax:expr()}].
-
--define(is_type_id(T), element(1, T) =:= id orelse
-                       element(1, T) =:= qid orelse
-                       element(1, T) =:= con orelse
-                       element(1, T) =:= qcon).
 
 -type type() :: aeso_syntax:type().
 -type name() :: string().
@@ -114,6 +101,7 @@ when_warning(A, B) -> aeso_tc_options:when_warning(A, B).
 %% -------
 
 ensure_first_order(A, B) -> aeso_tc_type_utils:ensure_first_order(A, B).
+app_t(A, B, C) -> aeso_tc_type_utils:app_t(A, B, C).
 
 %% -------
 
@@ -127,6 +115,10 @@ unfold_record_types(A, B) -> aeso_tc_type_unfolding:unfold_record_types(A, B).
 %% -------
 
 opposite_variance(A) -> aeso_tc_type_utils:opposite_variance(A).
+
+%% -------
+
+fresh_uvar(A) -> aeso_tc_fresh:fresh_uvar(A).
 
 %% -- The rest ---------------------------------------------------------------
 
@@ -943,9 +935,6 @@ arg_type(ArgAnn, {app_t, Attrs, Name, Args}) ->
 arg_type(_, T) ->
     T.
 
-app_t(_Ann, Name, [])  -> Name;
-app_t(Ann, Name, Args) -> {app_t, Ann, Name, Args}.
-
 %% Hack: don't allow passing the 'value' named arg if not stateful. This only
 %% works since the user can't create functions with named arguments.
 check_stateful_named_arg(Env, {id, _, "value"}, Default) ->
@@ -1584,54 +1573,3 @@ get_oracle_type({qid, _, ["Oracle", "check"]},        [OType| _], _    ) -> OTyp
 get_oracle_type({qid, _, ["Oracle", "check_query"]},  [OType| _], _    ) -> OType;
 get_oracle_type({qid, _, ["Oracle", "respond"]},      [OType| _], _    ) -> OType;
 get_oracle_type(_Fun, _Args, _Ret) -> false.
-
-fresh_uvar(Attrs) ->
-    {uvar, Attrs, make_ref()}.
-
-create_freshen_tvars() ->
-    aeso_tc_ets_manager:ets_new(freshen_tvars, [set]).
-
-destroy_freshen_tvars() ->
-    aeso_tc_ets_manager:ets_delete(freshen_tvars).
-
-freshen_type(Ann, Type) ->
-    create_freshen_tvars(),
-    Type1 = freshen(Ann, Type),
-    destroy_freshen_tvars(),
-    Type1.
-
-freshen(Type) ->
-    freshen(aeso_syntax:get_ann(Type), Type).
-
-freshen(Ann, {tvar, _, Name}) ->
-    NewT = case aeso_tc_ets_manager:ets_lookup(freshen_tvars, Name) of
-               []          -> fresh_uvar(Ann);
-               [{Name, T}] -> T
-           end,
-    aeso_tc_ets_manager:ets_insert(freshen_tvars, {Name, NewT}),
-    NewT;
-freshen(Ann, {bytes_t, _, any}) ->
-    X = fresh_uvar(Ann),
-    aeso_tc_constraints:add_is_bytes_constraint(X),
-    X;
-freshen(Ann, T) when is_tuple(T) ->
-    list_to_tuple(freshen(Ann, tuple_to_list(T)));
-freshen(Ann, [A | B]) ->
-    [freshen(Ann, A) | freshen(Ann, B)];
-freshen(_, X) ->
-    X.
-
-freshen_type_sig(Ann, TypeSig = {type_sig, _, Constr, _, _, _}) ->
-    FunT = freshen_type(Ann, aeso_tc_type_utils:typesig_to_fun_t(TypeSig)),
-    apply_typesig_constraint(Ann, Constr, FunT),
-    FunT.
-
-apply_typesig_constraint(_Ann, none, _FunT) -> ok;
-apply_typesig_constraint(Ann, address_to_contract, {fun_t, _, [], [_], Type}) ->
-    aeso_tc_constraints:add_is_contract_constraint(Type, {address_to_contract, Ann});
-apply_typesig_constraint(Ann, bytes_concat, {fun_t, _, [], [A, B], C}) ->
-    aeso_tc_constraints:add_add_bytes_constraint(Ann, concat, A, B, C);
-apply_typesig_constraint(Ann, bytes_split, {fun_t, _, [], [C], {tuple_t, _, [A, B]}}) ->
-    aeso_tc_constraints:add_add_bytes_constraint(Ann, split, A, B, C);
-apply_typesig_constraint(Ann, bytecode_hash, {fun_t, _, _, [Con], _}) ->
-    aeso_tc_constraints:add_is_contract_constraint(Con, {bytecode_hash, Ann}).
