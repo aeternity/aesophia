@@ -272,7 +272,7 @@ to_sophia_value(ContractString, FunName, ok, Data, Options0) ->
         Code = string_to_code(ContractString, Options),
         #{ unfolded_typed_ast := TypedAst, type_env  := TypeEnv} = Code,
         {ok, _, Type0} = get_decode_type(FunName, TypedAst),
-        Type   = aeso_ast_infer_types:unfold_types_in_type(TypeEnv, Type0, [unfold_record_types, unfold_variant_types]),
+        Type   = aeso_tc_type_unfolding:unfold_types_in_type(TypeEnv, Type0, [unfold_record_types, unfold_variant_types]),
 
         try
             {ok, aeso_vm_decode:from_fate(Type, aeb_fate_encoding:deserialize(Data))}
@@ -323,7 +323,7 @@ decode_calldata(ContractString, FunName, Calldata, Options0) ->
         ArgTypes      = lists:map(GetType, Args),
         Type0         = {tuple_t, [], ArgTypes},
         %% user defined data types such as variants needed to match against
-        Type          = aeso_ast_infer_types:unfold_types_in_type(TypeEnv, Type0, [unfold_record_types, unfold_variant_types]),
+        Type          = aeso_tc_type_unfolding:unfold_types_in_type(TypeEnv, Type0, [unfold_record_types, unfold_variant_types]),
         case aeb_fate_abi:decode_calldata(FunName, Calldata) of
             {ok, FateArgs} ->
                 try

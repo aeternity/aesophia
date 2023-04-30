@@ -34,11 +34,17 @@ fresh_uvar(A) -> aeso_ast_infer_types:fresh_uvar(A).
 freshen(A) -> aeso_ast_infer_types:freshen(A).
 create_freshen_tvars() -> aeso_ast_infer_types:create_freshen_tvars().
 destroy_freshen_tvars() -> aeso_ast_infer_types:destroy_freshen_tvars().
-unify(A, B, C, D) -> aeso_ast_infer_types:unify(A, B, C, D).
-unfold_types_in_type(A, B) -> aeso_ast_infer_types:unfold_types_in_type(A, B).
 app_t(A, B, C) -> aeso_ast_infer_types:app_t(A, B, C).
 
 %% -- Moved functions --------------------------------------------------------
+
+unify(A, B, C, D) -> aeso_tc_unify:unify(A, B, C, D).
+
+%% -------
+
+unfold_types_in_type(A, B) -> aeso_tc_type_unfolding:unfold_types_in_type(A, B).
+
+%% -------
 
 qname(A) -> aeso_tc_name_manip:qname(A).
 

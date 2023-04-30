@@ -4,10 +4,13 @@
 
 %% -- Circular dependency ----------------------------------------------------
 
-unfold_types_in_type(A, B, C) -> aeso_ast_infer_types:unfold_types_in_type(A, B, C).
 opposite_variance(A) -> aeso_ast_infer_types:opposite_variance(A).
 
 %% -- Moved functions --------------------------------------------------------
+
+unfold_types_in_type(A, B, C) -> aeso_tc_type_unfolding:unfold_types_in_type(A, B, C).
+
+%% -------
 
 type_error(A) -> aeso_tc_errors:type_error(A).
 cannot_unify(A, B, C, D) -> aeso_tc_errors:cannot_unify(A, B, C, D).
