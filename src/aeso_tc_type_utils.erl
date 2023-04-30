@@ -7,6 +7,7 @@
         , fun_arity/1
         , ensure_first_order/2
         , ensure_monomorphic/2
+        , opposite_variance/1
         ]).
 
 typesig_to_fun_t({type_sig, Ann, _Constr, Named, Args, Res}) ->
@@ -80,3 +81,8 @@ is_first_order({fun_t, _, _, _, _})    -> false;
 is_first_order(Ts) when is_list(Ts)    -> lists:all(fun is_first_order/1, Ts);
 is_first_order(Tup) when is_tuple(Tup) -> is_first_order(tuple_to_list(Tup));
 is_first_order(_)                      -> true.
+
+opposite_variance(invariant) -> invariant;
+opposite_variance(covariant) -> contravariant;
+opposite_variance(contravariant) -> covariant;
+opposite_variance(bivariant) -> bivariant.

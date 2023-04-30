@@ -124,6 +124,10 @@ unify(A, B, C, D) -> aeso_tc_unify:unify(A, B, C, D).
 unfold_types_in_type(A, B) -> aeso_tc_type_unfolding:unfold_types_in_type(A, B).
 unfold_record_types(A, B) -> aeso_tc_type_unfolding:unfold_record_types(A, B).
 
+%% -------
+
+opposite_variance(A) -> aeso_tc_type_utils:opposite_variance(A).
+
 %% -- The rest ---------------------------------------------------------------
 
 map_t(As, K, V) -> {app_t, As, {id, As, "map"}, [K, V]}.
@@ -509,11 +513,6 @@ infer_type_vars_variance({fun_t, _, [], Args, Res}) ->
     FlippedArgsVariance = lists:map(fun({TVar, Variance}) -> {TVar, opposite_variance(Variance)} end, ArgsVariance),
     FlippedArgsVariance ++ ResVariance;
 infer_type_vars_variance(_) -> [].
-
-opposite_variance(invariant) -> invariant;
-opposite_variance(covariant) -> contravariant;
-opposite_variance(contravariant) -> covariant;
-opposite_variance(bivariant) -> bivariant.
 
 -spec check_constants(env(), [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
 check_constants(Env, Consts) ->
