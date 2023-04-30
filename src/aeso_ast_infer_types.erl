@@ -19,38 +19,27 @@
 %% Newly exported
 -export([ infer_const/2
         ]).
--export_type([ utype/0
-             , typesig/0
+-export_type([ typesig/0
              ]).
 
 -include("aeso_utils.hrl").
 
 -type env() :: aeso_tc_env:env().
 
--type utype() :: {fun_t, aeso_syntax:ann(), named_args_t(), [utype()] | var_args, utype()}
-               | {app_t, aeso_syntax:ann(), utype(), [utype()]}
-               | {tuple_t, aeso_syntax:ann(), [utype()]}
-               | aeso_syntax:id()  | aeso_syntax:qid()
-               | aeso_syntax:con() | aeso_syntax:qcon()  %% contracts
-               | aeso_syntax:tvar()
-               | {if_t, aeso_syntax:ann(), aeso_syntax:id(), utype(), utype()}  %% Can branch on named argument (protected)
-               | uvar().
-
--type uvar() :: {uvar, aeso_syntax:ann(), reference()}.
-
--type named_args_t() :: uvar() | [{named_arg_t, aeso_syntax:ann(), aeso_syntax:id(), utype(), aeso_syntax:expr()}].
-
 -type type() :: aeso_syntax:type().
 -type name() :: string().
--type typesig() :: {type_sig, aeso_syntax:ann(), type_constraints(), [aeso_syntax:named_arg_t()], [type()], type()}.
-
--type type_constraints() :: none | bytes_concat | bytes_split | address_to_contract | bytecode_hash.
 
 -type variance() :: invariant | covariant | contravariant | bivariant.
 
 -define(PRINT_TYPES(Fmt, Args),
         when_option(pp_types, fun () -> io:format(Fmt, Args) end)).
 -define(CONSTRUCTOR_MOCK_NAME, "#__constructor__#").
+
+%% -- Duplicated types -------------------------------------------------------
+
+-type utype() :: aeso_tc_typedefs:utype().
+-type named_args_t() :: aeso_tc_typedefs:named_args_t().
+-type typesig() :: aeso_tc_typedefs:typesig().
 
 %% -- Moved functions --------------------------------------------------------
 

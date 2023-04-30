@@ -19,7 +19,7 @@
 
 -type uvar() :: {uvar, aeso_syntax:ann(), reference()}.
 -type named_args_t() :: uvar() | [{named_arg_t, aeso_syntax:ann(), aeso_syntax:id(), utype(), aeso_syntax:expr()}].
--type utype() :: aeso_ast_infer_types:utype().
+-type utype() :: aeso_tc_typedefs:utype().
 
 %% -- Duplicated macros ------------------------------------------------------
 

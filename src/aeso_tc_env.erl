@@ -135,8 +135,8 @@ infer_const(A, B) -> aeso_ast_infer_types:infer_const(A, B).
 -type name() :: string().
 -type qname() :: [string()].
 -type type() :: aeso_syntax:type().
--type utype() :: aeso_ast_infer_types:utype().
--type typesig() :: aeso_ast_infer_types:typesig().
+-type utype() :: aeso_tc_typedefs:utype().
+-type typesig() :: aeso_tc_typedefs:typesig().
 
 %% -- Duplicated macros ------------------------------------------------------
 
