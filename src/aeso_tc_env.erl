@@ -68,6 +68,8 @@
         , empty_env/0
         ]).
 
+-export([destroy_and_report_type_errors/1]).
+
 -export_type([env/0]).
 
 -include("aeso_utils.hrl").
@@ -147,6 +149,7 @@ infer_const(A, B) -> aeso_ast_infer_types:infer_const(A, B).
 name(A) -> aeso_tc_name_manip:name(A).
 qname(A) -> aeso_tc_name_manip:qname(A).
 qid(A, B) -> aeso_tc_name_manip:qid(A, B).
+qcon(A, B) -> aeso_tc_name_manip:qcon(A, B).
 set_qname(A, B) -> aeso_tc_name_manip:set_qname(A, B).
 
 %% -------
@@ -992,3 +995,27 @@ global_env() ->
              maps:from_list([{N, [#field_info{ ann = [], field_t = T, record_t = Tx, kind = record }]}
                              || {N, T} <- TxFlds ])
         }.
+
+destroy_and_report_type_errors(Env) ->
+    Errors0 = lists:reverse(aeso_tc_ets_manager:ets_tab2list(type_errors)),
+    %% io:format("Type errors now: ~p\n", [Errors0]),
+    aeso_tc_errors:destroy_type_errors(),
+    Errors  = [ aeso_tc_errors:mk_error(unqualify(Env, Err)) || Err <- Errors0 ],
+    aeso_errors:throw(Errors).  %% No-op if Errors == []
+
+%% Strip current namespace from error message for nicer printing.
+unqualify(Env, {qid, Ann, Xs}) ->
+    qid(Ann, unqualify1(aeso_tc_env:namespace(Env), Xs));
+unqualify(Env, {qcon, Ann, Xs}) ->
+    qcon(Ann, unqualify1(aeso_tc_env:namespace(Env), Xs));
+unqualify(Env, T) when is_tuple(T) ->
+    list_to_tuple(unqualify(Env, tuple_to_list(T)));
+unqualify(Env, [H | T]) -> [unqualify(Env, H) | unqualify(Env, T)];
+unqualify(_Env, X) -> X.
+
+unqualify1(NS, Xs) ->
+    try lists:split(length(NS), Xs) of
+        {NS, Ys} -> Ys;
+        _        -> Xs
+    catch _:_ -> Xs
+    end.

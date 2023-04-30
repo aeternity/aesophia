@@ -10,7 +10,7 @@
 
 type_error(A) -> aeso_tc_errors:type_error(A).
 create_type_errors() -> aeso_tc_errors:create_type_errors().
-destroy_and_report_type_errors(A) -> aeso_tc_errors:destroy_and_report_type_errors(A).
+destroy_and_report_type_errors(A) -> aeso_tc_env:destroy_and_report_type_errors(A).
 
 %% -------
 
