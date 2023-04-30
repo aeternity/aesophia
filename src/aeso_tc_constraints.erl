@@ -46,8 +46,8 @@ type_error(A) -> aeso_tc_errors:type_error(A).
 
 %% -------
 
-ensure_monomorphic(A, B) -> aeso_tc_type_utils:ensure_monomorphic(A, B).
-ensure_first_order(A, B) -> aeso_tc_type_utils:ensure_first_order(A, B).
+is_monomorphic(A) -> aeso_tc_type_utils:is_monomorphic(A).
+is_first_order(A) -> aeso_tc_type_utils:is_first_order(A).
 app_t(A, B, C) -> aeso_tc_type_utils:app_t(A, B, C).
 
 %% -------
@@ -432,10 +432,10 @@ check_oracle_type_constraints(_Env, []) ->
 check_oracle_type_constraints(Env, [{oracle_type, Ann, OType} | Rest]) ->
     Type = unfold_types_in_type(Env, aeso_tc_type_utils:instantiate(OType)),
     {app_t, _, {id, _, "oracle"}, [QType, RType]} = Type,
-    ensure_monomorphic(QType, {invalid_oracle_type, polymorphic,  query,    Ann, Type}),
-    ensure_monomorphic(RType, {invalid_oracle_type, polymorphic,  response, Ann, Type}),
-    ensure_first_order(QType, {invalid_oracle_type, higher_order, query,    Ann, Type}),
-    ensure_first_order(RType, {invalid_oracle_type, higher_order, response, Ann, Type}),
+    is_monomorphic(QType) orelse type_error({invalid_oracle_type, polymorphic,  query,    Ann, Type}),
+    is_monomorphic(RType) orelse type_error({invalid_oracle_type, polymorphic,  response, Ann, Type}),
+    is_first_order(QType) orelse type_error({invalid_oracle_type, higher_order, query,    Ann, Type}),
+    is_first_order(RType) orelse type_error({invalid_oracle_type, higher_order, response, Ann, Type}),
     check_oracle_type_constraints(Env, Rest).
 
 %% -- Field constraints --

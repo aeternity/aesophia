@@ -89,7 +89,7 @@ when_warning(A, B) -> aeso_tc_options:when_warning(A, B).
 
 %% -------
 
-ensure_first_order(A, B) -> aeso_tc_type_utils:ensure_first_order(A, B).
+is_first_order(A) -> aeso_tc_type_utils:is_first_order(A).
 app_t(A, B, C) -> aeso_tc_type_utils:app_t(A, B, C).
 
 %% -------
@@ -945,9 +945,9 @@ check_entrypoints(Defs) ->
          get_option(allow_higher_order_entrypoints, false) =:= false ].
 
 ensure_first_order_entrypoint({letfun, Ann, Id = {id, _, Name}, Args, Ret, _}) ->
-    [ ensure_first_order(ArgType, {higher_order_entrypoint, AnnArg, Id, {argument, ArgId, ArgType}})
+    [ is_first_order(ArgType) orelse type_error({higher_order_entrypoint, AnnArg, Id, {argument, ArgId, ArgType}})
       || {typed, AnnArg, ArgId, ArgType} <- Args ],
-    [ ensure_first_order(Ret, {higher_order_entrypoint, Ann, Id, {result, Ret}})
+    [ is_first_order(Ret) orelse type_error({higher_order_entrypoint, Ann, Id, {result, Ret}})
       || Name /= "init" ],  %% init can return higher-order values, since they're written to the store
                             %% rather than being returned.
     ok.
