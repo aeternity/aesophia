@@ -291,14 +291,15 @@ builtins() ->
                                    {"gt_inv", 1}, {"gt_add", 2}, {"gt_mul", 2}, {"gt_pow", 2}, {"gt_is_one", 1},
                                    {"pairing", 2}, {"miller_loop", 2}, {"final_exp", 1},
                                    {"int_to_fr", 1}, {"int_to_fp", 1}, {"fr_to_int", 1}, {"fp_to_int", 1}]},
-              {["StringInternal"], [{"length", 1}, {"concat", 2}, {"to_list", 1}, {"from_list", 1},
+              {["StringInternal"], [{"length", 1}, {"concat", 2}, {"to_list", 1}, {"from_list", 1}, {"to_bytes", 1},
                                     {"sha3", 1}, {"sha256", 1}, {"blake2b", 1}, {"to_lower", 1}, {"to_upper", 1}]},
               {["Char"],     [{"to_int", 1}, {"from_int", 1}]},
               {["Auth"],     [{"tx_hash", none}, {"tx", none}]},
               {["Bits"],     [{"set", 2}, {"clear", 2}, {"test", 2}, {"sum", 1}, {"intersection", 2},
                               {"union", 2}, {"difference", 2}, {"none", none}, {"all", none}]},
-              {["Bytes"],    [{"to_int", 1}, {"to_str", 1}, {"concat", 2}, {"split", 1}]},
-              {["Int"],      [{"to_str", 1}, {"mulmod", 2}]},
+              {["Bytes"],    [{"to_int", 1}, {"to_str", 1}, {"concat", 2}, {"split", 1}, {"to_fixed_size", 1},
+                              {"to_any_size", 1}, {"size", 1}, {"split_any", 2}]},
+              {["Int"],      [{"to_str", 1}, {"to_bytes", 2}, {"mulmod", 2}]},
               {["Address"],  [{"to_str", 1}, {"to_bytes", 1}, {"to_contract", 1},
                               {"is_oracle", 1}, {"is_contract", 1}, {"is_payable", 1}]}
              ],
@@ -610,6 +611,9 @@ expr_to_fcode(Env, Type, {qid, Ann, X}) ->
             {builtin_u, FAnn, B, Ar, TypeArgs};
         {builtin_u, FAnn, B = bytes_split, Ar} ->
             {fun_t, _, _, _, {tuple_t, _, [{bytes_t, _, N}, _]}} = Type,
+            {builtin_u, FAnn, B, Ar, [{lit, FAnn, {int, N}}]};
+        {builtin_u, FAnn, B = bytes_to_fixed_size, Ar} ->
+            {fun_t, _, _, _, {app_t, _, {id, _, "option"}, [{bytes_t, _, N}]}} = Type,
             {builtin_u, FAnn, B, Ar, [{lit, FAnn, {int, N}}]};
         Other -> Other
     end;
@@ -1166,13 +1170,13 @@ stmts_to_fcode(Env, [Expr | Stmts]) ->
 op_builtins() ->
     [map_from_list, map_to_list, map_delete, map_member, map_size,
      stringinternal_length, stringinternal_concat, stringinternal_to_list, stringinternal_from_list,
-     stringinternal_sha3, stringinternal_sha256, stringinternal_blake2b,
+     stringinternal_to_bytes, stringinternal_sha3, stringinternal_sha256, stringinternal_blake2b,
      char_to_int, char_from_int, stringinternal_to_lower, stringinternal_to_upper,
-     bits_set, bits_clear, bits_test, bits_sum, bits_intersection, bits_union,
-     bits_difference, int_to_str, int_mulmod, address_to_str, address_to_bytes, crypto_verify_sig,
-     address_to_contract,
-     crypto_verify_sig_secp256k1, crypto_sha3, crypto_sha256, crypto_blake2b, crypto_poseidon,
-     crypto_ecverify_secp256k1, crypto_ecrecover_secp256k1,
+     bits_set, bits_clear, bits_test, bits_sum, bits_intersection, bits_union, bits_difference,
+     int_to_str, int_to_bytes, int_mulmod,
+     address_to_str, address_to_bytes, address_to_contract,
+     crypto_verify_sig, crypto_verify_sig_secp256k1, crypto_sha3, crypto_sha256, crypto_blake2b,
+     crypto_poseidon, crypto_ecverify_secp256k1, crypto_ecrecover_secp256k1,
      mcl_bls12_381_g1_neg, mcl_bls12_381_g1_norm, mcl_bls12_381_g1_valid,
      mcl_bls12_381_g1_is_zero, mcl_bls12_381_g1_add, mcl_bls12_381_g1_mul,
      mcl_bls12_381_g2_neg, mcl_bls12_381_g2_norm, mcl_bls12_381_g2_valid,
