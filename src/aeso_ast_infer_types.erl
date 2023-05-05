@@ -3155,9 +3155,9 @@ unify1(Env, T, {uvar, A, R}, Variance, When) ->
     unify1(Env, {uvar, A, R}, T, Variance, When);
 unify1(_Env, {tvar, _, X}, {tvar, _, X}, _Variance, _When) -> true; %% Rigid type variables
 unify1(Env, [A|B], [C|D], [V|Variances], When) ->
-    unify0(Env, A, C, V, When) andalso unify0(Env, B, D, Variances, When);
+    unify0(Env, A, C, V, When) and unify0(Env, B, D, Variances, When);
 unify1(Env, [A|B], [C|D], Variance, When) ->
-    unify0(Env, A, C, Variance, When) andalso unify0(Env, B, D, Variance, When);
+    unify0(Env, A, C, Variance, When) and unify0(Env, B, D, Variance, When);
 unify1(_Env, X, X, _Variance, _When) ->
     true;
 unify1(_Env, _A, {id, _, "void"}, Variance, _When)
@@ -3202,8 +3202,8 @@ unify1(_Env, {fun_t, _, _, var_args, _}, {fun_t, _, _, _, _}, _Variance, When) -
     type_error({unify_varargs, When});
 unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, Variance, When)
   when length(Args1) == length(Args2) ->
-    unify0(Env, Named1, Named2, opposite_variance(Variance), When) andalso
-    unify0(Env, Args1, Args2, opposite_variance(Variance), When) andalso
+    unify0(Env, Named1, Named2, opposite_variance(Variance), When) and
+    unify0(Env, Args1, Args2, opposite_variance(Variance), When) and
     unify0(Env, Result1, Result2, Variance, When);
 unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, Variance, When)
   when length(Args1) == length(Args2), Tag == id orelse Tag == qid ->
@@ -3890,8 +3890,11 @@ mk_error({bad_top_level_decl, Decl}) ->
     Msg = io_lib:format("The definition of '~s' must appear inside a ~s.",
                         [pp_expr(Id), What]),
     mk_t_err(pos(Decl), Msg);
-mk_error({unknown_byte_length, Type}) ->
-    Msg = io_lib:format("Cannot resolve length of byte array.", []),
+mk_error({unknown_byte_type, Ctx, Type}) ->
+    Msg = io_lib:format("Cannot resolve type of byte array in\n  ~s", [pp_context(Ctx)]),
+    mk_t_err(pos(Type), Msg);
+mk_error({unknown_byte_length, Ctx, Type}) ->
+    Msg = io_lib:format("Cannot resolve length of byte array in\n  ~s", [pp_context(Ctx)]),
     mk_t_err(pos(Type), Msg);
 mk_error({unsolved_bytes_constraint, Ann, concat, A, B, C}) ->
     Msg = io_lib:format("Failed to resolve byte array lengths in call to Bytes.concat with arguments of type\n"
@@ -3901,6 +3904,12 @@ mk_error({unsolved_bytes_constraint, Ann, concat, A, B, C}) ->
     mk_t_err(pos(Ann), Msg);
 mk_error({unsolved_bytes_constraint, Ann, split, A, B, C}) ->
     Msg = io_lib:format("Failed to resolve byte array lengths in call to Bytes.split with argument of type\n"
+                        "~s  (at ~s)\nand result types\n~s  (at ~s)\n~s  (at ~s)",
+                        [ pp_type("  - ", C), pp_loc(C), pp_type("  - ", A), pp_loc(A),
+                          pp_type("  - ", B), pp_loc(B)]),
+    mk_t_err(pos(Ann), Msg);
+mk_error({unsolved_bytes_constraint, Ann, split_any, A, B, C}) ->
+    Msg = io_lib:format("Failed to resolve byte arrays in call to Bytes.split_any with argument of type\n"
                         "~s  (at ~s)\nand result types\n~s  (at ~s)\n~s  (at ~s)",
                         [ pp_type("  - ", C), pp_loc(C), pp_type("  - ", A), pp_loc(A),
                           pp_type("  - ", B), pp_loc(B)]),
