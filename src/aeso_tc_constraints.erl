@@ -52,10 +52,10 @@ app_t(A, B, C) -> aeso_tc_type_utils:app_t(A, B, C).
 
 %% -------
 
-fresh_uvar(A) -> aeso_tc_fresh:fresh_uvar(A).
-freshen(A) -> aeso_tc_fresh:freshen(A).
-create_freshen_tvars() -> aeso_tc_fresh:create_freshen_tvars().
-destroy_freshen_tvars() -> aeso_tc_fresh:destroy_freshen_tvars().
+fresh_uvar(A) -> aeso_tc_env:fresh_uvar(A).
+freshen(A) -> aeso_tc_env:freshen(A).
+create_freshen_tvars() -> aeso_tc_env:create_freshen_tvars().
+destroy_freshen_tvars() -> aeso_tc_env:destroy_freshen_tvars().
 
 %% ---------------------------------------------------------------------------
 

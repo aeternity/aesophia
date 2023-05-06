@@ -51,6 +51,10 @@ set_qname(A, B) -> aeso_tc_name_manip:set_qname(A, B).
 
 type_error(A) -> aeso_tc_errors:type_error(A).
 create_type_errors() -> aeso_tc_errors:create_type_errors().
+
+%% -------
+
+fresh_uvar(A) -> aeso_tc_env:fresh_uvar(A).
 destroy_and_report_type_errors(A) -> aeso_tc_env:destroy_and_report_type_errors(A).
 
 %% -------
@@ -104,10 +108,6 @@ unfold_record_types(A, B) -> aeso_tc_type_unfolding:unfold_record_types(A, B).
 %% -------
 
 opposite_variance(A) -> aeso_tc_type_utils:opposite_variance(A).
-
-%% -------
-
-fresh_uvar(A) -> aeso_tc_fresh:fresh_uvar(A).
 
 %% -- The rest ---------------------------------------------------------------
 
