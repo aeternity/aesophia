@@ -54,8 +54,6 @@
         ]).
 
 -export([ lookup_env/4
-        , lookup_name/3
-        , lookup_name/4
         , lookup_type/2
         , lookup_record_field/2
         , lookup_record_field/3
@@ -66,13 +64,6 @@
 -export([ init_env/0
         , init_env/1
         , empty_env/0
-        ]).
-
-%% Freshening
--export([ fresh_uvar/1
-        , freshen/1
-        , create_freshen_tvars/0
-        , destroy_freshen_tvars/0
         ]).
 
 -export([destroy_and_report_type_errors/1]).
@@ -153,7 +144,6 @@ name(A) -> aeso_tc_name_manip:name(A).
 qname(A) -> aeso_tc_name_manip:qname(A).
 qid(A, B) -> aeso_tc_name_manip:qid(A, B).
 qcon(A, B) -> aeso_tc_name_manip:qcon(A, B).
-set_qname(A, B) -> aeso_tc_name_manip:set_qname(A, B).
 
 %% -------
 
@@ -163,10 +153,6 @@ type_error(A) -> aeso_tc_errors:type_error(A).
 
 warn_potential_shadowing(A, B, C) -> aeso_tc_warnings:warn_potential_shadowing(A, B, C).
 used_include(A) -> aeso_tc_warnings:used_include(A).
-used_variable(A, B, C) -> aeso_tc_warnings:used_variable(A, B, C).
-used_stateful(A) -> aeso_tc_warnings:used_stateful(A).
-register_function_call(A, B) -> aeso_tc_warnings:register_function_call(A, B).
-used_constant(A, B) -> aeso_tc_warnings:used_constant(A, B).
 
 %% -------
 
@@ -581,54 +567,6 @@ lookup_env1(#env{ namespace = Current, used_namespaces = UsedNamespaces, scopes 
             end
     end.
 
-lookup_name(Env, As, Name) ->
-    lookup_name(Env, As, Name, []).
-
-lookup_name(Env = #env{ namespace = NS, current_function = CurFn }, As, Id, Options) ->
-    case lookup_env(Env, term, As, qname(Id)) of
-        false ->
-            type_error({unbound_variable, Id}),
-            {Id, fresh_uvar(As)};
-        {QId, {_, Ty}} ->
-            %% Variables and functions cannot be used when CurFn is `none`.
-            %% i.e. they cannot be used in toplevel constants
-            [ begin
-                when_warning(
-                    warn_unused_variables,
-                    fun() -> used_variable(NS, name(CurFn), QId) end),
-                when_warning(
-                    warn_unused_functions,
-                    fun() -> register_function_call(NS ++ qname(CurFn), QId) end)
-              end || CurFn =/= none ],
-
-            when_warning(warn_unused_constants, fun() -> used_constant(NS, QId) end),
-
-            Freshen = proplists:get_value(freshen, Options, false),
-            check_stateful(Env, Id, Ty),
-            Ty1 = case Ty of
-                    {type_sig, _, _, _, _, _} -> freshen_type_sig(As, Ty);
-                    _ when Freshen            -> freshen_type(As, Ty);
-                    _                         -> Ty
-                  end,
-            {set_qname(QId, Id), Ty1}
-    end.
-
-check_stateful(#env{ in_guard = true }, Id, Type = {type_sig, _, _, _, _, _}) ->
-    case aeso_syntax:get_ann(stateful, Type, false) of
-        false -> ok;
-        true  ->
-            type_error({stateful_not_allowed_in_guards, Id})
-    end;
-check_stateful(#env{ stateful = false, current_function = Fun }, Id, Type = {type_sig, _, _, _, _, _}) ->
-    case aeso_syntax:get_ann(stateful, Type, false) of
-        false -> ok;
-        true  ->
-            type_error({stateful_not_allowed, Id, Fun})
-    end;
-check_stateful(#env{ current_function = Fun }, _Id, _Type) ->
-    when_warning(warn_unused_stateful, fun() -> used_stateful(Fun) end),
-    ok.
-
 -spec lookup_record_field(env(), name()) -> [field_info()].
 lookup_record_field(Env, FieldName) ->
     maps:get(FieldName, Env#env.fields, []).
@@ -1001,51 +939,3 @@ unqualify1(NS, Xs) ->
         _        -> Xs
     catch _:_ -> Xs
     end.
-
-create_freshen_tvars() ->
-    aeso_tc_ets_manager:ets_new(freshen_tvars, [set]).
-
-destroy_freshen_tvars() ->
-    aeso_tc_ets_manager:ets_delete(freshen_tvars).
-
-freshen_type(Ann, Type) ->
-    create_freshen_tvars(),
-    Type1 = freshen(Ann, Type),
-    destroy_freshen_tvars(),
-    Type1.
-
-freshen(Type) ->
-    freshen(aeso_syntax:get_ann(Type), Type).
-
-freshen(Ann, {tvar, _, Name}) ->
-    NewT = case aeso_tc_ets_manager:ets_lookup(freshen_tvars, Name) of
-               []          -> fresh_uvar(Ann);
-               [{Name, T}] -> T
-           end,
-    aeso_tc_ets_manager:ets_insert(freshen_tvars, {Name, NewT}),
-    NewT;
-freshen(Ann, {bytes_t, _, any}) ->
-    X = fresh_uvar(Ann),
-    aeso_tc_constraints:add_is_bytes_constraint(X),
-    X;
-freshen(Ann, T) when is_tuple(T) ->
-    list_to_tuple(freshen(Ann, tuple_to_list(T)));
-freshen(Ann, [A | B]) ->
-    [freshen(Ann, A) | freshen(Ann, B)];
-freshen(_, X) ->
-    X.
-
-freshen_type_sig(Ann, TypeSig = {type_sig, _, Constr, _, _, _}) ->
-    FunT = freshen_type(Ann, aeso_tc_type_utils:typesig_to_fun_t(TypeSig)),
-    apply_typesig_constraint(Ann, Constr, FunT),
-    FunT.
-
-apply_typesig_constraint(_Ann, none, _FunT) -> ok;
-apply_typesig_constraint(Ann, address_to_contract, {fun_t, _, [], [_], Type}) ->
-    aeso_tc_constraints:add_is_contract_constraint(Type, {address_to_contract, Ann});
-apply_typesig_constraint(Ann, bytes_concat, {fun_t, _, [], [A, B], C}) ->
-    aeso_tc_constraints:add_add_bytes_constraint(Ann, concat, A, B, C);
-apply_typesig_constraint(Ann, bytes_split, {fun_t, _, [], [C], {tuple_t, _, [A, B]}}) ->
-    aeso_tc_constraints:add_add_bytes_constraint(Ann, split, A, B, C);
-apply_typesig_constraint(Ann, bytecode_hash, {fun_t, _, _, [Con], _}) ->
-    aeso_tc_constraints:add_is_contract_constraint(Con, {bytecode_hash, Ann}).

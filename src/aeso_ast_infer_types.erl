@@ -73,6 +73,9 @@ potential_unused_variables(A, B, C) -> aeso_tc_warnings:potential_unused_variabl
 potential_unused_function(A, B, C, D) -> aeso_tc_warnings:potential_unused_function(A, B, C, D).
 mk_warning(A) -> aeso_tc_warnings:mk_warning(A).
 used_stateful(A) -> aeso_tc_warnings:used_stateful(A).
+used_variable(A, B, C) -> aeso_tc_warnings:used_variable(A, B, C).
+register_function_call(A, B) -> aeso_tc_warnings:register_function_call(A, B).
+used_constant(A, B) -> aeso_tc_warnings:used_constant(A, B).
 warn_potential_negative_spend(A, B, C) -> aeso_tc_warnings:warn_potential_negative_spend(A, B, C).
 warn_potential_division_by_zero(A, B, C) -> aeso_tc_warnings:warn_potential_division_by_zero(A, B, C).
 potential_unused_return_value(A) -> aeso_tc_warnings:potential_unused_return_value(A).
@@ -1060,10 +1063,10 @@ infer_expr(_Env, Body={id, As, "???"}) ->
     type_error({hole_found, As, T}),
     {typed, As, Body, T};
 infer_expr(Env, Id = {Tag, As, _}) when Tag == id; Tag == qid ->
-    {QName, Type} = aeso_tc_env:lookup_name(Env, As, Id),
+    {QName, Type} = lookup_name(Env, As, Id),
     {typed, As, QName, Type};
 infer_expr(Env, Id = {Tag, As, _}) when Tag == con; Tag == qcon ->
-    {QName, Type} = aeso_tc_env:lookup_name(Env, As, Id, [freshen]),
+    {QName, Type} = lookup_name(Env, As, Id, [freshen]),
     {typed, As, QName, Type};
 infer_expr(Env, {tuple, As, Cpts}) ->
     NewCpts = [infer_expr(Env, C) || C <- Cpts],
@@ -1582,3 +1585,61 @@ get_oracle_type({qid, _, ["Oracle", "check"]},        [OType| _], _    ) -> OTyp
 get_oracle_type({qid, _, ["Oracle", "check_query"]},  [OType| _], _    ) -> OType;
 get_oracle_type({qid, _, ["Oracle", "respond"]},      [OType| _], _    ) -> OType;
 get_oracle_type(_Fun, _Args, _Ret) -> false.
+
+lookup_name(Env, As, Name) ->
+    lookup_name(Env, As, Name, []).
+
+lookup_name(Env, As, Id, Options) ->
+    case aeso_tc_env:lookup_env(Env, term, As, qname(Id)) of
+        false ->
+            type_error({unbound_variable, Id}),
+            {Id, fresh_uvar(As)};
+        {QId, {_, Ty}} ->
+            NS = aeso_tc_env:namespace(Env),
+            CurFn = aeso_tc_env:current_function(Env),
+            %% Variables and functions cannot be used when CurFn is `none`.
+            %% i.e. they cannot be used in toplevel constants
+            [ begin
+                when_warning(
+                    warn_unused_variables,
+                    fun() -> used_variable(NS, name(CurFn), QId) end),
+                when_warning(
+                    warn_unused_functions,
+                    fun() -> register_function_call(NS ++ qname(CurFn), QId) end)
+              end || CurFn =/= none ],
+
+            when_warning(warn_unused_constants, fun() -> used_constant(NS, QId) end),
+
+            Freshen = proplists:get_value(freshen, Options, false),
+            check_stateful(Env, Id, Ty),
+            Ty1 = case Ty of
+                    {type_sig, _, _, _, _, _} -> aeso_tc_constraints:freshen_type_sig(As, Ty);
+                    _ when Freshen            -> aeso_tc_constraints:freshen_type(As, Ty);
+                    _                         -> Ty
+                  end,
+            {set_qname(QId, Id), Ty1}
+    end.
+
+check_stateful(Env, Id, Type = {type_sig, _, _, _, _, _}) ->
+     IsStatefulType = aeso_syntax:get_ann(stateful, Type, false),
+     IsStatefulType andalso (check_stateful_not_in_guard(Env, Id) andalso check_stateful_in_stateful_fun(Env, Id)),
+     ok;
+ check_stateful(Env, _Id, _Type) ->
+     when_warning(warn_unused_stateful, fun() -> used_stateful(aeso_tc_env:current_function(Env)) end),
+     ok.
+
+ check_stateful_not_in_guard(Env, Id) ->
+     case aeso_tc_env:in_guard(Env) of
+         false -> true;
+         true  ->
+             type_error({stateful_not_allowed_in_guards, Id}),
+             false
+     end.
+
+ check_stateful_in_stateful_fun(Env, Id) ->
+     case aeso_tc_env:stateful(Env) of
+         true  -> true;
+         false ->
+             type_error({stateful_not_allowed, Id, aeso_tc_env:current_function(Env)}),
+             false
+     end.
