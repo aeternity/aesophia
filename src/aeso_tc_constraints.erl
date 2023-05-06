@@ -5,8 +5,6 @@
         , create_constraints/0
         , add_is_contract_constraint/2
         , add_is_contract_constraint/3
-        , add_is_bytes_constraint/1
-        , add_add_bytes_constraint/5
         , add_aens_resolve_constraint/1
         , add_oracle_type_constraint/2
         , add_named_argument_constraint/3
@@ -137,12 +135,6 @@ add_named_argument_constraint(Args, Name, Type) ->
             args = Args,
             name = Name,
             type = Type }).
-
-add_is_bytes_constraint(Type) ->
-    add_constraint({is_bytes, Type}).
-
-add_add_bytes_constraint(Ann, Kind, A, B, C) ->
-    add_constraint({add_bytes, Ann, Kind, A, B, C}).
 
 add_field_constraint(RecordT, Field, FieldT, Kind, Context) ->
     add_constraint(#field_constraint{
@@ -570,7 +562,7 @@ freshen(Ann, {tvar, _, Name}) ->
     NewT;
 freshen(Ann, {bytes_t, _, any}) ->
     X = fresh_uvar(Ann),
-    aeso_tc_constraints:add_is_bytes_constraint(X),
+    add_constraint({is_bytes, X}),
     X;
 freshen(Ann, T) when is_tuple(T) ->
     list_to_tuple(freshen(Ann, tuple_to_list(T)));
@@ -594,8 +586,8 @@ apply_typesig_constraint(_Ann, none, _FunT) -> ok;
 apply_typesig_constraint(Ann, address_to_contract, {fun_t, _, [], [_], Type}) ->
     aeso_tc_constraints:add_is_contract_constraint(Type, {address_to_contract, Ann});
 apply_typesig_constraint(Ann, bytes_concat, {fun_t, _, [], [A, B], C}) ->
-    aeso_tc_constraints:add_add_bytes_constraint(Ann, concat, A, B, C);
+    add_constraint({add_bytes, Ann, concat, A, B, C});
 apply_typesig_constraint(Ann, bytes_split, {fun_t, _, [], [C], {tuple_t, _, [A, B]}}) ->
-    aeso_tc_constraints:add_add_bytes_constraint(Ann, split, A, B, C);
+    add_constraint({add_bytes, Ann, split, A, B, C});
 apply_typesig_constraint(Ann, bytecode_hash, {fun_t, _, _, [Con], _}) ->
     aeso_tc_constraints:add_is_contract_constraint(Con, {bytecode_hash, Ann}).
