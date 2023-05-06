@@ -5,8 +5,6 @@
         , create_constraints/0
         , add_is_contract_constraint/2
         , add_is_contract_constraint/3
-        , add_is_bytes_constraint/1
-        , add_add_bytes_constraint/5
         , add_aens_resolve_constraint/1
         , add_oracle_type_constraint/2
         , add_named_argument_constraint/3
@@ -137,12 +135,6 @@ add_named_argument_constraint(Args, Name, Type) ->
             args = Args,
             name = Name,
             type = Type }).
-
-add_is_bytes_constraint(Type) ->
-    add_constraint({is_bytes, Type}).
-
-add_add_bytes_constraint(Ann, Kind, A, B, C) ->
-    add_constraint({add_bytes, Ann, Kind, A, B, C}).
 
 add_field_constraint(RecordT, Field, FieldT, Kind, Context) ->
     add_constraint(#field_constraint{
