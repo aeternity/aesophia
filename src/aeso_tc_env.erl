@@ -49,7 +49,7 @@
         , bind_funs/2
         , bind_tvars/2
         , bind_type/4
-        , bind_consts/4
+        , bind_const/4
         , bind_fields_append/4
         ]).
 
@@ -134,10 +134,6 @@
     }).
 
 -opaque env() :: #env{}.
-
-%% -- Circular dependency ----------------------------------------------------
-
-infer_const(A, B) -> aeso_ast_infer_types:infer_const(A, B).
 
 %% -- Duplicated types -------------------------------------------------------
 
@@ -351,25 +347,6 @@ bind_const(X, Ann, Type, Env) ->
         _ ->
             type_error({duplicate_definition, X, [Ann, aeso_syntax:get_ann(Type)]}),
             Env
-    end.
-
--spec bind_consts(env(), #{ name() => aeso_syntax:decl() }, [{acyclic, name()} | {cyclic, [name()]}], [aeso_syntax:decl()]) ->
-        {env(), [aeso_syntax:decl()]}.
-bind_consts(Env, _Consts, [], Acc) ->
-    {Env, lists:reverse(Acc)};
-bind_consts(Env, Consts, [{cyclic, Xs} | _SCCs], _Acc) ->
-    ConstDecls = [ maps:get(X, Consts) || X <- Xs ],
-    type_error({mutually_recursive_constants, lists:reverse(ConstDecls)}),
-    {Env, []};
-bind_consts(Env, Consts, [{acyclic, X} | SCCs], Acc) ->
-    case maps:get(X, Consts, undefined) of
-        Const = {letval, Ann, Id, _} ->
-            NewConst = {letval, _, {typed, _, _, Type}, _} = infer_const(Env, Const),
-            NewEnv = bind_const(name(Id), Ann, Type, Env),
-            bind_consts(NewEnv, Consts, SCCs, [NewConst | Acc]);
-        undefined ->
-            %% When a used id is not a letval, a type error will be thrown
-            bind_consts(Env, Consts, SCCs, Acc)
     end.
 
 %% Bind state primitives

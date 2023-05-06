@@ -111,6 +111,26 @@ opposite_variance(A) -> aeso_tc_type_utils:opposite_variance(A).
 
 %% -- The rest ---------------------------------------------------------------
 
+%% TODO: Should be moved to aeso_tc_env and shouldn't depend on infer_const
+-spec bind_consts(env(), #{ name() => aeso_syntax:decl() }, [{acyclic, name()} | {cyclic, [name()]}], [aeso_syntax:decl()]) ->
+        {env(), [aeso_syntax:decl()]}.
+bind_consts(Env, _Consts, [], Acc) ->
+    {Env, lists:reverse(Acc)};
+bind_consts(Env, Consts, [{cyclic, Xs} | _SCCs], _Acc) ->
+    ConstDecls = [ maps:get(X, Consts) || X <- Xs ],
+    type_error({mutually_recursive_constants, lists:reverse(ConstDecls)}),
+    {Env, []};
+bind_consts(Env, Consts, [{acyclic, X} | SCCs], Acc) ->
+    case maps:get(X, Consts, undefined) of
+        Const = {letval, Ann, Id, _} ->
+            NewConst = {letval, _, {typed, _, _, Type}, _} = infer_const(Env, Const),
+            NewEnv = aeso_tc_env:bind_const(name(Id), Ann, Type, Env),
+            bind_consts(NewEnv, Consts, SCCs, [NewConst | Acc]);
+        undefined ->
+            %% When a used id is not a letval, a type error will be thrown
+            bind_consts(Env, Consts, SCCs, Acc)
+    end.
+
 map_t(As, K, V) -> {app_t, As, {id, As, "map"}, [K, V]}.
 
 -spec infer(aeso_syntax:ast()) -> {aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]} | {env(), aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]}.
@@ -508,7 +528,7 @@ check_constants(Env, Consts) ->
     ConstMap = maps:from_list([ {name(Id), Const} || Const = {letval, _, Id, _} <- Valid ]),
     DepGraph = maps:map(fun(_, Const) -> aeso_syntax_utils:used_ids(Const) end, ConstMap),
     SCCs = aeso_utils:scc(DepGraph),
-    aeso_tc_env:bind_consts(Env, ConstMap, SCCs, []).
+    bind_consts(Env, ConstMap, SCCs, []).
 
 check_usings(Env, []) ->
     Env;
