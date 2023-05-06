@@ -173,6 +173,10 @@ used_constant(A, B) -> aeso_tc_warnings:used_constant(A, B).
 get_option(A, B) -> aeso_tc_options:get_option(A, B).
 when_warning(A, B) -> aeso_tc_options:when_warning(A, B).
 
+%% -------
+
+fresh_uvar(A) -> aeso_tc_type_utils:fresh_uvar(A).
+
 %% -- Getters ------------------------------------------------------------
 
 contract_parents(#env{contract_parents = ContractParents}) ->
@@ -997,9 +1001,6 @@ unqualify1(NS, Xs) ->
         _        -> Xs
     catch _:_ -> Xs
     end.
-
-fresh_uvar(Attrs) ->
-    {uvar, Attrs, make_ref()}.
 
 create_freshen_tvars() ->
     aeso_tc_ets_manager:ets_new(freshen_tvars, [set]).

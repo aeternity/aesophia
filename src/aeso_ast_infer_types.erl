@@ -54,7 +54,6 @@ create_type_errors() -> aeso_tc_errors:create_type_errors().
 
 %% -------
 
-fresh_uvar(A) -> aeso_tc_env:fresh_uvar(A).
 destroy_and_report_type_errors(A) -> aeso_tc_env:destroy_and_report_type_errors(A).
 
 %% -------
@@ -93,6 +92,7 @@ when_warning(A, B) -> aeso_tc_options:when_warning(A, B).
 
 %% -------
 
+fresh_uvar(A) -> aeso_tc_type_utils:fresh_uvar(A).
 is_first_order(A) -> aeso_tc_type_utils:is_first_order(A).
 app_t(A, B, C) -> aeso_tc_type_utils:app_t(A, B, C).
 

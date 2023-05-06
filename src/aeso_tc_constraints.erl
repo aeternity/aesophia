@@ -49,10 +49,10 @@ type_error(A) -> aeso_tc_errors:type_error(A).
 is_monomorphic(A) -> aeso_tc_type_utils:is_monomorphic(A).
 is_first_order(A) -> aeso_tc_type_utils:is_first_order(A).
 app_t(A, B, C) -> aeso_tc_type_utils:app_t(A, B, C).
+fresh_uvar(A) -> aeso_tc_type_utils:fresh_uvar(A).
 
 %% -------
 
-fresh_uvar(A) -> aeso_tc_env:fresh_uvar(A).
 freshen(A) -> aeso_tc_env:freshen(A).
 create_freshen_tvars() -> aeso_tc_env:create_freshen_tvars().
 destroy_freshen_tvars() -> aeso_tc_env:destroy_freshen_tvars().

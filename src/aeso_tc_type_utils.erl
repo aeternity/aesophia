@@ -1,6 +1,7 @@
 -module(aeso_tc_type_utils).
 
--export([ dereference/1
+-export([ fresh_uvar/1
+        , dereference/1
         , dereference_deep/1
         , instantiate/1
         , typesig_to_fun_t/1
@@ -10,6 +11,10 @@
         , is_first_order/1
         , is_monomorphic/1
         ]).
+
+%% TODO: Find a better place for this function
+fresh_uvar(Attrs) ->
+    {uvar, Attrs, make_ref()}.
 
 dereference(T = {uvar, _, R}) ->
     case aeso_tc_ets_manager:ets_lookup(type_vars, R) of
