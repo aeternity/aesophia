@@ -393,9 +393,6 @@ mk_error({using_undefined_namespace_parts, Ann, Namespace, Parts}) ->
     PartsStr = lists:concat(lists:join(", ", Parts)),
     Msg = io_lib:format("The namespace ~s does not define the following names: ~s", [Namespace, PartsStr]),
     mk_t_err(pos(Ann), Msg);
-mk_error({unknown_warning, Warning}) ->
-    Msg = io_lib:format("Trying to report unknown warning: ~p", [Warning]),
-    mk_t_err(pos(0, 0), Msg);
 mk_error({empty_record_definition, Ann, Name}) ->
     Msg = io_lib:format("Empty record definitions are not allowed. Cannot define the record `~s`", [Name]),
     mk_t_err(pos(Ann), Msg);

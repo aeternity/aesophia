@@ -8,12 +8,6 @@
 
 %% -- Moved functions --------------------------------------------------------
 
-type_error(A) -> aeso_tc_errors:type_error(A).
-create_type_errors() -> aeso_tc_errors:create_type_errors().
-destroy_and_report_type_errors(A) -> aeso_tc_env:destroy_and_report_type_errors(A).
-
-%% -------
-
 all_warnings() -> aeso_tc_warnings:all_warnings().
 
 %% ---------------------------------------------------------------------------
@@ -36,9 +30,9 @@ when_option(Opt, Do) ->
 when_warning(Warn, Do) ->
     case lists:member(Warn, all_warnings()) of
         false ->
-            create_type_errors(),
-            type_error({unknown_warning, Warn}),
-            destroy_and_report_type_errors(aeso_tc_env:init_env());
+            %% TODO: An error for passing invalid wanring name should be thrown here.
+            %%       Validation of compiler options might be done at an earlier stage.
+            ok;
         true ->
             case aeso_tc_ets_manager:ets_tab_exists(warnings) of
                 true ->
