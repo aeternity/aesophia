@@ -2417,7 +2417,7 @@ pp_case({'case', Pat, Split}) ->
                   prettypr:nest(2, pp_split(Split))]).
 
 -spec pp_pat(fsplit_pat()) -> prettypr:document().
-pp_pat({tuple, Xs})            -> pp_fexpr({tuple, [], [{var, X} || X <- Xs]});
+pp_pat({tuple, Xs})            -> pp_fexpr({tuple, [], [{var, [], X} || X <- Xs]});
 pp_pat({'::', X, Xs})          -> pp_fexpr({op, [], '::', [{var, [], X}, {var, [], Xs}]});
 pp_pat({con, As, I, Xs})       -> pp_fexpr({con, [], As, I, [{var, [], X} || X <- Xs]});
 pp_pat({var, X})               -> pp_fexpr({var, [], X});
