@@ -2301,6 +2301,8 @@ pp_par(Xs) -> prettypr:par(Xs).
 -spec pp_fexpr(fexpr()) -> prettypr:document().
 pp_fexpr({lit, _, {typerep, T}}) ->
     pp_ftype(T);
+pp_fexpr({lit, _, {contract_code, Contract}}) ->
+    pp_beside(pp_text("contract "), pp_text(Contract));
 pp_fexpr({lit, _, {Tag, Lit}}) ->
     aeso_pretty:expr({Tag, [], Lit});
 pp_fexpr({nil, _}) ->
@@ -2371,9 +2373,7 @@ pp_fexpr({set_state, FAnn, R, A}) ->
     pp_call(pp_text("set_state"), [{lit, FAnn, {int, R}}, A]);
 pp_fexpr({get_state, FAnn, R}) ->
     pp_call(pp_text("get_state"), [{lit, FAnn, {int, R}}]);
-pp_fexpr({switch, _, Split}) -> pp_split(Split);
-pp_fexpr({contract_code, Contract}) ->
-    pp_beside(pp_text("contract "), pp_text(Contract)).
+pp_fexpr({switch, _, Split}) -> pp_split(Split).
 
 -spec pp_call(prettypr:document(), [fexpr()]) -> prettypr:document().
 pp_call(Fun, Args) ->
@@ -2403,7 +2403,11 @@ pp_ftype({variant, Cons}) ->
                  [ case Args of
                      [] -> pp_fexpr({con, [], [], I - 1, []});
                      _  -> pp_beside(pp_fexpr({con, [], [], I - 1, []}), pp_ftype({tuple, Args}))
-                   end || {I, Args} <- indexed(Cons)])).
+                   end || {I, Args} <- indexed(Cons)]));
+pp_ftype([]) ->
+    %% NOTE: This could happen with `{typerep, []}` since `[]` is not a ftype().
+    %% TODO: It would be better to make sure that `{typerep, []}` does not arrive here.
+    pp_text("[]").
 
 -spec pp_split(fsplit()) -> prettypr:document().
 pp_split({nosplit, _, E}) -> pp_fexpr(E);
