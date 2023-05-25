@@ -1309,7 +1309,7 @@ lifted_fun([Z], Xs, Body) ->
 lifted_fun(FVs, Xs, Body) ->
     Z    = "%env",
     FAnn = get_fann(Body),
-    Proj = fun({I, Y}, E) -> {'let', get_fann(Body), Y, {proj, FAnn, {var, FAnn, Z}, I - 1}, E} end,
+    Proj = fun({I, Y}, E) -> {'let', FAnn, Y, {proj, FAnn, {var, FAnn, Z}, I - 1}, E} end,
     #{ attrs  => [private],
        args   => [{Z, any} | [{X, any} || X <- Xs]],
        return => any,
