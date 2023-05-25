@@ -12,6 +12,8 @@
         , file/2
         , from_string/2
         , check_call/4
+        , decode_value/4
+        , encode_value/4
         , create_calldata/3
         , create_calldata/4
         , version/0
@@ -188,30 +190,55 @@ check_call(Source, FunName, Args, Options) ->
     check_call1(Source, FunName, Args, Options).
 
 check_call1(ContractString0, FunName, Args, Options) ->
+    case add_extra_call(ContractString0, {call, FunName, Args}, Options) of
+        {ok, CallName, Code} ->
+            {def, _, FcodeArgs} = get_call_body(CallName, Code),
+            {ok, FunName, [ aeso_fcode_to_fate:term_to_fate(A) || A <- FcodeArgs ]};
+        Err = {error, _} ->
+            Err
+    end.
+
+add_extra_call(Contract0, Call, Options) ->
     try
         %% First check the contract without the __call function
         #{fcode := OrgFcode
         , fcode_env := #{child_con_env := ChildContracts}
-        , ast := Ast} = string_to_code(ContractString0, Options),
+        , ast := Ast} = string_to_code(Contract0, Options),
         {FateCode, _} = aeso_fcode_to_fate:compile(ChildContracts, OrgFcode, #{}, []),
         %% collect all hashes and compute the first name without hash collision to
         SymbolHashes = maps:keys(aeb_fate_code:symbols(FateCode)),
         CallName = first_none_match(?CALL_NAME, SymbolHashes,
                                     lists:seq($1, $9) ++ lists:seq($A, $Z) ++ lists:seq($a, $z)),
-        ContractString = insert_call_function(Ast, ContractString0, CallName, FunName, Args),
-        #{fcode := Fcode} = string_to_code(ContractString, Options),
-        CallArgs = arguments_of_body(CallName, FunName, Fcode),
-
-        {ok, FunName, CallArgs}
+        Contract = insert_call_function(Ast, Contract0, CallName, Call),
+        {ok, CallName, string_to_code(Contract, Options)}
     catch
         throw:{error, Errors} -> {error, Errors}
     end.
 
-arguments_of_body(CallName, _FunName, Fcode) ->
+get_call_body(CallName, #{fcode := Fcode}) ->
     #{body := Body} = maps:get({entrypoint, list_to_binary(CallName)}, maps:get(functions, Fcode)),
-    {def, _FName, Args} = Body,
-    %% FName is either {entrypoint, list_to_binary(FunName)} or 'init'
-    [ aeso_fcode_to_fate:term_to_fate(A) || A <- Args ].
+    Body.
+
+encode_value(Contract0, Type, Value, Options) ->
+    case add_extra_call(Contract0, {value, Type, Value}, Options) of
+        {ok, CallName, Code} ->
+            Body = get_call_body(CallName, Code),
+            {ok, aeb_fate_encoding:serialize(aeso_fcode_to_fate:term_to_fate(Body))};
+        Err = {error, _} ->
+            Err
+    end.
+
+decode_value(Contract0, Type, FateValue, Options) ->
+    case add_extra_call(Contract0, {type, Type}, Options) of
+        {ok, CallName, Code} ->
+            #{ unfolded_typed_ast := TypedAst
+             , type_env           := TypeEnv} = Code,
+            {ok, _, Type0} = get_decode_type(CallName, TypedAst),
+            Type1 = aeso_ast_infer_types:unfold_types_in_type(TypeEnv, Type0, [unfold_record_types, unfold_variant_types]),
+            fate_data_to_sophia_value(Type0, Type1, FateValue);
+        Err = {error, _} ->
+            Err
+    end.
 
 first_none_match(_CallName, _Hashes, []) ->
     error(unable_to_find_unique_call_name);
@@ -224,14 +251,31 @@ first_none_match(CallName, Hashes, [Char|Chars]) ->
     end.
 
 %% Add the __call function to a contract.
--spec insert_call_function(aeso_syntax:ast(), string(), string(), string(), [string()]) -> string().
-insert_call_function(Ast, Code, Call, FunName, Args) ->
+-spec insert_call_function(aeso_syntax:ast(), string(), string(),
+                           {call, string(), [string()]} | {value, string(), string()} | {type, string()}) -> string().
+insert_call_function(Ast, Code, Call, {call, FunName, Args}) ->
     Ind = last_contract_indent(Ast),
     lists:flatten(
         [ Code,
           "\n\n",
           lists:duplicate(Ind, " "),
           "stateful entrypoint ", Call, "() = ", FunName, "(", string:join(Args, ","), ")\n"
+        ]);
+insert_call_function(Ast, Code, Call, {value, Type, Value}) ->
+    Ind = last_contract_indent(Ast),
+    lists:flatten(
+        [ Code,
+          "\n\n",
+          lists:duplicate(Ind, " "),
+          "entrypoint ", Call, "() : ", Type, " = ", Value, "\n"
+        ]);
+insert_call_function(Ast, Code, Call, {type, Type}) ->
+    Ind = last_contract_indent(Ast),
+    lists:flatten(
+        [ Code,
+          "\n\n",
+          lists:duplicate(Ind, " "),
+          "entrypoint ", Call, "(val : ", Type, ") = val\n"
         ]).
 
 -spec insert_init_function(string(), options()) -> string().
@@ -274,20 +318,23 @@ to_sophia_value(ContractString, FunName, ok, Data, Options0) ->
         {ok, _, Type0} = get_decode_type(FunName, TypedAst),
         Type   = aeso_ast_infer_types:unfold_types_in_type(TypeEnv, Type0, [unfold_record_types, unfold_variant_types]),
 
-        try
-            {ok, aeso_vm_decode:from_fate(Type, aeb_fate_encoding:deserialize(Data))}
-        catch throw:cannot_translate_to_sophia ->
-                Type1 = prettypr:format(aeso_pretty:type(Type0)),
-                Msg = io_lib:format("Cannot translate FATE value ~p\n  of Sophia type ~s",
-                                    [aeb_fate_encoding:deserialize(Data), Type1]),
-                {error, [aeso_errors:new(data_error, Msg)]};
-              _:_ ->
-                Type1 = prettypr:format(aeso_pretty:type(Type0)),
-                Msg = io_lib:format("Failed to decode binary as type ~s", [Type1]),
-                {error, [aeso_errors:new(data_error, Msg)]}
-        end
+        fate_data_to_sophia_value(Type0, Type, Data)
     catch
         throw:{error, Errors} -> {error, Errors}
+    end.
+
+fate_data_to_sophia_value(Type, UnfoldedType, FateData) ->
+    try
+        {ok, aeso_vm_decode:from_fate(UnfoldedType, aeb_fate_encoding:deserialize(FateData))}
+    catch throw:cannot_translate_to_sophia ->
+            Type1 = prettypr:format(aeso_pretty:type(Type)),
+            Msg = io_lib:format("Cannot translate FATE value ~p\n  of Sophia type ~s",
+                                [aeb_fate_encoding:deserialize(FateData), Type1]),
+            {error, [aeso_errors:new(data_error, Msg)]};
+          _:_ ->
+            Type1 = prettypr:format(aeso_pretty:type(Type)),
+            Msg = io_lib:format("Failed to decode binary as type ~s", [Type1]),
+            {error, [aeso_errors:new(data_error, Msg)]}
     end.
 
 -spec create_calldata(string(), string(), [string()]) ->
