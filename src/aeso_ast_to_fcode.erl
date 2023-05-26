@@ -2164,12 +2164,17 @@ rename_spat(Ren, {assign, X, P}) ->
 -spec rename_split(rename(), fsplit()) -> fsplit().
 rename_split(Ren, {split, Type, X, Cases}) ->
     {split, Type, rename_var(Ren, X), [rename_case(Ren, C) || C <- Cases]};
-rename_split(Ren, {nosplit, Rens, E}) -> {nosplit, Rens, rename(Ren, E)}.
+rename_split(Ren, {nosplit, Rens, E}) ->
+    {nosplit, update_rename(Rens, Ren), rename(Ren, E)}.
 
 -spec rename_case(rename(), fcase()) -> fcase().
 rename_case(Ren, {'case', Pat, Split}) ->
     {Pat1, Ren1} = rename_spat(Ren, Pat),
     {'case', Pat1, rename_split(Ren1, Split)}.
+
+-spec update_rename(rename(), rename()) -> rename().
+update_rename(OldRen, NewRen) ->
+    [{Name, proplists:get_value(Rename, NewRen, Rename)} || {Name, Rename} <- OldRen].
 
 %% -- Records --
 
