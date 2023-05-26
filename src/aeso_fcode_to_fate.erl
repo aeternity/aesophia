@@ -414,7 +414,7 @@ split_to_scode(Env, {nosplit, Renames, Expr}) ->
 split_to_scode(Env, {split, {tuple, _}, X, Alts}) ->
     {Def, Alts1} = catchall_to_scode(Env, X, Alts),
     Arg = lookup_var(Env, X),
-    Alt = case [ {Xs, Split} || {'case', {tuple, _, Xs}, Split} <- Alts1 ] of
+    Alt = case [ {Xs, Split} || {'case', {tuple, Xs}, Split} <- Alts1 ] of
             []            -> missing;
             [{Xs, S} | _] ->
                 {Code, Env1} = match_tuple(Env, Arg, Xs),
