@@ -2427,7 +2427,8 @@ pp_pat({con, As, I, Xs})       -> pp_fexpr({con, [], As, I, [{var, [], X} || X <
 pp_pat({var, X})               -> pp_fexpr({var, [], X});
 pp_pat(P = {Tag, _}) when Tag == bool; Tag == int; Tag == string
                                -> pp_fexpr({lit, [], P});
-pp_pat(Pat)                    -> pp_fexpr(Pat).
+pp_pat(nil)                    -> pp_fexpr({nil, []});
+pp_pat({assign, X, Y})         -> pp_beside([pp_text(X), pp_text(" = "), pp_text(Y)]).
 
 -spec is_infix(op()) -> boolean().
 is_infix(Op) ->
