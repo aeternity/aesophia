@@ -371,7 +371,7 @@ Each bit is true if and only if it was 1 in `a` and 0 in `b`
 
 ### Bytes
 
-#### to_int
+#### to\_int
 ```
 Bytes.to_int(b : bytes(n)) : int
 ```
@@ -379,7 +379,7 @@ Bytes.to_int(b : bytes(n)) : int
 Interprets the byte array as a big endian integer
 
 
-#### to_str
+#### to\_str
 ```
 Bytes.to_str(b : bytes(n)) : string
 ```
@@ -392,7 +392,8 @@ Returns the hexadecimal representation of the byte array
 Bytes.concat : (a : bytes(m), b : bytes(n)) => bytes(m + n)
 ```
 
-Concatenates two byte arrays
+Concatenates two byte arrays, if `m` and `n` are known at compile time, the
+result can be used as a fixed size byte array, otherwise it has type `bytes()`.
 
 
 #### split
@@ -402,6 +403,38 @@ Bytes.split(a : bytes(m + n)) : bytes(m) * bytes(n)
 
 Splits a byte array at given index
 
+#### split\_any
+```
+Bytes.split_any(a : bytes(), at : int) : option(bytes() * bytes(n))
+```
+
+Splits an arbitrary size byte array at index `at`. If `at` is positive split
+from the beginning of the array, if `at` is negative, split `abs(at)` from the
+_end_ of the array. If the array is shorter than `abs(at)` then `None` is
+returned.
+
+#### to\_fixed\_size
+```
+Bytes.to_fixed_size(a : bytes()) : option(bytes(n))
+```
+
+Converts an arbitrary size byte array to a fix size byte array. If `a` is
+`n` bytes, `None` is returned.
+
+#### to\_any\_size
+```
+Bytes.to_any_size(a : bytes(n)) : bytes()
+```
+
+Converts a fixed size byte array to an arbitrary size byte array. This is a
+no-op at run-time, and only used during type checking.
+
+#### size
+```
+Bytes.size(a : bytes()) : int
+```
+
+Computes the lenght/size of a byte array.
 
 ### Call
 
@@ -830,12 +863,20 @@ Verifies a standard 64-byte ECDSA signature (`R || S`).
 
 ### Int
 
-#### to_str
+#### to\_str
 ```
-Int.to_str : int => string
+Int.to_str(n : int) : string
 ```
 
-Casts integer to string using decimal representation
+Casts the integer to a string (in decimal representation).
+
+#### to\_bytes
+```
+Int.to_bytes(n : int, size : int) : bytes()
+```
+
+Casts the integer to a byte array with `size` bytes (big endian, truncating if
+necessary).
 
 
 ### Map
@@ -2411,6 +2452,13 @@ to_int(s : string) : option(int)
 
 Converts a decimal ("123", "-253") or a hexadecimal ("0xa2f", "-0xBBB") string into
 an integer. If the string doesn't contain a valid number `None` is returned.
+
+#### to\_bytes
+```
+to_bytes(s : string) : bytes()
+```
+
+Converts string into byte array.
 
 #### sha3
 ```
