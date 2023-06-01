@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   contract C =
     let cc = 2
   ```
+- API functions for encoding/decoding Sophia values to/from FATE.
 ### Changed
 ### Removed
 ### Fixed
