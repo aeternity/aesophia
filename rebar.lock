@@ -16,7 +16,7 @@
   {git,"https://github.com/aeternity/enacl.git",
        {ref,"793ddb502f7fe081302e1c42227dca70b09f8e17"}},
   2},
- {<<"getopt">>,{pkg,<<"getopt">>,<<"1.0.1">>},0},
+ {<<"getopt">>,{pkg,<<"getopt">>,<<"1.0.1">>},1},
  {<<"jsx">>,
   {git,"https://github.com/talentdeficit/jsx.git",
        {ref,"3074d4865b3385a050badf7828ad31490d860df5"}},
