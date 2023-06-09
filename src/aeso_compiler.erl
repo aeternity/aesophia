@@ -186,7 +186,7 @@ check_call(Source, FunName, Args, Options) ->
 check_call1(ContractString0, FunName, Args, Options) ->
     case add_extra_call(ContractString0, {call, FunName, Args}, Options) of
         {ok, CallName, Code} ->
-            {def, _, FcodeArgs} = get_call_body(CallName, Code),
+            {def, _, _, FcodeArgs} = get_call_body(CallName, Code),
             {ok, FunName, [ aeso_fcode_to_fate:term_to_fate(A) || A <- FcodeArgs ]};
         Err = {error, _} ->
             Err
