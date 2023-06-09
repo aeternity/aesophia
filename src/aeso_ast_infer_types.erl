@@ -351,11 +351,11 @@ bind_contract(Typing, {Contract, Ann, Id, _Impls, Contents}, Env)
     Sys         = [{origin, system}],
     TypeOrFresh = fun({typed, _, _, Type}) -> Type; (_) -> fresh_uvar(Sys) end,
     Fields      =
-        [ {field_t, AnnF, Entrypoint, contract_call_type(Type)}
+        [ {field_t, AnnF, Entrypoint, contract_call_type(aeso_syntax:set_ann(Sys, Type))}
           || {fun_decl, AnnF, Entrypoint, Type = {fun_t, _, _, _, _}} <- Contents ] ++
         [ {field_t, AnnF, Entrypoint,
            contract_call_type(
-             {fun_t, AnnF, [], [TypeOrFresh(Arg) || Arg <- Args], TypeOrFresh(Ret)})
+             {fun_t, Sys, [], [TypeOrFresh(Arg) || Arg <- Args], TypeOrFresh(Ret)})
           }
           || {letfun, AnnF, Entrypoint = {id, _, Name}, Args, _Type, [{guarded, _, [], Ret}]} <- Contents,
              Name =/= "init"
