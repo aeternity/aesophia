@@ -53,8 +53,6 @@ The **pp_** options all print to standard output the following:
 
 The option `include_child_contract_symbols` includes the symbols of child contracts functions in the generated fate code. It is turned off by default to avoid making contracts bigger on chain.
 
-The option `debug_info` includes information related to debugging in the compiler output. Currently this option only includes the mapping from variables to registers.
-
 #### Options to control which compiler optimizations should run:
 
 By default all optimizations are turned on, to disable an optimization, it should be

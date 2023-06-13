@@ -52,7 +52,8 @@
                tailpos           = true,
                child_contracts   = #{},
                saved_fresh_names = #{},
-               options           = [] }).
+               options           = [],
+               debug_info        = false }).
 
 %% -- Debugging --------------------------------------------------------------
 
@@ -81,24 +82,16 @@ code_error(Err) ->
 compile(FCode, SavedFreshNames, Options) ->
     compile(#{}, FCode, SavedFreshNames, Options).
 compile(ChildContracts, FCode, SavedFreshNames, Options) ->
-    try
-        compile1(ChildContracts, FCode, SavedFreshNames, Options)
-    after
-        put(variables_registers, undefined)
-    end.
-
-compile1(ChildContracts, FCode, SavedFreshNames, Options) ->
     #{ contract_name := ContractName,
        functions     := Functions } = FCode,
     SFuns  = functions_to_scode(ChildContracts, ContractName, Functions, SavedFreshNames, Options),
     SFuns1 = optimize_scode(SFuns, Options),
     FateCode = to_basic_blocks(SFuns1),
     ?debug(compile, Options, "~s\n", [aeb_fate_asm:pp(FateCode)]),
-    FateCode1 = case proplists:get_value(include_child_contract_symbols, Options, false) of
-                    false -> FateCode;
-                    true -> add_child_symbols(ChildContracts, FateCode)
-                end,
-    {FateCode1, get_variables_registers()}.
+    case proplists:get_value(include_child_contract_symbols, Options, false) of
+        false -> FateCode;
+        true  -> add_child_symbols(ChildContracts, FateCode)
+    end.
 
 make_function_id(X) ->
     aeb_fate_code:symbol_identifier(make_function_name(X)).
@@ -123,31 +116,15 @@ functions_to_scode(ChildContracts, ContractName, Functions, SavedFreshNames, Opt
 
 function_to_scode(ChildContracts, ContractName, Functions, Name, Attrs0, Args, Body, ResType, SavedFreshNames, Options) ->
     {ArgTypes, ResType1} = typesig_to_scode(Args, ResType),
-    Attrs = Attrs0 -- [stateful], %% Only track private and payable from here.
+    Attrs = [ A || A <- Attrs0, A == private orelse A == payable ],
     Env = init_env(ChildContracts, ContractName, Functions, Name, Args, SavedFreshNames, Options),
-    [ add_variables_register(Env, Arg, Register) ||
-        proplists:get_value(debug_info, Options, false),
-        {Arg, Register} <- Env#env.vars ],
+    ArgsNames = [ X || {X, _} <- lists:reverse(Env#env.vars) ],
+
+    %% DBG_LOC is added before the function body to make it possible to break
+    %% at the function signature
     SCode = to_scode(Env, Body),
-    {Attrs, {ArgTypes, ResType1}, SCode}.
-
-get_variables_registers() ->
-    case get(variables_registers) of
-        undefined -> #{};
-        Vs        -> Vs
-    end.
-
-add_variables_register(Env = #env{saved_fresh_names = SavedFreshNames}, Name, Register) ->
-    Olds = get_variables_registers(),
-    RealName = maps:get(Name, SavedFreshNames, Name),
-    FunName =
-        case Env#env.current_function of
-            event -> "Chain.event";
-            {entrypoint, BinName} -> binary_to_list(BinName);
-            {local_fun, QualName} -> lists:last(QualName)
-        end,
-    New = {Env#env.contract, FunName, RealName},
-    put(variables_registers, Olds#{New => Register}).
+    DbgSCode = dbg_contract(Env) ++ dbg_loc(Env, Attrs0) ++ dbg_scoped_vars(Env, ArgsNames, SCode),
+    {Attrs, {ArgTypes, ResType1}, DbgSCode}.
 
 -define(tvars, '$tvars').
 
@@ -194,20 +171,20 @@ types_to_scode(Ts) -> lists:map(fun type_to_scode/1, Ts).
 %% -- Environment functions --
 
 init_env(ChildContracts, ContractName, FunNames, Name, Args, SavedFreshNames, Options) ->
-    #env{ vars      = [ {X, {arg, I}} || {I, {X, _}} <- with_ixs(Args) ],
-          contract  = ContractName,
-          child_contracts = ChildContracts,
-          locals    = FunNames,
-          current_function = Name,
-          options = Options,
-          tailpos   = true,
-          saved_fresh_names = SavedFreshNames }.
+    #env{ vars              = [ {X, {arg, I}} || {I, {X, _}} <- with_ixs(Args) ],
+          contract          = ContractName,
+          child_contracts   = ChildContracts,
+          locals            = FunNames,
+          current_function  = Name,
+          options           = Options,
+          tailpos           = true,
+          saved_fresh_names = SavedFreshNames,
+          debug_info        = proplists:get_value(debug_info, Options, false) }.
 
 next_var(#env{ vars = Vars }) ->
     1 + lists:max([-1 | [J || {_, {var, J}} <- Vars]]).
 
 bind_var(Name, Var, Env = #env{ vars = Vars }) ->
-    proplists:get_value(debug_info, Env#env.options, false) andalso add_variables_register(Env, Name, Var),
     Env#env{ vars = [{Name, Var} | Vars] }.
 
 bind_local(Name, Env) ->
@@ -234,7 +211,7 @@ serialize_contract_code(Env, C) ->
             Options = Env#env.options,
             SavedFreshNames = Env#env.saved_fresh_names,
             FCode = maps:get(C, Env#env.child_contracts),
-            {FateCode, _} = compile1(Env#env.child_contracts, FCode, SavedFreshNames, Options),
+            FateCode = compile(Env#env.child_contracts, FCode, SavedFreshNames, Options),
             ByteCode = aeb_fate_code:serialize(FateCode, []),
             {ok, Version} = aeso_compiler:version(),
             OriginalSourceCode = proplists:get_value(original_src, Options, ""),
@@ -268,44 +245,44 @@ lit_to_fate(Env, L) ->
 term_to_fate(E) -> term_to_fate(#env{}, #{}, E).
 term_to_fate(GlobEnv, E) -> term_to_fate(GlobEnv, #{}, E).
 
-term_to_fate(GlobEnv, _Env, {lit, L}) ->
+term_to_fate(GlobEnv, _Env, {lit, _, L}) ->
     lit_to_fate(GlobEnv, L);
 %% negative literals are parsed as 0 - N
-term_to_fate(_GlobEnv, _Env, {op, '-', [{lit, {int, 0}}, {lit, {int, N}}]}) ->
+term_to_fate(_GlobEnv, _Env, {op, _, '-', [{lit, _, {int, 0}}, {lit, _, {int, N}}]}) ->
     aeb_fate_data:make_integer(-N);
-term_to_fate(_GlobEnv, _Env, nil) ->
+term_to_fate(_GlobEnv, _Env, {nil, _}) ->
     aeb_fate_data:make_list([]);
-term_to_fate(GlobEnv, Env, {op, '::', [Hd, Tl]}) ->
+term_to_fate(GlobEnv, Env, {op, _, '::', [Hd, Tl]}) ->
     %% The Tl will translate into a list, because FATE lists are just lists
     [term_to_fate(GlobEnv, Env, Hd) | term_to_fate(GlobEnv, Env, Tl)];
-term_to_fate(GlobEnv, Env, {tuple, As}) ->
+term_to_fate(GlobEnv, Env, {tuple, _, As}) ->
     aeb_fate_data:make_tuple(list_to_tuple([ term_to_fate(GlobEnv, Env, A) || A<-As]));
-term_to_fate(GlobEnv, Env, {con, Ar, I, As}) ->
+term_to_fate(GlobEnv, Env, {con, _, Ar, I, As}) ->
     FateAs = [ term_to_fate(GlobEnv, Env, A) || A <- As ],
     aeb_fate_data:make_variant(Ar, I, list_to_tuple(FateAs));
-term_to_fate(_GlobEnv, _Env, {builtin, bits_all, []}) ->
+term_to_fate(_GlobEnv, _Env, {builtin, _, bits_all, []}) ->
     aeb_fate_data:make_bits(-1);
-term_to_fate(_GlobEnv, _Env, {builtin, bits_none, []}) ->
+term_to_fate(_GlobEnv, _Env, {builtin, _, bits_none, []}) ->
     aeb_fate_data:make_bits(0);
-term_to_fate(GlobEnv, _Env, {op, bits_set, [B, I]}) ->
+term_to_fate(GlobEnv, _Env, {op, _, bits_set, [B, I]}) ->
     {bits, N} = term_to_fate(GlobEnv, B),
     J         = term_to_fate(GlobEnv, I),
     {bits, N bor (1 bsl J)};
-term_to_fate(GlobEnv, _Env, {op, bits_clear, [B, I]}) ->
+term_to_fate(GlobEnv, _Env, {op, _, bits_clear, [B, I]}) ->
     {bits, N} = term_to_fate(GlobEnv, B),
     J         = term_to_fate(GlobEnv, I),
     {bits, N band bnot (1 bsl J)};
-term_to_fate(GlobEnv, Env, {'let', X, E, Body}) ->
+term_to_fate(GlobEnv, Env, {'let', _, X, E, Body}) ->
     Env1 = Env#{ X => term_to_fate(GlobEnv, Env, E) },
     term_to_fate(GlobEnv, Env1, Body);
-term_to_fate(_GlobEnv, Env, {var, X}) ->
+term_to_fate(_GlobEnv, Env, {var, _, X}) ->
     case maps:get(X, Env, undefined) of
         undefined -> throw(not_a_fate_value);
         V         -> V
     end;
-term_to_fate(_GlobEnv, _Env, {builtin, map_empty, []}) ->
+term_to_fate(_GlobEnv, _Env, {builtin, _, map_empty, []}) ->
     aeb_fate_data:make_map(#{});
-term_to_fate(GlobEnv, Env, {op, map_set, [M, K, V]}) ->
+term_to_fate(GlobEnv, Env, {op, _, map_set, [M, K, V]}) ->
     Map = term_to_fate(GlobEnv, Env, M),
     Map#{term_to_fate(GlobEnv, Env, K) => term_to_fate(GlobEnv, Env, V)};
 term_to_fate(_GlobEnv, _Env, _) ->
@@ -313,52 +290,59 @@ term_to_fate(_GlobEnv, _Env, _) ->
 
 to_scode(Env, T) ->
     try term_to_fate(Env, T) of
-        V -> [push(?i(V))]
+        V ->
+            FAnn = element(2, T),
+            [dbg_loc(Env, FAnn), push(?i(V))]
     catch throw:not_a_fate_value ->
         to_scode1(Env, T)
     end.
 
-to_scode1(Env, {lit, L}) ->
-    [push(?i(lit_to_fate(Env, L)))];
+to_scode1(Env, {lit, Ann, L}) ->
+    [ dbg_loc(Env, Ann), push(?i(lit_to_fate(Env, L))) ];
 
-to_scode1(_Env, nil) ->
-    [aeb_fate_ops:nil(?a)];
+to_scode1(Env, {nil, Ann}) ->
+    [ dbg_loc(Env, Ann), aeb_fate_ops:nil(?a) ];
 
-to_scode1(Env, {var, X}) ->
-    [push(lookup_var(Env, X))];
+to_scode1(Env, {var, Ann, X}) ->
+    [ dbg_loc(Env, Ann), push(lookup_var(Env, X)) ];
 
-to_scode1(Env, {con, Ar, I, As}) ->
+to_scode1(Env, {con, Ann, Ar, I, As}) ->
     N = length(As),
-    [[to_scode(notail(Env), A) || A <- As],
-     aeb_fate_ops:variant(?a, ?i(Ar), ?i(I), ?i(N))];
+    [ dbg_loc(Env, Ann),
+      [to_scode(notail(Env), A) || A <- As],
+      aeb_fate_ops:variant(?a, ?i(Ar), ?i(I), ?i(N)) ];
 
-to_scode1(Env, {tuple, As}) ->
+to_scode1(Env, {tuple, Ann, As}) ->
     N = length(As),
-    [[ to_scode(notail(Env), A) || A <- As ],
-     tuple(N)];
+    [ dbg_loc(Env, Ann),
+      [ to_scode(notail(Env), A) || A <- As ],
+      tuple(N) ];
 
-to_scode1(Env, {proj, E, I}) ->
-    [to_scode(notail(Env), E),
-     aeb_fate_ops:element_op(?a, ?i(I), ?a)];
+to_scode1(Env, {proj, Ann, E, I}) ->
+    [ dbg_loc(Env, Ann),
+      to_scode(notail(Env), E),
+      aeb_fate_ops:element_op(?a, ?i(I), ?a) ];
 
-to_scode1(Env, {set_proj, R, I, E}) ->
-    [to_scode(notail(Env), E),
-     to_scode(notail(Env), R),
-     aeb_fate_ops:setelement(?a, ?i(I), ?a, ?a)];
+to_scode1(Env, {set_proj, Ann, R, I, E}) ->
+    [ dbg_loc(Env, Ann),
+      to_scode(notail(Env), E),
+      to_scode(notail(Env), R),
+      aeb_fate_ops:setelement(?a, ?i(I), ?a, ?a) ];
 
-to_scode1(Env, {op, Op, Args}) ->
-    call_to_scode(Env, op_to_scode(Op), Args);
+to_scode1(Env, {op, Ann, Op, Args}) ->
+    [ dbg_loc(Env, Ann) | call_to_scode(Env, op_to_scode(Op), Args) ];
 
-to_scode1(Env, {'let', X, {var, Y}, Body}) ->
+to_scode1(Env, {'let', Ann, X, {var, _, Y}, Body}) ->
     Env1 = bind_var(X, lookup_var(Env, Y), Env),
-    to_scode(Env1, Body);
-to_scode1(Env, {'let', X, Expr, Body}) ->
+    [ dbg_loc(Env, Ann) | dbg_scoped_vars(Env1, [X], to_scode(Env1, Body)) ];
+to_scode1(Env, {'let', Ann, X, Expr, Body}) ->
     {I, Env1} = bind_local(X, Env),
-    [ to_scode(notail(Env), Expr),
-      aeb_fate_ops:store({var, I}, {stack, 0}),
-      to_scode(Env1, Body) ];
+    SCode = [ to_scode(notail(Env), Expr),
+              aeb_fate_ops:store({var, I}, {stack, 0}),
+              to_scode(Env1, Body) ],
+    [ dbg_loc(Env, Ann) | dbg_scoped_vars(Env1, [X], SCode) ];
 
-to_scode1(Env = #env{ current_function = Fun, tailpos = true }, {def, Fun, Args}) ->
+to_scode1(Env = #env{ current_function = Fun, tailpos = true, debug_info = false }, {def, Ann, Fun, Args}) ->
     %% Tail-call to current function, f(e0..en). Compile to
     %%      [ let xi = ei ]
     %%      [ STORE argi xi ]
@@ -371,61 +355,62 @@ to_scode1(Env = #env{ current_function = Fun, tailpos = true }, {def, Fun, Args}
                                 aeb_fate_ops:store({var, I}, ?a)],
                         {[I | Is], Acc1, Env2}
                     end, {[], [], Env}, Args),
-    [ Code,
+    [ dbg_loc(Env, Ann),
+      Code,
       [ aeb_fate_ops:store({arg, I}, {var, J})
         || {I, J} <- lists:zip(lists:seq(0, length(Vars) - 1),
                                lists:reverse(Vars)) ],
       loop ];
-to_scode1(Env, {def, Fun, Args}) ->
+to_scode1(Env, {def, Ann, Fun, Args}) ->
     FName = make_function_id(Fun),
     Lbl   = aeb_fate_data:make_string(FName),
-    call_to_scode(Env, local_call(Env, ?i(Lbl)), Args);
-to_scode1(Env, {funcall, Fun, Args}) ->
-    call_to_scode(Env, [to_scode(Env, Fun), local_call(Env, ?a)], Args);
+    [ dbg_loc(Env, Ann) | call_to_scode(Env, local_call(Env, ?i(Lbl)), Args) ];
+to_scode1(Env, {funcall, Ann, Fun, Args}) ->
+    [ dbg_loc(Env, Ann) | call_to_scode(Env, [to_scode(Env, Fun), local_call(Env, ?a)], Args) ];
 
-to_scode1(Env, {builtin, B, Args}) ->
-    builtin_to_scode(Env, B, Args);
+to_scode1(Env, {builtin, Ann, B, Args}) ->
+    [ dbg_loc(Env, Ann) | builtin_to_scode(Env, B, Args) ];
 
-to_scode1(Env, {remote, ArgsT, RetT, Ct, Fun, [Gas, Value, Protected | Args]}) ->
+to_scode1(Env, {remote, Ann, ArgsT, RetT, Ct, Fun, [Gas, Value, Protected | Args]}) ->
     Lbl = make_function_id(Fun),
     {ArgTypes, RetType0} = typesig_to_scode([{"_", T} || T <- ArgsT], RetT),
     ArgType = ?i(aeb_fate_data:make_typerep({tuple, ArgTypes})),
     RetType = ?i(aeb_fate_data:make_typerep(RetType0)),
-    case Protected of
-        {lit, {bool, false}} ->
+    SCode = case Protected of
+        {lit, _, {bool, false}} ->
             case Gas of
-                {builtin, call_gas_left, _} ->
+                {builtin, _, call_gas_left, _} ->
                     Call = aeb_fate_ops:call_r(?a, Lbl, ArgType, RetType, ?a),
                     call_to_scode(Env, Call, [Ct, Value | Args]);
                 _ ->
                     Call = aeb_fate_ops:call_gr(?a, Lbl, ArgType, RetType, ?a, ?a),
                     call_to_scode(Env, Call, [Ct, Value, Gas | Args])
             end;
-        {lit, {bool, true}} ->
+        {lit, _, {bool, true}} ->
             Call = aeb_fate_ops:call_pgr(?a, Lbl, ArgType, RetType, ?a, ?a, ?i(true)),
             call_to_scode(Env, Call, [Ct, Value, Gas | Args]);
         _ ->
             Call = aeb_fate_ops:call_pgr(?a, Lbl, ArgType, RetType, ?a, ?a, ?a),
             call_to_scode(Env, Call, [Ct, Value, Gas, Protected | Args])
-    end;
+    end,
+    [ dbg_loc(Env, Ann) | SCode ];
 
-to_scode1(_Env, {get_state, Reg}) ->
-    [push(?s(Reg))];
-to_scode1(Env, {set_state, Reg, Val}) ->
-    call_to_scode(Env, [{'STORE', ?s(Reg), ?a},
-                        tuple(0)], [Val]);
+to_scode1(Env, {get_state, Ann, Reg}) ->
+    [ dbg_loc(Env, Ann), push(?s(Reg)) ];
+to_scode1(Env, {set_state, Ann, Reg, Val}) ->
+    [ dbg_loc(Env, Ann) | call_to_scode(Env, [{'STORE', ?s(Reg), ?a}, tuple(0)], [Val]) ];
 
-to_scode1(Env, {closure, Fun, FVs}) ->
-    to_scode(Env, {tuple, [{lit, {string, make_function_id(Fun)}}, FVs]});
+to_scode1(Env, {closure, Ann, Fun, FVs}) ->
+    [ to_scode(Env, {tuple, Ann, [{lit, Ann, {string, make_function_id(Fun)}}, FVs]}) ];
 
-to_scode1(Env, {switch, Case}) ->
-    split_to_scode(Env, Case).
+to_scode1(Env, {switch, Ann, Case}) ->
+    [ dbg_loc(Env, Ann) | split_to_scode(Env, Case) ].
 
-local_call( Env, Fun) when Env#env.tailpos -> aeb_fate_ops:call_t(Fun);
-local_call(_Env, Fun)                      -> aeb_fate_ops:call(Fun).
+local_call( Env = #env{debug_info = false}, Fun) when Env#env.tailpos -> aeb_fate_ops:call_t(Fun);
+local_call(_Env, Fun)                                                 -> aeb_fate_ops:call(Fun).
 
-split_to_scode(Env, {nosplit, Expr}) ->
-    [switch_body, to_scode(Env, Expr)];
+split_to_scode(Env, {nosplit, Renames, Expr}) ->
+    [switch_body, dbg_scoped_vars(Env, Renames, to_scode(Env, Expr))];
 split_to_scode(Env, {split, {tuple, _}, X, Alts}) ->
     {Def, Alts1} = catchall_to_scode(Env, X, Alts),
     Arg = lookup_var(Env, X),
@@ -649,7 +634,7 @@ builtin_to_scode(Env, chain_bytecode_hash, [_Addr] = Args) ->
 builtin_to_scode(Env, chain_clone,
                  [InitArgsT, GasCap, Value, Prot, Contract | InitArgs]) ->
     case GasCap of
-        {builtin, call_gas_left, _} ->
+        {builtin, _, call_gas_left, _} ->
             call_to_scode(Env, aeb_fate_ops:clone(?a, ?a, ?a, ?a),
                           [Contract, InitArgsT, Value, Prot | InitArgs]
                          );
@@ -750,6 +735,77 @@ push(A) -> {'STORE', ?a, A}.
 
 tuple(0) -> push(?i({tuple, {}}));
 tuple(N) -> aeb_fate_ops:tuple(?a, N).
+
+%% -- Debug info functions --
+
+dbg_contract(#env{debug_info = false}) ->
+    [];
+dbg_contract(#env{contract = Contract}) ->
+    [{'DBG_CONTRACT', {immediate, Contract}}].
+
+dbg_loc(#env{debug_info = false}, _) ->
+    [];
+dbg_loc(_Env, Ann) ->
+    File = case proplists:get_value(file, Ann, no_file) of
+                no_file -> "";
+                F       -> F
+            end,
+    Line = proplists:get_value(line, Ann, undefined),
+    case Line of
+        undefined -> [];
+        _         -> [{'DBG_LOC', {immediate, File}, {immediate, Line}}]
+    end.
+
+dbg_scoped_vars(#env{debug_info = false}, _, SCode) ->
+    SCode;
+dbg_scoped_vars(_Env, [], SCode) ->
+    SCode;
+dbg_scoped_vars(Env, [{SavedVarName, Var} | Rest], SCode) ->
+    dbg_scoped_vars(Env, Rest, dbg_scoped_var(Env, SavedVarName, Var, SCode));
+dbg_scoped_vars(Env = #env{saved_fresh_names = SavedFreshNames}, [Var | Rest], SCode) ->
+    SavedVarName = maps:get(Var, SavedFreshNames, Var),
+    dbg_scoped_vars(Env, Rest, dbg_scoped_var(Env, SavedVarName, Var, SCode)).
+
+dbg_scoped_var(Env, SavedVarName, Var, SCode) ->
+    case SavedVarName == "_" orelse is_fresh_name(SavedVarName) of
+        true ->
+            SCode;
+        false ->
+            Register = lookup_var(Env, Var),
+            Def      = [{'DBG_DEF',   {immediate, SavedVarName}, Register}],
+            Undef    = [{'DBG_UNDEF', {immediate, SavedVarName}, Register}],
+            Def ++ dbg_undef(Undef, SCode)
+    end.
+
+is_fresh_name([$% | _]) ->
+    true;
+is_fresh_name(_) ->
+    false.
+
+dbg_undef(_Undef, missing) ->
+    missing;
+dbg_undef(Undef, loop) ->
+    [Undef, loop];
+dbg_undef(Undef, switch_body) ->
+    [switch_body, Undef];
+dbg_undef(Undef, {switch, Arg, Type, Alts, Catch}) ->
+    NewAlts   = [ dbg_undef(Undef, Alt) || Alt <- Alts ],
+    NewCatch  = dbg_undef(Undef, Catch),
+    NewSwitch = {switch, Arg, Type, NewAlts, NewCatch},
+    NewSwitch;
+dbg_undef(Undef, SCode) when is_list(SCode) ->
+    lists:droplast(SCode) ++ [dbg_undef(Undef, lists:last(SCode))];
+dbg_undef(Undef, SCode) when is_tuple(SCode); is_atom(SCode) ->
+    [Mnemonic | _] =
+        case is_tuple(SCode) of
+            true  -> tuple_to_list(SCode);
+            false -> [SCode]
+        end,
+    Op = aeb_fate_opcodes:m_to_op(Mnemonic),
+    case aeb_fate_opcodes:end_bb(Op) of
+        true  -> [Undef, SCode];
+        false -> [SCode, Undef]
+    end.
 
 %% -- Phase II ---------------------------------------------------------------
 %%  Optimize
@@ -886,6 +942,10 @@ attributes(I) ->
         loop                                  -> Impure(pc, []);
         switch_body                           -> Pure(none, []);
         'RETURN'                              -> Impure(pc, []);
+        {'DBG_LOC', _, _}                     -> Impure(none, []);
+        {'DBG_DEF', _, _}                     -> Impure(none, []);
+        {'DBG_UNDEF', _, _}                   -> Impure(none, []);
+        {'DBG_CONTRACT', _}                   -> Impure(none, []);
         {'RETURNR', A}                        -> Impure(pc, A);
         {'CALL', A}                           -> Impure(?a, [A]);
         {'CALL_R', A, _, B, C, D}             -> Impure(?a, [A, B, C, D]);
@@ -1605,7 +1665,23 @@ bb(_Name, Code) ->
     Blocks  = lists:flatmap(fun split_calls/1, Blocks1),
     Labels  = maps:from_list([ {Ref, I} || {I, {Ref, _}} <- with_ixs(Blocks) ]),
     BBs     = [ set_labels(Labels, B) || B <- Blocks ],
-    maps:from_list(BBs).
+    maps:from_list(dbg_loc_filter(BBs)).
+
+%% Filter DBG_LOC instructions to keep one instruction per line
+dbg_loc_filter(BBs) ->
+    dbg_loc_filter(BBs, [], [], sets:new()).
+
+dbg_loc_filter([], _, AllBlocks, _) ->
+    lists:reverse(AllBlocks);
+dbg_loc_filter([{I, []} | Rest], AllOps, AllBlocks, DbgLocs) ->
+    dbg_loc_filter(Rest, [], [{I, lists:reverse(AllOps)} | AllBlocks], DbgLocs);
+dbg_loc_filter([{I, [Op = {'DBG_LOC', _, _} | Ops]} | Rest], AllOps, AllBlocks, DbgLocs) ->
+    case sets:is_element(Op, DbgLocs) of
+        true  -> dbg_loc_filter([{I, Ops} | Rest], AllOps, AllBlocks, DbgLocs);
+        false -> dbg_loc_filter([{I, Ops} | Rest], [Op | AllOps], AllBlocks, sets:add_element(Op, DbgLocs))
+    end;
+dbg_loc_filter([{I, [Op | Ops]} | Rest], AllOps, AllBlocks, DbgLocs) ->
+    dbg_loc_filter([{I, Ops} | Rest], [Op | AllOps], AllBlocks, DbgLocs).
 
 %% -- Break up scode into basic blocks --
 

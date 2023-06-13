@@ -119,7 +119,7 @@ from_string1(ContractString, Options) ->
      , warnings := Warnings } = string_to_code(ContractString, Options),
     #{ child_con_env := ChildContracts } = FCodeEnv,
     SavedFreshNames = maps:get(saved_fresh_names, FCodeEnv, #{}),
-    {FateCode, VarsRegs} = aeso_fcode_to_fate:compile(ChildContracts, FCode, SavedFreshNames, Options),
+    FateCode = aeso_fcode_to_fate:compile(ChildContracts, FCode, SavedFreshNames, Options),
     pp_assembler(FateCode, Options),
     ByteCode = aeb_fate_code:serialize(FateCode, []),
     {ok, Version} = version(),
@@ -132,13 +132,7 @@ from_string1(ContractString, Options) ->
             payable => maps:get(payable, FCode),
             warnings => Warnings
            },
-    ResDbg = Res#{variables_registers => VarsRegs},
-    FinalRes =
-        case proplists:get_value(debug_info, Options, false) of
-            true  -> ResDbg;
-            false -> Res
-        end,
-    {ok, maybe_generate_aci(FinalRes, FoldedTypedAst, Options)}.
+    {ok, maybe_generate_aci(Res, FoldedTypedAst, Options)}.
 
 maybe_generate_aci(Result, FoldedTypedAst, Options) ->
     case proplists:get_value(aci, Options) of
@@ -192,7 +186,7 @@ check_call(Source, FunName, Args, Options) ->
 check_call1(ContractString0, FunName, Args, Options) ->
     case add_extra_call(ContractString0, {call, FunName, Args}, Options) of
         {ok, CallName, Code} ->
-            {def, _, FcodeArgs} = get_call_body(CallName, Code),
+            {def, _, _, FcodeArgs} = get_call_body(CallName, Code),
             {ok, FunName, [ aeso_fcode_to_fate:term_to_fate(A) || A <- FcodeArgs ]};
         Err = {error, _} ->
             Err
@@ -204,7 +198,7 @@ add_extra_call(Contract0, Call, Options) ->
         #{fcode := OrgFcode
         , fcode_env := #{child_con_env := ChildContracts}
         , ast := Ast} = string_to_code(Contract0, Options),
-        {FateCode, _} = aeso_fcode_to_fate:compile(ChildContracts, OrgFcode, #{}, []),
+        FateCode = aeso_fcode_to_fate:compile(ChildContracts, OrgFcode, #{}, []),
         %% collect all hashes and compute the first name without hash collision to
         SymbolHashes = maps:keys(aeb_fate_code:symbols(FateCode)),
         CallName = first_none_match(?CALL_NAME, SymbolHashes,
