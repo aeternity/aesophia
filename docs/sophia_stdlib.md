@@ -190,7 +190,7 @@ using the private key of the `owner` account for signing.
 ##### update
 ```
 AENS.update(owner : address, name : string, expiry : option(Chain.ttl), client_ttl : option(int),
-            new_ptrs : map(string, AENS.pointee), <signature : signature>) : unit
+            new_ptrs : option(map(string, AENS.pointee)), <signature : signature>) : unit
 ```
 
 Updates the name. If the optional parameters are set to `None` that parameter
