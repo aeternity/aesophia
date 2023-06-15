@@ -915,7 +915,7 @@ using the private key of the <code>owner</code> account for signing.</p>
 using the private key of the <code>owner</code> account for signing.</p>
 <h5 id="update">update</h5>
 <div class="highlight"><pre><span></span><code>AENS.update(owner : address, name : string, expiry : option(Chain.ttl), client_ttl : option(int),
-            new_ptrs : map(string, AENS.pointee), &lt;signature : signature&gt;) : unit
+            new_ptrs : option(map(string, AENS.pointee)), &lt;signature : signature&gt;) : unit
 </code></pre></div>
 <p>Updates the name. If the optional parameters are set to <code>None</code> that parameter
 will not be updated, for example if <code>None</code> is passed as <code>expiry</code> the expiry
