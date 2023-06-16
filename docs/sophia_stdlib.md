@@ -470,38 +470,6 @@ Chain.block_height : int"
 The height of the current block (i.e. the block in which the current call will be included).
 
 
-##### coinbase
-```
-Chain.coinbase : address
-```
-
-The address of the account that mined the current block.
-
-
-##### timestamp
-```
-Chain.timestamp : int
-```
-
-The timestamp of the current block (unix time, milliseconds).
-
-
-##### difficulty
-```
-Chain.difficulty : int
-```
-
-The difficulty of the current block.
-
-
-##### gas
-```
-Chain.gas_limit : int
-```
-
-The gas limit of the current block.
-
-
 ##### bytecode_hash
 ```
 Chain.bytecode_hash : 'c => option(hash)
@@ -565,6 +533,7 @@ main contract Market =
 The typechecker must be certain about the created contract's type, so it is
 worth writing it explicitly as shown in the example.
 
+
 ##### clone
 ```
 Chain.clone : ( ref : 'c, gas : int, value : int, protected : bool, ...
@@ -623,11 +592,44 @@ implementation of the `init` function does not actually return `state`, but
 calls `put` instead. Moreover, FATE prevents even handcrafted calls to `init`.
 
 
+##### coinbase
+```
+Chain.coinbase : address
+```
+
+The address of the account that mined the current block.
+
+
+##### difficulty
+```
+Chain.difficulty : int
+```
+
+The difficulty of the current block.
+
+
 ##### event
 ```
 Chain.event(e : event) : unit
 ```
 Emits the event. To use this function one needs to define the `event` type as a `datatype` in the contract.
+
+
+##### spend
+```
+Chain.spend(to : address, amount : int) : unit
+```
+
+Spend `amount` tokens to `to`. Will fail (and abort the contract) if contract
+doesn't have `amount` tokens to transfer, or, if `to` is not `payable`.
+
+
+##### timestamp
+```
+Chain.timestamp : int
+```
+
+The timestamp of the current block (unix time, milliseconds).
 
 
 ### Char
