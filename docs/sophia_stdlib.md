@@ -612,7 +612,17 @@ The difficulty of the current block.
 ```
 Chain.event(e : event) : unit
 ```
-Emits the event. To use this function one needs to define the `event` type as a `datatype` in the contract.
+
+Emits the event. To use this function one needs to define the `event` type as a
+`datatype` in the contract.
+
+
+##### gas\_limit
+```
+Chain.gas_limit : int
+```
+
+The gas limit of the current block.
 
 
 ##### spend
