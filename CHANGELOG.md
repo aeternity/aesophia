@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+### Changed
+### Removed
+### Fixed
+
+## [7.2.0]
+### Added
 - Toplevel compile-time constants
   ```
   namespace N =
@@ -14,7 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     let cc = 2
   ```
 - API functions for encoding/decoding Sophia values to/from FATE.
-### Changed
 ### Removed
 - Remove the mapping from variables to FATE registers from the compilation output.
 ### Fixed
@@ -390,7 +395,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v7.1.0...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v7.2.0...HEAD
+[7.2.0]: https://github.com/aeternity/aesophia/compare/v7.1.0...v7.2.0
 [7.1.0]: https://github.com/aeternity/aesophia/compare/v7.0.1...v7.1.0
 [7.0.1]: https://github.com/aeternity/aesophia/compare/v7.0.0...v7.0.1
 [7.0.0]: https://github.com/aeternity/aesophia/compare/v6.1.0...v7.0.0
