@@ -1074,22 +1074,6 @@ the current generation.</p>
 <div class="highlight"><pre><span></span><code>Chain.block_height : int&quot;
 </code></pre></div>
 <p>The height of the current block (i.e. the block in which the current call will be included).</p>
-<h5 id="coinbase">coinbase</h5>
-<div class="highlight"><pre><span></span><code>Chain.coinbase : address
-</code></pre></div>
-<p>The address of the account that mined the current block.</p>
-<h5 id="timestamp">timestamp</h5>
-<div class="highlight"><pre><span></span><code>Chain.timestamp : int
-</code></pre></div>
-<p>The timestamp of the current block (unix time, milliseconds).</p>
-<h5 id="difficulty">difficulty</h5>
-<div class="highlight"><pre><span></span><code>Chain.difficulty : int
-</code></pre></div>
-<p>The difficulty of the current block.</p>
-<h5 id="gas">gas</h5>
-<div class="highlight"><pre><span></span><code>Chain.gas_limit : int
-</code></pre></div>
-<p>The gas limit of the current block.</p>
 <h5 id="bytecode_hash">bytecode_hash</h5>
 <div class="highlight"><pre><span></span><code>Chain.bytecode_hash : &#39;c =&gt; option(hash)
 </code></pre></div>
@@ -1184,10 +1168,32 @@ good practice to set its return type to <code>void</code> in order to indicate t
 function is not supposed to be called and is state agnostic. Trivia: internal
 implementation of the <code>init</code> function does not actually return <code>state</code>, but
 calls <code>put</code> instead. Moreover, FATE prevents even handcrafted calls to <code>init</code>.</p>
-<h5 id="event">event</h5>
-<p><div class="highlight"><pre><span></span><code>Chain.event(e : event) : unit
+<h5 id="coinbase">coinbase</h5>
+<div class="highlight"><pre><span></span><code>Chain.coinbase : address
 </code></pre></div>
-Emits the event. To use this function one needs to define the <code>event</code> type as a <code>datatype</code> in the contract.</p>
+<p>The address of the account that mined the current block.</p>
+<h5 id="difficulty">difficulty</h5>
+<div class="highlight"><pre><span></span><code>Chain.difficulty : int
+</code></pre></div>
+<p>The difficulty of the current block.</p>
+<h5 id="event">event</h5>
+<div class="highlight"><pre><span></span><code>Chain.event(e : event) : unit
+</code></pre></div>
+<p>Emits the event. To use this function one needs to define the <code>event</code> type as a
+<code>datatype</code> in the contract.</p>
+<h5 id="gas_limit">gas_limit</h5>
+<div class="highlight"><pre><span></span><code>Chain.gas_limit : int
+</code></pre></div>
+<p>The gas limit of the current block.</p>
+<h5 id="spend">spend</h5>
+<div class="highlight"><pre><span></span><code>Chain.spend(to : address, amount : int) : unit
+</code></pre></div>
+<p>Spend <code>amount</code> tokens to <code>to</code>. Will fail (and abort the contract) if contract
+doesn't have <code>amount</code> tokens to transfer, or, if <code>to</code> is not <code>payable</code>.</p>
+<h5 id="timestamp">timestamp</h5>
+<div class="highlight"><pre><span></span><code>Chain.timestamp : int
+</code></pre></div>
+<p>The timestamp of the current block (unix time, milliseconds).</p>
 <h3 id="char">Char</h3>
 <h4 id="to_int_1">to_int</h4>
 <p><code>Char.to_int(c : char) : int
