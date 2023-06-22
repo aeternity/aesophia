@@ -568,6 +568,8 @@ builtin_to_scode(_Env, chain_difficulty, []) ->
     [aeb_fate_ops:difficulty(?a)];
 builtin_to_scode(_Env, chain_gas_limit, []) ->
     [aeb_fate_ops:gaslimit(?a)];
+builtin_to_scode(_Env, chain_network_id, []) ->
+    [aeb_fate_ops:network_id(?a)];
 builtin_to_scode(_Env, contract_balance, []) ->
     [aeb_fate_ops:balance(?a)];
 builtin_to_scode(_Env, contract_address, []) ->
@@ -1090,6 +1092,7 @@ attributes(I) ->
         {'MICROBLOCK', A}                     -> Pure(A, []);
         {'DIFFICULTY', A}                     -> Pure(A, []);
         {'GASLIMIT', A}                       -> Pure(A, []);
+        {'NETWORK_ID', A}                     -> Pure(A, []);
         {'GAS', A}                            -> Pure(A, []);
         {'LOG0', A}                           -> Impure(none, [A]);
         {'LOG1', A, B}                        -> Impure(none, [A, B]);
