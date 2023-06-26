@@ -392,7 +392,7 @@ Returns the hexadecimal representation of the byte array
 Bytes.concat : (a : bytes(m), b : bytes(n)) => bytes(m + n)
 ```
 
-Concatenates two byte arrays, if `m` and `n` are known at compile time, the
+Concatenates two byte arrays. If `m` and `n` are known at compile time, the
 result can be used as a fixed size byte array, otherwise it has type `bytes()`.
 
 
