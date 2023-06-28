@@ -1580,7 +1580,7 @@ simpl_proj(Env, I, Expr) ->
 
 -spec get_catchalls([fcase()]) -> [fcase()].
 get_catchalls(Alts) ->
-    [ C || C = {'case', {var, _, _}, _} <- Alts ].
+    [ C || C = {'case', {var, _}, _} <- Alts ].
 
 %% The scode compiler can't handle multiple catch-alls, so we need to nest them
 %% inside each other. Instead of
