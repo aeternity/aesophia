@@ -1262,7 +1262,7 @@ event_function(_Env = #{event_type := {variant_t, EventCons}}, EventType = {vari
                     end,
                 Indices = [ {var, [], V} || {indexed, V} <- IVars ],
                 Body = {builtin, [], chain_event, [Payload, Hash | Indices]},
-                {'case', {con, [], Arities, Tag, Vars}, {nosplit, [], Body}}
+                {'case', {con, Arities, Tag, Vars}, {nosplit, [], Body}}
            end,
     #{ attrs  => [private],
        args   => [{"e", EventType}],
@@ -1580,7 +1580,7 @@ simpl_proj(Env, I, Expr) ->
 
 -spec get_catchalls([fcase()]) -> [fcase()].
 get_catchalls(Alts) ->
-    [ C || C = {'case', {var, _, _}, _} <- Alts ].
+    [ C || C = {'case', {var, _}, _} <- Alts ].
 
 %% The scode compiler can't handle multiple catch-alls, so we need to nest them
 %% inside each other. Instead of
