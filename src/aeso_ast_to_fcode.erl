@@ -1262,7 +1262,7 @@ event_function(_Env = #{event_type := {variant_t, EventCons}}, EventType = {vari
                     end,
                 Indices = [ {var, [], V} || {indexed, V} <- IVars ],
                 Body = {builtin, [], chain_event, [Payload, Hash | Indices]},
-                {'case', {con, [], Arities, Tag, Vars}, {nosplit, [], Body}}
+                {'case', {con, Arities, Tag, Vars}, {nosplit, [], Body}}
            end,
     #{ attrs  => [private],
        args   => [{"e", EventType}],
