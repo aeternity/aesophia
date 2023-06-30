@@ -1,0 +1,27 @@
+include "String.aes"
+contract BytesMisc =
+  entrypoint sizeFixed(b : bytes(4)) : int = Bytes.size(b)
+  entrypoint sizeAny(b : bytes()) : int = Bytes.size(b)
+  entrypoint int_to_bytes(i : int) : bytes() = Int.to_bytes(i, 16)
+
+  entrypoint test(b3 : bytes(3), b7 : bytes(7), bX : bytes, i : int, s : string) =
+    let bi = Int.to_bytes(i, 8)
+    let bs = String.to_bytes(s)
+
+    let b10 = Bytes.concat(b3, b7)
+
+    let (b4, b6 : bytes(6)) = Bytes.split(b10)
+
+    let Some((b8, b2)) = Bytes.split_any(bX, 8)
+
+    let bX7 = Bytes.concat(bX, b7)
+
+    let Some((b5, bX2)) = Bytes.split_any(bX7, 5)
+
+    let Some((b7b, b0)) = Bytes.split_any(bX, Bytes.size(b7))
+
+    let Some(b5b : bytes(5)) = Bytes.to_fixed_size(b5)
+
+    let (b1 : bytes(1), _) = Bytes.split(b5b)
+
+    [bi, bs, b0, Bytes.to_any_size(b1), b2, Bytes.to_any_size(b4), Bytes.to_any_size(b6), b7b, b8, bX2]

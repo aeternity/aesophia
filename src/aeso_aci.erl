@@ -282,6 +282,8 @@ decode_type(#{list := [Et]}) ->
 decode_type(#{map := Ets}) ->
     Ts = decode_types(Ets),
     ["map",$(,lists:join(",", Ts),$)];
+decode_type(#{bytes := any}) ->
+    ["bytes()"];
 decode_type(#{bytes := Len}) ->
     ["bytes(", integer_to_list(Len), ")"];
 decode_type(#{variant := Ets}) ->

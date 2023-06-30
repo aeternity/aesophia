@@ -275,7 +275,9 @@ type({tuple_t, _, Args}) ->
     tuple_type(Args);
 type({args_t, _, Args}) ->
     args_type(Args);
-type({bytes_t, _, any}) -> text("bytes(_)");
+type({bytes_t, _, any}) -> text("bytes()");
+type({bytes_t, _, '_'}) -> text("bytes(_)");
+type({bytes_t, _, fixed}) -> text("bytes(_)");
 type({bytes_t, _, Len}) ->
     text(lists:concat(["bytes(", Len, ")"]));
 type({if_t, _, Id, Then, Else}) ->
