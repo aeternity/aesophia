@@ -89,8 +89,9 @@
 
 -type field_constraint() :: #field_constraint{} | #record_create_constraint{} | #is_contract_constraint{}.
 
--type byte_constraint() :: {is_bytes, utype()}
-                         | {add_bytes, aeso_syntax:ann(), concat | split, utype(), utype(), utype()}.
+-type byte_constraint() :: {is_bytes, term(), utype()}
+                         | {is_fixed_bytes, term(), utype()}
+                         | {add_bytes, aeso_syntax:ann(), concat | split | split_any, utype(), utype(), utype()}.
 
 -type aens_resolve_constraint() :: {aens_resolve_type, utype()}.
 -type oracle_type_constraint() :: {oracle_type, aeso_syntax:ann(), utype()}.
@@ -829,6 +830,7 @@ global_env() ->
                      [{"length",    Fun1(String, Int)},
                       {"concat",    Fun([String, String], String)},
                       {"to_list",   Fun1(String, List(Char))},
+                      {"to_bytes",  Fun1(String, Bytes(any))},
                       {"from_list", Fun1(List(Char), String)},
                       {"to_upper",  Fun1(String, String)},
                       {"to_lower",  Fun1(String, String)},
@@ -859,15 +861,20 @@ global_env() ->
     %% Bytes
     BytesScope = #scope
         { funs = MkDefs(
-                   [{"to_int", Fun1(Bytes(any), Int)},
-                    {"to_str", Fun1(Bytes(any), String)},
-                    {"concat", FunC(bytes_concat, [Bytes(any), Bytes(any)], Bytes(any))},
-                    {"split",  FunC(bytes_split, [Bytes(any)], Pair(Bytes(any), Bytes(any)))}
+                   [{"to_int",        Fun1(Bytes('_'), Int)},
+                    {"to_str",        Fun1(Bytes('_'), String)},
+                    {"to_fixed_size", Fun1(Bytes(any), Option(Bytes(fixed)))},
+                    {"to_any_size",   Fun1(Bytes(fixed), Bytes(any))},
+                    {"size",          Fun1(Bytes('_'), Int)},
+                    {"concat",        FunC(bytes_concat, [Bytes('_'), Bytes('_')], Bytes('_'))},
+                    {"split",         FunC1(bytes_split, Bytes(fixed), Pair(Bytes(fixed), Bytes(fixed)))},
+                    {"split_any",     Fun([Bytes(any), Int], Option(Pair(Bytes(any), Bytes(any))))}
                    ]) },
 
     %% Conversion
-    IntScope     = #scope{ funs = MkDefs([{"to_str", Fun1(Int, String)},
-                                          {"mulmod", Fun([Int, Int, Int], Int)}]) },
+    IntScope     = #scope{ funs = MkDefs([{"to_str",   Fun1(Int, String)},
+                                          {"to_bytes", Fun([Int, Int], Bytes(any))},
+                                          {"mulmod",   Fun([Int, Int, Int], Int)}]) },
 
     AddressScope = #scope{ funs = MkDefs([{"to_str", Fun1(Address, String)},
                                           {"to_bytes", Fun1(Address, Bytes(32))},
@@ -1790,8 +1797,8 @@ lookup_name(Env = #env{ namespace = NS, current_function = CurFn }, As, Id, Opti
             Freshen = proplists:get_value(freshen, Options, false),
             check_stateful(Env, Id, Ty),
             Ty1 = case Ty of
-                    {type_sig, _, _, _, _, _} -> freshen_type_sig(As, Ty);
-                    _ when Freshen            -> freshen_type(As, Ty);
+                    {type_sig, _, _, _, _, _} -> freshen_type_sig(As, Ty, [{fun_name, Id}]);
+                    _ when Freshen            -> freshen_type(As, Ty, [{fun_name, Id}]);
                     _                         -> Ty
                   end,
             {set_qname(QId, Id), Ty1}
@@ -2672,7 +2679,8 @@ destroy_and_report_unsolved_constraints(Env) ->
                            (_)                            -> false
                         end, OtherCs2),
     {BytesCs, OtherCs4} =
-        lists:partition(fun({is_bytes, _})              -> true;
+        lists:partition(fun({is_bytes, _, _})           -> true;
+                           ({is_fixed_bytes, _, _})     -> true;
                            ({add_bytes, _, _, _, _, _}) -> true;
                            (_)                          -> false
                         end, OtherCs3),
@@ -2801,15 +2809,21 @@ solve_constraint(Env, C = #dependent_type_constraint{}) ->
     check_named_argument_constraint(Env, C);
 solve_constraint(Env, C = #named_argument_constraint{}) ->
     check_named_argument_constraint(Env, C);
-solve_constraint(_Env, {is_bytes, _}) -> ok;
-solve_constraint(Env, {add_bytes, Ann, _, A0, B0, C0}) ->
+solve_constraint(_Env, {is_bytes, _, _}) -> ok;
+solve_constraint(_Env, {is_fixed_bytes, _, _}) -> ok;
+solve_constraint(Env, {add_bytes, Ann, Action, A0, B0, C0}) ->
     A = unfold_types_in_type(Env, dereference(A0)),
     B = unfold_types_in_type(Env, dereference(B0)),
     C = unfold_types_in_type(Env, dereference(C0)),
     case {A, B, C} of
-        {{bytes_t, _, M}, {bytes_t, _, N}, _} -> unify(Env, {bytes_t, Ann, M + N}, C, {at, Ann});
-        {{bytes_t, _, M}, _, {bytes_t, _, R}} when R >= M -> unify(Env, {bytes_t, Ann, R - M}, B, {at, Ann});
-        {_, {bytes_t, _, N}, {bytes_t, _, R}} when R >= N -> unify(Env, {bytes_t, Ann, R - N}, A, {at, Ann});
+        {{bytes_t, _, M}, {bytes_t, _, N}, _} when is_integer(M), is_integer(N) ->
+            unify(Env, {bytes_t, Ann, M + N}, C, {at, Ann});
+        {{bytes_t, _, M}, _, {bytes_t, _, R}} when is_integer(M), is_integer(R), R >= M ->
+            unify(Env, {bytes_t, Ann, R - M}, B, {at, Ann});
+        {_, {bytes_t, _, N}, {bytes_t, _, R}} when is_integer(N), is_integer(R), R >= N ->
+            unify(Env, {bytes_t, Ann, R - N}, A, {at, Ann});
+        {{bytes_t, _, _}, {bytes_t, _, _}, _} when Action == concat ->
+            unify(Env, {bytes_t, Ann, any}, C, {at, Ann});
         _ -> ok
     end;
 solve_constraint(_, _) -> ok.
@@ -2818,18 +2832,29 @@ check_bytes_constraints(Env, Constraints) ->
     InAddConstraint = [ T || {add_bytes, _, _, A, B, C} <- Constraints,
                              T <- [A, B, C],
                              element(1, T) /= bytes_t ],
+    InSplitConstraint = [ T || {add_bytes, _, split, A, B, C} <- Constraints,
+                               T <- [A, B, C],
+                               element(1, T) /= bytes_t ],
     %% Skip is_bytes constraints for types that occur in add_bytes constraints
     %% (no need to generate error messages for both is_bytes and add_bytes).
-    Skip = fun({is_bytes, T}) -> lists:member(T, InAddConstraint);
+    Skip = fun({is_bytes, _, T}) -> lists:member(T, InAddConstraint);
+              ({is_fixed_bytes, _, T}) -> lists:member(T, InSplitConstraint);
               (_) -> false end,
     [ check_bytes_constraint(Env, C) || C <- Constraints, not Skip(C) ].
 
-check_bytes_constraint(Env, {is_bytes, Type}) ->
+check_bytes_constraint(Env, {is_bytes, Ann, Type}) ->
     Type1 = unfold_types_in_type(Env, instantiate(Type)),
     case Type1 of
-        {bytes_t, _, _} -> ok;
+        {bytes_t, _, N} when is_integer(N); N == any -> ok;
         _               ->
-            type_error({unknown_byte_length, Type})
+            type_error({unknown_byte_type, Ann, Type})
+    end;
+check_bytes_constraint(Env, {is_fixed_bytes, Ann, Type}) ->
+    Type1 = unfold_types_in_type(Env, instantiate(Type)),
+    case Type1 of
+        {bytes_t, _, N} when is_integer(N) -> ok;
+        _                                  ->
+            type_error({unknown_byte_length, Ann, Type})
     end;
 check_bytes_constraint(Env, {add_bytes, Ann, Fun, A0, B0, C0}) ->
     A = unfold_types_in_type(Env, instantiate(A0)),
@@ -3130,9 +3155,9 @@ unify1(Env, T, {uvar, A, R}, Variance, When) ->
     unify1(Env, {uvar, A, R}, T, Variance, When);
 unify1(_Env, {tvar, _, X}, {tvar, _, X}, _Variance, _When) -> true; %% Rigid type variables
 unify1(Env, [A|B], [C|D], [V|Variances], When) ->
-    unify0(Env, A, C, V, When) andalso unify0(Env, B, D, Variances, When);
+    unify0(Env, A, C, V, When) and unify0(Env, B, D, Variances, When);
 unify1(Env, [A|B], [C|D], Variance, When) ->
-    unify0(Env, A, C, Variance, When) andalso unify0(Env, B, D, Variance, When);
+    unify0(Env, A, C, Variance, When) and unify0(Env, B, D, Variance, When);
 unify1(_Env, X, X, _Variance, _When) ->
     true;
 unify1(_Env, _A, {id, _, "void"}, Variance, _When)
@@ -3177,8 +3202,8 @@ unify1(_Env, {fun_t, _, _, var_args, _}, {fun_t, _, _, _, _}, _Variance, When) -
     type_error({unify_varargs, When});
 unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, Variance, When)
   when length(Args1) == length(Args2) ->
-    unify0(Env, Named1, Named2, opposite_variance(Variance), When) andalso
-    unify0(Env, Args1, Args2, opposite_variance(Variance), When) andalso
+    unify0(Env, Named1, Named2, opposite_variance(Variance), When) and
+    unify0(Env, Args1, Args2, opposite_variance(Variance), When) and
     unify0(Env, Result1, Result2, Variance, When);
 unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, Variance, When)
   when length(Args1) == length(Args2), Tag == id orelse Tag == qid ->
@@ -3292,49 +3317,59 @@ create_freshen_tvars() ->
 destroy_freshen_tvars() ->
     ets_delete(freshen_tvars).
 
-freshen_type(Ann, Type) ->
+freshen_type(Ann, Type, Ctx) ->
     create_freshen_tvars(),
-    Type1 = freshen(Ann, Type),
+    Type1 = freshen(Ann, Type, Ctx),
     destroy_freshen_tvars(),
     Type1.
 
 freshen(Type) ->
-    freshen(aeso_syntax:get_ann(Type), Type).
+    freshen(aeso_syntax:get_ann(Type), Type, none).
 
-freshen(Ann, {tvar, _, Name}) ->
+freshen(Ann, {tvar, _, Name}, _Ctx) ->
     NewT = case ets_lookup(freshen_tvars, Name) of
                []          -> fresh_uvar(Ann);
                [{Name, T}] -> T
            end,
     ets_insert(freshen_tvars, {Name, NewT}),
     NewT;
-freshen(Ann, {bytes_t, _, any}) ->
+freshen(Ann, {bytes_t, _, '_'}, Ctx) ->
     X = fresh_uvar(Ann),
-    add_constraint({is_bytes, X}),
+    add_constraint({is_bytes, Ctx, X}),
     X;
-freshen(Ann, T) when is_tuple(T) ->
-    list_to_tuple(freshen(Ann, tuple_to_list(T)));
-freshen(Ann, [A | B]) ->
-    [freshen(Ann, A) | freshen(Ann, B)];
-freshen(_, X) ->
+freshen(Ann, {bytes_t, _, fixed}, Ctx) ->
+    X = fresh_uvar(Ann),
+    add_constraint({is_fixed_bytes, Ctx, X}),
+    X;
+freshen(Ann, {fun_t, FAnn, NamedArgs, Args, Result}, Ctx) when is_list(Args) ->
+    {fun_t, FAnn, freshen(Ann, NamedArgs, Ctx),
+     [ freshen(Ann, Arg, [{arg, Ix} | Ctx]) || {Arg, Ix} <- lists:zip(Args, lists:seq(1, length(Args))) ],
+     freshen(Ann, Result, [result | Ctx])};
+freshen(Ann, {fun_t, FAnn, NamedArgs, Arg, Result}, Ctx) ->
+    {fun_t, FAnn, freshen(Ann, NamedArgs, Ctx), freshen(Ann, Arg, Ctx), freshen(Ann, Result, [result | Ctx])};
+freshen(Ann, T, Ctx) when is_tuple(T) ->
+    list_to_tuple(freshen(Ann, tuple_to_list(T), Ctx));
+freshen(Ann, [A | B], Ctx) ->
+    [freshen(Ann, A, Ctx) | freshen(Ann, B, Ctx)];
+freshen(_, X, _Ctx) ->
     X.
 
-freshen_type_sig(Ann, TypeSig = {type_sig, _, Constr, _, _, _}) ->
-    FunT = freshen_type(Ann, typesig_to_fun_t(TypeSig)),
+freshen_type_sig(Ann, TypeSig = {type_sig, _, Constr, _, _, _}, Ctx) ->
+    FunT = freshen_type(Ann, typesig_to_fun_t(TypeSig), Ctx),
     apply_typesig_constraint(Ann, Constr, FunT),
     FunT.
 
 apply_typesig_constraint(_Ann, none, _FunT) -> ok;
 apply_typesig_constraint(Ann, address_to_contract, {fun_t, _, [], [_], Type}) ->
     add_constraint([#is_contract_constraint{ contract_t = Type,
-                                        context    = {address_to_contract, Ann}}]);
+                                             context    = {address_to_contract, Ann}}]);
 apply_typesig_constraint(Ann, bytes_concat, {fun_t, _, [], [A, B], C}) ->
     add_constraint({add_bytes, Ann, concat, A, B, C});
 apply_typesig_constraint(Ann, bytes_split, {fun_t, _, [], [C], {tuple_t, _, [A, B]}}) ->
     add_constraint({add_bytes, Ann, split, A, B, C});
 apply_typesig_constraint(Ann, bytecode_hash, {fun_t, _, _, [Con], _}) ->
     add_constraint([#is_contract_constraint{ contract_t = Con,
-                                        context    = {bytecode_hash, Ann} }]).
+                                             context    = {bytecode_hash, Ann} }]).
 
 
 %% Dereferences all uvars and replaces the uninstantiated ones with a
@@ -3855,8 +3890,11 @@ mk_error({bad_top_level_decl, Decl}) ->
     Msg = io_lib:format("The definition of '~s' must appear inside a ~s.",
                         [pp_expr(Id), What]),
     mk_t_err(pos(Decl), Msg);
-mk_error({unknown_byte_length, Type}) ->
-    Msg = io_lib:format("Cannot resolve length of byte array.", []),
+mk_error({unknown_byte_type, Ctx, Type}) ->
+    Msg = io_lib:format("Cannot resolve type of byte array in\n  ~s", [pp_context(Ctx)]),
+    mk_t_err(pos(Type), Msg);
+mk_error({unknown_byte_length, Ctx, Type}) ->
+    Msg = io_lib:format("Cannot resolve length of byte array in\n  ~s", [pp_context(Ctx)]),
     mk_t_err(pos(Type), Msg);
 mk_error({unsolved_bytes_constraint, Ann, concat, A, B, C}) ->
     Msg = io_lib:format("Failed to resolve byte array lengths in call to Bytes.concat with arguments of type\n"
@@ -3866,6 +3904,12 @@ mk_error({unsolved_bytes_constraint, Ann, concat, A, B, C}) ->
     mk_t_err(pos(Ann), Msg);
 mk_error({unsolved_bytes_constraint, Ann, split, A, B, C}) ->
     Msg = io_lib:format("Failed to resolve byte array lengths in call to Bytes.split with argument of type\n"
+                        "~s  (at ~s)\nand result types\n~s  (at ~s)\n~s  (at ~s)",
+                        [ pp_type("  - ", C), pp_loc(C), pp_type("  - ", A), pp_loc(A),
+                          pp_type("  - ", B), pp_loc(B)]),
+    mk_t_err(pos(Ann), Msg);
+mk_error({unsolved_bytes_constraint, Ann, split_any, A, B, C}) ->
+    Msg = io_lib:format("Failed to resolve byte arrays in call to Bytes.split_any with argument of type\n"
                         "~s  (at ~s)\nand result types\n~s  (at ~s)\n~s  (at ~s)",
                         [ pp_type("  - ", C), pp_loc(C), pp_type("  - ", A), pp_loc(A),
                           pp_type("  - ", B), pp_loc(B)]),
@@ -4236,6 +4280,18 @@ pp_type(Type) ->
 pp_type(Label, Type) ->
     prettypr:format(prettypr:beside(prettypr:text(Label), aeso_pretty:type(Type, [show_generated])), 80, 80).
 
+
+pp_context([{fun_name, Id}]) -> ["a call to ", pp(Id)];
+pp_context([result | Ctx]) -> ["the result of ", pp_context(Ctx)];
+pp_context([{arg, N} | Ctx]) ->
+  Cnt = fun(1) -> "first";
+           (2) -> "second";
+           (3) -> "third";
+           (I) -> io_lib:format("~pth", [I])
+        end,
+  ["the ", Cnt(N), " argument of ", pp_context(Ctx)];
+pp_context(none) -> "unknown context".
+
 src_file(T)      -> aeso_syntax:get_ann(file, T, no_file).
 include_type(T)  -> aeso_syntax:get_ann(include_type, T, none).
 line_number(T)   -> aeso_syntax:get_ann(line, T, 0).
@@ -4287,7 +4343,7 @@ pp({tuple_t, _, []}) ->
     "unit";
 pp({tuple_t, _, Cpts}) ->
     ["(", string:join(lists:map(fun pp/1, Cpts), " * "), ")"];
-pp({bytes_t, _, any}) -> "bytes(_)";
+pp({bytes_t, _, any}) -> "bytes()";
 pp({bytes_t, _, Len}) ->
     ["bytes(", integer_to_list(Len), ")"];
 pp({app_t, _, T, []}) ->

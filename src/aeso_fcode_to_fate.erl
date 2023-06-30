@@ -539,6 +539,14 @@ builtin_to_scode(Env, bytes_concat, [_, _] = Args) ->
     call_to_scode(Env, aeb_fate_ops:bytes_concat(?a, ?a, ?a), Args);
 builtin_to_scode(Env, bytes_split, [_, _] = Args) ->
     call_to_scode(Env, aeb_fate_ops:bytes_split(?a, ?a, ?a), Args);
+builtin_to_scode(Env, bytes_split_any, [_, _] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:bytes_split_any(?a, ?a, ?a), Args);
+builtin_to_scode(Env, bytes_to_fixed_size, [_, _] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:bytes_to_fixed_size(?a, ?a, ?a), Args);
+builtin_to_scode(Env, bytes_to_any_size, [A]) ->
+    [to_scode(Env, A)]; %% no_op!
+builtin_to_scode(Env, bytes_size, [_] = Args) ->
+    call_to_scode(Env, aeb_fate_ops:bytes_size(?a, ?a), Args);
 builtin_to_scode(Env, abort, [_] = Args) ->
     call_to_scode(Env, aeb_fate_ops:abort(?a), Args);
 builtin_to_scode(Env, exit, [_] = Args) ->
@@ -683,6 +691,7 @@ op_to_scode(map_member)        -> aeb_fate_ops:map_member(?a, ?a, ?a);
 op_to_scode(map_size)          -> aeb_fate_ops:map_size_(?a, ?a);
 op_to_scode(stringinternal_length)    -> aeb_fate_ops:str_length(?a, ?a);
 op_to_scode(stringinternal_concat)    -> aeb_fate_ops:str_join(?a, ?a, ?a);
+op_to_scode(stringinternal_to_bytes)  -> aeb_fate_ops:str_to_bytes(?a, ?a);
 op_to_scode(stringinternal_to_list)   -> aeb_fate_ops:str_to_list(?a, ?a);
 op_to_scode(stringinternal_from_list) -> aeb_fate_ops:str_from_list(?a, ?a);
 op_to_scode(stringinternal_to_lower)  -> aeb_fate_ops:str_to_lower(?a, ?a);
@@ -699,6 +708,7 @@ op_to_scode(bits_difference)   -> aeb_fate_ops:bits_diff(?a, ?a, ?a);
 op_to_scode(address_to_str)    -> aeb_fate_ops:addr_to_str(?a, ?a);
 op_to_scode(address_to_bytes)  -> aeb_fate_ops:addr_to_bytes(?a, ?a);
 op_to_scode(int_to_str)        -> aeb_fate_ops:int_to_str(?a, ?a);
+op_to_scode(int_to_bytes)      -> aeb_fate_ops:int_to_bytes(?a, ?a, ?a);
 op_to_scode(int_mulmod)        -> aeb_fate_ops:mulmod(?a, ?a, ?a, ?a);
 op_to_scode(contract_to_address)         -> aeb_fate_ops:contract_to_address(?a, ?a);
 op_to_scode(address_to_contract)         -> aeb_fate_ops:address_to_contract(?a, ?a);
@@ -1019,9 +1029,11 @@ attributes(I) ->
         {'APPEND', A, B, C}                   -> Pure(A, [B, C]);
         {'STR_JOIN', A, B, C}                 -> Pure(A, [B, C]);
         {'INT_TO_STR', A, B}                  -> Pure(A, B);
+        {'INT_TO_BYTES', A, B, C}             -> Pure(A, [B, C]);
         {'ADDR_TO_STR', A, B}                 -> Pure(A, B);
         {'STR_REVERSE', A, B}                 -> Pure(A, B);
         {'STR_LENGTH', A, B}                  -> Pure(A, B);
+        {'STR_TO_BYTES', A, B}                -> Pure(A, B);
         {'INT_TO_ADDR', A, B}                 -> Pure(A, B);
         {'VARIANT', A, B, C, D}               -> Pure(A, [?a, B, C, D]);
         {'VARIANT_TEST', A, B, C}             -> Pure(A, [B, C]);
@@ -1055,6 +1067,9 @@ attributes(I) ->
         {'BYTES_TO_STR', A, B}                -> Pure(A, [B]);
         {'BYTES_CONCAT', A, B, C}             -> Pure(A, [B, C]);
         {'BYTES_SPLIT', A, B, C}              -> Pure(A, [B, C]);
+        {'BYTES_SPLIT_ANY', A, B, C}          -> Pure(A, [B, C]);
+        {'BYTES_SIZE', A, B}                  -> Pure(A, B);
+        {'BYTES_TO_FIXED_SIZE', A, B, C}      -> Pure(A, [B, C]);
         {'ORACLE_CHECK', A, B, C, D}          -> Pure(A, [B, C, D]);
         {'ORACLE_CHECK_QUERY', A, B, C, D, E} -> Pure(A, [B, C, D, E]);
         {'IS_ORACLE', A, B}                   -> Pure(A, [B]);
