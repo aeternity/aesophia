@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only contains the old datatypes, that can be used to interface existing
   contracts. Standard library `AENSCompat` is added to convert between old and
   new pointers.
+- Introduce arbitrary sized binary arrays (type `bytes()`); adding `Bytes.split_any`,
+  `Bytes.to_fixed_size`, `Bytes.to_any_size`, `Bytes.size`, `String.to_bytes`,
+  and `Int.to_bytes`; and adjust `Bytes.concat` to allow both fixed and arbitrary
+  sized byte arrays.
 ### Changed
 ### Removed
 - `Bitwise.aes` standard library is removed - the builtin operations are superior.
