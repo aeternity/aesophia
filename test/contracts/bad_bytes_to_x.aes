@@ -1,0 +1,5 @@
+// include "String.aes"
+contract BytesToX =
+  entrypoint fail1(b : bytes()) = Bytes.to_fixed_size(b)
+  entrypoint fail2(b : bytes(4)) = Bytes.to_fixed_size(b)
+  entrypoint fail3(b : bytes()) = Bytes.to_any_size(b)

@@ -170,6 +170,7 @@ compilable_contracts() ->
      "namespace_bug",
      "bytes_to_x",
      "bytes_concat",
+     "bytes_misc",
      "aens",
      "aens_update",
      "tuple_match",
@@ -448,6 +449,10 @@ failing_contracts() ->
         [<<?Pos(12, 42)
            "Cannot unify `int` and `string`\n"
            "when checking the type of the expression `r.foo() : map(int, string)` "
+           "against the expected type `map(string, int)`">>,
+         <<?Pos(12, 42)
+           "Cannot unify `string` and `int`\n"
+           "when checking the type of the expression `r.foo() : map(int, string)` "
            "against the expected type `map(string, int)`">>])
     , ?TYPE_ERROR(not_toplevel_include,
                   [<<?Pos(2, 11)
@@ -605,6 +610,21 @@ failing_contracts() ->
         [<<?Pos(3, 5)
            "Unbound variable `Chain.event`\n"
            "Did you forget to define the event type?">>])
+    , ?TYPE_ERROR(bad_bytes_to_x,
+        [<<?Pos(3, 35)
+           "Cannot resolve length of byte array in\n"
+           "  the result of a call to Bytes.to_fixed_size">>,
+         <<?Pos(4, 36)
+           "Cannot unify `bytes()` and `bytes(4)`\nwhen checking the application of\n"
+           "  `Bytes.to_fixed_size : (bytes()) => option('a)`\n"
+           "to arguments\n"
+           "  `b : bytes(4)`">>,
+         <<?Pos(4, 36)
+           "Cannot resolve length of byte array in\n"
+           "  the result of a call to Bytes.to_fixed_size">>,
+         <<?Pos(5, 35)
+           "Cannot resolve length of byte array in\n"
+           "  the first argument of a call to Bytes.to_any_size">>])
     , ?TYPE_ERROR(bad_bytes_concat,
         [<<?Pos(12, 40)
            "Failed to resolve byte array lengths in call to Bytes.concat with arguments of type\n"
@@ -629,7 +649,8 @@ failing_contracts() ->
            "and result type\n"
            "  - 'c  (at line 16, column 39)">>,
          <<?Pos(19, 25)
-           "Cannot resolve length of byte array.">>])
+           "Cannot resolve type of byte array in\n"
+           "  the first argument of a call to Bytes.to_str">>])
     , ?TYPE_ERROR(bad_bytes_split,
          [<<?Pos(13, 5)
             "Failed to resolve byte array lengths in call to Bytes.split with argument of type\n"
@@ -929,6 +950,9 @@ failing_contracts() ->
                    <<?Pos(67,36)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
                      "when checking the application of\n  `DT_INV : ((Cat) => Cat) => dt_inv(Cat)`\nto arguments\n  `f_c_to_a : (Cat) => Animal`">>,
+                   <<?Pos(67,36)
+                     "Cannot unify `Cat` and `Animal` in a invariant context\n"
+                     "when checking the type of the expression `DT_INV(f_c_to_a) : dt_inv(Cat)` against the expected type `dt_inv(Animal)`">>,
                    <<?Pos(68,36)
                      "Cannot unify `Cat` and `Animal` in a invariant context\n"
                      "when checking the type of the expression `DT_INV(f_c_to_c) : dt_inv(Cat)` against the expected type `dt_inv(Animal)`">>,
@@ -977,6 +1001,9 @@ failing_contracts() ->
                    <<?Pos(116,59)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
                      "when checking the type of the expression `DT_A_CONTRA_B_CONTRA(f_c_to_c_to_u) : dt_a_contra_b_contra(Cat, Cat)` against the expected type `dt_a_contra_b_contra(Animal, Animal)`">>,
+                   <<?Pos(116,59)
+                     "Cannot unify `Cat` and `Animal` in a contravariant context\n"
+                     "when checking the type of the expression `DT_A_CONTRA_B_CONTRA(f_c_to_c_to_u) : dt_a_contra_b_contra(Cat, Cat)` against the expected type `dt_a_contra_b_contra(Animal, Animal)`">>,
                    <<?Pos(119,59)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
                      "when checking the type of the expression `DT_A_CONTRA_B_CONTRA(f_c_to_a_to_u) : dt_a_contra_b_contra(Cat, Animal)` against the expected type `dt_a_contra_b_contra(Animal, Cat)`">>,
@@ -1020,6 +1047,9 @@ failing_contracts() ->
                    <<?Pos(19,13)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
                      "when checking the type of the pattern `o07 : oracle(Animal, Cat)` against the expected type `oracle(Cat, Animal)`">>,
+                   <<?Pos(19,13)
+                     "Cannot unify `Animal` and `Cat` in a covariant context\n"
+                     "when checking the type of the pattern `o07 : oracle(Animal, Cat)` against the expected type `oracle(Cat, Animal)`">>,
                    <<?Pos(20,13)
                      "Cannot unify `Cat` and `Animal` in a contravariant context\n"
                      "when checking the type of the pattern `o08 : oracle(Animal, Cat)` against the expected type `oracle(Cat, Cat)`">>,
@@ -1041,6 +1071,9 @@ failing_contracts() ->
                    <<?Pos(39,13)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
                      "when checking the type of the pattern `q10 : oracle_query(Cat, Animal)` against the expected type `oracle_query(Animal, Cat)`">>,
+                   <<?Pos(42,13)
+                     "Cannot unify `Animal` and `Cat` in a covariant context\n"
+                     "when checking the type of the pattern `q13 : oracle_query(Cat, Cat)` against the expected type `oracle_query(Animal, Animal)`">>,
                    <<?Pos(42,13)
                      "Cannot unify `Animal` and `Cat` in a covariant context\n"
                      "when checking the type of the pattern `q13 : oracle_query(Cat, Cat)` against the expected type `oracle_query(Animal, Animal)`">>,

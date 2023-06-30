@@ -1,5 +1,8 @@
 include "List.aes"
 namespace String =
+  // Gives a bytes() representation of the string
+  function to_bytes(s : string) : bytes() = StringInternal.to_bytes(s)
+
   // Computes the SHA3/Keccak hash of the string
   function sha3(s : string) : hash    = StringInternal.sha3(s)
   // Computes the SHA256 hash of the string.
