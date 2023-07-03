@@ -653,6 +653,7 @@ global_env() ->
                      {"block_height", Int},
                      {"difficulty",   Int},
                      {"gas_limit",    Int},
+                     {"network_id",   String},
                      {"bytecode_hash",FunC1(bytecode_hash, A, Option(Hash))},
                      {"create",       Stateful(
                                         FunN([ {named_arg_t, Ann, {id, Ann, "value"}, Int, {typed, Ann, {int, Ann, 0}, Int}}

@@ -734,6 +734,14 @@ Chain.gas_limit : int
 The gas limit of the current block.
 
 
+##### network\_id
+```
+Chain.network\_id : string
+```
+
+The network id of the chain.
+
+
 ##### spend
 ```
 Chain.spend(to : address, amount : int) : unit
