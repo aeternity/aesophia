@@ -2,7 +2,8 @@
 
 contract ChainTest =
 
-  record state = { last_bf : address }
+  record state = { last_bf : address
+                 , nw_id   : string }
 
   function init() : state =
     {last_bf = Contract.address}
@@ -11,3 +12,6 @@ contract ChainTest =
 
   function save_coinbase() =
     put(state{last_bf = Chain.coinbase})
+
+  function save_network_id() =
+    put(state{nw_id = Chain.network_id})
