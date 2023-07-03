@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Bytes.to_fixed_size`, `Bytes.to_any_size`, `Bytes.size`, `String.to_bytes`,
   and `Int.to_bytes`; and adjust `Bytes.concat` to allow both fixed and arbitrary
   sized byte arrays.
+- `Chain.network_id` - a function to get hold of the Chain's network id.
 ### Changed
 ### Removed
 - `Bitwise.aes` standard library is removed - the builtin operations are superior.
