@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 ### Removed
 ### Fixed
+- Fixed a bug with polymorphism that allowed functions with the same name but different type to be considered as implementations for their corresponding interface function.
 
 ## [7.2.1]
 ### Fixed

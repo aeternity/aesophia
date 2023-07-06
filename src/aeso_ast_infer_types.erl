@@ -1582,7 +1582,7 @@ check_reserved_entrypoints(Funs) ->
 check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type = {fun_t, _, _, _, _}}) ->
     Type1 = {fun_t, _, Named, Args, Ret} = check_type(Env, Type),
     TypeSig = {type_sig, Ann, none, Named, Args, Ret},
-    register_implementation(Id, TypeSig),
+    register_implementation(Env, Id, TypeSig),
     {{Name, TypeSig}, {fun_decl, Ann, Id, Type1}};
 check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type}) ->
     type_error({fundecl_must_have_funtype, Ann, Id, Type}),
@@ -1590,13 +1590,16 @@ check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type}) ->
 
 %% Register the function FunId as implemented by deleting it from the functions
 %% to be implemented table if it is included there, or return true otherwise.
--spec register_implementation(FunId, FunSig) -> true | no_return() when
+-spec register_implementation(env(), FunId, FunSig) -> true | no_return() when
       FunId :: aeso_syntax:id(),
       FunSig :: typesig().
-register_implementation(Id, Sig) ->
+register_implementation(Env, Id, Sig) ->
     Name = name(Id),
     case ets_lookup(functions_to_implement, Name) of
-        [{Name, Interface, Decl = {fun_decl, _, DeclId, _}}] ->
+        [{Name, Interface, Decl = {fun_decl, _, DeclId, FunT}}] ->
+            When = {implement_interface_fun, aeso_syntax:get_ann(Sig), Name, name(Interface)},
+            unify(Env, typesig_to_fun_t(Sig), FunT, When),
+
             DeclStateful   = aeso_syntax:get_ann(stateful,   Decl, false),
             DeclPayable    = aeso_syntax:get_ann(payable,    Decl, false),
 
@@ -1624,7 +1627,7 @@ infer_nonrec(Env, LetFun) ->
     create_constraints(),
     NewLetFun = {{_, Sig}, _} = infer_letfun(Env, LetFun),
     check_special_funs(Env, NewLetFun),
-    register_implementation(get_letfun_id(LetFun), Sig),
+    register_implementation(Env, get_letfun_id(LetFun), Sig),
     solve_then_destroy_and_report_unsolved_constraints(Env),
     Result = {TypeSig, _} = instantiate(NewLetFun),
     print_typesig(TypeSig),
@@ -1654,7 +1657,7 @@ infer_letrec(Env, Defs) ->
     Inferred =
         [ begin
             Res    = {{Name, TypeSig}, LetFun} = infer_letfun(ExtendEnv, LF),
-            register_implementation(get_letfun_id(LetFun), TypeSig),
+            register_implementation(Env, get_letfun_id(LetFun), TypeSig),
             Got    = proplists:get_value(Name, Funs),
             Expect = typesig_to_fun_t(TypeSig),
             unify(Env, Got, Expect, {check_typesig, Name, Got, Expect}),
@@ -4164,6 +4167,10 @@ pp_when({arg_name, Id1, Id2, When}) ->
 pp_when({var_args, Ann, Fun}) ->
     {pos(Ann)
     , io_lib:format("when resolving arguments of variadic function `~s`", [pp_expr(Fun)])
+    };
+pp_when({implement_interface_fun, Ann, Entrypoint, Interface}) ->
+    { pos(Ann)
+    , io_lib:format("when implementing the entrypoint `~s` from the interface `~s`", [Entrypoint, Interface])
     };
 pp_when(unknown) -> {pos(0,0), ""}.
 
