@@ -3073,7 +3073,8 @@ unify0(Env, A, B, Variance, When) ->
 unify1(_Env, {uvar, _, R}, {uvar, _, R}, _Variance, _When) ->
     true;
 unify1(_Env, {uvar, _, _}, {fun_t, _, _, var_args, _}, _Variance, When) ->
-    type_error({unify_varargs, When});
+    type_error({unify_varargs, When}),
+    false;
 unify1(Env, {uvar, A, R}, T, _Variance, When) ->
     case occurs_check(R, T) of
         true ->
@@ -3134,9 +3135,11 @@ unify1(Env, {if_t, _, {id, _, Id}, Then1, Else1}, {if_t, _, {id, _, Id}, Then2, 
     unify0(Env, Else1, Else2, Variance, When);
 
 unify1(_Env, {fun_t, _, _, _, _}, {fun_t, _, _, var_args, _}, _Variance, When) ->
-    type_error({unify_varargs, When});
+    type_error({unify_varargs, When}),
+    false;
 unify1(_Env, {fun_t, _, _, var_args, _}, {fun_t, _, _, _, _}, _Variance, When) ->
-    type_error({unify_varargs, When});
+    type_error({unify_varargs, When}),
+    false;
 unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, Variance, When)
   when length(Args1) == length(Args2) ->
     unify0(Env, Named1, Named2, opposite_variance(Variance), When) andalso
@@ -3158,7 +3161,7 @@ unify1(Env, {tuple_t, _, As}, {tuple_t, _, Bs}, Variance, When)
   when length(As) == length(Bs) ->
     unify0(Env, As, Bs, Variance, When);
 unify1(Env, {named_arg_t, _, Id1, Type1, _}, {named_arg_t, _, Id2, Type2, _}, Variance, When) ->
-    unify1(Env, Id1, Id2, Variance, {arg_name, Id1, Id2, When}),
+    unify1(Env, Id1, Id2, Variance, {arg_name, Id1, Id2, When}) andalso
     unify1(Env, Type1, Type2, Variance, When);
 %% The grammar is a bit inconsistent about whether types without
 %% arguments are represented as applications to an empty list of
