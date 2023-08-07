@@ -154,7 +154,6 @@
     , in_pattern       = false              :: boolean()
     , in_guard         = false              :: boolean()
     , stateful         = false              :: boolean()
-    , unify_throws     = true               :: boolean()
     , current_const    = none               :: none | aeso_syntax:id()
     , current_function = none               :: none | aeso_syntax:id()
     , what             = top                :: top | namespace | contract | contract_interface
@@ -3075,15 +3074,10 @@ unify1(_Env, {uvar, _, R}, {uvar, _, R}, _Variance, _When) ->
 unify1(_Env, {uvar, _, _}, {fun_t, _, _, var_args, _}, _Variance, When) ->
     type_error({unify_varargs, When}),
     false;
-unify1(Env, {uvar, A, R}, T, _Variance, When) ->
+unify1(_Env, {uvar, A, R}, T, _Variance, When) ->
     case occurs_check(R, T) of
         true ->
-            if
-                Env#env.unify_throws ->
-                    cannot_unify({uvar, A, R}, T, none, When);
-                true ->
-                    ok
-            end,
+            cannot_unify({uvar, A, R}, T, none, When),
             false;
         false ->
             ets_insert(type_vars, {R, T}),
@@ -3110,18 +3104,13 @@ unify1(Env, A = {con, _, NameA}, B = {con, _, NameB}, Variance, When) ->
     case is_subtype(Env, NameA, NameB, Variance) of
         true -> true;
         false ->
-            if
-                Env#env.unify_throws ->
-                    IsSubtype = is_subtype(Env, NameA, NameB, contravariant) orelse
-                                is_subtype(Env, NameA, NameB, covariant),
-                    Cxt = case IsSubtype of
-                              true  -> Variance;
-                              false -> none
-                          end,
-                    cannot_unify(A, B, Cxt, When);
-                true ->
-                    ok
-            end,
+            IsSubtype = is_subtype(Env, NameA, NameB, contravariant) orelse
+                        is_subtype(Env, NameA, NameB, covariant),
+            Cxt = case IsSubtype of
+                      true  -> Variance;
+                      false -> none
+                  end,
+            cannot_unify(A, B, Cxt, When),
             false
     end;
 unify1(_Env, {qid, _, Name}, {qid, _, Name}, _Variance, _When) ->
@@ -3170,13 +3159,8 @@ unify1(Env, {app_t, _, T, []}, B, Variance, When) ->
     unify0(Env, T, B, Variance, When);
 unify1(Env, A, {app_t, _, T, []}, Variance, When) ->
     unify0(Env, A, T, Variance, When);
-unify1(Env, A, B, _Variance, When) ->
-    if
-        Env#env.unify_throws ->
-            cannot_unify(A, B, none, When);
-        true ->
-            ok
-    end,
+unify1(_Env, A, B, _Variance, When) ->
+    cannot_unify(A, B, none, When),
     false.
 
 is_subtype(_Env, NameA, NameB, invariant) ->
