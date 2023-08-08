@@ -57,6 +57,12 @@ Address.to_str(a : address) : string
 
 Base58 encoded string
 
+#### to_bytes
+```
+Address.to_bytes(a : address) : bytes(32)
+```
+
+The binary representation of the address.
 
 #### is_contract
 ```
@@ -563,14 +569,6 @@ Chain.block_height : int"
 ```
 
 The height of the current block (i.e. the block in which the current call will be included).
-
-#### to_bytes
-```
-Address.to_bytes(a : address) : bytes(32)
-```
-
-The binary representation of the address.
-
 
 ##### bytecode_hash
 ```
