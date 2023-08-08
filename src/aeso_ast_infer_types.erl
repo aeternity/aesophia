@@ -2577,27 +2577,11 @@ destroy_constraints() ->
 
 %% Solve all constraints by iterating until no-progress
 
-
-
-
 -spec solve_all_constraints(env()) -> ok.
 solve_all_constraints(Env) ->
     Constraints = [C || C <- get_constraints(), not one_shot_field_constraint(Env, C) ],
     solve_constraints_top(Env, Constraints).
 
-%% solve_constraints_top(Env, Constraints) ->
-%%     UnsolvedCs = solve_constraints(Env, Constraints),
-
-%%     if length(UnsolvedCs) < length(Constraints) ->
-%%         solve_constraints_top(Env, UnsolvedCs);
-%%        true ->
-%%         Progress = solve_unknown_record_types(Env, UnsolvedCs),
-%%         if Progress == true ->
-%%             solve_constraints_top(Env, UnsolvedCs);
-%%            true ->
-%%             ok
-%%         end
-%%     end.
 solve_constraints_top(Env, Constraints) ->
     UnsolvedCs = solve_constraints(Env, Constraints),
     Progress   = solve_unknown_record_constraints(Env, UnsolvedCs),
@@ -2679,7 +2663,6 @@ one_shot_field_constraint(Env, #field_constraint{record_t = RecordType,
                      _    -> lookup_record_field_arity(Env, FieldName, Arity, Kind)
                  end,
 
-    io:format("CS: ~p ~p ~p\n", [FieldName, FieldType, RecordType]),
     case FieldInfos of
         [] ->
             type_error({undefined_field, Field}),
@@ -2734,17 +2717,10 @@ destroy_and_report_unsolved_constraints(Env) ->
                            (_)                   -> false
                         end, OtherCs5),
 
-    UnsolvedNamedArgCs = solve_constraints(Env, NamedArgCs),
-    [ type_error({unsolved_named_argument_constraint, C}) || C <- UnsolvedNamedArgCs ],
-
-    UnsolvedFieldCs = solve_constraints(Env, FieldCs),
-    case solve_unknown_record_types(Env, UnsolvedFieldCs) of
-        true   -> ok;
-        Errors -> [ type_error(Err) || Err <- Errors ]
-    end,
-
+    check_field_constraints(Env, FieldCs),
     check_record_create_constraints(Env, CreateCs),
     check_is_contract_constraints(Env, ContractCs),
+    check_named_args_constraints(Env, NamedArgCs),
     check_bytes_constraints(Env, BytesCs),
     check_aens_resolve_constraints(Env, AensResolveCs),
     check_oracle_type_constraints(Env, OracleTypeCs),
@@ -2812,6 +2788,17 @@ specialize_dependent_type(Env, Type) ->
             end;
         _ -> Type   %% Currently no deep dependent types
     end.
+
+check_field_constraints(Env, Constraints) ->
+    UnsolvedFieldCs = solve_constraints(Env, Constraints),
+    case solve_unknown_record_constraints(Env, UnsolvedFieldCs) of
+        true   -> ok;
+        Errors -> [ type_error(Err) || Err <- Errors ]
+    end.
+
+check_named_args_constraints(Env, Constraints) ->
+    UnsolvedNamedArgCs = solve_constraints(Env, Constraints),
+    [ type_error({unsolved_named_argument_constraint, C}) || C <- UnsolvedNamedArgCs ].
 
 check_bytes_constraints(Env, Constraints) ->
     InAddConstraint = [ T || {add_bytes, _, _, A, B, C} <- Constraints,
@@ -2907,18 +2894,6 @@ check_is_contract_constraints(Env, [C | Cs]) ->
         _ -> type_error({not_a_contract_type, Type1, Cxt})
     end,
     check_is_contract_constraints(Env, Cs).
-
--spec solve_unknown_record_types(env(), [field_constraint()]) -> true | [tuple()].
-solve_unknown_record_types(Env, Unknown) ->
-    UVars = lists:usort([UVar || #field_constraint{record_t = UVar = {uvar, _, _}} <- Unknown]),
-    Solutions = [solve_for_uvar(Env, UVar, [{Kind, When, Field}
-                                            || #field_constraint{record_t = U, field = Field, kind = Kind, context = When} <- Unknown,
-                                               U == UVar])
-                 || UVar <- UVars],
-    case lists:member(true, Solutions) of
-        true  -> true;
-        false -> Solutions
-    end.
 
 record_type_name({app_t, _Attrs, RecId, _Args}) when ?is_type_id(RecId) ->
     RecId;
