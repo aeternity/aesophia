@@ -4119,8 +4119,8 @@ pp_when({if_branches, Then, ThenType0, Else, ElseType0}) ->
     Branches = [ {Then, ThenType} | [ {B, ElseType} || B <- if_branches(Else) ] ],
     {pos(element(1, hd(Branches))),
      io_lib:format("when comparing the types of the if-branches\n"
-                   "~s", [ [ io_lib:format("~s (at ~s)\n", [pp_typed("  - ", B, BType), pp_loc(B)])
-                           || {B, BType} <- Branches ] ])};
+                   "~s", [string:join([ io_lib:format("~s (at ~s)", [pp_typed("  - ", B, BType), pp_loc(B)])
+                                       || {B, BType} <- Branches ], "\n")])};
 pp_when({case_pat, Pat, PatType0, ExprType0}) ->
     {PatType, ExprType} = instantiate({PatType0, ExprType0}),
     {pos(Pat),
