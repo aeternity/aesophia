@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 ### Removed
 ### Fixed
+
+## [7.3.0]
+### Fixed
 - Fixed a bug with polymorphism that allowed functions with the same name but different type to be considered as implementations for their corresponding interface function.
 - Fixed a bug in the byte code optimization that incorrectly reordered dependent instructions.
 
@@ -401,7 +404,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v7.2.1...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v7.3.0...HEAD
+[7.2.1]: https://github.com/aeternity/aesophia/compare/v7.2.1...v7.3.0
 [7.2.1]: https://github.com/aeternity/aesophia/compare/v7.2.0...v7.2.1
 [7.2.0]: https://github.com/aeternity/aesophia/compare/v7.1.0...v7.2.0
 [7.1.0]: https://github.com/aeternity/aesophia/compare/v7.0.1...v7.1.0
