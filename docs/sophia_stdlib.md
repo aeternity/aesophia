@@ -57,6 +57,12 @@ Address.to_str(a : address) : string
 
 Base58 encoded string
 
+#### to_bytes
+```
+Address.to_bytes(a : address) : bytes(32)
+```
+
+The binary representation of the address.
 
 #### is_contract
 ```
@@ -564,14 +570,6 @@ Chain.block_height : int"
 
 The height of the current block (i.e. the block in which the current call will be included).
 
-#### to_bytes
-```
-Address.to_bytes(a : address) : bytes(32)
-```
-
-The binary representation of the address.
-
-
 ##### bytecode_hash
 ```
 Chain.bytecode_hash : 'c => option(hash)
@@ -834,11 +832,14 @@ Hash any object to blake2b
 
 #### verify_sig
 ```
-Crypto.verify_sig(msg : hash, pubkey : address, sig : signature) : bool
+Crypto.verify_sig(msg : bytes(), pubkey : address, sig : signature) : bool
 ```
 
 Checks if the signature of `msg` was made using private key corresponding to
-the `pubkey`
+the `pubkey`.
+
+Note: before v8 of the compiler, `msg` had type `hash` (i.e. `bytes(32)`).
+
 
 #### ecverify_secp256k1
 ```
