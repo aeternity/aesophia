@@ -1141,11 +1141,16 @@ independent({i, _, I}, {i, _, J}) ->
     StackI = lists:member(?a, [WI | RI]),
     StackJ = lists:member(?a, [WJ | RJ]),
 
-    if  WI == pc; WJ == pc   -> false;     %% no jumps
-        not (PureI or PureJ) -> false;     %% at least one is pure
-        StackI and StackJ    -> false;     %% cannot both use the stack
-        WI == WJ             -> false;     %% cannot write to the same register
-        true                 ->
+    ReadStoreI = [] /= [ x || {store, _} <- RI ],
+    ReadStoreJ = [] /= [ x || {store, _} <- RJ ],
+
+    if  WI == pc; WJ == pc       -> false;  %% no jumps
+        not (PureI or PureJ)     -> false;  %% at least one is pure
+        StackI and StackJ        -> false;  %% cannot both use the stack
+        WI == WJ                 -> false;  %% cannot write to the same register
+        ReadStoreI and not PureJ -> false;  %% can't read store/state if other is impure
+        ReadStoreJ and not PureI -> false;  %% can't read store/state if other is impure
+        true                     ->
             %% and cannot write to each other's inputs
             not lists:member(WI, RJ) andalso
             not lists:member(WJ, RI)
