@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sized byte arrays.
 - `Chain.network_id` - a function to get hold of the Chain's network id.
 ### Changed
+- `Crypto.verify_sig` is changed to have `msg : bytes()`. I.e. the
+  signed data can be of any length (used to be limited to `bytes(32)`/`hash`).
 ### Removed
 - `Bitwise.aes` standard library is removed - the builtin operations are superior.
 

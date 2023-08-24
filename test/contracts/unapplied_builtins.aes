@@ -36,7 +36,7 @@ contract UnappliedBuiltins =
   function map_delete()                  = Map.delete : (_, m) => _
   function map_from_list()               = Map.from_list : _ => m
   function map_to_list()                 = Map.to_list : m => _
-  function crypto_verify_sig()           = Crypto.verify_sig
+  function crypto_verify_sig()           = Crypto.verify_sig : (bytes(), _, _) => _
   function crypto_verify_sig_secp256k1() = Crypto.verify_sig_secp256k1
   function crypto_ecverify_secp256k1()   = Crypto.ecverify_secp256k1
   function crypto_ecrecover_secp256k1()  = Crypto.ecrecover_secp256k1

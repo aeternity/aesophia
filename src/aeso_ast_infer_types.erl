@@ -775,7 +775,7 @@ global_env() ->
     %% Crypto/Curve operations
     CryptoScope = #scope
         { funs = MkDefs(
-                     [{"verify_sig",           Fun([Hash, Address, SignId], Bool)},
+                     [{"verify_sig",           Fun([Bytes('_'), Address, SignId], Bool)},
                       {"verify_sig_secp256k1", Fun([Hash, Bytes(64), SignId], Bool)},
                       {"ecverify_secp256k1",   Fun([Hash, Bytes(20), Bytes(65)], Bool)},
                       {"ecrecover_secp256k1",  Fun([Hash, Bytes(65)], Option(Bytes(20)))},
