@@ -405,7 +405,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pass a (stubbed) contract string.
 
 [Unreleased]: https://github.com/aeternity/aesophia/compare/v7.3.0...HEAD
-[7.2.1]: https://github.com/aeternity/aesophia/compare/v7.2.1...v7.3.0
+[7.3.0]: https://github.com/aeternity/aesophia/compare/v7.2.1...v7.3.0
 [7.2.1]: https://github.com/aeternity/aesophia/compare/v7.2.0...v7.2.1
 [7.2.0]: https://github.com/aeternity/aesophia/compare/v7.1.0...v7.2.0
 [7.1.0]: https://github.com/aeternity/aesophia/compare/v7.0.1...v7.1.0
