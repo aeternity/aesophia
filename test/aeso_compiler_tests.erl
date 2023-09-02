@@ -1313,7 +1313,9 @@ validate(Contract1, Contract2) ->
                   true  -> [debug_mode];
                   false -> []
               end ++
-                  [{include, {file_system, [aeso_test_utils:contract_path()]}}]);
+                  [ {src_file, lists:concat([Contract2, ".aes"])}
+                  , {include, {file_system, [aeso_test_utils:contract_path()]}}
+                  ]);
         Error -> print_and_throw(Error)
     end.
 

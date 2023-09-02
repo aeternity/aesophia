@@ -58,7 +58,10 @@
               | {contract_code, string()} %% for CREATE, by name
               | {typerep, ftype()}.
 
--type fann() :: [ {file, aeso_syntax:ann_file()} | {line, aeso_syntax:ann_line()} ].
+-type fann() :: [ {file, aeso_syntax:ann_file()} |
+                  {line, aeso_syntax:ann_line()} |
+                  {col, aeso_syntax:ann_col()}
+                ].
 
 -type fexpr() :: {lit, fann(), flit()}
                | {nil, fann()}
@@ -387,11 +390,23 @@ to_fcode(Env, [{namespace, _, {con, _, Con}, Decls} | Code]) ->
     Env1 = decls_to_fcode(Env#{ context => {namespace, Con} }, Decls),
     to_fcode(Env1, Code).
 
+-spec ann_loc(aeso_syntax:ann() | fann()) -> {File, Line, Column} when
+      File   :: string() | none,
+      Line   :: non_neg_integer() | none,
+      Column :: non_neg_integer() | none.
+ann_loc(Ann) ->
+    File = proplists:get_value(file, Ann, none),
+    Line = proplists:get_value(line, Ann, none),
+    Col  = proplists:get_value(col, Ann, none),
+    {File, Line, Col}.
+
 -spec to_fann(aeso_syntax:ann()) -> fann().
 to_fann(Ann) ->
-    File = proplists:lookup(file, Ann),
-    Line = proplists:lookup(line, Ann),
-    [ X || X <- [File, Line], X =/= none ].
+    {File, Line, Col} = ann_loc(Ann),
+    [ {Tag, X} ||
+        {Tag, X} <- [{file, File}, {line, Line}, {col, Col}],
+        X =/= none, X =/= no_file
+    ].
 
 -spec get_fann(fexpr()) -> fann().
 get_fann(FExpr) -> element(2, FExpr).
@@ -1276,10 +1291,13 @@ event_function(_Env = #{event_type := {variant_t, EventCons}}, EventType = {vari
 
 -spec lambda_lift(fcode()) -> fcode().
 lambda_lift(FCode = #{ functions := Funs, state_layout := StateLayout }) ->
-    init_lambda_funs(),
-    Funs1   = maps:map(fun(_, Body) -> lambda_lift_fun(StateLayout, Body) end, Funs),
-    NewFuns = get_lambda_funs(),
-    FCode#{ functions := maps:merge(Funs1, NewFuns) }.
+    NewFuns =
+        [ {FunName, FunDef}
+          || {ParentName, ParentDef} <- maps:to_list(Funs),
+             {NewParentDef, Lambdas} <- [lambda_lift_fun(StateLayout, ParentName, ParentDef)],
+             {FunName, FunDef} <- [{ParentName, NewParentDef} | maps:to_list(Lambdas)]
+        ],
+    FCode#{ functions := maps:from_list(NewFuns) }.
 
 -define(lambda_key, '%lambdalifted').
 
@@ -1289,16 +1307,35 @@ init_lambda_funs() -> put(?lambda_key, #{}).
 -spec get_lambda_funs() -> term().
 get_lambda_funs()  -> erase(?lambda_key).
 
--spec add_lambda_fun(fun_def()) -> fun_name().
-add_lambda_fun(Def) ->
-    Name = fresh_fun(),
+-spec add_lambda_fun(fun_name(), fann(), fun_def()) -> fun_name().
+add_lambda_fun(Parent, FAnn, Def) ->
     Funs = get(?lambda_key),
-    put(?lambda_key, Funs#{ Name => Def }),
+    LambdaId = maps:get({fresh, Parent}, Funs, 0),
+    Name = lambda_name(FAnn, LambdaId, Parent),
+    put(?lambda_key, Funs#{ Name => Def, {fresh, Parent} => LambdaId + 1}),
     Name.
 
--spec lambda_lift_fun(state_layout(), fun_def()) -> fun_def().
-lambda_lift_fun(Layout, Def = #{ body := Body }) ->
-    Def#{ body := lambda_lift_expr(Layout, Body) }.
+-spec lambda_name(fann(), non_neg_integer(), fun_name()) -> fun_name().
+lambda_name(FAnn, Id, PName) ->
+    PSName = case PName of
+                 {entrypoint, N} -> [binary_to_list(N)];
+                 {local_fun, Ns} -> Ns
+             end,
+    {_File, Line, Col} = ann_loc(FAnn),
+    Name = PSName ++
+           [ "%lambda"
+           , if is_integer(Line) -> integer_to_list(Line); true -> "" end
+           , if is_integer(Col) -> integer_to_list(Col); true -> "" end
+           , integer_to_list(Id)],
+    {local_fun, Name}.
+
+-spec lambda_lift_fun(state_layout(), fun_name(), fun_def()) -> {fun_def(), #{var_name() => term()}}.
+lambda_lift_fun(Layout, Name, Def = #{ body := Body }) ->
+    %% Not thread safe! We initialize state per functions not to depend on the order in which
+    %% functions are processed.
+    init_lambda_funs(),
+    NewDef = Def#{ body := lambda_lift_expr(Layout, Name, Body) },
+    {NewDef, get_lambda_funs()}.
 
 -spec lifted_fun([var_name()], [var_name()], fexpr()) -> fun_def().
 lifted_fun([Z], Xs, Body) ->
@@ -1316,21 +1353,20 @@ lifted_fun(FVs, Xs, Body) ->
        body   => lists:foldr(Proj, Body, indexed(FVs))
      }.
 
--spec make_closure([var_name()], [var_name()], fexpr()) -> Closure when
+-spec make_closure(fun_name(), fann(), [var_name()], [var_name()], fexpr()) -> Closure when
       Closure :: fexpr().
-make_closure(FVs, Xs, Body) ->
-    Fun   = add_lambda_fun(lifted_fun(FVs, Xs, Body)),
-    FAnn  = get_fann(Body),
+make_closure(ParentName, FAnn, FVs, Xs, Body) ->
+    Name  = add_lambda_fun(ParentName, FAnn, lifted_fun(FVs, Xs, Body)),
     Tup = fun([Y]) -> Y; (Ys) -> {tuple, FAnn, Ys} end,
-    {closure, FAnn, Fun, Tup([{var, FAnn, Y} || Y <- FVs])}.
+    {closure, FAnn, Name, Tup([{var, FAnn, Y} || Y <- FVs])}.
 
--spec lambda_lift_expr(state_layout(), fexpr()) -> Closure when
+-spec lambda_lift_expr(state_layout(), fun_name(), fexpr()) -> Closure when
       Closure :: fexpr().
-lambda_lift_expr(Layout, L = {lam, _, Xs, Body}) ->
+lambda_lift_expr(Layout, Name, L = {lam, FAnn, Xs, Body}) ->
     FVs   = free_vars(L),
-    make_closure(FVs, Xs, lambda_lift_expr(Layout, Body));
-lambda_lift_expr(Layout, UExpr) when element(1, UExpr) == def_u; element(1, UExpr) == builtin_u ->
-    [Tag, _, F, Ar | _] = tuple_to_list(UExpr),
+    make_closure(Name, FAnn, FVs, Xs, lambda_lift_expr(Layout, Name, Body));
+lambda_lift_expr(Layout, Name, UExpr) when element(1, UExpr) == def_u; element(1, UExpr) == builtin_u ->
+    [Tag, FAnn, F, Ar | _] = tuple_to_list(UExpr),
     ExtraArgs = case UExpr of
                     {builtin_u, _, _, _, TypeArgs} -> TypeArgs;
                     _                              -> []
@@ -1341,41 +1377,41 @@ lambda_lift_expr(Layout, UExpr) when element(1, UExpr) == def_u; element(1, UExp
                builtin_u -> builtin_to_fcode(Layout, get_fann(UExpr), F, Args);
                def_u     -> {def, get_fann(UExpr), F, Args}
            end,
-    make_closure([], Xs, Body);
-lambda_lift_expr(Layout, {remote_u, FAnn, ArgsT, RetT, Ct, F}) ->
+    make_closure(Name, FAnn, [], Xs, Body);
+lambda_lift_expr(Layout, Name, {remote_u, FAnn, ArgsT, RetT, Ct, F}) ->
     FVs  = free_vars(Ct),
-    Ct1  = lambda_lift_expr(Layout, Ct),
+    Ct1  = lambda_lift_expr(Layout, Name, Ct),
     NamedArgCount = 3,
     Xs   = [ lists:concat(["arg", I]) || I <- lists:seq(1, length(ArgsT) + NamedArgCount) ],
     Args = [{var, [], X} || X <- Xs],
-    make_closure(FVs, Xs, {remote, FAnn, ArgsT, RetT, Ct1, F, Args});
-lambda_lift_expr(Layout, Expr) ->
+    make_closure(Name, FAnn, FVs, Xs, {remote, FAnn, ArgsT, RetT, Ct1, F, Args});
+lambda_lift_expr(Layout, Name, Expr) ->
     case Expr of
         {lit, _, _}               -> Expr;
         {nil, _}                  -> Expr;
         {var, _, _}               -> Expr;
         {closure, _, _, _}        -> Expr;
-        {def, FAnn, D, As}        -> {def, FAnn, D, lambda_lift_exprs(Layout, As)};
-        {builtin, FAnn, B, As}    -> {builtin, FAnn, B, lambda_lift_exprs(Layout, As)};
-        {remote, FAnn, ArgsT, RetT, Ct, F, As} -> {remote, FAnn, ArgsT, RetT, lambda_lift_expr(Layout, Ct), F, lambda_lift_exprs(Layout, As)};
-        {con, FAnn, Ar, C, As}    -> {con, FAnn, Ar, C, lambda_lift_exprs(Layout, As)};
-        {tuple, FAnn, As}         -> {tuple, FAnn, lambda_lift_exprs(Layout, As)};
-        {proj, FAnn, A, I}        -> {proj, FAnn, lambda_lift_expr(Layout, A), I};
-        {set_proj, FAnn, A, I, B} -> {set_proj, FAnn, lambda_lift_expr(Layout, A), I, lambda_lift_expr(Layout, B)};
-        {op, FAnn, Op, As}        -> {op, FAnn, Op, lambda_lift_exprs(Layout, As)};
-        {'let', FAnn, X, A, B}    -> {'let', FAnn, X, lambda_lift_expr(Layout, A), lambda_lift_expr(Layout, B)};
-        {funcall, FAnn, A, Bs}    -> {funcall, FAnn, lambda_lift_expr(Layout, A), lambda_lift_exprs(Layout, Bs)};
-        {set_state, FAnn, R, A}   -> {set_state, FAnn, R, lambda_lift_expr(Layout, A)};
+        {def, FAnn, D, As}        -> {def, FAnn, D, lambda_lift_exprs(Layout, Name, As)};
+        {builtin, FAnn, B, As}    -> {builtin, FAnn, B, lambda_lift_exprs(Layout, Name, As)};
+        {remote, FAnn, ArgsT, RetT, Ct, F, As} -> {remote, FAnn, ArgsT, RetT, lambda_lift_expr(Layout, Name, Ct), F, lambda_lift_exprs(Layout, Name, As)};
+        {con, FAnn, Ar, C, As}    -> {con, FAnn, Ar, C, lambda_lift_exprs(Layout, Name, As)};
+        {tuple, FAnn, As}         -> {tuple, FAnn, lambda_lift_exprs(Layout, Name, As)};
+        {proj, FAnn, A, I}        -> {proj, FAnn, lambda_lift_expr(Layout, Name, A), I};
+        {set_proj, FAnn, A, I, B} -> {set_proj, FAnn, lambda_lift_expr(Layout, Name, A), I, lambda_lift_expr(Layout, Name, B)};
+        {op, FAnn, Op, As}        -> {op, FAnn, Op, lambda_lift_exprs(Layout, Name, As)};
+        {'let', FAnn, X, A, B}    -> {'let', FAnn, X, lambda_lift_expr(Layout, Name, A), lambda_lift_expr(Layout, Name, B)};
+        {funcall, FAnn, A, Bs}    -> {funcall, FAnn, lambda_lift_expr(Layout, Name, A), lambda_lift_exprs(Layout, Name, Bs)};
+        {set_state, FAnn, R, A}   -> {set_state, FAnn, R, lambda_lift_expr(Layout, Name, A)};
         {get_state, _, _}         -> Expr;
-        {switch, FAnn, S}         -> {switch, FAnn, lambda_lift_expr(Layout, S)};
-        {split, Type, X, Alts}    -> {split, Type, X, lambda_lift_exprs(Layout, Alts)};
-        {nosplit, Rens, A}        -> {nosplit, Rens, lambda_lift_expr(Layout, A)};
-        {'case', P, S}            -> {'case', P, lambda_lift_expr(Layout, S)}
+        {switch, FAnn, S}         -> {switch, FAnn, lambda_lift_expr(Layout, Name, S)};
+        {split, Type, X, Alts}    -> {split, Type, X, lambda_lift_exprs(Layout, Name, Alts)};
+        {nosplit, Rens, A}        -> {nosplit, Rens, lambda_lift_expr(Layout, Name, A)};
+        {'case', P, S}            -> {'case', P, lambda_lift_expr(Layout, Name, S)}
     end.
 
--spec lambda_lift_exprs(state_layout(), [fexpr()]) -> [Closure] when
+-spec lambda_lift_exprs(state_layout(), fun_name(), [fexpr()]) -> [Closure] when
       Closure :: fexpr().
-lambda_lift_exprs(Layout, As) -> [lambda_lift_expr(Layout, A) || A <- As].
+lambda_lift_exprs(Layout, Name, As) -> [lambda_lift_expr(Layout, Name, A) || A <- As].
 
 %% -- Optimisations ----------------------------------------------------------
 
@@ -1899,9 +1935,6 @@ fresh_name_save(Name) ->
 
 -spec fresh_name() -> var_name().
 fresh_name() -> fresh_name("%").
-
--spec fresh_fun() -> fun_name().
-fresh_fun() -> {local_fun, [fresh_name("^")]}.
 
 -spec fresh_name(string()) -> var_name().
 fresh_name(Prefix) ->
