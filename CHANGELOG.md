@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
+- Names of lifted lambdas now consist of parent function's name and their
+  position in the source code.
 ### Removed
 ### Fixed
+- Lifted lambdas get their names assigned deterministically.
 
 ## [7.3.0]
 ### Fixed
