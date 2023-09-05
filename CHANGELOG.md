@@ -7,9 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
+### Removed
+### Fixed
+
+## [7.4.0]
+### Changed
 - Names of lifted lambdas now consist of parent function's name and their
   position in the source code.
-### Removed
 ### Fixed
 - Lifted lambdas get their names assigned deterministically.
 
@@ -407,7 +411,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v7.3.0...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v7.4.0...HEAD
+[7.4.0]: https://github.com/aeternity/aesophia/compare/v7.3.0...v7.4.0
 [7.3.0]: https://github.com/aeternity/aesophia/compare/v7.2.1...v7.3.0
 [7.2.1]: https://github.com/aeternity/aesophia/compare/v7.2.0...v7.2.1
 [7.2.0]: https://github.com/aeternity/aesophia/compare/v7.1.0...v7.2.0
