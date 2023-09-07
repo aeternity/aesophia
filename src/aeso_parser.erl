@@ -757,7 +757,9 @@ stdlib_options() ->
     end.
 
 get_include_code(File, Ann, Opts) ->
-    case {read_file(File, Opts), read_file(File, stdlib_options())} of
+    %% Temporarily extend include paths with the directory of the current file
+    Opts1 = include_current_file_dir(Opts, Ann),
+    case {read_file(File, Opts1), read_file(File, stdlib_options())} of
         {{ok, Bin}, {ok, _}} ->
             case filename:basename(File) == File of
                 true -> { error
@@ -772,6 +774,19 @@ get_include_code(File, Ann, Opts) ->
             {ok, binary_to_list(Bin)};
         {_, _} ->
             {error, {ann_pos(Ann), include_error, File}}
+    end.
+
+include_current_file_dir(Opts, Ann) ->
+    case {proplists:get_value(file, Ann, undefined),
+          proplists:get_value(include, Opts, undefined)} of
+        {undefined, _} -> Opts;
+        {FromFile, {file_system, Paths}} ->
+            BaseDir = aeso_utils:canonical_dir(filename:dirname(FromFile)),
+            case lists:member(BaseDir, Paths) of
+                false -> [{include, {file_system, [BaseDir | Paths]}} | Opts];
+                true  -> Opts
+            end;
+        {_, _} -> Opts
     end.
 
 -spec hash_include(string() | binary(), string()) -> include_hash().
