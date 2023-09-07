@@ -99,7 +99,7 @@ add_include_path(File, Options) ->
         false ->
             Dir = filename:dirname(File),
             {ok, Cwd} = file:get_cwd(),
-            [{include, {file_system, [Cwd, Dir]}} | Options]
+            [{include, {file_system, [Cwd, aeso_utils:canonical_dir(Dir)]}} | Options]
     end.
 
 -spec from_string(binary() | string(), options()) -> {ok, map()} | {error, [aeso_errors:error()]}.
