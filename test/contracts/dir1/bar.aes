@@ -1,0 +1,4 @@
+include "../dir2/baz.aes"
+namespace D =
+  function g() = E.h()
+
