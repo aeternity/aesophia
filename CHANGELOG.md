@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
-- Improve how includes with relative paths are resolved during parsing/compilation.
+- Improve how includes with relative paths are resolved during parsing/compilation. Relative
+  include paths are now always relative to the file containing the `include` statement.
 ### Removed
 ### Fixed
 
