@@ -493,6 +493,24 @@ the file, except that error messages will refer to the original source
 locations. The language will try to include each file at most one time automatically,
 so even cyclic includes should be working without any special tinkering.
 
+### Include files using relative paths
+
+When including code from another file using the `include` statement, the path
+is relative to _the file that includes it_. Consider the following file tree:
+```
+c1.aes
+c3.aes
+dir1/c2.aes
+dir1/c3.aes
+```
+
+If `c1.aes` contains `include "c3.aes"` it will include the top level `c3.aes`,
+while if `c2.aes` contained the same line it would as expected include
+`dir1/c3.aes`.
+
+Note: Prior to v7.5.0, it would consider the include path relative to _the main
+contract file_ (or any explicitly set include path).
+
 ## Standard library
 
 Sophia offers [standard library](sophia_stdlib.md) which exposes some

@@ -42,6 +42,7 @@
                 | {include, {file_system, [string()]} |
                             {explicit_files, #{string() => binary()}}}
                 | {src_file, string()}
+                | {src_dir, string()}
                 | {aci, aeso_aci:aci_type()}.
 -type options() :: [option()].
 
@@ -87,7 +88,9 @@ file(Filename) ->
 file(File, Options0) ->
     Options = add_include_path(File, Options0),
     case read_contract(File) of
-        {ok, Bin} -> from_string(Bin, [{src_file, File} | Options]);
+        {ok, Bin} ->
+            SrcDir = aeso_utils:canonical_dir(filename:dirname(File)),
+            from_string(Bin, [{src_file, File}, {src_dir, SrcDir} | Options]);
         {error, Error} ->
             Msg = lists:flatten([File,": ",file:format_error(Error)]),
             {error, [aeso_errors:new(file_error, Msg)]}
@@ -99,7 +102,7 @@ add_include_path(File, Options) ->
         false ->
             Dir = filename:dirname(File),
             {ok, Cwd} = file:get_cwd(),
-            [{include, {file_system, [Cwd, Dir]}} | Options]
+            [{include, {file_system, [Cwd, aeso_utils:canonical_dir(Dir)]}} | Options]
     end.
 
 -spec from_string(binary() | string(), options()) -> {ok, map()} | {error, [aeso_errors:error()]}.

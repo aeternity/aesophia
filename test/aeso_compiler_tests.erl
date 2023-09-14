@@ -161,6 +161,7 @@ compilable_contracts() ->
      "state_handling",
      "events",
      "include",
+     "relative_include",
      "basic_auth",
      "basic_auth_tx",
      "bitcoin_auth",

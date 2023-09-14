@@ -15,7 +15,7 @@
          many/1, many1/1, sep/2, sep1/2,
          infixl/2, infixr/2]).
 
--export([current_file/0, set_current_file/1,
+-export([current_file/0, set_current_file/1, current_dir/0, set_current_dir/1,
          current_include_type/0, set_current_include_type/1]).
 
 %% -- Types ------------------------------------------------------------------
@@ -479,6 +479,13 @@ current_file() ->
 
 set_current_file(File) ->
     put('$current_file', File).
+
+%% Current source directory
+current_dir() ->
+    get('$current_dir').
+
+set_current_dir(File) ->
+    put('$current_dir', File).
 
 add_current_file({L, C}) -> {current_file(), L, C};
 add_current_file(Pos)    -> Pos.

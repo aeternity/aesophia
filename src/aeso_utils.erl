@@ -6,9 +6,21 @@
 %%%-------------------------------------------------------------------
 -module(aeso_utils).
 
--export([scc/1]).
+-export([scc/1, canonical_dir/1]).
 
 -export_type([graph/1]).
+
+%% -- Simplistic canonical directory
+%% Note: no attempts to be 100% complete
+
+canonical_dir(Dir) ->
+    {ok, Cwd} = file:get_cwd(),
+    AbsName = filename:absname(Dir),
+    RelAbsName = filename:join(tl(filename:split(AbsName))),
+    case filelib:safe_relative_path(RelAbsName, Cwd) of
+        unsafe -> AbsName;
+        Simplified -> filename:absname(Simplified, "")
+    end.
 
 %% -- Topological sort
 
