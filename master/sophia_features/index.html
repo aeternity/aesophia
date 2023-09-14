@@ -419,6 +419,19 @@
     Splitting code over multiple files
   </a>
   
+    <nav class="md-nav" aria-label="Splitting code over multiple files">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#include-files-using-relative-paths" class="md-nav__link">
+    Include files using relative paths
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -833,6 +846,19 @@
   <a href="#splitting-code-over-multiple-files" class="md-nav__link">
     Splitting code over multiple files
   </a>
+  
+    <nav class="md-nav" aria-label="Splitting code over multiple files">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#include-files-using-relative-paths" class="md-nav__link">
+    Include files using relative paths
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1497,6 +1523,19 @@ example, if the file <code>library.aes</code> contains</p>
 the file, except that error messages will refer to the original source
 locations. The language will try to include each file at most one time automatically,
 so even cyclic includes should be working without any special tinkering.</p>
+<h3 id="include-files-using-relative-paths">Include files using relative paths</h3>
+<p>When including code from another file using the <code>include</code> statement, the path
+is relative to <em>the file that includes it</em>. Consider the following file tree:
+<div class="highlight"><pre><span></span><code>c1.aes
+c3.aes
+dir1/c2.aes
+dir1/c3.aes
+</code></pre></div></p>
+<p>If <code>c1.aes</code> contains <code>include "c3.aes"</code> it will include the top level <code>c3.aes</code>,
+while if <code>c2.aes</code> contained the same line it would as expected include
+<code>dir1/c3.aes</code>.</p>
+<p>Note: Prior to v7.5.0, it would consider the include path relative to <em>the main
+contract file</em> (or any explicitly set include path).</p>
 <h2 id="standard-library">Standard library</h2>
 <p>Sophia offers <a href="../sophia_stdlib/">standard library</a> which exposes some
 primitive operations and some higher level utilities. The builtin
