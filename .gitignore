@@ -24,3 +24,4 @@ current_counterexample.eqc
 test/contracts/test.aes
 __pycache__
 .docssite/docs/*.md
+.vscode

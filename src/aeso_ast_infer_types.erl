@@ -924,14 +924,14 @@ infer(Contracts, Options) ->
         {Env1, Decls} = infer1(Env, Contracts1, [], Options),
         when_warning(warn_unused_functions, fun() -> destroy_and_report_unused_functions() end),
         when_option(warn_error, fun() -> destroy_and_report_warnings_as_type_errors() end),
-        WarningsUnsorted = lists:map(fun mk_warning/1, ets_tab2list(warnings)),
-        Warnings = aeso_warnings:sort_warnings(WarningsUnsorted),
         {Env2, DeclsFolded, DeclsUnfolded} =
             case proplists:get_value(dont_unfold, Options, false) of
                 true  -> {Env1, Decls, Decls};
                 false -> E = on_scopes(Env1, fun(Scope) -> unfold_record_types(Env1, Scope) end),
                          {E, Decls, unfold_record_types(E, Decls)}
             end,
+        WarningsUnsorted = lists:map(fun mk_warning/1, ets_tab2list(warnings)),
+        Warnings = aeso_warnings:sort_warnings(WarningsUnsorted),
         case proplists:get_value(return_env, Options, false) of
             false -> {DeclsFolded, DeclsUnfolded, Warnings};
             true  -> {Env2, DeclsFolded, DeclsUnfolded, Warnings}

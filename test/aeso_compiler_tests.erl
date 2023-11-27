@@ -70,6 +70,7 @@ simple_compile_test_() ->
        fun() ->
            #{ warnings := Warnings } = compile("warnings", [warn_all]),
            #{ warnings := [] } = compile("warning_unused_include_no_include", [warn_all]),
+           #{ warnings := [] } = compile("warning_used_record_typedef", [warn_all]),
            check_warnings(warnings(), Warnings)
        end} ] ++
     [].
