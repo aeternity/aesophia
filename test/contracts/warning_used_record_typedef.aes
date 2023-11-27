@@ -1,0 +1,5 @@
+contract Test =
+    type option_int = option(int)
+    record option_point = {x: int, y: option_int}
+
+    entrypoint test_option_record(a: option_point) = a
