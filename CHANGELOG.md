@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   include paths are now always relative to the file containing the `include` statement.
 ### Removed
 ### Fixed
+- Disable unused type warnings for types used inside of records.
 
 ## [7.4.0]
 ### Changed
