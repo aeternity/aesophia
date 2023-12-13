@@ -142,7 +142,7 @@ datatype name = Name(address, Chain.ttl, map(string, AENSv2.pointee))
 
 ```
 datatype pointee = AccountPt(address) | OraclePt(address)
-                 | ContractPt(address) | ChannelPt(address) | DataPt(string)
+                 | ContractPt(address) | ChannelPt(address) | DataPt(bytes())
 ```
 
 Note: on-chain there is a maximum length enforced for `DataPt`, it is 1024 bytes.

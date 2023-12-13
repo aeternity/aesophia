@@ -1,19 +1,21 @@
 include "Option.aes"
+include "String.aes"
 include "AENSCompat.aes"
 contract interface OldAENSContract =
   entrypoint set : (string, string, AENS.pointee) => unit
   entrypoint lookup : (string, string) => AENS.pointee
 
 main contract AENSUpdate =
-  stateful entrypoint update_name(owner : address, name : string) =
+  stateful entrypoint update_name(owner : address, name : string, b : bytes(2)) =
     let p1 : AENSv2.pointee = AENSv2.AccountPt(Call.caller)
     let p2 : AENSv2.pointee = AENSv2.OraclePt(Call.caller)
     let p3 : AENSv2.pointee = AENSv2.ContractPt(Call.caller)
     let p4 : AENSv2.pointee = AENSv2.ChannelPt(Call.caller)
-    let p5 : AENSv2.pointee = AENSv2.DataPt("any something will do")
+    let p5 : AENSv2.pointee = AENSv2.DataPt(String.to_bytes("any something will do"))
+    let p6 : AENSv2.pointee = AENSv2.DataPt(Int.to_bytes(1345, 4))
     AENSv2.update(owner, name, None, None,
                   Some({ ["account_pubkey"] = p1, ["oracle_pubkey"] = p2,
-                         ["contract_pubkey"] = p3, ["misc"] = p4, ["data"] = p5 }))
+                         ["contract_pubkey"] = p3, ["misc"] = p4, ["data"] = p5, ["data2"] = p6 }))
 
   stateful entrypoint old_interaction(c : OldAENSContract, owner : address, name : string) =
     let p : AENS.pointee = c.lookup(name, "key1")

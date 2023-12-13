@@ -756,7 +756,7 @@ global_env() ->
                       {"OraclePt",   Fun1(Address, PointeeV2)},
                       {"ContractPt", Fun1(Address, PointeeV2)},
                       {"ChannelPt",  Fun1(Address, PointeeV2)},
-                      {"DataPt",     Fun1(String,  PointeeV2)},
+                      {"DataPt",     Fun1(Bytes(any),  PointeeV2)},
                       %% Name object constructor v2
                       {"Name", Fun([Address, TTL, Map(String, PointeeV2)], AENSNameV2)}
                      ])
