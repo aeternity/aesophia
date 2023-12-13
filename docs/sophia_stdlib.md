@@ -425,7 +425,7 @@ Bytes.to_fixed_size(a : bytes()) : option(bytes(n))
 ```
 
 Converts an arbitrary size byte array to a fix size byte array. If `a` is
-`n` bytes, `None` is returned.
+not `n` bytes, `None` is returned.
 
 #### to\_any\_size
 ```
