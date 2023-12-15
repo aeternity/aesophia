@@ -15,6 +15,7 @@ from_fate({id, _, "address"}, ?FATE_ADDRESS(Bin)) -> {account_pubkey, [], Bin};
 from_fate({app_t, _, {id, _, "oracle"}, _}, ?FATE_ORACLE(Bin)) -> {oracle_pubkey, [], Bin};
 from_fate({app_t, _, {id, _, "oracle_query"}, _}, ?FATE_ORACLE_Q(Bin)) -> {oracle_query_id, [], Bin};
 from_fate({con, _, _Name},  ?FATE_CONTRACT(Bin)) -> {contract_pubkey, [], Bin};
+from_fate({bytes_t, _, any}, ?FATE_BYTES(Bin)) -> {bytes, [], Bin};
 from_fate({bytes_t, _, N},  ?FATE_BYTES(Bin)) when byte_size(Bin) == N -> {bytes, [], Bin};
 from_fate({id, _, "bits"},  ?FATE_BITS(N)) -> make_bits(N);
 from_fate({id, _, "int"},     N) when is_integer(N) ->
@@ -78,6 +79,7 @@ from_fate_builtin(QType, Val) ->
     Hsh = {bytes_t, [], 32},
     I32 = {bytes_t, [], 32},
     I48 = {bytes_t, [], 48},
+    Bts = {bytes_t, [], any},
     Qid = fun(Name) -> {qid, [], Name} end,
     Map = fun(KT, VT) -> {app_t, [], {id, [], "map"}, [KT, VT]} end,
     ChainTxArities = [3, 0, 0, 0, 0, 0, 1, 1, 1, 2, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2, 0],
@@ -103,16 +105,16 @@ from_fate_builtin(QType, Val) ->
             App(["AENSv2","Name"], [Chk(Adr, Addr), Chk(Qid(["Chain", "ttl"]), TTL),
                                     Chk(Map(Str, Qid(["AENSv2", "pointee"])), Ptrs)]);
 
-        {["AENSv2", "pointee"], {variant, [1, 1, 1, 1, 1], 0, {Val}}} ->
-            App(["AENSv2","AccountPt"], [Chk(Adr, Val)]);
-        {["AENSv2", "pointee"], {variant, [1, 1, 1, 1, 1], 1, {Val}}} ->
-            App(["AENSv2","OraclePt"], [Chk(Adr, Val)]);
-        {["AENSv2", "pointee"], {variant, [1, 1, 1, 1, 1], 2, {Val}}} ->
-            App(["AENSv2","ContractPt"], [Chk(Adr, Val)]);
-        {["AENSv2", "pointee"], {variant, [1, 1, 1, 1, 1], 3, {Val}}} ->
-            App(["AENSv2","ChannelPt"], [Chk(Adr, Val)]);
-        {["AENSv2", "pointee"], {variant, [1, 1, 1, 1, 1], 4, {Val}}} ->
-            App(["AENSv2","DataPt"], [Chk(Str, Val)]);
+        {["AENSv2", "pointee"], {variant, [1, 1, 1, 1, 1], 0, {Value}}} ->
+            App(["AENSv2","AccountPt"], [Chk(Adr, Value)]);
+        {["AENSv2", "pointee"], {variant, [1, 1, 1, 1, 1], 1, {Value}}} ->
+            App(["AENSv2","OraclePt"], [Chk(Adr, Value)]);
+        {["AENSv2", "pointee"], {variant, [1, 1, 1, 1, 1], 2, {Value}}} ->
+            App(["AENSv2","ContractPt"], [Chk(Adr, Value)]);
+        {["AENSv2", "pointee"], {variant, [1, 1, 1, 1, 1], 3, {Value}}} ->
+            App(["AENSv2","ChannelPt"], [Chk(Adr, Value)]);
+        {["AENSv2", "pointee"], {variant, [1, 1, 1, 1, 1], 4, {Value}}} ->
+            App(["AENSv2","DataPt"], [Chk(Bts, Value)]);
 
         {["Chain", "ga_meta_tx"], {variant, [2], 0, {Addr, X}}} ->
             App(["Chain","GAMetaTx"], [Chk(Adr, Addr), Chk(Int, X)]);
