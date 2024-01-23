@@ -7,9 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
+### Removed
+### Fixed
+
+## [7.4.1]
+### Changed
 - Improve how includes with relative paths are resolved during parsing/compilation. Relative
   include paths are now always relative to the file containing the `include` statement.
-### Removed
 ### Fixed
 - Disable unused type warnings for types used inside of records.
 
@@ -414,7 +418,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v7.4.0...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v7.4.1...HEAD
+[7.4.1]: https://github.com/aeternity/aesophia/compare/v7.4.0...v7.4.1
 [7.4.0]: https://github.com/aeternity/aesophia/compare/v7.3.0...v7.4.0
 [7.3.0]: https://github.com/aeternity/aesophia/compare/v7.2.1...v7.3.0
 [7.2.1]: https://github.com/aeternity/aesophia/compare/v7.2.0...v7.2.1
