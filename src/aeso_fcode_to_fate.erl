@@ -285,6 +285,8 @@ term_to_fate(_GlobEnv, _Env, {builtin, _, map_empty, []}) ->
 term_to_fate(GlobEnv, Env, {op, _, map_set, [M, K, V]}) ->
     Map = term_to_fate(GlobEnv, Env, M),
     Map#{term_to_fate(GlobEnv, Env, K) => term_to_fate(GlobEnv, Env, V)};
+term_to_fate(GlobEnv, Env, {builtin, _, bytes_to_any_size, [Bs]}) ->
+    term_to_fate(GlobEnv, Env, Bs);
 term_to_fate(_GlobEnv, _Env, _) ->
     throw(not_a_fate_value).
 

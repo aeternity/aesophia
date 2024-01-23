@@ -20,6 +20,8 @@ contract FunctionArguments =
   entrypoint read(a : answer(int)) =
      a.result
 
+  entrypoint any_bytes(b : bytes()) = b
+
   entrypoint sjutton(b : bytes(17)) =
      b
 
