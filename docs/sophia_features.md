@@ -948,16 +948,18 @@ functions are provided.
 
 ## AENS interface
 
-Contracts can interact with the
-[æternity naming system](https://github.com/aeternity/protocol/blob/master/AENS.md).
-For this purpose the [AENS](sophia_stdlib.md#aens) library was exposed.
+Contracts can interact with the [æternity naming
+system](https://github.com/aeternity/protocol/blob/master/AENS.md). For this
+purpose the [AENS](sophia_stdlib.md#aens) and later the
+[AENSv2](sophia_stdlib.md#aensv2) library was exposed.
 
 ### Example
 
 In this example we assume that the name `name` already exists, and is owned by
 an account with address `addr`. In order to allow a contract `ct` to handle
-`name` the account holder needs to create a
-[signature](#delegation-signature) `sig` of `addr | name.hash | ct.address`.
+`name` the account holder needs to create a [delegation
+signature](#delegation-signature) `sig` from the name owner address `addr`, the
+name hash and the contract address.
 
 Armed with this information we can for example write a function that extends
 the name if it expires within 1000 blocks:
@@ -1099,8 +1101,34 @@ however is in the gas consumption — while `abort` returns unused gas, a call t
 
 ## Delegation signature
 
-Some chain operations (`Oracle.<operation>` and `AENS.<operation>`) have an
+Some chain operations (`Oracle.<operation>` and `AENSv2.<operation>`) have an
 optional delegation signature. This is typically used when a user/accounts
-would like to allow a contract to act on it's behalf. The exact data to be
-signed varies for the different operations, but in all cases you should prepend
-the signature data with the `network_id` (`ae_mainnet` for the æternity mainnet, etc.).
+would like to allow a contract to act on it's behalf.
+
+### From Ceres
+
+From the Ceres protocol version the delegation signatures have more structure,
+including a unique tag, `network_id` and identifiers; there are five different
+delegation signatures:
+
+ - AENS wildcard - the user signs: `owner account + contract`
+ - `AENS_PRECLAIM` - the user signs: `owner account + contract`
+ - `AENS_CLAIM, AENS_UPDATE, AENS_TRANSFER, AENS_REVOKE` - the user signs: `owner account + name hash + contract`
+ - `ORACLE_REGISTER, ORACLE_EXTEND` - the user signs: `owner account + contract`
+ - `ORACLE_RESPOND` - the user signs: `query id + contract`
+
+See [Serialized signature
+data](https://github.com/aeternity/protocol/blob/master/contracts/fate.md#from-ceres-serialized-signature-data)
+for the exact structure used.
+
+### Before ceres
+
+The exact data to be signed varies for the different operations, but in all
+cases you should prepend the signature data with the `network_id` (`ae_mainnet`
+for the æternity mainnet, etc.).
+
+There are four different delegation signatures:
+ - `AENS_PRECLAIM` - the user signs: owner `network_id + account + contract`
+ - `AENS_CLAIM, AENS_UPDATE, AENS_TRANSFER, AENS_REVOKE` - the user signs: `network_id + owner account + name hash + contract`
+ - `ORACLE_REGISTER, ORACLE_EXTEND` - the user signs: `network_id + owner account + contract`
+ - `ORACLE_RESPOND` - the user signs: `network_id + query id + contract`

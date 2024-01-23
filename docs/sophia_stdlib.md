@@ -181,14 +181,14 @@ Note: Changed to produce `AENSv2.name` in v8.0 (Ceres protocol upgrade).
 AENSv2.preclaim(owner : address, commitment_hash : hash, <signature : signature>) : unit
 ```
 
-The [signature](./sophia_features.md#delegation-signature) should be over
-`network id` + `owner address` + `Contract.address` (concatenated as byte arrays).
+The [signature](./sophia_features.md#delegation-signature) should be a
+serialized structure containing `network id`, `owner address`, and
+`Contract.address`.
 
 From Ceres (i.e. FATE VM version 3) the
 [signature](./sophia_features.md#delegation-signature) can also be generic
 (allowing _all_, existing and future, names to be delegated with one
-signature), i.e. over `network id` + `owner address` + `string "AENS"` +
-`Contract.address`.
+signature), i.e. containing `network id`, `owner address`, `Contract.address`.
 
 
 ##### claim
@@ -196,14 +196,14 @@ signature), i.e. over `network id` + `owner address` + `string "AENS"` +
 AENSv2.claim(owner : address, name : string, salt : int, name_fee : int, <signature : signature>) : unit
 ```
 
-The [signature](./sophia_features.md#delegation-signature) should be over
-`network id` + `owner address` + `name_hash` + `Contract.address` (concatenated
-as byte arrays) using the private key of the `owner` account for signing.
+The [signature](./sophia_features.md#delegation-signature) should be a
+serialized structure containing `network id`, `owner address`, and
+`Contract.address`. Using the private key of `owner address` for signing.
 
 From Ceres (i.e. FATE VM version 3) the
 [signature](./sophia_features.md#delegation-signature) can also be generic
 (allowing _all_, existing and future, names to be delegated with one
-signature), i.e. over `network id` + `owner address` + `string "AENS"` +
+signature), i.e. containing `network id`, `owner address`, `name_hash`, and
 `Contract.address`.
 
 
@@ -214,15 +214,14 @@ AENSv2.transfer(owner : address, new_owner : address, name : string, <signature 
 
 Transfers name to the new owner.
 
-The [signature](./sophia_features.md#delegation-signature) should be over
-`network id` + `owner address` + `name_hash` + `Contract.address`
-(concatenated as byte arrays)
-using the private key of the `owner` account for signing.
+The [signature](./sophia_features.md#delegation-signature) should be a
+serialized structure containing `network id`, `owner address`, and
+`Contract.address`. Using the private key of `owner address` for signing.
 
 From Ceres (i.e. FATE VM version 3) the
 [signature](./sophia_features.md#delegation-signature) can also be generic
 (allowing _all_, existing and future, names to be delegated with one
-signature), i.e. over `network id` + `owner address` + `string "AENS"` +
+signature), i.e. containing `network id`, `owner address`, `name_hash`, and
 `Contract.address`.
 
 
@@ -233,15 +232,14 @@ AENSv2.revoke(owner : address, name : string, <signature : signature>) : unit
 
 Revokes the name to extend the ownership time.
 
-The [signature](./sophia_features.md#delegation-signature) should be over
-`network id` + `owner address` + `name_hash` + `Contract.address`
-(concatenated as byte arrays)
-using the private key of the `owner` account for signing.
+The [signature](./sophia_features.md#delegation-signature) should be a
+serialized structure containing `network id`, `owner address`, and
+`Contract.address`. Using the private key of `owner address` for signing.
 
 From Ceres (i.e. FATE VM version 3) the
 [signature](./sophia_features.md#delegation-signature) can also be generic
 (allowing _all_, existing and future, names to be delegated with one
-signature), i.e. over `network id` + `owner address` + `string "AENS"` +
+signature), i.e. containing `network id`, `owner address`, `name_hash`, and
 `Contract.address`.
 
 
@@ -256,6 +254,16 @@ will not be updated, for example if `None` is passed as `expiry` the expiry
 block of the name is not changed.
 
 Note: Changed to consume `AENSv2.pointee` in v8.0 (Ceres protocol upgrade).
+
+The [signature](./sophia_features.md#delegation-signature) should be a
+serialized structure containing `network id`, `owner address`, and
+`Contract.address`. Using the private key of `owner address` for signing.
+
+From Ceres (i.e. FATE VM version 3) the
+[signature](./sophia_features.md#delegation-signature) can also be generic
+(allowing _all_, existing and future, names to be delegated with one
+signature), i.e. containing `network id`, `owner address`, `name_hash`, and
+`Contract.address`.
 
 ### Auth
 
@@ -944,11 +952,11 @@ Oracle.register(<signature : bytes(64)>, acct : address, qfee : int, ttl : Chain
 Registers new oracle answering questions of type `'a` with answers of type `'b`.
 
 * The `acct` is the address of the oracle to register (can be the same as the contract).
-* `signature` is a signature proving that the contract is allowed to register the account -
-  the `network id` + `account address` + `contract address` (concatenated as byte arrays) is
-  [signed](./sophia_features.md#delegation-signature) with the
-  private key of the account, proving you have the private key of the oracle to be. If the
-  address is the same as the contract `sign` is ignored and can be left out entirely.
+* The [signature](./sophia_features.md#delegation-signature) should be a
+  serialized structure containing `network id`, `account address`, and
+  `contract address`. Using the private key of `account address` for signing.
+  Proving you have the private key of the oracle to be. If the address is the same
+  as the contract `sign` is ignored and can be left out entirely.
 * The `qfee` is the minimum query fee to be paid by a user when asking a question of the oracle.
 * The `ttl` is the Time To Live for the oracle in key blocks, either relative to the current
   key block height (`RelativeTTL(delta)`) or a fixed key block height (`FixedTTL(height)`).
@@ -962,7 +970,7 @@ Examples:
 ```
 
 
-#### get_question
+#### get\_question
 ```
 Oracle.get_question(o : oracle('a, 'b), q : oracle_query('a, 'b)) : 'a
 ```
@@ -975,12 +983,11 @@ Checks what was the question of query `q` on oracle `o`
 Oracle.respond(<signature : bytes(64)>, o : oracle('a, 'b), q : oracle_query('a, 'b), 'b) : unit
 ```
 
-Responds to the question `q` on `o`.
-Unless the contract address is the same as the oracle address the `signature`
-(which is an optional, named argument)
+Responds to the question `q` on `o`.  Unless the contract address is the same
+as the oracle address the `signature` (which is an optional, named argument)
 needs to be provided. Proving that we have the private key of the oracle by
-[signing](./sophia_features.md#delegation-signature)
-the `network id` + `oracle query id` + `contract address`
+[signing](./sophia_features.md#delegation-signature) should be a serialized
+structure containing `network id`, `oracle query id`, and `contract address`.
 
 
 #### extend
@@ -993,7 +1000,7 @@ Extends TTL of an oracle.
 * `o` is the oracle being extended
 * `ttl` must be `RelativeTTL`. The time to live of `o` will be extended by this value.
 
-#### query_fee
+#### query\_fee
 ```
 Oracle.query_fee(o : oracle('a, 'b)) : int
 ```
@@ -1014,7 +1021,7 @@ Asks the oracle a question.
 The call fails if the oracle could expire before an answer.
 
 
-#### get_answer
+#### get\_answer
 ```
 Oracle.get_answer(o : oracle('a, 'b), q : oracle_query('a, 'b)) : option('b)
 ```
