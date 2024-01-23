@@ -15,7 +15,7 @@ from_fate({id, _, "address"}, ?FATE_ADDRESS(Bin)) -> {account_pubkey, [], Bin};
 from_fate({app_t, _, {id, _, "oracle"}, _}, ?FATE_ORACLE(Bin)) -> {oracle_pubkey, [], Bin};
 from_fate({app_t, _, {id, _, "oracle_query"}, _}, ?FATE_ORACLE_Q(Bin)) -> {oracle_query_id, [], Bin};
 from_fate({con, _, _Name},  ?FATE_CONTRACT(Bin)) -> {contract_pubkey, [], Bin};
-from_fate({bytes_t, _, any}, ?FATE_BYTES(Bin)) -> {bytes, [], Bin};
+from_fate({bytes_t, _, any}, ?FATE_BYTES(Bin)) -> make_any_bytes(Bin);
 from_fate({bytes_t, _, N},  ?FATE_BYTES(Bin)) when byte_size(Bin) == N -> {bytes, [], Bin};
 from_fate({id, _, "bits"},  ?FATE_BITS(N)) -> make_bits(N);
 from_fate({id, _, "int"},     N) when is_integer(N) ->
@@ -187,3 +187,5 @@ make_bits(Set, Zero, I, N) when 0 == N rem 2 ->
 make_bits(Set, Zero, I, N) ->
     {app, [], Set, [make_bits(Set, Zero, I + 1, N div 2), {int, [], I}]}.
 
+make_any_bytes(Bin) ->
+  {app, [], {qid, [], ["Bytes", "to_any_size"]}, [{bytes, [], Bin}]}.

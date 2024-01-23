@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `Int.to_bytes`; and adjust `Bytes.concat` to allow both fixed and arbitrary
   sized byte arrays.
 - `Chain.network_id` - a function to get hold of the Chain's network id.
+- Allowing `Bytes.to_any_size` in calldata creation, to enable creation of arguments
+  with arbitray size.
 ### Changed
 - `Crypto.verify_sig` is changed to have `msg : bytes()`. I.e. the
   signed data can be of any length (used to be limited to `bytes(32)`/`hash`).
