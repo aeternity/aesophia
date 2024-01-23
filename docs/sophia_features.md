@@ -939,7 +939,7 @@ purpose the [AENS](sophia_stdlib.md#aens) and later the
 
 In this example we assume that the name `name` already exists, and is owned by
 an account with address `addr`. In order to allow a contract `ct` to handle
-`name` the account holder needs to create a [delegatrion
+`name` the account holder needs to create a [delegation
 signature](#delegation-signature) `sig` from the name owner address `addr`, the
 name hash and the contract address.
 
@@ -1100,7 +1100,7 @@ delegation signatures:
  - `ORACLE_RESPOND` - the user signs: `query id + contract`
 
 See [Serialized signature
-data](https://github.com/aeternity/protocol/contracts/fate.md#from-ceres-serialized-signature-data)
+data](https://github.com/aeternity/protocol/blob/master/contracts/fate.md#from-ceres-serialized-signature-data)
 for the exact structure used.
 
 ### Before ceres
