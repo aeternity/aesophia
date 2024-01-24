@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [CERES 8.0.0]
+## [Unreleased]
+### Added
+### Changed
+### Removed
+### Fixed
+
+## [8.0.0-rc1]
 ### Added
 - Bitwise operations for integers: `band`, `bor`, `bxor`, `bnot`, `<<` and `>>`.
 - `Int.mulmod` - combined builtin operation for multiplication and modulus.
@@ -12,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Address.to_bytes` - convert an address to its binary representation (for hashing, etc.).
 - Raw data pointers added to AENS. In short we have introduced a new namespace
   `AENSv2`; they contain types similar to the old `AENS`; `AENS.name` and
-  `AENS.pointee`, where the latter now has a constructor `DataPt(string)`. All
+  `AENS.pointee`, where the latter now has a constructor `DataPt(bytes())`. All
   AENS actions have been moved to `AENSv2`, and `AENSv2.lookup` and
   `AENSv2.update` consume and produce the new types. The old `AENS` namespace
   only contains the old datatypes, that can be used to interface existing
@@ -30,12 +36,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   signed data can be of any length (used to be limited to `bytes(32)`/`hash`).
 ### Removed
 - `Bitwise.aes` standard library is removed - the builtin operations are superior.
-
-## [Unreleased]
-### Added
-### Changed
-### Removed
-### Fixed
 
 ## [7.4.1]
 ### Changed
@@ -445,7 +445,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v7.4.1...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v8.0.0-rc1...HEAD
+[8.0.0-rc1]: https://github.com/aeternity/aesophia/compare/v7.4.1...v8.0.0-rc1
 [7.4.1]: https://github.com/aeternity/aesophia/compare/v7.4.0...v7.4.1
 [7.4.0]: https://github.com/aeternity/aesophia/compare/v7.3.0...v7.4.0
 [7.3.0]: https://github.com/aeternity/aesophia/compare/v7.2.1...v7.3.0
