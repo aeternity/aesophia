@@ -1176,7 +1176,7 @@ changes the type of the contract call, wrapping the result in an <code>option</c
 If the call fails the result is <code>None</code>, otherwise it's <code>Some(r)</code> where <code>r</code> is
 the return value of the call.</p>
 <div class="highlight"><pre><span></span><code><span class="k">contract</span><span class="w"> </span><span class="k">interface</span><span class="w"> </span><span class="nf">VotingType</span><span class="w"> </span><span class="ow">=</span>
-<span class="w">  </span><span class="k">entrypoint</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="n">vote</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="ow">=&gt;</span><span class="w"> </span><span class="kt">unit</span>
+<span class="w">  </span><span class="k">entrypoint</span><span class="w"> </span><span class="n">vote</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="ow">=&gt;</span><span class="w"> </span><span class="kt">unit</span>
 
 <span class="k">contract</span><span class="w"> </span><span class="nf">Voter</span><span class="w"> </span><span class="ow">=</span>
 <span class="w">  </span><span class="k">entrypoint</span><span class="w"> </span><span class="n">tryVote</span><span class="p">(</span><span class="n">v</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="nf">VotingType</span><span class="p">,</span><span class="w"> </span><span class="n">alt</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="ow">=</span>
@@ -1274,7 +1274,7 @@ contract interface X : Z =
 <li>A <code>stateful</code> entrypoint can only implement a <code>stateful</code> entrypoint, and cannot implement a non-<code>stateful</code> entrypoint.</li>
 </ol>
 <h4 id="subtyping-and-variance">Subtyping and variance</h4>
-<p>Subtyping in Sophia follows common rules that take type variance into account. As described by <a href="https://en.wikipedia.org/wiki/Covariance_and_contravariance_(computer_science)">Wikipedia</a>, </p>
+<p>Subtyping in Sophia follows common rules that take type variance into account. As described by <a href="https://en.wikipedia.org/wiki/Covariance_and_contravariance_(computer_science)">Wikipedia</a>,</p>
 <blockquote>
 <p>Variance refers to how subtyping between more complex types relates to subtyping between their components.</p>
 </blockquote>
@@ -1785,7 +1785,7 @@ arithmetic operations:
 - division (<code>x / y</code>), truncated towards zero
 - remainder (<code>x mod y</code>), satisfying <code>y * (x / y) + x mod y == x</code> for non-zero <code>y</code>
 - exponentiation (<code>x ^ y</code>)</p>
-<p>All operations are <em>safe</em> with respect to overflow and underflow. 
+<p>All operations are <em>safe</em> with respect to overflow and underflow.
 The division and modulo operations throw an arithmetic error if the
 right-hand operand is zero.</p>
 <h2 id="bit-fields">Bit fields</h2>
