@@ -84,7 +84,7 @@ the return value of the call.
 
 ```sophia
 contract interface VotingType =
-  entrypoint : vote : string => unit
+  entrypoint vote : string => unit
 
 contract Voter =
   entrypoint tryVote(v : VotingType, alt : string) =
@@ -204,7 +204,7 @@ When a `contract` or a `contract interface` implements another `contract interfa
 
 #### Subtyping and variance
 
-Subtyping in Sophia follows common rules that take type variance into account. As described by [Wikipedia](https://en.wikipedia.org/wiki/Covariance_and_contravariance_(computer_science)), 
+Subtyping in Sophia follows common rules that take type variance into account. As described by [Wikipedia](https://en.wikipedia.org/wiki/Covariance_and_contravariance_(computer_science)),
 
 >Variance refers to how subtyping between more complex types relates to subtyping between their components.
 
@@ -224,11 +224,11 @@ A good example of where it matters can be pictured by subtyping of function type
 ```sophia
 contract interface Animal =
   entrypoint age : () => int
-  
+
 contract Dog : Animal =
   entrypoint age() = // ...
   entrypoint woof() = "woof"
-  
+
 contract Cat : Animal =
   entrypoint age() = // ...
   entrypoint meow() = "meow"
@@ -628,7 +628,7 @@ arithmetic operations:
 - remainder (`x mod y`), satisfying `y * (x / y) + x mod y == x` for non-zero `y`
 - exponentiation (`x ^ y`)
 
-All operations are *safe* with respect to overflow and underflow. 
+All operations are *safe* with respect to overflow and underflow.
 The division and modulo operations throw an arithmetic error if the
 right-hand operand is zero.
 
