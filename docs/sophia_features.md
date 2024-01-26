@@ -640,10 +640,16 @@ Sophia arbitrary-sized integers (FATE) also supports the following bitwise opera
 - arithmetic bitshift left (`x << n`)
 - arithmetic bitshift right (`x >> n`)
 
+Note: Arithmetic bitshift treats the number as a signed integer (in 2s
+complement), and "retains" the topmost bit. I.e. shifting in zeros if the
+topmost bit was 0, and ones if it was one.
+
 ## Bit fields
 
-Sophia integers do not support bit arithmetic. Instead there is a separate
-type `bits`. See the standard library [documentation](sophia_stdlib.md#bits).
+Originally Sophia integers did not support bit arithmetic. Instead we used a
+separate type `bits` (see the standard library
+[documentation](sophia_stdlib.md#bits)) - it is still provided as an
+alternative to bit arithmetic.
 
 A bit field can be of arbitrary size (but it is still represented by the
 corresponding integer, so setting very high bits can be expensive).

@@ -146,7 +146,7 @@ datatype pointee = AccountPt(address) | OraclePt(address)
 ```
 
 Note: on-chain there is a maximum length enforced for `DataPt`, it is 1024 bytes.
-Sophia itself does _not_ enforce this.
+Sophia itself does _not_ check for this.
 
 #### Functions
 
@@ -893,7 +893,8 @@ Int.to_bytes(n : int, size : int) : bytes()
 ```
 
 Casts the integer to a byte array with `size` bytes (big endian, truncating if
-necessary).
+necessary not preserving signedness). I.e. if you try to squeeze `-129` into a
+single byte that will be indistinguishable from `127`.
 
 
 ### Map
@@ -2474,7 +2475,9 @@ an integer. If the string doesn't contain a valid number `None` is returned.
 to_bytes(s : string) : bytes()
 ```
 
-Converts string into byte array.
+Converts string into byte array. String is UTF-8 encoded. I.e.
+`String.length(s)` is not guaranteed to be equal to
+`Bytes.size(String.to_bytes(s))`.
 
 #### sha3
 ```
