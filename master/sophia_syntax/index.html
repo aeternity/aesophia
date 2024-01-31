@@ -848,8 +848,8 @@ element may be indented less than the indentation of the block. For instance</p>
 
 <span class="n">BinOp</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="err">&#39;</span><span class="o">||</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">&amp;&amp;</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;&lt;&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;&gt;&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">=&lt;</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">&gt;=</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">==</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">!=</span><span class="err">&#39;</span>
 <span class="w">        </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">::</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">++</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;+&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;-&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;*&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;/&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">mod</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;^&#39;</span>
-<span class="w">        </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">|&gt;</span><span class="err">&#39;</span>
-<span class="n">UnOp</span><span class="w">  </span><span class="o">::=</span><span class="w"> </span><span class="sc">&#39;-&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;!&#39;</span>
+<span class="w">        </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">band</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">bor</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">bxor</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">&lt;&lt;</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">&gt;&gt;</span><span class="err">&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">|&gt;</span><span class="err">&#39;</span>
+<span class="n">UnOp</span><span class="w">  </span><span class="o">::=</span><span class="w"> </span><span class="sc">&#39;-&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="sc">&#39;!&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="n">bnot</span><span class="err">&#39;</span>
 </code></pre></div>
 <h2 id="operators-types">Operators types</h2>
 <table>
@@ -867,6 +867,10 @@ element may be indented less than the indentation of the block. For instance</p>
 <tr>
 <td><code>!</code> <code>&amp;&amp;</code> <code>||</code></td>
 <td>logical operators</td>
+</tr>
+<tr>
+<td><code>band</code> <code>bor</code> <code>bxor</code> <code>bnot</code> <code>&lt;&lt;</code> <code>&gt;&gt;</code></td>
+<td>bitwise operators</td>
 </tr>
 <tr>
 <td><code>==</code> <code>!=</code> <code>&lt;</code> <code>&gt;</code> <code>=&lt;</code> <code>&gt;=</code></td>
@@ -893,7 +897,7 @@ element may be indented less than the indentation of the block. For instance</p>
 </thead>
 <tbody>
 <tr>
-<td><code>!</code></td>
+<td><code>!</code> <code>bnot</code></td>
 <td>right</td>
 </tr>
 <tr>
@@ -913,12 +917,28 @@ element may be indented less than the indentation of the block. For instance</p>
 <td>left</td>
 </tr>
 <tr>
+<td><code>&lt;&lt;</code> <code>&gt;&gt;</code></td>
+<td>left</td>
+</tr>
+<tr>
 <td><code>::</code> <code>++</code></td>
 <td>right</td>
 </tr>
 <tr>
 <td><code>&lt;</code> <code>&gt;</code> <code>=&lt;</code> <code>&gt;=</code> <code>==</code> <code>!=</code></td>
 <td>none</td>
+</tr>
+<tr>
+<td><code>band</code></td>
+<td>left</td>
+</tr>
+<tr>
+<td><code>bxor</code></td>
+<td>left</td>
+</tr>
+<tr>
+<td><code>bor</code></td>
+<td>left</td>
 </tr>
 <tr>
 <td><code>&amp;&amp;</code></td>

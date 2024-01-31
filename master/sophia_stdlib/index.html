@@ -357,6 +357,13 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#aensv2" class="md-nav__link">
+    AENSv2
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#auth" class="md-nav__link">
     Auth
   </a>
@@ -447,8 +454,8 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#bitwise" class="md-nav__link">
-    Bitwise
+  <a href="#aenscompat" class="md-nav__link">
+    AENSCompat
   </a>
   
 </li>
@@ -608,6 +615,13 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#aensv2" class="md-nav__link">
+    AENSv2
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#auth" class="md-nav__link">
     Auth
   </a>
@@ -698,8 +712,8 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#bitwise" class="md-nav__link">
-    Bitwise
+  <a href="#aenscompat" class="md-nav__link">
+    AENSCompat
   </a>
   
 </li>
@@ -802,6 +816,7 @@ in the scope and do not need any actions to be used, while the others require so
 <ul>
 <li><a href="#address">Address</a></li>
 <li><a href="#aens">AENS</a></li>
+<li><a href="#aensv2">AENSv2</a></li>
 <li><a href="#auth">Auth</a></li>
 <li><a href="#bits">Bits</a></li>
 <li><a href="#bytes">Bytes</a></li>
@@ -818,6 +833,7 @@ in the scope and do not need any actions to be used, while the others require so
 <div class="highlight"><pre><span></span><code>include &quot;List.aes&quot;
 </code></pre></div></p>
 <ul>
+<li><a href="#aenscompat">AENSCompat</a></li>
 <li><a href="#bitwise">Bitwise</a></li>
 <li><a href="#bls12_381">BLS12_381</a></li>
 <li><a href="#func">Func</a></li>
@@ -836,6 +852,10 @@ in the scope and do not need any actions to be used, while the others require so
 <div class="highlight"><pre><span></span><code>Address.to_str(a : address) : string
 </code></pre></div>
 <p>Base58 encoded string</p>
+<h4 id="to_bytes">to_bytes</h4>
+<div class="highlight"><pre><span></span><code>Address.to_bytes(a : address) : bytes(32)
+</code></pre></div>
+<p>The binary representation of the address.</p>
 <h4 id="is_contract">is_contract</h4>
 <div class="highlight"><pre><span></span><code>Address.is_contract(a : address) : bool
 </code></pre></div>
@@ -853,13 +873,10 @@ in the scope and do not need any actions to be used, while the others require so
 </code></pre></div>
 <p>Cast address to contract type C (where <code>C</code> is a contract)</p>
 <h3 id="aens">AENS</h3>
-<p>The following functionality is available for interacting with the æternity
-naming system (AENS).
-If <code>owner</code> is equal to <code>Contract.address</code> the signature <code>signature</code> is
-ignored, and can be left out since it is a named argument. Otherwise we need
-a signature to prove that we are allowed to do AENS operations on behalf of
-<code>owner</code>. The <a href="https://github.com/aeternity/protocol/blob/iris/consensus/consensus.md#transaction-signature">signature is tied to a network id</a>,
-i.e. the signature material should be prefixed by the network id.</p>
+<p>The old AENS namespace, kept in the compiler to be able to interact with
+contracts from before Ceres, compiled using aesophia compiler version 7.x and
+earlier. Used in <a href="#aenscompat">AENSCompat</a> when converting between old and new
+pointers.</p>
 <h4 id="types">Types</h4>
 <h5 id="name">name</h5>
 <div class="highlight"><pre><span></span><code>datatype name = Name(address, Chain.ttl, map(string, AENS.pointee))
@@ -868,58 +885,104 @@ i.e. the signature material should be prefixed by the network id.</p>
 <div class="highlight"><pre><span></span><code>datatype pointee = AccountPt(address) | OraclePt(address)
                  | ContractPt(address) | ChannelPt(address)
 </code></pre></div>
+<h3 id="aensv2">AENSv2</h3>
+<p>Note: introduced in v8.0</p>
+<p>The following functionality is available for interacting with the æternity
+naming system (AENS).  If <code>owner</code> is equal to <code>Contract.address</code> the signature
+<code>signature</code> is ignored, and can be left out since it is a named argument.
+Otherwise we need a signature to prove that we are allowed to do AENS
+operations on behalf of <code>owner</code>. The <a href="https://github.com/aeternity/protocol/blob/iris/consensus/consensus.md#transaction-signature">signature is tied to a network
+id</a>,
+i.e. the signature material should be prefixed by the network id.</p>
+<h4 id="types_1">Types</h4>
+<h5 id="name_1">name</h5>
+<div class="highlight"><pre><span></span><code>datatype name = Name(address, Chain.ttl, map(string, AENSv2.pointee))
+</code></pre></div>
+<h5 id="pointee_1">pointee</h5>
+<div class="highlight"><pre><span></span><code>datatype pointee = AccountPt(address) | OraclePt(address)
+                 | ContractPt(address) | ChannelPt(address) | DataPt(bytes())
+</code></pre></div>
+<p>Note: on-chain there is a maximum length enforced for <code>DataPt</code>, it is 1024 bytes.
+Sophia itself does <em>not</em> check for this.</p>
 <h4 id="functions">Functions</h4>
 <h5 id="resolve">resolve</h5>
-<div class="highlight"><pre><span></span><code>AENS.resolve(name : string, key : string) : option(&#39;a)
+<div class="highlight"><pre><span></span><code>AENSv2.resolve(name : string, key : string) : option(&#39;a)
 </code></pre></div>
 <p>Name resolution. Here <code>name</code> should be a registered name and <code>key</code> one of the attributes
 associated with this name (for instance <code>"account_pubkey"</code>). The return type
 (<code>'a</code>) must be resolved at compile time to an atomic type and the value is
 type checked against this type at run time.</p>
 <h5 id="lookup">lookup</h5>
-<div class="highlight"><pre><span></span><code>AENS.lookup(name : string) : option(AENS.name)
+<div class="highlight"><pre><span></span><code>AENSv2.lookup(name : string) : option(AENSv2.name)
 </code></pre></div>
-<p>If <code>name</code> is an active name <code>AENS.lookup</code> returns a name object.
+<p>If <code>name</code> is an active name <code>AENSv2.lookup</code> returns a name object.
 The three arguments to <code>Name</code> are <code>owner</code>, <code>expiry</code> and a map of the
 <code>pointees</code> for the name. Note: the expiry of the name is always a fixed TTL.
 For example:
-<div class="highlight"><pre><span></span><code>let Some(Name(owner, FixedTTL(expiry), ptrs)) = AENS.lookup(&quot;example.chain&quot;)
+<div class="highlight"><pre><span></span><code>let Some(AENSv2.Name(owner, FixedTTL(expiry), ptrs)) = AENSv2.lookup(&quot;example.chain&quot;)
 </code></pre></div></p>
+<p>Note: Changed to produce <code>AENSv2.name</code> in v8.0 (Ceres protocol upgrade).</p>
 <h5 id="preclaim">preclaim</h5>
-<div class="highlight"><pre><span></span><code>AENS.preclaim(owner : address, commitment_hash : hash, &lt;signature : signature&gt;) : unit
+<div class="highlight"><pre><span></span><code>AENSv2.preclaim(owner : address, commitment_hash : hash, &lt;signature : signature&gt;) : unit
 </code></pre></div>
-<p>The <a href="../sophia_features/#delegation-signature">signature</a> should be over
-<code>network id</code> + <code>owner address</code> + <code>Contract.address</code> (concatenated as byte arrays).</p>
+<p>The <a href="../sophia_features/#delegation-signature">signature</a> should be a
+serialized structure containing <code>network id</code>, <code>owner address</code>, and
+<code>Contract.address</code>.</p>
+<p>From Ceres (i.e. FATE VM version 3) the
+<a href="../sophia_features/#delegation-signature">signature</a> can also be generic
+(allowing <em>all</em>, existing and future, names to be delegated with one
+signature), i.e. containing <code>network id</code>, <code>owner address</code>, <code>Contract.address</code>.</p>
 <h5 id="claim">claim</h5>
-<div class="highlight"><pre><span></span><code>AENS.claim(owner : address, name : string, salt : int, name_fee : int, &lt;signature : signature&gt;) : unit
+<div class="highlight"><pre><span></span><code>AENSv2.claim(owner : address, name : string, salt : int, name_fee : int, &lt;signature : signature&gt;) : unit
 </code></pre></div>
-<p>The <a href="../sophia_features/#delegation-signature">signature</a> should be over
-<code>network id</code> + <code>owner address</code> + <code>name_hash</code> + <code>Contract.address</code>
-(concatenated as byte arrays)
-using the private key of the <code>owner</code> account for signing.</p>
+<p>The <a href="../sophia_features/#delegation-signature">signature</a> should be a
+serialized structure containing <code>network id</code>, <code>owner address</code>, and
+<code>Contract.address</code>. Using the private key of <code>owner address</code> for signing.</p>
+<p>From Ceres (i.e. FATE VM version 3) the
+<a href="../sophia_features/#delegation-signature">signature</a> can also be generic
+(allowing <em>all</em>, existing and future, names to be delegated with one
+signature), i.e. containing <code>network id</code>, <code>owner address</code>, <code>name_hash</code>, and
+<code>Contract.address</code>.</p>
 <h5 id="transfer">transfer</h5>
-<div class="highlight"><pre><span></span><code>AENS.transfer(owner : address, new_owner : address, name : string, &lt;signature : signature&gt;) : unit
+<div class="highlight"><pre><span></span><code>AENSv2.transfer(owner : address, new_owner : address, name : string, &lt;signature : signature&gt;) : unit
 </code></pre></div>
 <p>Transfers name to the new owner.</p>
-<p>The <a href="../sophia_features/#delegation-signature">signature</a> should be over
-<code>network id</code> + <code>owner address</code> + <code>name_hash</code> + <code>Contract.address</code>
-(concatenated as byte arrays)
-using the private key of the <code>owner</code> account for signing.</p>
+<p>The <a href="../sophia_features/#delegation-signature">signature</a> should be a
+serialized structure containing <code>network id</code>, <code>owner address</code>, and
+<code>Contract.address</code>. Using the private key of <code>owner address</code> for signing.</p>
+<p>From Ceres (i.e. FATE VM version 3) the
+<a href="../sophia_features/#delegation-signature">signature</a> can also be generic
+(allowing <em>all</em>, existing and future, names to be delegated with one
+signature), i.e. containing <code>network id</code>, <code>owner address</code>, <code>name_hash</code>, and
+<code>Contract.address</code>.</p>
 <h5 id="revoke">revoke</h5>
-<div class="highlight"><pre><span></span><code>AENS.revoke(owner : address, name : string, &lt;signature : signature&gt;) : unit
+<div class="highlight"><pre><span></span><code>AENSv2.revoke(owner : address, name : string, &lt;signature : signature&gt;) : unit
 </code></pre></div>
 <p>Revokes the name to extend the ownership time.</p>
-<p>The <a href="../sophia_features/#delegation-signature">signature</a> should be over
-<code>network id</code> + <code>owner address</code> + <code>name_hash</code> + <code>Contract.address</code>
-(concatenated as byte arrays)
-using the private key of the <code>owner</code> account for signing.</p>
+<p>The <a href="../sophia_features/#delegation-signature">signature</a> should be a
+serialized structure containing <code>network id</code>, <code>owner address</code>, and
+<code>Contract.address</code>. Using the private key of <code>owner address</code> for signing.</p>
+<p>From Ceres (i.e. FATE VM version 3) the
+<a href="../sophia_features/#delegation-signature">signature</a> can also be generic
+(allowing <em>all</em>, existing and future, names to be delegated with one
+signature), i.e. containing <code>network id</code>, <code>owner address</code>, <code>name_hash</code>, and
+<code>Contract.address</code>.</p>
 <h5 id="update">update</h5>
-<div class="highlight"><pre><span></span><code>AENS.update(owner : address, name : string, expiry : option(Chain.ttl), client_ttl : option(int),
-            new_ptrs : option(map(string, AENS.pointee)), &lt;signature : signature&gt;) : unit
+<div class="highlight"><pre><span></span><code>AENSv2.update(owner : address, name : string, expiry : option(Chain.ttl), client_ttl : option(int),
+              new_ptrs : option(map(string, AENSv2.pointee)), &lt;signature : signature&gt;) : unit
 </code></pre></div>
 <p>Updates the name. If the optional parameters are set to <code>None</code> that parameter
 will not be updated, for example if <code>None</code> is passed as <code>expiry</code> the expiry
 block of the name is not changed.</p>
+<p>Note: Changed to consume <code>AENSv2.pointee</code> in v8.0 (Ceres protocol upgrade).</p>
+<p>The <a href="../sophia_features/#delegation-signature">signature</a> should be a
+serialized structure containing <code>network id</code>, <code>owner address</code>, and
+<code>Contract.address</code>. Using the private key of <code>owner address</code> for signing.</p>
+<p>From Ceres (i.e. FATE VM version 3) the
+<a href="../sophia_features/#delegation-signature">signature</a> can also be generic
+(allowing <em>all</em>, existing and future, names to be delegated with one
+signature), i.e. containing <code>network id</code>, <code>owner address</code>, <code>name_hash</code>, and
+<code>Contract.address</code>.</p>
 <h3 id="auth">Auth</h3>
 <h4 id="tx">tx</h4>
 <div class="highlight"><pre><span></span><code>Auth.tx : option(Chain.tx)
@@ -948,7 +1011,10 @@ block of the name is not changed.</p>
 <h4 id="tx_hash">tx_hash</h4>
 <div class="highlight"><pre><span></span><code>Auth.tx_hash : option(hash)
 </code></pre></div>
-<p>Gets the transaction hash during authentication.</p>
+<p>Gets the transaction hash during authentication. Note: <code>Auth.tx_hash</code>
+computation differs between protocol versions (changed in Ceres!), see
+<a href="https://github.com/aeternity/protocol/blob/master/serializations.md">aeserialisation</a>
+specification for details.</p>
 <h3 id="bits">Bits</h3>
 <h4 id="none">none</h4>
 <div class="highlight"><pre><span></span><code>Bits.none : bits
@@ -998,11 +1064,33 @@ block of the name is not changed.</p>
 <h4 id="concat">concat</h4>
 <div class="highlight"><pre><span></span><code>Bytes.concat : (a : bytes(m), b : bytes(n)) =&gt; bytes(m + n)
 </code></pre></div>
-<p>Concatenates two byte arrays</p>
+<p>Concatenates two byte arrays. If <code>m</code> and <code>n</code> are known at compile time, the
+result can be used as a fixed size byte array, otherwise it has type <code>bytes()</code>.</p>
 <h4 id="split">split</h4>
 <div class="highlight"><pre><span></span><code>Bytes.split(a : bytes(m + n)) : bytes(m) * bytes(n)
 </code></pre></div>
 <p>Splits a byte array at given index</p>
+<h4 id="split_any">split_any</h4>
+<div class="highlight"><pre><span></span><code>Bytes.split_any(a : bytes(), at : int) : option(bytes() * bytes(n))
+</code></pre></div>
+<p>Splits an arbitrary size byte array at index <code>at</code>. If <code>at</code> is positive split
+from the beginning of the array, if <code>at</code> is negative, split <code>abs(at)</code> from the
+<em>end</em> of the array. If the array is shorter than <code>abs(at)</code> then <code>None</code> is
+returned.</p>
+<h4 id="to_fixed_size">to_fixed_size</h4>
+<div class="highlight"><pre><span></span><code>Bytes.to_fixed_size(a : bytes()) : option(bytes(n))
+</code></pre></div>
+<p>Converts an arbitrary size byte array to a fix size byte array. If <code>a</code> is
+not <code>n</code> bytes, <code>None</code> is returned.</p>
+<h4 id="to_any_size">to_any_size</h4>
+<div class="highlight"><pre><span></span><code>Bytes.to_any_size(a : bytes(n)) : bytes()
+</code></pre></div>
+<p>Converts a fixed size byte array to an arbitrary size byte array. This is a
+no-op at run-time, and only used during type checking.</p>
+<h4 id="size">size</h4>
+<div class="highlight"><pre><span></span><code>Bytes.size(a : bytes()) : int
+</code></pre></div>
+<p>Computes the lenght/size of a byte array.</p>
 <h3 id="call">Call</h3>
 <p>Values related to the call to the current contract</p>
 <h4 id="origin">origin</h4>
@@ -1021,6 +1109,10 @@ block of the name is not changed.</p>
 <div class="highlight"><pre><span></span><code>Call.gas_price : int
 </code></pre></div>
 <p>The gas price of the current call.</p>
+<h4 id="mulmod">mulmod</h4>
+<div class="highlight"><pre><span></span><code>Int.mulmod : (a : int, b : int, q : int) : int
+</code></pre></div>
+<p>Combined multiplication and modulus, returns <code>(a * b) mod q</code>.</p>
 <h4 id="fee">fee</h4>
 <div class="highlight"><pre><span></span><code>Call.fee : int
 </code></pre></div>
@@ -1031,7 +1123,7 @@ block of the name is not changed.</p>
 <p>The amount of gas left for the current call.</p>
 <h3 id="chain">Chain</h3>
 <p>Values and functions related to the chain itself and other entities that live on it.</p>
-<h4 id="types_1">Types</h4>
+<h4 id="types_2">Types</h4>
 <h5 id="tx_1">tx</h5>
 <div class="highlight"><pre><span></span><code>record tx = { paying_for : option(Chain.paying_for_tx)
             , ga_metas : list(Chain.ga_meta_tx)
@@ -1102,6 +1194,11 @@ creation transaction – it sets the initial value of the newly created contract
 charging the calling contract. Note that this won't be visible in <code>Call.value</code>
 in the <code>init</code> call of the new contract. It will be included in
 <code>Contract.balance</code>, however.</p>
+<h4 id="poseidon">poseidon</h4>
+<div class="highlight"><pre><span></span><code>Crypto.poseidon(x1 : int, x2 : int) : int
+</code></pre></div>
+<p>Hash two integers (in the scalar field of BLS12-381) to another integer (in the scalar
+field of BLS12-281). This is a ZK/SNARK-friendly hash function.</p>
 <p>The type <code>'c</code> must be instantiated with a contract.</p>
 <p>Example usage:
 <div class="highlight"><pre><span></span><code>payable contract Auction =
@@ -1185,6 +1282,10 @@ calls <code>put</code> instead. Moreover, FATE prevents even handcrafted calls t
 <div class="highlight"><pre><span></span><code>Chain.gas_limit : int
 </code></pre></div>
 <p>The gas limit of the current block.</p>
+<h5 id="network_id">network_id</h5>
+<div class="highlight"><pre><span></span><code>Chain.network\_id : string
+</code></pre></div>
+<p>The network id of the chain.</p>
 <h5 id="spend">spend</h5>
 <div class="highlight"><pre><span></span><code>Chain.spend(to : address, amount : int) : unit
 </code></pre></div>
@@ -1232,10 +1333,11 @@ Char.from_int(i : int) : option(char)</code></p>
 </code></pre></div>
 <p>Hash any object to blake2b</p>
 <h4 id="verify_sig">verify_sig</h4>
-<div class="highlight"><pre><span></span><code>Crypto.verify_sig(msg : hash, pubkey : address, sig : signature) : bool
+<div class="highlight"><pre><span></span><code>Crypto.verify_sig(msg : bytes(), pubkey : address, sig : signature) : bool
 </code></pre></div>
 <p>Checks if the signature of <code>msg</code> was made using private key corresponding to
-the <code>pubkey</code></p>
+the <code>pubkey</code>.</p>
+<p>Note: before v8 of the compiler, <code>msg</code> had type <code>hash</code> (i.e. <code>bytes(32)</code>).</p>
 <h4 id="ecverify_secp256k1">ecverify_secp256k1</h4>
 <div class="highlight"><pre><span></span><code>Crypto.ecverify_secp256k1(msg : hash, addr : bytes(20), sig : bytes(65)) : bool
 </code></pre></div>
@@ -1255,9 +1357,15 @@ recovery identifier byte <code>V</code>. The expected organization of the signat
 <p>Verifies a standard 64-byte ECDSA signature (<code>R || S</code>).</p>
 <h3 id="int">Int</h3>
 <h4 id="to_str_2">to_str</h4>
-<div class="highlight"><pre><span></span><code>Int.to_str : int =&gt; string
+<div class="highlight"><pre><span></span><code>Int.to_str(n : int) : string
 </code></pre></div>
-<p>Casts integer to string using decimal representation</p>
+<p>Casts the integer to a string (in decimal representation).</p>
+<h4 id="to_bytes_1">to_bytes</h4>
+<div class="highlight"><pre><span></span><code>Int.to_bytes(n : int, size : int) : bytes()
+</code></pre></div>
+<p>Casts the integer to a byte array with <code>size</code> bytes (big endian, truncating if
+necessary not preserving signedness). I.e. if you try to squeeze <code>-129</code> into a
+single byte that will be indistinguishable from <code>127</code>.</p>
 <h3 id="map">Map</h3>
 <h4 id="lookup_1">lookup</h4>
 <p><code>Map.lookup(k : 'k, m : map('k, 'v)) : option('v)</code></p>
@@ -1273,7 +1381,7 @@ default value <code>v</code> if the key is not present</p>
 <h4 id="delete">delete</h4>
 <p><code>Map.delete(k : 'k, m : map('k, 'v)) : map('k, 'v)</code></p>
 <p>Removes the key from the map</p>
-<h4 id="size">size</h4>
+<h4 id="size_1">size</h4>
 <p><code>Map.size(m : map('k, 'v)) : int</code></p>
 <p>Returns the number of elements in the map</p>
 <h4 id="to_list">to_list</h4>
@@ -1289,11 +1397,11 @@ default value <code>v</code> if the key is not present</p>
 <p>Registers new oracle answering questions of type <code>'a</code> with answers of type <code>'b</code>.</p>
 <ul>
 <li>The <code>acct</code> is the address of the oracle to register (can be the same as the contract).</li>
-<li><code>signature</code> is a signature proving that the contract is allowed to register the account -
-  the <code>network id</code> + <code>account address</code> + <code>contract address</code> (concatenated as byte arrays) is
-  <a href="../sophia_features/#delegation-signature">signed</a> with the
-  private key of the account, proving you have the private key of the oracle to be. If the
-  address is the same as the contract <code>sign</code> is ignored and can be left out entirely.</li>
+<li>The <a href="../sophia_features/#delegation-signature">signature</a> should be a
+  serialized structure containing <code>network id</code>, <code>account address</code>, and
+  <code>contract address</code>. Using the private key of <code>account address</code> for signing.
+  Proving you have the private key of the oracle to be. If the address is the same
+  as the contract <code>sign</code> is ignored and can be left out entirely.</li>
 <li>The <code>qfee</code> is the minimum query fee to be paid by a user when asking a question of the oracle.</li>
 <li>The <code>ttl</code> is the Time To Live for the oracle in key blocks, either relative to the current
   key block height (<code>RelativeTTL(delta)</code>) or a fixed key block height (<code>FixedTTL(height)</code>).</li>
@@ -1311,12 +1419,11 @@ default value <code>v</code> if the key is not present</p>
 <h4 id="respond">respond</h4>
 <div class="highlight"><pre><span></span><code>Oracle.respond(&lt;signature : bytes(64)&gt;, o : oracle(&#39;a, &#39;b), q : oracle_query(&#39;a, &#39;b), &#39;b) : unit
 </code></pre></div>
-<p>Responds to the question <code>q</code> on <code>o</code>.
-Unless the contract address is the same as the oracle address the <code>signature</code>
-(which is an optional, named argument)
+<p>Responds to the question <code>q</code> on <code>o</code>.  Unless the contract address is the same
+as the oracle address the <code>signature</code> (which is an optional, named argument)
 needs to be provided. Proving that we have the private key of the oracle by
-<a href="../sophia_features/#delegation-signature">signing</a>
-the <code>network id</code> + <code>oracle query id</code> + <code>contract address</code></p>
+<a href="../sophia_features/#delegation-signature">signing</a> should be a serialized
+structure containing <code>network id</code>, <code>oracle query id</code>, and <code>contract address</code>.</p>
 <h4 id="extend">extend</h4>
 <div class="highlight"><pre><span></span><code>Oracle.extend(&lt;signature : bytes(64)&gt;, o : oracle(&#39;a, &#39;b), ttl : Chain.ttl) : unit
 </code></pre></div>
@@ -1355,50 +1462,17 @@ The call fails if the oracle could expire before an answer.</p>
 <p>It returns <code>true</code> iff the oracle query exist and has the expected type.</p>
 <h2 id="includable-namespaces">Includable namespaces</h2>
 <p>These need to be explicitly included (with <code>.aes</code> suffix)</p>
-<h3 id="bitwise">Bitwise</h3>
-<p>Bitwise operations on arbitrary precision integers.</p>
-<h4 id="bsr">bsr</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.bsr(n : int, x : int) : int
+<h3 id="aenscompat">AENSCompat</h3>
+<h4 id="pointee_to_v2">pointee_to_V2</h4>
+<div class="highlight"><pre><span></span><code>AENSCompat.pointee_to_V2(p : AENS.pointee) : AENSv2.pointee
 </code></pre></div>
-<p>Logical bit shift <code>x</code> right <code>n</code> positions.</p>
-<h4 id="bsl">bsl</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.bsl(n : int, x : int) : int
+<p>Translate old pointee format to new, this is always possible.</p>
+<h4 id="pointee_from_v2">pointee_from_V2</h4>
+<div class="highlight"><pre><span></span><code>AENSCompat.pointee_from_V2(p2 : AENSv2.pointee) : option(AENS.pointee)
 </code></pre></div>
-<p>Logical bit shift <code>x</code> left <code>n</code> positions.</p>
-<h4 id="bsli">bsli</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.bsli(n : int, x : int, lim : int) : int
-</code></pre></div>
-<p>Logical bit shift <code>x</code> left <code>n</code> positions, limit to <code>lim</code> bits.</p>
-<h4 id="band">band</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.band(x : int, y : int) : int
-</code></pre></div>
-<p>Bitwise <code>and</code> of <code>x</code> and <code>y</code>.</p>
-<h4 id="bor">bor</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.bor(x : int, y : int) : int
-</code></pre></div>
-<p>Bitwise <code>or</code> of <code>x</code> and <code>y</code>.</p>
-<h4 id="bxor">bxor</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.bxor(x : int, y : int) : int
-</code></pre></div>
-<p>Bitwise <code>xor</code> of <code>x</code> and <code>y</code>.</p>
-<h4 id="bnot">bnot</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.bnot(x : int) : int
-</code></pre></div>
-<p>Bitwise <code>not</code> of <code>x</code>. Defined and implemented as <code>bnot(x) = bxor(x, -1)</code>.</p>
-<h4 id="uband">uband</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.uband(x : int, y : int) : int
-</code></pre></div>
-<p>Bitwise <code>and</code> of <em>non-negative</em> numbers <code>x</code> and <code>y</code>.</p>
-<h4 id="ubor">ubor</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.ubor(x : int, y : int) : int
-</code></pre></div>
-<p>Bitwise <code>or</code> of <em>non-negative</em> <code>x</code> and <code>y</code>.</p>
-<h4 id="ubxor">ubxor</h4>
-<div class="highlight"><pre><span></span><code>Bitwise.ubxor(x : int, y : int) : int
-</code></pre></div>
-<p>Bitwise <code>xor</code> of <em>non-negative</em> <code>x</code> and <code>y</code>.</p>
+<p>Translate new pointee format to old, <code>DataPt</code> can't be translated, so <code>None</code> is returned in this case.</p>
 <h3 id="bls12_381">BLS12_381</h3>
-<h4 id="types_2">Types</h4>
+<h4 id="types_3">Types</h4>
 <h5 id="fr">fr</h5>
 <p>Built-in (Montgomery) integer representation 32 bytes</p>
 <h5 id="fp">fp</h5>
@@ -1617,7 +1691,7 @@ The operator comparison is not possible to overload at this moment, nor the
 language provides checkers to prevent unintended usage of them. Therefore the typechecker
 <strong>will</strong> allow that and the results of such comparison will be unspecified.
 You should use <a href="#lt">lt</a>, <a href="#geq">geq</a>, <a href="#eq">eq</a> etc instead.</p>
-<h4 id="types_3">Types</h4>
+<h4 id="types_4">Types</h4>
 <h5 id="frac_1">frac</h5>
 <div class="highlight"><pre><span></span><code>datatype frac = Pos(int, int) | Zero | Neg(int, int)
 </code></pre></div>
@@ -2040,7 +2114,7 @@ will yield <code>None</code>.</p>
 </code></pre></div>
 <p>Swaps elements.</p>
 <h3 id="set_1"><a name='set-stdlib'>Set</a></h3>
-<h4 id="types_4">Types</h4>
+<h4 id="types_5">Types</h4>
 <div class="highlight"><pre><span></span><code>record set(&#39;a) = { to_map : map(&#39;a, unit) }
 </code></pre></div>
 <h4 id="functions_4">Functions</h4>
@@ -2060,7 +2134,7 @@ will yield <code>None</code>.</p>
 <div class="highlight"><pre><span></span><code>Set.delete(e : &#39;a, s : set(&#39;a)) : set(&#39;a)
 </code></pre></div>
 <p>Removes the element <code>e</code> from the set <code>s</code></p>
-<h5 id="size_1">size</h5>
+<h5 id="size_2">size</h5>
 <div class="highlight"><pre><span></span><code>size(s : set(&#39;a)) : int
 </code></pre></div>
 <p>Returns the number of elements in the set <code>s</code></p>
@@ -2156,6 +2230,12 @@ code point and the strangely dotted <code>i</code> becomes <code>[105, 775]</cod
 </code></pre></div>
 <p>Converts a decimal ("123", "-253") or a hexadecimal ("0xa2f", "-0xBBB") string into
 an integer. If the string doesn't contain a valid number <code>None</code> is returned.</p>
+<h4 id="to_bytes_2">to_bytes</h4>
+<div class="highlight"><pre><span></span><code>to_bytes(s : string) : bytes()
+</code></pre></div>
+<p>Converts string into byte array. String is UTF-8 encoded. I.e.
+<code>String.length(s)</code> is not guaranteed to be equal to
+<code>Bytes.size(String.to_bytes(s))</code>.</p>
 <h4 id="sha3_1">sha3</h4>
 <div class="highlight"><pre><span></span><code>sha3(s : string) : hash
 </code></pre></div>

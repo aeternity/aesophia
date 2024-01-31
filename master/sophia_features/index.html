@@ -666,6 +666,26 @@
     Delegation signature
   </a>
   
+    <nav class="md-nav" aria-label="Delegation signature">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-ceres" class="md-nav__link">
+    From Ceres
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#before-ceres" class="md-nav__link">
+    Before ceres
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -1093,6 +1113,26 @@
   <a href="#delegation-signature" class="md-nav__link">
     Delegation signature
   </a>
+  
+    <nav class="md-nav" aria-label="Delegation signature">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-ceres" class="md-nav__link">
+    From Ceres
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#before-ceres" class="md-nav__link">
+    Before ceres
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1788,9 +1828,21 @@ arithmetic operations:
 <p>All operations are <em>safe</em> with respect to overflow and underflow.
 The division and modulo operations throw an arithmetic error if the
 right-hand operand is zero.</p>
+<p>Sophia arbitrary-sized integers (FATE) also supports the following bitwise operations:
+- bitwise and (<code>x band y</code>)
+- bitwise or (<code>x bor y</code>)
+- bitwise xor (<code>x bxor y</code>)
+- bitwise not (<code>bnot x</code>)
+- arithmetic bitshift left (<code>x &lt;&lt; n</code>)
+- arithmetic bitshift right (<code>x &gt;&gt; n</code>)</p>
+<p>Note: Arithmetic bitshift treats the number as a signed integer (in 2s
+complement), and "retains" the topmost bit. I.e. shifting in zeros if the
+topmost bit was 0, and ones if it was one.</p>
 <h2 id="bit-fields">Bit fields</h2>
-<p>Sophia integers do not support bit arithmetic. Instead there is a separate
-type <code>bits</code>. See the standard library <a href="../sophia_stdlib/#bits">documentation</a>.</p>
+<p>Originally Sophia integers did not support bit arithmetic. Instead we used a
+separate type <code>bits</code> (see the standard library
+<a href="../sophia_stdlib/#bits">documentation</a>) - it is still provided as an
+alternative to bit arithmetic.</p>
 <p>A bit field can be of arbitrary size (but it is still represented by the
 corresponding integer, so setting very high bits can be expensive).</p>
 <h2 id="type-aliases">Type aliases</h2>
@@ -2017,14 +2069,16 @@ For a functionality documentation refer to the <a href="../sophia_stdlib/#oracle
 For extra safety <a href="../sophia_stdlib/#check">Oracle.check</a> and <a href="../sophia_stdlib/#check_query">Oracle.check_query</a>
 functions are provided.</p>
 <h2 id="aens-interface">AENS interface</h2>
-<p>Contracts can interact with the
-<a href="https://github.com/aeternity/protocol/blob/master/AENS.md">æternity naming system</a>.
-For this purpose the <a href="../sophia_stdlib/#aens">AENS</a> library was exposed.</p>
+<p>Contracts can interact with the <a href="https://github.com/aeternity/protocol/blob/master/AENS.md">æternity naming
+system</a>. For this
+purpose the <a href="../sophia_stdlib/#aens">AENS</a> and later the
+<a href="../sophia_stdlib/#aensv2">AENSv2</a> library was exposed.</p>
 <h3 id="example_1">Example</h3>
 <p>In this example we assume that the name <code>name</code> already exists, and is owned by
 an account with address <code>addr</code>. In order to allow a contract <code>ct</code> to handle
-<code>name</code> the account holder needs to create a
-<a href="#delegation-signature">signature</a> <code>sig</code> of <code>addr | name.hash | ct.address</code>.</p>
+<code>name</code> the account holder needs to create a <a href="#delegation-signature">delegation
+signature</a> <code>sig</code> from the name owner address <code>addr</code>, the
+name hash and the contract address.</p>
 <p>Armed with this information we can for example write a function that extends
 the name if it expires within 1000 blocks:
 <div class="highlight"><pre><span></span><code><span class="w">  </span><span class="k">stateful</span><span class="w"> </span><span class="k">entrypoint</span><span class="w"> </span><span class="n">extend_if_necessary</span><span class="p">(</span><span class="n">addr</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="kt">address</span><span class="p">,</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="n">sig</span><span class="w"> </span><span class="ow">:</span><span class="w"> </span><span class="kt">signature</span><span class="p">)</span><span class="w"> </span><span class="ow">=</span>
@@ -2127,11 +2181,32 @@ consumes all available gas.</p>
 however is in the gas consumption — while <code>abort</code> returns unused gas, a call to
 <code>exit</code> burns it all.</p>
 <h2 id="delegation-signature">Delegation signature</h2>
-<p>Some chain operations (<code>Oracle.&lt;operation&gt;</code> and <code>AENS.&lt;operation&gt;</code>) have an
+<p>Some chain operations (<code>Oracle.&lt;operation&gt;</code> and <code>AENSv2.&lt;operation&gt;</code>) have an
 optional delegation signature. This is typically used when a user/accounts
-would like to allow a contract to act on it's behalf. The exact data to be
-signed varies for the different operations, but in all cases you should prepend
-the signature data with the <code>network_id</code> (<code>ae_mainnet</code> for the æternity mainnet, etc.).</p>
+would like to allow a contract to act on it's behalf.</p>
+<h3 id="from-ceres">From Ceres</h3>
+<p>From the Ceres protocol version the delegation signatures have more structure,
+including a unique tag, <code>network_id</code> and identifiers; there are five different
+delegation signatures:</p>
+<ul>
+<li>AENS wildcard - the user signs: <code>owner account + contract</code></li>
+<li><code>AENS_PRECLAIM</code> - the user signs: <code>owner account + contract</code></li>
+<li><code>AENS_CLAIM, AENS_UPDATE, AENS_TRANSFER, AENS_REVOKE</code> - the user signs: <code>owner account + name hash + contract</code></li>
+<li><code>ORACLE_REGISTER, ORACLE_EXTEND</code> - the user signs: <code>owner account + contract</code></li>
+<li><code>ORACLE_RESPOND</code> - the user signs: <code>query id + contract</code></li>
+</ul>
+<p>See <a href="https://github.com/aeternity/protocol/blob/master/contracts/fate.md#from-ceres-serialized-signature-data">Serialized signature
+data</a>
+for the exact structure used.</p>
+<h3 id="before-ceres">Before ceres</h3>
+<p>The exact data to be signed varies for the different operations, but in all
+cases you should prepend the signature data with the <code>network_id</code> (<code>ae_mainnet</code>
+for the æternity mainnet, etc.).</p>
+<p>There are four different delegation signatures:
+ - <code>AENS_PRECLAIM</code> - the user signs: owner <code>network_id + account + contract</code>
+ - <code>AENS_CLAIM, AENS_UPDATE, AENS_TRANSFER, AENS_REVOKE</code> - the user signs: <code>network_id + owner account + name hash + contract</code>
+ - <code>ORACLE_REGISTER, ORACLE_EXTEND</code> - the user signs: <code>network_id + owner account + contract</code>
+ - <code>ORACLE_RESPOND</code> - the user signs: <code>network_id + query id + contract</code></p>
 
 
 
