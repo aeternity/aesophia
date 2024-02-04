@@ -1323,7 +1323,12 @@ lambda_lift(FCode = #{ functions := Funs, state_layout := StateLayout }) ->
 init_lambda_funs() -> put(?lambda_key, #{}).
 
 -spec get_lambda_funs() -> term().
-get_lambda_funs()  -> erase(?lambda_key).
+get_lambda_funs()  ->
+    Lambdas = erase(?lambda_key),
+    %% Remove name feed entries and leave only actual functions
+    maps:filter(fun({fresh, _}, _) -> false;
+                   (_, _) -> true
+                end, Lambdas).
 
 -spec add_lambda_fun(fun_name(), fann(), fun_def()) -> fun_name().
 add_lambda_fun(Parent, FAnn, Def) ->
