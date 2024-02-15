@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Support for OTP-27 - no changes in behavior.
 ### Changed
 ### Removed
 ### Fixed
