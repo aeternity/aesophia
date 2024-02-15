@@ -418,7 +418,7 @@ stmt_p({'if', _, Cond, Then}) ->
     block_expr(200, beside(text("if"), paren(expr(Cond))), Then);
 stmt_p({elif, _, Cond, Then}) ->
     block_expr(200, beside(text("elif"), paren(expr(Cond))), Then);
-stmt_p({else, Else}) ->
+stmt_p({'else', Else}) ->
     HideGenerated = not show_generated(),
     case aeso_syntax:get_ann(origin, Else) of
         system when HideGenerated -> empty();
@@ -533,5 +533,5 @@ get_elifs(If = {'if', Ann, Cond, Then, Else}, Elifs) ->
         elif -> get_elifs(Else, [{elif, Ann, Cond, Then} | Elifs]);
         _    -> {lists:reverse(Elifs), If}
     end;
-get_elifs(Else, Elifs) -> {lists:reverse(Elifs), {else, Else}}.
+get_elifs(Else, Elifs) -> {lists:reverse(Elifs), {'else', Else}}.
 

@@ -302,7 +302,7 @@ stmt() ->
     , {switch, keyword(switch), parens(expr()), maybe_block(branch())}
     , {'if', keyword('if'), parens(expr()), body()}
     , {elif, keyword(elif), parens(expr()), body()}
-    , {else, keyword(else), body()}
+    , {'else', keyword('else'), body()}
     ])).
 
 branch() ->
@@ -326,7 +326,7 @@ expr100() ->
     Expr150 = ?LAZY_P(expr150()),
     choice(
     [ ?RULE(lam_args(), keyword('=>'), body(), {lam, _2, _1, _3})   %% TODO: better location
-    , {'if', keyword('if'), parens(Expr100), Expr150, right(tok(else), Expr100)}
+    , {'if', keyword('if'), parens(Expr100), Expr150, right(tok('else'), Expr100)}
     , ?RULE(Expr150, optional(right(tok(':'), type())),
             case _2 of
                 none       -> _1;
@@ -612,7 +612,7 @@ group_ifs([], Acc) ->
 group_ifs([{'if', Ann, Cond, Then} | Stmts], Acc) ->
     {Elses, Rest} = else_branches(Stmts, []),
     group_ifs(Rest, [build_if(Ann, Cond, Then, Elses) | Acc]);
-group_ifs([{else, Ann, _} | _], _) ->
+group_ifs([{'else', Ann, _} | _], _) ->
     fail({Ann, "No matching 'if' for 'else'"});
 group_ifs([{elif, Ann, _, _} | _], _) ->
     fail({Ann, "No matching 'if' for 'elif'"});
@@ -622,14 +622,14 @@ group_ifs([Stmt | Stmts], Acc) ->
 build_if(Ann, Cond, Then, [{elif, Ann1, Cond1, Then1} | Elses]) ->
     {'if', Ann, Cond, Then,
         set_ann(format, elif, build_if(Ann1, Cond1, Then1, Elses))};
-build_if(Ann, Cond, Then, [{else, _Ann, Else}]) ->
+build_if(Ann, Cond, Then, [{'else', _Ann, Else}]) ->
     {'if', Ann, Cond, Then, Else};
 build_if(Ann, Cond, Then, []) ->
     {'if', Ann, Cond, Then, {tuple, [{origin, system}], []}}.
 
 else_branches([Elif = {elif, _, _, _} | Stmts], Acc) ->
     else_branches(Stmts, [Elif | Acc]);
-else_branches([Else = {else, _, _} | Stmts], Acc) ->
+else_branches([Else = {'else', _, _} | Stmts], Acc) ->
     {lists:reverse([Else | Acc]), Stmts};
 else_branches(Stmts, Acc) ->
     {lists:reverse(Acc), Stmts}.
