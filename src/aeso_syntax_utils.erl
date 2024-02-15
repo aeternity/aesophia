@@ -6,7 +6,7 @@
 %%%-------------------------------------------------------------------
 -module(aeso_syntax_utils).
 
--export([used_ids/1, used_types/2, used/1]).
+-export([used_ids/1, used_ids/2, used_types/2, used/1]).
 
 -record(alg, {zero, plus, scoped}).
 
@@ -110,8 +110,20 @@ fold(Alg = #alg{zero = Zero, plus = Plus, scoped = Scoped}, Fun, K, X) ->
 
 %% Name dependencies
 
+%% Used ids, top level
 used_ids(E) ->
-    [ X || {{term, [X]}, _} <- used(E) ].
+    used_ids([], E).
+
+%% Used ids, top level or in (current) namespace
+used_ids(Ns, E) ->
+    [ lists:last(Xs) || {{term, Xs}, _} <- used(E), in_ns(Xs, Ns) ].
+
+in_ns([_], _) -> true;
+in_ns(Xs, Ns) -> in_ns_(Xs, Ns).
+
+in_ns_([_], [])            -> true;
+in_ns_([X | Xs], [X | Ns]) -> in_ns_(Xs, Ns);
+in_ns_(_, _)               -> false.
 
 used_types([Top] = _CurrentNS, T) ->
     F = fun({{type, [X]}, _}) -> [X];

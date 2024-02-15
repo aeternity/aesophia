@@ -1161,7 +1161,7 @@ infer_contract(Env0, What, Defs0, Options) ->
     _         = bind_funs(lists:map(FunBind, Functions), #env{}),
     FunMap    = maps:from_list([ {FunName(Def), Def} || Def <- Functions ]),
     check_reserved_entrypoints(FunMap),
-    DepGraph  = maps:map(fun(_, Def) -> aeso_syntax_utils:used_ids(Def) end, FunMap),
+    DepGraph  = maps:map(fun(_, Def) -> aeso_syntax_utils:used_ids(Env3#env.namespace, Def) end, FunMap),
     SCCs      = aeso_utils:scc(DepGraph),
     {Env4, Defs1} = check_sccs(Env3, FunMap, SCCs, []),
     %% Remove namespaces used in the current namespace
@@ -2953,7 +2953,6 @@ record_type_name({app_t, _Attrs, RecId, _Args}) when ?is_type_id(RecId) ->
 record_type_name(RecId) when ?is_type_id(RecId) ->
     RecId;
 record_type_name(_Other) ->
-    %% io:format("~p is not a record type\n", [Other]),
     {id, [{origin, system}], "not_a_record_type"}.
 
 solve_for_uvar(Env, UVar = {uvar, Attrs, _}, Fields0) ->
@@ -3562,7 +3561,6 @@ create_type_errors() ->
 
 destroy_and_report_type_errors(Env) ->
     Errors0 = lists:reverse(ets_tab2list(type_errors)),
-    %% io:format("Type errors now: ~p\n", [Errors0]),
     ets_delete(type_errors),
     Errors  = [ mk_error(unqualify(Env, Err)) || Err <- Errors0 ],
     aeso_errors:throw(Errors).  %% No-op if Errors == []
