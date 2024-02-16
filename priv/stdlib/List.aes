@@ -282,9 +282,9 @@ namespace List =
   private function
     asc : (('a, 'a) => bool, 'a, list('a), list('a)) => list(list('a))
     asc(lt, x, acc, h::t) =
-      if(lt(h, x)) List.reverse(x::acc) :: monotonic_subs(lt, h::t)
+      if(lt(h, x)) reverse(x::acc) :: monotonic_subs(lt, h::t)
       else asc(lt, h, x::acc, t)
-    asc(_, x, acc, []) = [List.reverse(x::acc)]
+    asc(_, x, acc, []) = [reverse(x::acc)]
 
   /** Merges list of sorted lists
    */
