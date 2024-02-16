@@ -558,6 +558,7 @@ Sophia has the following types:
 ## Literals
 | Type                 | Constant/Literal example(s)                                                                                                         |
 | ----------           | -------------------------------                                                                                                     |
+| unit                 | ()                                                                                                                                  |
 | int                  | `-1`, `2425`, `4598275923475723498573485768`                                                                                        |
 | address              | `ak_2gx9MEFxKvY9vMG5YnqnXWv1hCsX7rgnfvBLJS4aQurustR1rt`                                                                             |
 | bool                 | `true`, `false`                                                                                                                     |
