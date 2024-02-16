@@ -119,11 +119,7 @@ used_ids(Ns, E) ->
     [ lists:last(Xs) || {{term, Xs}, _} <- used(E), in_ns(Xs, Ns) ].
 
 in_ns([_], _) -> true;
-in_ns(Xs, Ns) -> in_ns_(Xs, Ns).
-
-in_ns_([_], [])            -> true;
-in_ns_([X | Xs], [X | Ns]) -> in_ns_(Xs, Ns);
-in_ns_(_, _)               -> false.
+in_ns(Xs, Ns) -> lists:droplast(Xs) == Ns.
 
 used_types([Top] = _CurrentNS, T) ->
     F = fun({{type, [X]}, _}) -> [X];
