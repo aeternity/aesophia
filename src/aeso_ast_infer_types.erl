@@ -1935,6 +1935,8 @@ infer_expr(_Env, Body={bytes, As, Bin}) ->
     {typed, As, Body, {bytes_t, As, byte_size(Bin)}};
 infer_expr(_Env, Body={account_pubkey, As, _}) ->
     {typed, As, Body, {id, As, "address"}};
+infer_expr(_Env, Body={signature, As, Bin}) when byte_size(Bin) == 64 ->
+    {typed, As, Body, {bytes_t, As, 64}};
 infer_expr(_Env, Body={oracle_pubkey, As, _}) ->
     Q = fresh_uvar(As),
     R = fresh_uvar(As),
@@ -2172,6 +2174,8 @@ check_valid_const_expr({string, _, _}) ->
 check_valid_const_expr({bytes, _, _}) ->
     true;
 check_valid_const_expr({account_pubkey, _, _}) ->
+    true;
+check_valid_const_expr({signature, _, _}) ->
     true;
 check_valid_const_expr({oracle_pubkey, _, _}) ->
     true;
@@ -3060,7 +3064,8 @@ unfold_types_in_type(Env, {app_t, Ann, Id, Args}, Options) when ?is_type_id(Id) 
 unfold_types_in_type(Env, Id, Options) when ?is_type_id(Id) ->
     %% Like the case above, but for types without parameters.
     when_warning(warn_unused_typedefs, fun() -> used_typedef(Id, 0) end),
-    UnfoldRecords = proplists:get_value(unfold_record_types, Options, false),
+    UnfoldSysAlias = not proplists:get_value(not_unfold_system_alias_types, Options, false),
+    UnfoldRecords  = proplists:get_value(unfold_record_types, Options, false),
     UnfoldVariants = proplists:get_value(unfold_variant_types, Options, false),
     case lookup_type(Env, Id) of
         {_, {_, {[], {record_t, Fields}}}} when UnfoldRecords ->
@@ -3068,7 +3073,12 @@ unfold_types_in_type(Env, Id, Options) when ?is_type_id(Id) ->
         {_, {_, {[], {variant_t, Constrs}}}} when UnfoldVariants ->
             {variant_t, unfold_types_in_type(Env, Constrs, Options)};
         {_, {_, {[], {alias_t, Type1}}}} ->
-            unfold_types_in_type(Env, Type1, Options);
+            case aeso_syntax:get_ann(Type1) of
+                [{origin, system}] when not UnfoldSysAlias ->
+                    Id;
+                _ ->
+                    unfold_types_in_type(Env, Type1, Options)
+            end;
         _ ->
             %% Not a record type, or ill-formed record type
             Id

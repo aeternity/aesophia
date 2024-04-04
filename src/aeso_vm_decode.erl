@@ -12,6 +12,9 @@
 
 -spec from_fate(aeso_syntax:type(), aeb_fate_data:fate_type()) -> aeso_syntax:expr().
 from_fate({id, _, "address"}, ?FATE_ADDRESS(Bin)) -> {account_pubkey, [], Bin};
+from_fate({id, _, "signature"}, ?FATE_BYTES(Bin)) -> {signature, [], Bin};
+from_fate({id, _, "hash"}, ?FATE_BYTES(Bin)) -> {bytes, [], Bin};
+from_fate({id, _, "unit"}, ?FATE_UNIT) -> {tuple, [], []};
 from_fate({app_t, _, {id, _, "oracle"}, _}, ?FATE_ORACLE(Bin)) -> {oracle_pubkey, [], Bin};
 from_fate({app_t, _, {id, _, "oracle_query"}, _}, ?FATE_ORACLE_Q(Bin)) -> {oracle_query_id, [], Bin};
 from_fate({con, _, _Name},  ?FATE_CONTRACT(Bin)) -> {contract_pubkey, [], Bin};

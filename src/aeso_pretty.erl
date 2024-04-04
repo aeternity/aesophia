@@ -387,7 +387,8 @@ expr_p(_, {Type, _, Bin})
     when Type == account_pubkey;
          Type == contract_pubkey;
          Type == oracle_pubkey;
-         Type == oracle_query_id ->
+         Type == oracle_query_id;
+         Type == signature ->
     text(binary_to_list(aeser_api_encoder:encode(Type, Bin)));
 expr_p(_, {string, _, <<>>}) -> text("\"\"");
 expr_p(_, {string, _, S}) ->
