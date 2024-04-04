@@ -117,6 +117,7 @@ compilable_contracts() ->
      {"funargs", "chain_base_tx", ["Chain.NameRevokeTx(#ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)"]},
      {"funargs", "chain_base_tx", ["Chain.NameTransferTx(ak_2dATVcZ9KJU5a8hdsVtTv21pYiGWiPbmVcU1Pz72FFqpk9pSRR, #ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)"]},
      {"funargs", "chain_base_tx", ["Chain.GAAttachTx"]},
+     {"funargs", "sig", ["sg_MhibzTP1wWzGCTjtPFr1TiPqRJrrJqw7auvEuF5i3FdoALWqXLBDY6xxRRNUSPHK3EQTnTzF12EyspkxrSMxVHKsZeSMj"]},
      {"variant_types", "init", []},
      {"basic_auth", "init", []},
      {"address_literals", "init", []},

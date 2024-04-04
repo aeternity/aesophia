@@ -11,4 +11,5 @@ contract C =
     let i = Int.mulmod(a, b, h)
     let j = Crypto.poseidon(i, a)
     let k : bytes(32) = Address.to_bytes(Call.origin)
-    (a bor b band c bxor a << bnot b >> a, k)
+    let l = sg_MhibzTP1wWzGCTjtPFr1TiPqRJrrJqw7auvEuF5i3FdoALWqXLBDY6xxRRNUSPHK3EQTnTzF12EyspkxrSMxVHKsZeSMj
+    (a bor b band c bxor a << bnot b >> a, k, l)

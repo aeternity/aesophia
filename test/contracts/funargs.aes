@@ -59,3 +59,5 @@ contract FunctionArguments =
   entrypoint chain_ga_meta_tx(tx : Chain.ga_meta_tx) = true
   entrypoint chain_paying_for_tx(tx : Chain.paying_for_tx) = true
   entrypoint chain_base_tx(tx : Chain.base_tx) = true
+
+  entrypoint sig(sg : signature) = true
