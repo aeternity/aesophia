@@ -573,7 +573,7 @@ Sophia has the following types:
 | state                | `state{ owner = Call.origin, magic_key = #a298105f }`                                                                               |
 | event                | `EventX(0, "Hello")`                                                                                                                |
 | hash                 | `#000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f`                                                                 |
-| signature            | `#000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f` |
+| signature            | `sg_MhibzTP1wWzGCTjtPFr1TiPqRJrrJqw7auvEuF5i3FdoALWqXLBDY6xxRRNUSPHK3EQTnTzF12EyspkxrSMxVHKsZeSMj`, `#000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f` |
 | Chain.ttl            | `FixedTTL(1050)`, `RelativeTTL(50)`                                                                                                 |
 | oracle('a, 'b)       | `ok_2YNyxd6TRJPNrTcEDCe9ra59SVUdp9FR9qWC5msKZWYD9bP9z5`                                                                             |
 | oracle_query('a, 'b) | `oq_2oRvyowJuJnEkxy58Ckkw77XfWJrmRgmGaLzhdqb67SKEL1gPY`                                                                             |
