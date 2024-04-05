@@ -30,6 +30,7 @@ interface main using as for hiding
 - `ContractAddress` base58-encoded 32 byte contract address with `ct_` prefix
 - `OracleAddress` base58-encoded 32 byte oracle address with `ok_` prefix
 - `OracleQueryId` base58-encoded 32 byte oracle query id with `oq_` prefix
+- `Signature` base58-encoded 64 byte cryptographic signature with `sg_` prefix
 
 Valid string escape codes are
 
@@ -239,6 +240,7 @@ Expr ::= '(' LamArgs ')' '=>' Block(Stmt)   // Anonymous function    (x) => x + 
        | Int | Bytes | String | Char        // Literals              123, 0xff, #00abc123, "foo", '%'
        | AccountAddress | ContractAddress   // Chain identifiers
        | OracleAddress | OracleQueryId      // Chain identifiers
+       | Signature                          // Signature
        | '???'                              // Hole expression       1 + ???
 
 Generator ::= Pattern '<-' Expr   // Generator
