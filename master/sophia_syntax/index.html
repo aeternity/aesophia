@@ -619,6 +619,7 @@ interface main using as for hiding
 <li><code>ContractAddress</code> base58-encoded 32 byte contract address with <code>ct_</code> prefix</li>
 <li><code>OracleAddress</code> base58-encoded 32 byte oracle address with <code>ok_</code> prefix</li>
 <li><code>OracleQueryId</code> base58-encoded 32 byte oracle query id with <code>oq_</code> prefix</li>
+<li><code>Signature</code> base58-encoded 64 byte cryptographic signature with <code>sg_</code> prefix</li>
 </ul>
 <p>Valid string escape codes are</p>
 <table>
@@ -831,6 +832,7 @@ element may be indented less than the indentation of the block. For instance</p>
 <span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Int</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Bytes</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Char</span><span class="w">        </span><span class="c1">// Literals              123, 0xff, #00abc123, &quot;foo&quot;, &#39;%&#39;</span>
 <span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">AccountAddress</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">ContractAddress</span><span class="w">   </span><span class="c1">// Chain identifiers</span>
 <span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">OracleAddress</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">OracleQueryId</span><span class="w">      </span><span class="c1">// Chain identifiers</span>
+<span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="n">Signature</span><span class="w">                          </span><span class="c1">// Signature</span>
 <span class="w">       </span><span class="o">|</span><span class="w"> </span><span class="err">&#39;</span><span class="o">???</span><span class="err">&#39;</span><span class="w">                              </span><span class="c1">// Hole expression       1 + ???</span>
 
 <span class="n">Generator</span><span class="w"> </span><span class="o">::=</span><span class="w"> </span><span class="n">Pattern</span><span class="w"> </span><span class="err">&#39;</span><span class="o">&lt;-</span><span class="err">&#39;</span><span class="w"> </span><span class="n">Expr</span><span class="w">   </span><span class="c1">// Generator</span>

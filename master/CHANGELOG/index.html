@@ -1884,8 +1884,14 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h3 id="added">Added</h3>
 <ul>
 <li>Support for OTP-27 - no changes in behavior.</li>
+<li>Signature literals <code>sg_...</code> - they have type <code>signature</code> (which is an alias for <code>bytes(64)</code>).</li>
 </ul>
 <h3 id="changed">Changed</h3>
+<ul>
+<li>System aliases are handled explicitly when converting to a Sophia value, this is only
+  observable for <code>signature</code> where a value of type <code>signature</code> is now represented as a
+  (new) signature literal.</li>
+</ul>
 <h3 id="removed">Removed</h3>
 <h3 id="fixed">Fixed</h3>
 <ul>
