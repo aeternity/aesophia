@@ -525,7 +525,7 @@ id_or_addr() ->
     ?RULE(id(), parse_addr_literal(_1)).
 
 parse_addr_literal(Id = {id, Ann, Name}) ->
-    case lists:member(lists:sublist(Name, 3), ["ak_", "ok_", "oq_", "ct_"]) of
+    case lists:member(lists:sublist(Name, 3), ["ak_", "ok_", "oq_", "ct_", "sg_"]) of
         false -> Id;
         true  ->
             try aeser_api_encoder:decode(list_to_binary(Name)) of

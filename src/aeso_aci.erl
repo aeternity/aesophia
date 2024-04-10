@@ -198,7 +198,8 @@ encode_expr({bytes, _, B})  ->
     <<N:Digits/unit:8>> = B,
     list_to_binary(lists:flatten(io_lib:format("#~*.16.0b", [Digits*2, N])));
 encode_expr({Lit, _, L}) when Lit == oracle_pubkey; Lit == oracle_query_id;
-                              Lit == contract_pubkey; Lit == account_pubkey ->
+                              Lit == contract_pubkey; Lit == account_pubkey;
+                              Lit == signature ->
     aeser_api_encoder:encode(Lit, L);
 encode_expr({app, _, {'-', _}, [{int, _, N}]}) ->
   encode_expr({int, [], -N});

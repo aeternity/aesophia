@@ -100,6 +100,7 @@
      | {contract_pubkey, ann(), binary()}
      | {oracle_pubkey, ann(), binary()}
      | {oracle_query_id, ann(), binary()}
+     | {signature, ann(), binary()}
      | {string, ann(), binary()}
      | {char, ann(), integer()}.
 

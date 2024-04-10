@@ -55,6 +55,7 @@
               | {contract_pubkey, binary()}
               | {oracle_pubkey, binary()}
               | {oracle_query_id, binary()}
+              | {signature, binary()}
               | {bool, false | true}
               | {contract_code, string()} %% for CREATE, by name
               | {typerep, ftype()}.
@@ -599,6 +600,7 @@ expr_to_fcode(_Env, _Type, {char,            Ann, N}) -> {lit, to_fann(Ann), {in
 expr_to_fcode(_Env, _Type, {bool,            Ann, B}) -> {lit, to_fann(Ann), {bool, B}};
 expr_to_fcode(_Env, _Type, {string,          Ann, S}) -> {lit, to_fann(Ann), {string, S}};
 expr_to_fcode(_Env, _Type, {account_pubkey,  Ann, K}) -> {lit, to_fann(Ann), {account_pubkey, K}};
+expr_to_fcode(_Env, _Type, {signature,       Ann, K}) -> {lit, to_fann(Ann), {signature, K}};
 expr_to_fcode(_Env, _Type, {contract_pubkey, Ann, K}) -> {lit, to_fann(Ann), {contract_pubkey, K}};
 expr_to_fcode(_Env, _Type, {oracle_pubkey,   Ann, K}) -> {lit, to_fann(Ann), {oracle_pubkey, K}};
 expr_to_fcode(_Env, _Type, {oracle_query_id, Ann, K}) -> {lit, to_fann(Ann), {oracle_query_id, K}};

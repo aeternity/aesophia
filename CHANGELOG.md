@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Support for OTP-27 - no changes in behavior.
+- Signature literals `sg_...` - they have type `signature` (which is an alias for `bytes(64)`).
 ### Changed
+- System aliases are handled explicitly when converting to a Sophia value, this is only
+  observable for `signature` where a value of type `signature` is now represented as a
+  (new) signature literal.
 ### Removed
 ### Fixed
 - Allow self-qualification, i.e. referencing `X.foo` when in namespace `X`.

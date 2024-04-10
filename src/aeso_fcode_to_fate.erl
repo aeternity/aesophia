@@ -235,6 +235,7 @@ lit_to_fate(Env, L) ->
         {bytes, B}           -> aeb_fate_data:make_bytes(B);
         {bool, B}            -> aeb_fate_data:make_boolean(B);
         {account_pubkey, K}  -> aeb_fate_data:make_address(K);
+        {signature, S}       -> aeb_fate_data:make_bytes(S);
         {contract_pubkey, K} -> aeb_fate_data:make_contract(K);
         {oracle_pubkey, K}   -> aeb_fate_data:make_oracle(K);
         {oracle_query_id, H} -> aeb_fate_data:make_oracle_query(H);
