@@ -391,24 +391,17 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#fixed" class="md-nav__link">
-    Fixed
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#800-rc1" class="md-nav__link">
-    8.0.0-rc1
+  <a href="#800" class="md-nav__link">
+    8.0.0
   </a>
   
-    <nav class="md-nav" aria-label="8.0.0-rc1">
+    <nav class="md-nav" aria-label="8.0.0">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -453,7 +446,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_1" class="md-nav__link">
+  <a href="#fixed" class="md-nav__link">
     Fixed
   </a>
   
@@ -480,7 +473,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_2" class="md-nav__link">
+  <a href="#fixed_1" class="md-nav__link">
     Fixed
   </a>
   
@@ -500,7 +493,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fixed_3" class="md-nav__link">
+  <a href="#fixed_2" class="md-nav__link">
     Fixed
   </a>
   
@@ -520,7 +513,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fixed_4" class="md-nav__link">
+  <a href="#fixed_3" class="md-nav__link">
     Fixed
   </a>
   
@@ -554,7 +547,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_5" class="md-nav__link">
+  <a href="#fixed_4" class="md-nav__link">
     Fixed
   </a>
   
@@ -588,7 +581,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_6" class="md-nav__link">
+  <a href="#fixed_5" class="md-nav__link">
     Fixed
   </a>
   
@@ -622,7 +615,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_7" class="md-nav__link">
+  <a href="#fixed_6" class="md-nav__link">
     Fixed
   </a>
   
@@ -1157,24 +1150,17 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#fixed" class="md-nav__link">
-    Fixed
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#800-rc1" class="md-nav__link">
-    8.0.0-rc1
+  <a href="#800" class="md-nav__link">
+    8.0.0
   </a>
   
-    <nav class="md-nav" aria-label="8.0.0-rc1">
+    <nav class="md-nav" aria-label="8.0.0">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1219,7 +1205,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_1" class="md-nav__link">
+  <a href="#fixed" class="md-nav__link">
     Fixed
   </a>
   
@@ -1246,7 +1232,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_2" class="md-nav__link">
+  <a href="#fixed_1" class="md-nav__link">
     Fixed
   </a>
   
@@ -1266,7 +1252,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fixed_3" class="md-nav__link">
+  <a href="#fixed_2" class="md-nav__link">
     Fixed
   </a>
   
@@ -1286,7 +1272,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fixed_4" class="md-nav__link">
+  <a href="#fixed_3" class="md-nav__link">
     Fixed
   </a>
   
@@ -1320,7 +1306,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_5" class="md-nav__link">
+  <a href="#fixed_4" class="md-nav__link">
     Fixed
   </a>
   
@@ -1354,7 +1340,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_6" class="md-nav__link">
+  <a href="#fixed_5" class="md-nav__link">
     Fixed
   </a>
   
@@ -1388,7 +1374,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_7" class="md-nav__link">
+  <a href="#fixed_6" class="md-nav__link">
     Fixed
   </a>
   
@@ -1880,24 +1866,11 @@
 <p>All notable changes to this project will be documented in this file.</p>
 <p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
-<h2 id="unreleased"><a href="https://github.com/aeternity/aesophia/compare/v8.0.0-rc1...HEAD">Unreleased</a></h2>
+<h2 id="unreleased"><a href="https://github.com/aeternity/aesophia/compare/v8.0.0...HEAD">Unreleased</a></h2>
 <h3 id="added">Added</h3>
-<ul>
-<li>Support for OTP-27 - no changes in behavior.</li>
-<li>Signature literals <code>sg_...</code> - they have type <code>signature</code> (which is an alias for <code>bytes(64)</code>).</li>
-</ul>
 <h3 id="changed">Changed</h3>
-<ul>
-<li>System aliases are handled explicitly when converting to a Sophia value, this is only
-  observable for <code>signature</code> where a value of type <code>signature</code> is now represented as a
-  (new) signature literal.</li>
-</ul>
 <h3 id="removed">Removed</h3>
-<h3 id="fixed">Fixed</h3>
-<ul>
-<li>Allow self-qualification, i.e. referencing <code>X.foo</code> when in namespace <code>X</code>.</li>
-</ul>
-<h2 id="800-rc1"><a href="https://github.com/aeternity/aesophia/compare/v7.4.1...v8.0.0-rc1">8.0.0-rc1</a></h2>
+<h2 id="800"><a href="https://github.com/aeternity/aesophia/compare/v7.4.1...v8.0.0">8.0.0</a></h2>
 <h3 id="added_1">Added</h3>
 <ul>
 <li>Bitwise operations for integers: <code>band</code>, <code>bor</code>, <code>bxor</code>, <code>bnot</code>, <code>&lt;&lt;</code> and <code>&gt;&gt;</code>.</li>
@@ -1919,11 +1892,17 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li><code>Chain.network_id</code> - a function to get hold of the Chain's network id.</li>
 <li>Allowing <code>Bytes.to_any_size</code> in calldata creation, to enable creation of arguments
   with arbitray size.</li>
+<li>Signature literals <code>sg_...</code> - they have type <code>signature</code> (which is an alias for <code>bytes(64)</code>).</li>
+<li>Support for OTP-27 - no changes in behavior.</li>
 </ul>
 <h3 id="changed_1">Changed</h3>
 <ul>
 <li><code>Crypto.verify_sig</code> is changed to have <code>msg : bytes()</code>. I.e. the
   signed data can be of any length (used to be limited to <code>bytes(32)</code>/<code>hash</code>).</li>
+<li>System aliases are handled explicitly when converting to a Sophia value, this is only
+  observable for <code>signature</code> where a value of type <code>signature</code> is now represented as a
+  (new) signature literal.</li>
+<li>Allow self-qualification, i.e. referencing <code>X.foo</code> when in namespace <code>X</code>.</li>
 </ul>
 <h3 id="removed_1">Removed</h3>
 <ul>
@@ -1935,7 +1914,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>Improve how includes with relative paths are resolved during parsing/compilation. Relative
   include paths are now always relative to the file containing the <code>include</code> statement.</li>
 </ul>
-<h3 id="fixed_1">Fixed</h3>
+<h3 id="fixed">Fixed</h3>
 <ul>
 <li>Disable unused type warnings for types used inside of records.</li>
 </ul>
@@ -1945,18 +1924,18 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>Names of lifted lambdas now consist of parent function's name and their
   position in the source code.</li>
 </ul>
-<h3 id="fixed_2">Fixed</h3>
+<h3 id="fixed_1">Fixed</h3>
 <ul>
 <li>Lifted lambdas get their names assigned deterministically.</li>
 </ul>
 <h2 id="730"><a href="https://github.com/aeternity/aesophia/compare/v7.2.1...v7.3.0">7.3.0</a></h2>
-<h3 id="fixed_3">Fixed</h3>
+<h3 id="fixed_2">Fixed</h3>
 <ul>
 <li>Fixed a bug with polymorphism that allowed functions with the same name but different type to be considered as implementations for their corresponding interface function.</li>
 <li>Fixed a bug in the byte code optimization that incorrectly reordered dependent instructions.</li>
 </ul>
 <h2 id="721"><a href="https://github.com/aeternity/aesophia/compare/v7.2.0...v7.2.1">7.2.1</a></h2>
-<h3 id="fixed_4">Fixed</h3>
+<h3 id="fixed_3">Fixed</h3>
 <ul>
 <li>Fixed bugs with the newly added debugging symbols</li>
 </ul>
@@ -1975,7 +1954,7 @@ contract C =
 <ul>
 <li>Remove the mapping from variables to FATE registers from the compilation output.</li>
 </ul>
-<h3 id="fixed_5">Fixed</h3>
+<h3 id="fixed_4">Fixed</h3>
 <ul>
 <li>Warning about unused include when there is no include.</li>
 </ul>
@@ -1998,7 +1977,7 @@ contract C =
 <li>Contracts can no longer be used as namespaces.</li>
 <li>Do not show unused stateful warning for functions that call other contracts with a non-zero value argument.</li>
 </ul>
-<h3 id="fixed_6">Fixed</h3>
+<h3 id="fixed_5">Fixed</h3>
 <ul>
 <li>Typechecker crashes if Chain.create or Chain.clone are used without arguments.</li>
 </ul>
@@ -2011,7 +1990,7 @@ contract C =
 <ul>
 <li>Update Sophia syntax docs to include missing information about existing syntax.</li>
 </ul>
-<h3 id="fixed_7">Fixed</h3>
+<h3 id="fixed_6">Fixed</h3>
 <ul>
 <li><a href="https://github.com/aeternity/aesophia/issues/404">404</a> Contract polymorphism crashes on non-obvious child contract typing.</li>
 </ul>
