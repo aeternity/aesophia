@@ -6,17 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- Support for OTP-27 - no changes in behavior.
-- Signature literals `sg_...` - they have type `signature` (which is an alias for `bytes(64)`).
 ### Changed
-- System aliases are handled explicitly when converting to a Sophia value, this is only
-  observable for `signature` where a value of type `signature` is now represented as a
-  (new) signature literal.
 ### Removed
-### Fixed
-- Allow self-qualification, i.e. referencing `X.foo` when in namespace `X`.
 
-## [8.0.0-rc1]
+## [8.0.0]
 ### Added
 - Bitwise operations for integers: `band`, `bor`, `bxor`, `bnot`, `<<` and `>>`.
 - `Int.mulmod` - combined builtin operation for multiplication and modulus.
@@ -37,9 +30,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Chain.network_id` - a function to get hold of the Chain's network id.
 - Allowing `Bytes.to_any_size` in calldata creation, to enable creation of arguments
   with arbitray size.
+- Signature literals `sg_...` - they have type `signature` (which is an alias for `bytes(64)`).
+- Support for OTP-27 - no changes in behavior.
 ### Changed
 - `Crypto.verify_sig` is changed to have `msg : bytes()`. I.e. the
   signed data can be of any length (used to be limited to `bytes(32)`/`hash`).
+- System aliases are handled explicitly when converting to a Sophia value, this is only
+  observable for `signature` where a value of type `signature` is now represented as a
+  (new) signature literal.
+- Allow self-qualification, i.e. referencing `X.foo` when in namespace `X`.
 ### Removed
 - `Bitwise.aes` standard library is removed - the builtin operations are superior.
 
@@ -451,8 +450,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v8.0.0-rc1...HEAD
-[8.0.0-rc1]: https://github.com/aeternity/aesophia/compare/v7.4.1...v8.0.0-rc1
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v8.0.0...HEAD
+[8.0.0]: https://github.com/aeternity/aesophia/compare/v7.4.1...v8.0.0
 [7.4.1]: https://github.com/aeternity/aesophia/compare/v7.4.0...v7.4.1
 [7.4.0]: https://github.com/aeternity/aesophia/compare/v7.3.0...v7.4.0
 [7.3.0]: https://github.com/aeternity/aesophia/compare/v7.2.1...v7.3.0
