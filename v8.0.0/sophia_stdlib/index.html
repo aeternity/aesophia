@@ -1,0 +1,2338 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../sophia_features/">
+      
+      
+        <link rel="next" href="../sophia_examples/">
+      
+      <link rel="icon" href="../favicon.png">
+      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.0.9">
+    
+    
+      
+        <title>Standard library - æternity Sophia Language</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.0d440cfe.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.2505c338.min.css">
+      
+      
+
+    
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="pink" data-md-color-accent="pink">
+  
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#standard-library" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-component="outdated" hidden>
+        
+          <aside class="md-banner md-banner--warning">
+            <div class="md-banner__inner md-grid md-typeset">
+              
+  You're not viewing the latest version.
+  <a href="../..">
+    <strong>Click here to go to latest.</strong>
+  </a>
+
+            </div>
+            <script>var el=document.querySelector("[data-md-component=outdated]"),outdated=__md_get("__outdated",sessionStorage);!0===outdated&&el&&(el.hidden=!1)</script>
+          </aside>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="æternity Sophia Language" class="md-header__button md-logo" aria-label="æternity Sophia Language" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            æternity Sophia Language
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Standard library
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      <form class="md-header__option" data-md-component="palette">
+        
+          
+          <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="pink" data-md-color-accent="pink"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+          
+            <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3 3.19.09m3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95 2.06.05m-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31Z"/></svg>
+            </label>
+          
+        
+          
+          <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="pink" data-md-color-accent="pink"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_2">
+          
+            <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5c-.84 0-1.65.15-2.39.42L12 2M3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29L3.34 7m.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14L3.36 17M20.65 7l-1.77 3.79a7.023 7.023 0 0 0-2.38-4.15l4.15.36m-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29L20.64 17M12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44L12 22Z"/></svg>
+            </label>
+          
+        
+      </form>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91 1.61 0 2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08Z"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/aeternity/aesophia" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="æternity Sophia Language" class="md-nav__button md-logo" aria-label="æternity Sophia Language" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    æternity Sophia Language
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/aeternity/aesophia" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        Introduction
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sophia_syntax/" class="md-nav__link">
+        Syntax
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sophia_features/" class="md-nav__link">
+        Features
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Standard library
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        Standard library
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#builtin-namespaces" class="md-nav__link">
+    Builtin namespaces
+  </a>
+  
+    <nav class="md-nav" aria-label="Builtin namespaces">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#address" class="md-nav__link">
+    Address
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aens" class="md-nav__link">
+    AENS
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aensv2" class="md-nav__link">
+    AENSv2
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#auth" class="md-nav__link">
+    Auth
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bits" class="md-nav__link">
+    Bits
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bytes" class="md-nav__link">
+    Bytes
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#call" class="md-nav__link">
+    Call
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chain" class="md-nav__link">
+    Chain
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#char" class="md-nav__link">
+    Char
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#contract" class="md-nav__link">
+    Contract
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crypto" class="md-nav__link">
+    Crypto
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#int" class="md-nav__link">
+    Int
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map" class="md-nav__link">
+    Map
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#oracle" class="md-nav__link">
+    Oracle
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#includable-namespaces" class="md-nav__link">
+    Includable namespaces
+  </a>
+  
+    <nav class="md-nav" aria-label="Includable namespaces">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#aenscompat" class="md-nav__link">
+    AENSCompat
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bls12_381" class="md-nav__link">
+    BLS12_381
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#func" class="md-nav__link">
+    Func
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frac" class="md-nav__link">
+    Frac
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#list" class="md-nav__link">
+    List
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option" class="md-nav__link">
+    Option
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pair" class="md-nav__link">
+    Pair
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#set_1" class="md-nav__link">
+    Set
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#string" class="md-nav__link">
+    String
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#triple" class="md-nav__link">
+    Triple
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sophia_examples/" class="md-nav__link">
+        Contract examples
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CHANGELOG/" class="md-nav__link">
+        Changelog
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#builtin-namespaces" class="md-nav__link">
+    Builtin namespaces
+  </a>
+  
+    <nav class="md-nav" aria-label="Builtin namespaces">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#address" class="md-nav__link">
+    Address
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aens" class="md-nav__link">
+    AENS
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aensv2" class="md-nav__link">
+    AENSv2
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#auth" class="md-nav__link">
+    Auth
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bits" class="md-nav__link">
+    Bits
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bytes" class="md-nav__link">
+    Bytes
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#call" class="md-nav__link">
+    Call
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chain" class="md-nav__link">
+    Chain
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#char" class="md-nav__link">
+    Char
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#contract" class="md-nav__link">
+    Contract
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crypto" class="md-nav__link">
+    Crypto
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#int" class="md-nav__link">
+    Int
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map" class="md-nav__link">
+    Map
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#oracle" class="md-nav__link">
+    Oracle
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#includable-namespaces" class="md-nav__link">
+    Includable namespaces
+  </a>
+  
+    <nav class="md-nav" aria-label="Includable namespaces">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#aenscompat" class="md-nav__link">
+    AENSCompat
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bls12_381" class="md-nav__link">
+    BLS12_381
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#func" class="md-nav__link">
+    Func
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frac" class="md-nav__link">
+    Frac
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#list" class="md-nav__link">
+    List
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option" class="md-nav__link">
+    Option
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pair" class="md-nav__link">
+    Pair
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#set_1" class="md-nav__link">
+    Set
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#string" class="md-nav__link">
+    String
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#triple" class="md-nav__link">
+    Triple
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<!--
+Oh Hi! I see you are editing the stdlib documentation, that's really cool.
+I have a request for you – if you are going to update some stuff here please
+check if the comments in the sources are up to date as well. You may find them
+in the priv/stdlib directory. Thanks!
+-->
+
+<h1 id="standard-library">Standard library</h1>
+<p>Sophia language offers standard library that consists of several namespaces. Some of them are already
+in the scope and do not need any actions to be used, while the others require some files to be included.</p>
+<p>The out-of-the-box namespaces are:</p>
+<ul>
+<li><a href="#address">Address</a></li>
+<li><a href="#aens">AENS</a></li>
+<li><a href="#aensv2">AENSv2</a></li>
+<li><a href="#auth">Auth</a></li>
+<li><a href="#bits">Bits</a></li>
+<li><a href="#bytes">Bytes</a></li>
+<li><a href="#call">Call</a></li>
+<li><a href="#chain">Chain</a></li>
+<li><a href="#char">Char</a></li>
+<li><a href="#contract">Contract</a></li>
+<li><a href="#crypto">Crypto</a></li>
+<li><a href="#int">Int</a></li>
+<li><a href="#map">Map</a></li>
+<li><a href="#oracle">Oracle</a></li>
+</ul>
+<p>The following ones need to be included as regular files with <code>.aes</code> suffix, for example
+<div class="highlight"><pre><span></span><code>include &quot;List.aes&quot;
+</code></pre></div></p>
+<ul>
+<li><a href="#aenscompat">AENSCompat</a></li>
+<li><a href="#bitwise">Bitwise</a></li>
+<li><a href="#bls12_381">BLS12_381</a></li>
+<li><a href="#func">Func</a></li>
+<li><a href="#frac">Frac</a></li>
+<li><a href="#list">List</a></li>
+<li><a href="#option">Option</a></li>
+<li><a href="#pair">Pair</a></li>
+<li><a href="#set-stdlib">Set</a></li>
+<li><a href="#string">String</a></li>
+<li><a href="#triple">Triple</a></li>
+</ul>
+<h2 id="builtin-namespaces">Builtin namespaces</h2>
+<p>They are available without any explicit includes.</p>
+<h3 id="address">Address</h3>
+<h4 id="to_str">to_str</h4>
+<div class="highlight"><pre><span></span><code>Address.to_str(a : address) : string
+</code></pre></div>
+<p>Base58 encoded string</p>
+<h4 id="to_bytes">to_bytes</h4>
+<div class="highlight"><pre><span></span><code>Address.to_bytes(a : address) : bytes(32)
+</code></pre></div>
+<p>The binary representation of the address.</p>
+<h4 id="is_contract">is_contract</h4>
+<div class="highlight"><pre><span></span><code>Address.is_contract(a : address) : bool
+</code></pre></div>
+<p>Is the address a contract</p>
+<h4 id="is_oracle">is_oracle</h4>
+<div class="highlight"><pre><span></span><code>Address.is_oracle(a : address) : bool
+</code></pre></div>
+<p>Is the address a registered oracle</p>
+<h4 id="is_payable">is_payable</h4>
+<div class="highlight"><pre><span></span><code>Address.is_payable(a : address) : bool
+</code></pre></div>
+<p>Can the address be spent to</p>
+<h4 id="to_contract">to_contract</h4>
+<div class="highlight"><pre><span></span><code>Address.to_contract(a : address) : C
+</code></pre></div>
+<p>Cast address to contract type C (where <code>C</code> is a contract)</p>
+<h3 id="aens">AENS</h3>
+<p>The old AENS namespace, kept in the compiler to be able to interact with
+contracts from before Ceres, compiled using aesophia compiler version 7.x and
+earlier. Used in <a href="#aenscompat">AENSCompat</a> when converting between old and new
+pointers.</p>
+<h4 id="types">Types</h4>
+<h5 id="name">name</h5>
+<div class="highlight"><pre><span></span><code>datatype name = Name(address, Chain.ttl, map(string, AENS.pointee))
+</code></pre></div>
+<h5 id="pointee">pointee</h5>
+<div class="highlight"><pre><span></span><code>datatype pointee = AccountPt(address) | OraclePt(address)
+                 | ContractPt(address) | ChannelPt(address)
+</code></pre></div>
+<h3 id="aensv2">AENSv2</h3>
+<p>Note: introduced in v8.0</p>
+<p>The following functionality is available for interacting with the æternity
+naming system (AENS).  If <code>owner</code> is equal to <code>Contract.address</code> the signature
+<code>signature</code> is ignored, and can be left out since it is a named argument.
+Otherwise we need a signature to prove that we are allowed to do AENS
+operations on behalf of <code>owner</code>. The <a href="https://github.com/aeternity/protocol/blob/iris/consensus/consensus.md#transaction-signature">signature is tied to a network
+id</a>,
+i.e. the signature material should be prefixed by the network id.</p>
+<h4 id="types_1">Types</h4>
+<h5 id="name_1">name</h5>
+<div class="highlight"><pre><span></span><code>datatype name = Name(address, Chain.ttl, map(string, AENSv2.pointee))
+</code></pre></div>
+<h5 id="pointee_1">pointee</h5>
+<div class="highlight"><pre><span></span><code>datatype pointee = AccountPt(address) | OraclePt(address)
+                 | ContractPt(address) | ChannelPt(address) | DataPt(bytes())
+</code></pre></div>
+<p>Note: on-chain there is a maximum length enforced for <code>DataPt</code>, it is 1024 bytes.
+Sophia itself does <em>not</em> check for this.</p>
+<h4 id="functions">Functions</h4>
+<h5 id="resolve">resolve</h5>
+<div class="highlight"><pre><span></span><code>AENSv2.resolve(name : string, key : string) : option(&#39;a)
+</code></pre></div>
+<p>Name resolution. Here <code>name</code> should be a registered name and <code>key</code> one of the attributes
+associated with this name (for instance <code>"account_pubkey"</code>). The return type
+(<code>'a</code>) must be resolved at compile time to an atomic type and the value is
+type checked against this type at run time.</p>
+<h5 id="lookup">lookup</h5>
+<div class="highlight"><pre><span></span><code>AENSv2.lookup(name : string) : option(AENSv2.name)
+</code></pre></div>
+<p>If <code>name</code> is an active name <code>AENSv2.lookup</code> returns a name object.
+The three arguments to <code>Name</code> are <code>owner</code>, <code>expiry</code> and a map of the
+<code>pointees</code> for the name. Note: the expiry of the name is always a fixed TTL.
+For example:
+<div class="highlight"><pre><span></span><code>let Some(AENSv2.Name(owner, FixedTTL(expiry), ptrs)) = AENSv2.lookup(&quot;example.chain&quot;)
+</code></pre></div></p>
+<p>Note: Changed to produce <code>AENSv2.name</code> in v8.0 (Ceres protocol upgrade).</p>
+<h5 id="preclaim">preclaim</h5>
+<div class="highlight"><pre><span></span><code>AENSv2.preclaim(owner : address, commitment_hash : hash, &lt;signature : signature&gt;) : unit
+</code></pre></div>
+<p>The <a href="../sophia_features/#delegation-signature">signature</a> should be a
+serialized structure containing <code>network id</code>, <code>owner address</code>, and
+<code>Contract.address</code>.</p>
+<p>From Ceres (i.e. FATE VM version 3) the
+<a href="../sophia_features/#delegation-signature">signature</a> can also be generic
+(allowing <em>all</em>, existing and future, names to be delegated with one
+signature), i.e. containing <code>network id</code>, <code>owner address</code>, <code>Contract.address</code>.</p>
+<h5 id="claim">claim</h5>
+<div class="highlight"><pre><span></span><code>AENSv2.claim(owner : address, name : string, salt : int, name_fee : int, &lt;signature : signature&gt;) : unit
+</code></pre></div>
+<p>The <a href="../sophia_features/#delegation-signature">signature</a> should be a
+serialized structure containing <code>network id</code>, <code>owner address</code>, and
+<code>Contract.address</code>. Using the private key of <code>owner address</code> for signing.</p>
+<p>From Ceres (i.e. FATE VM version 3) the
+<a href="../sophia_features/#delegation-signature">signature</a> can also be generic
+(allowing <em>all</em>, existing and future, names to be delegated with one
+signature), i.e. containing <code>network id</code>, <code>owner address</code>, <code>name_hash</code>, and
+<code>Contract.address</code>.</p>
+<h5 id="transfer">transfer</h5>
+<div class="highlight"><pre><span></span><code>AENSv2.transfer(owner : address, new_owner : address, name : string, &lt;signature : signature&gt;) : unit
+</code></pre></div>
+<p>Transfers name to the new owner.</p>
+<p>The <a href="../sophia_features/#delegation-signature">signature</a> should be a
+serialized structure containing <code>network id</code>, <code>owner address</code>, and
+<code>Contract.address</code>. Using the private key of <code>owner address</code> for signing.</p>
+<p>From Ceres (i.e. FATE VM version 3) the
+<a href="../sophia_features/#delegation-signature">signature</a> can also be generic
+(allowing <em>all</em>, existing and future, names to be delegated with one
+signature), i.e. containing <code>network id</code>, <code>owner address</code>, <code>name_hash</code>, and
+<code>Contract.address</code>.</p>
+<h5 id="revoke">revoke</h5>
+<div class="highlight"><pre><span></span><code>AENSv2.revoke(owner : address, name : string, &lt;signature : signature&gt;) : unit
+</code></pre></div>
+<p>Revokes the name to extend the ownership time.</p>
+<p>The <a href="../sophia_features/#delegation-signature">signature</a> should be a
+serialized structure containing <code>network id</code>, <code>owner address</code>, and
+<code>Contract.address</code>. Using the private key of <code>owner address</code> for signing.</p>
+<p>From Ceres (i.e. FATE VM version 3) the
+<a href="../sophia_features/#delegation-signature">signature</a> can also be generic
+(allowing <em>all</em>, existing and future, names to be delegated with one
+signature), i.e. containing <code>network id</code>, <code>owner address</code>, <code>name_hash</code>, and
+<code>Contract.address</code>.</p>
+<h5 id="update">update</h5>
+<div class="highlight"><pre><span></span><code>AENSv2.update(owner : address, name : string, expiry : option(Chain.ttl), client_ttl : option(int),
+              new_ptrs : option(map(string, AENSv2.pointee)), &lt;signature : signature&gt;) : unit
+</code></pre></div>
+<p>Updates the name. If the optional parameters are set to <code>None</code> that parameter
+will not be updated, for example if <code>None</code> is passed as <code>expiry</code> the expiry
+block of the name is not changed.</p>
+<p>Note: Changed to consume <code>AENSv2.pointee</code> in v8.0 (Ceres protocol upgrade).</p>
+<p>The <a href="../sophia_features/#delegation-signature">signature</a> should be a
+serialized structure containing <code>network id</code>, <code>owner address</code>, and
+<code>Contract.address</code>. Using the private key of <code>owner address</code> for signing.</p>
+<p>From Ceres (i.e. FATE VM version 3) the
+<a href="../sophia_features/#delegation-signature">signature</a> can also be generic
+(allowing <em>all</em>, existing and future, names to be delegated with one
+signature), i.e. containing <code>network id</code>, <code>owner address</code>, <code>name_hash</code>, and
+<code>Contract.address</code>.</p>
+<h3 id="auth">Auth</h3>
+<h4 id="tx">tx</h4>
+<div class="highlight"><pre><span></span><code>Auth.tx : option(Chain.tx)
+</code></pre></div>
+<p>Where <code>Chain.tx</code> is (built-in) defined like:
+<div class="highlight"><pre><span></span><code>namespace Chain =
+  record tx = { paying_for : option(Chain.paying_for_tx)
+              , ga_metas : list(Chain.ga_meta_tx)
+              , actor : address
+              , fee   : int
+              , ttl   : int
+              , tx    : Chain.base_tx }
+
+  datatype ga_meta_tx    = GAMetaTx(address, int)
+  datatype paying_for_tx = PayingForTx(address, int)
+  datatype base_tx = SpendTx(address, int, string)
+                   | OracleRegisterTx | OracleQueryTx | OracleResponseTx | OracleExtendTx
+                   | NamePreclaimTx | NameClaimTx(hash) | NameUpdateTx(string)
+                   | NameRevokeTx(hash) | NameTransferTx(address, string)
+                   | ChannelCreateTx(address) | ChannelDepositTx(address, int) | ChannelWithdrawTx(address, int) |
+                   | ChannelForceProgressTx(address) | ChannelCloseMutualTx(address) | ChannelCloseSoloTx(address)
+                   | ChannelSlashTx(address) | ChannelSettleTx(address) | ChannelSnapshotSoloTx(address)
+                   | ContractCreateTx(int) | ContractCallTx(address, int)
+                   | GAAttachTx
+</code></pre></div></p>
+<h4 id="tx_hash">tx_hash</h4>
+<div class="highlight"><pre><span></span><code>Auth.tx_hash : option(hash)
+</code></pre></div>
+<p>Gets the transaction hash during authentication. Note: <code>Auth.tx_hash</code>
+computation differs between protocol versions (changed in Ceres!), see
+<a href="https://github.com/aeternity/protocol/blob/master/serializations.md">aeserialisation</a>
+specification for details.</p>
+<h3 id="bits">Bits</h3>
+<h4 id="none">none</h4>
+<div class="highlight"><pre><span></span><code>Bits.none : bits
+</code></pre></div>
+<p>A bit field with all bits cleared</p>
+<h4 id="all">all</h4>
+<div class="highlight"><pre><span></span><code>Bits.all : bits
+</code></pre></div>
+<p>A bit field with all bits set</p>
+<h4 id="set">set</h4>
+<div class="highlight"><pre><span></span><code>Bits.set(b : bits, i : int) : bits
+</code></pre></div>
+<p>Set bit i</p>
+<h4 id="clear">clear</h4>
+<div class="highlight"><pre><span></span><code>Bits.clear(b : bits, i : int) : bits
+</code></pre></div>
+<p>Clear bit i</p>
+<h4 id="test">test</h4>
+<div class="highlight"><pre><span></span><code>Bits.test(b : bits, i : int) : bool
+</code></pre></div>
+<p>Check if bit i is set</p>
+<h4 id="sum">sum</h4>
+<div class="highlight"><pre><span></span><code>Bits.sum(b : bits) : int
+</code></pre></div>
+<p>Count the number of set bits</p>
+<h4 id="union">union</h4>
+<div class="highlight"><pre><span></span><code>Bits.union(a : bits, b : bits) : bits
+</code></pre></div>
+<p>Bitwise disjunction</p>
+<h4 id="intersection">intersection</h4>
+<div class="highlight"><pre><span></span><code>Bits.intersection(a : bits, b : bits) : bits
+</code></pre></div>
+<p>Bitwise conjunction</p>
+<h4 id="difference">difference</h4>
+<div class="highlight"><pre><span></span><code>Bits.difference(a : bits, b : bits) : bits
+</code></pre></div>
+<p>Each bit is true if and only if it was 1 in <code>a</code> and 0 in <code>b</code></p>
+<h3 id="bytes">Bytes</h3>
+<h4 id="to_int">to_int</h4>
+<div class="highlight"><pre><span></span><code>Bytes.to_int(b : bytes(n)) : int
+</code></pre></div>
+<p>Interprets the byte array as a big endian integer</p>
+<h4 id="to_str_1">to_str</h4>
+<div class="highlight"><pre><span></span><code>Bytes.to_str(b : bytes(n)) : string
+</code></pre></div>
+<p>Returns the hexadecimal representation of the byte array</p>
+<h4 id="concat">concat</h4>
+<div class="highlight"><pre><span></span><code>Bytes.concat : (a : bytes(m), b : bytes(n)) =&gt; bytes(m + n)
+</code></pre></div>
+<p>Concatenates two byte arrays. If <code>m</code> and <code>n</code> are known at compile time, the
+result can be used as a fixed size byte array, otherwise it has type <code>bytes()</code>.</p>
+<h4 id="split">split</h4>
+<div class="highlight"><pre><span></span><code>Bytes.split(a : bytes(m + n)) : bytes(m) * bytes(n)
+</code></pre></div>
+<p>Splits a byte array at given index</p>
+<h4 id="split_any">split_any</h4>
+<div class="highlight"><pre><span></span><code>Bytes.split_any(a : bytes(), at : int) : option(bytes() * bytes(n))
+</code></pre></div>
+<p>Splits an arbitrary size byte array at index <code>at</code>. If <code>at</code> is positive split
+from the beginning of the array, if <code>at</code> is negative, split <code>abs(at)</code> from the
+<em>end</em> of the array. If the array is shorter than <code>abs(at)</code> then <code>None</code> is
+returned.</p>
+<h4 id="to_fixed_size">to_fixed_size</h4>
+<div class="highlight"><pre><span></span><code>Bytes.to_fixed_size(a : bytes()) : option(bytes(n))
+</code></pre></div>
+<p>Converts an arbitrary size byte array to a fix size byte array. If <code>a</code> is
+not <code>n</code> bytes, <code>None</code> is returned.</p>
+<h4 id="to_any_size">to_any_size</h4>
+<div class="highlight"><pre><span></span><code>Bytes.to_any_size(a : bytes(n)) : bytes()
+</code></pre></div>
+<p>Converts a fixed size byte array to an arbitrary size byte array. This is a
+no-op at run-time, and only used during type checking.</p>
+<h4 id="size">size</h4>
+<div class="highlight"><pre><span></span><code>Bytes.size(a : bytes()) : int
+</code></pre></div>
+<p>Computes the lenght/size of a byte array.</p>
+<h3 id="call">Call</h3>
+<p>Values related to the call to the current contract</p>
+<h4 id="origin">origin</h4>
+<div class="highlight"><pre><span></span><code>Call.origin : address
+</code></pre></div>
+<p>The address of the account that signed the call transaction that led to this call.</p>
+<h4 id="caller">caller</h4>
+<div class="highlight"><pre><span></span><code>Call.caller : address
+</code></pre></div>
+<p>The address of the entity (possibly another contract) calling the contract.</p>
+<h4 id="value">value</h4>
+<div class="highlight"><pre><span></span><code>Call.value : int
+</code></pre></div>
+<p>The amount of coins transferred to the contract in the call.</p>
+<h4 id="gas_price">gas_price</h4>
+<div class="highlight"><pre><span></span><code>Call.gas_price : int
+</code></pre></div>
+<p>The gas price of the current call.</p>
+<h4 id="mulmod">mulmod</h4>
+<div class="highlight"><pre><span></span><code>Int.mulmod : (a : int, b : int, q : int) : int
+</code></pre></div>
+<p>Combined multiplication and modulus, returns <code>(a * b) mod q</code>.</p>
+<h4 id="fee">fee</h4>
+<div class="highlight"><pre><span></span><code>Call.fee : int
+</code></pre></div>
+<p>The fee of the current call.</p>
+<h4 id="gas_left">gas_left</h4>
+<div class="highlight"><pre><span></span><code>Call.gas_left() : int
+</code></pre></div>
+<p>The amount of gas left for the current call.</p>
+<h3 id="chain">Chain</h3>
+<p>Values and functions related to the chain itself and other entities that live on it.</p>
+<h4 id="types_2">Types</h4>
+<h5 id="tx_1">tx</h5>
+<div class="highlight"><pre><span></span><code>record tx = { paying_for : option(Chain.paying_for_tx)
+            , ga_metas : list(Chain.ga_meta_tx)
+            , actor : address
+            , fee   : int
+            , ttl   : int
+            , tx    : Chain.base_tx }
+</code></pre></div>
+<h5 id="ga_meta_tx">ga_meta_tx</h5>
+<div class="highlight"><pre><span></span><code>datatype ga_meta_tx    = GAMetaTx(address, int)
+</code></pre></div>
+<h5 id="paying_for_tx">paying_for_tx</h5>
+<div class="highlight"><pre><span></span><code>datatype paying_for_tx = PayingForTx(address, int)
+</code></pre></div>
+<h5 id="base_tx">base_tx</h5>
+<div class="highlight"><pre><span></span><code>datatype base_tx = SpendTx(address, int, string)
+                 | OracleRegisterTx | OracleQueryTx | OracleResponseTx | OracleExtendTx
+                 | NamePreclaimTx | NameClaimTx(hash) | NameUpdateTx(string)
+                 | NameRevokeTx(hash) | NameTransferTx(address, string)
+                 | ChannelCreateTx(address) | ChannelDepositTx(address, int) | ChannelWithdrawTx(address, int) |
+                 | ChannelForceProgressTx(address) | ChannelCloseMutualTx(address) | ChannelCloseSoloTx(address)
+                 | ChannelSlashTx(address) | ChannelSettleTx(address) | ChannelSnapshotSoloTx(address)
+                 | ContractCreateTx(int) | ContractCallTx(address, int)
+                 | GAAttachTx
+</code></pre></div>
+<h4 id="functions_1">Functions</h4>
+<h5 id="balance">balance</h5>
+<div class="highlight"><pre><span></span><code>Chain.balance(a : address) : int
+</code></pre></div>
+<p>The balance of account <code>a</code>.</p>
+<h5 id="block_hash">block_hash</h5>
+<div class="highlight"><pre><span></span><code>Chain.block_hash(h : int) : option(bytes(32))
+</code></pre></div>
+<p>The hash of the block at height <code>h</code>. <code>h</code> has to be within 256 blocks from the
+current height of the chain or else the function will return <code>None</code>.</p>
+<p>NOTE: In FATE VM version 1 <code>Chain.block_height</code> was not considered an
+allowed height. From FATE VM version 2 (IRIS) it will return the block hash of
+the current generation.</p>
+<h5 id="block_height">block_height</h5>
+<div class="highlight"><pre><span></span><code>Chain.block_height : int&quot;
+</code></pre></div>
+<p>The height of the current block (i.e. the block in which the current call will be included).</p>
+<h5 id="bytecode_hash">bytecode_hash</h5>
+<div class="highlight"><pre><span></span><code>Chain.bytecode_hash : &#39;c =&gt; option(hash)
+</code></pre></div>
+<p>Returns the hash of the contract's bytecode (or <code>None</code> if it is
+nonexistent or deployed before FATE2). The type <code>'c</code> must be
+instantiated with a contract. The charged gas increases linearly to
+the size of the serialized bytecode of the deployed contract.</p>
+<h5 id="create">create</h5>
+<div class="highlight"><pre><span></span><code>Chain.create(value : int, ...) =&gt; &#39;c
+</code></pre></div>
+<p>Creates and deploys a new instance of a contract <code>'c</code>. All of the
+unnamed arguments will be passed to the <code>init</code> function. The charged
+gas increases linearly with the size of the compiled child contract's
+bytecode. The <code>source_hash</code> on-chain entry of the newly created
+contract will be the SHA256 hash over concatenation of</p>
+<ul>
+<li>whole contract source code</li>
+<li>single null byte</li>
+<li>name of the child contract</li>
+</ul>
+<p>The resulting contract's public key can be predicted and in case it happens to
+have some funds before its creation, its balance will be increased by
+the <code>value</code> parameter.</p>
+<p>The <code>value</code> argument (default <code>0</code>) is equivalent to the value in the contract
+creation transaction – it sets the initial value of the newly created contract
+charging the calling contract. Note that this won't be visible in <code>Call.value</code>
+in the <code>init</code> call of the new contract. It will be included in
+<code>Contract.balance</code>, however.</p>
+<h4 id="poseidon">poseidon</h4>
+<div class="highlight"><pre><span></span><code>Crypto.poseidon(x1 : int, x2 : int) : int
+</code></pre></div>
+<p>Hash two integers (in the scalar field of BLS12-381) to another integer (in the scalar
+field of BLS12-281). This is a ZK/SNARK-friendly hash function.</p>
+<p>The type <code>'c</code> must be instantiated with a contract.</p>
+<p>Example usage:
+<div class="highlight"><pre><span></span><code>payable contract Auction =
+  record state = {supply: int, name: string}
+  entrypoint init(supply, name) = {supply: supply, name: name}
+  stateful payable entrypoint buy(amount) =
+    require(Call.value == amount, &quot;amount_value_mismatch&quot;)
+    ...
+  stateful entrypoint sell(amount) =
+    require(amount &gt;= 0, &quot;negative_amount&quot;)
+    ...
+
+main contract Market =
+  type state = list(Auction)
+  entrypoint init() = []
+  stateful entrypoint new(name : string) =
+    let new_auction = Chain.create(0, name) : Auction
+    put(new_auction::state)
+</code></pre></div></p>
+<p>The typechecker must be certain about the created contract's type, so it is
+worth writing it explicitly as shown in the example.</p>
+<h5 id="clone">clone</h5>
+<div class="highlight"><pre><span></span><code>Chain.clone : ( ref : &#39;c, gas : int, value : int, protected : bool, ...
+              ) =&gt; if(protected) option(&#39;c) else &#39;c
+</code></pre></div>
+<p>Clones the contract under the mandatory named argument <code>ref</code>. That means a new
+contract of the same bytecode and the same <code>payable</code> parameter shall be created.
+<strong>NOTE:</strong> the <code>state</code> won't be copied and the contract will be initialized with
+a regular call to the <code>init</code> function with the remaining unnamed arguments. The
+resulting contract's public key can be predicted and in case it happens to have
+some funds before its creation, its balance will be increased by the <code>value</code>
+parameter. This operation is significantly cheaper than <code>Chain.create</code> as it
+costs a fixed amount of gas.</p>
+<p>The <code>gas</code> argument (default <code>Call.gas_left</code>) limits the gas supply for the
+<code>init</code> call of the cloned contract.</p>
+<p>The <code>value</code> argument (default <code>0</code>) is equivalent to the value in the contract
+creation transaction – it sets the initial value of the newly created contract
+charging the calling contract. Note that this won't be visible in <code>Call.value</code>
+in the <code>init</code> call of the new contract. It will be included in
+<code>Contract.balance</code>, however.</p>
+<p>The <code>protected</code> argument (default <code>false</code>) works identically as in remote calls.
+If set to <code>true</code> it will change the return type to <code>option('c)</code> and will catch
+all errors such as <code>abort</code>, out of gas and wrong arguments. Note that it can
+only take a boolean <em>literal</em>, so other expressions such as variables will be
+rejected by the compiler.</p>
+<p>The type <code>'c</code> must be instantiated with a contract.</p>
+<p>Example usage:</p>
+<div class="highlight"><pre><span></span><code>payable contract interface Auction =
+  entrypoint init : (int, string) =&gt; void
+  stateful payable entrypoint buy : (int) =&gt; ()
+  stateful entrypoint sell : (int) =&gt; ()
+
+main contract Market =
+  type state = list(Auction)
+  entrypoint init() = []
+  stateful entrypoint new_of(template : Auction, name : string) =
+    switch(Chain.clone(ref=template, protected=true, 0, name))
+      None =&gt; abort(&quot;Bad auction!&quot;)
+      Some(new_auction) =&gt;
+        put(new_auction::state)
+</code></pre></div>
+<p>When cloning by an interface, <code>init</code> entrypoint declaration is required. It is a
+good practice to set its return type to <code>void</code> in order to indicate that this
+function is not supposed to be called and is state agnostic. Trivia: internal
+implementation of the <code>init</code> function does not actually return <code>state</code>, but
+calls <code>put</code> instead. Moreover, FATE prevents even handcrafted calls to <code>init</code>.</p>
+<h5 id="coinbase">coinbase</h5>
+<div class="highlight"><pre><span></span><code>Chain.coinbase : address
+</code></pre></div>
+<p>The address of the account that mined the current block.</p>
+<h5 id="difficulty">difficulty</h5>
+<div class="highlight"><pre><span></span><code>Chain.difficulty : int
+</code></pre></div>
+<p>The difficulty of the current block.</p>
+<h5 id="event">event</h5>
+<div class="highlight"><pre><span></span><code>Chain.event(e : event) : unit
+</code></pre></div>
+<p>Emits the event. To use this function one needs to define the <code>event</code> type as a
+<code>datatype</code> in the contract.</p>
+<h5 id="gas_limit">gas_limit</h5>
+<div class="highlight"><pre><span></span><code>Chain.gas_limit : int
+</code></pre></div>
+<p>The gas limit of the current block.</p>
+<h5 id="network_id">network_id</h5>
+<div class="highlight"><pre><span></span><code>Chain.network\_id : string
+</code></pre></div>
+<p>The network id of the chain.</p>
+<h5 id="spend">spend</h5>
+<div class="highlight"><pre><span></span><code>Chain.spend(to : address, amount : int) : unit
+</code></pre></div>
+<p>Spend <code>amount</code> tokens to <code>to</code>. Will fail (and abort the contract) if contract
+doesn't have <code>amount</code> tokens to transfer, or, if <code>to</code> is not <code>payable</code>.</p>
+<h5 id="timestamp">timestamp</h5>
+<div class="highlight"><pre><span></span><code>Chain.timestamp : int
+</code></pre></div>
+<p>The timestamp of the current block (unix time, milliseconds).</p>
+<h3 id="char">Char</h3>
+<h4 id="to_int_1">to_int</h4>
+<p><code>Char.to_int(c : char) : int
+<div class="highlight"><pre><span></span><code>Returns the UTF-8 codepoint of a character
+
+
+#### from_int
+</code></pre></div>
+Char.from_int(i : int) : option(char)</code></p>
+<p>Opposite of <a href="#to_int">to_int</a>. Returns <code>None</code> if the integer doesn't correspond to a single (normalized) codepoint.</p>
+<h3 id="contract">Contract</h3>
+<p>Values related to the current contract</p>
+<h4 id="creator">creator</h4>
+<div class="highlight"><pre><span></span><code>Contract.creator : address
+</code></pre></div>
+<p>Address of the entity that signed the contract creation transaction</p>
+<h4 id="address_1">address</h4>
+<div class="highlight"><pre><span></span><code>Contract.address : address
+</code></pre></div>
+<p>Address of the contract account</p>
+<h4 id="balance_1">balance</h4>
+<div class="highlight"><pre><span></span><code>Contract.balance : int
+</code></pre></div>
+<p>Amount of coins in the contract account</p>
+<h3 id="crypto">Crypto</h3>
+<h4 id="sha3">sha3</h4>
+<div class="highlight"><pre><span></span><code>Crypto.sha3(x : &#39;a) : hash
+</code></pre></div>
+<p>Hash any object to SHA3</p>
+<h4 id="sha256">sha256</h4>
+<div class="highlight"><pre><span></span><code>Crypto.sha256(x : &#39;a) : hash
+</code></pre></div>
+<p>Hash any object to SHA256</p>
+<h4 id="blake2b">blake2b</h4>
+<div class="highlight"><pre><span></span><code>Crypto.blake2b(x : &#39;a) : hash
+</code></pre></div>
+<p>Hash any object to blake2b</p>
+<h4 id="verify_sig">verify_sig</h4>
+<div class="highlight"><pre><span></span><code>Crypto.verify_sig(msg : bytes(), pubkey : address, sig : signature) : bool
+</code></pre></div>
+<p>Checks if the signature of <code>msg</code> was made using private key corresponding to
+the <code>pubkey</code>.</p>
+<p>Note: before v8 of the compiler, <code>msg</code> had type <code>hash</code> (i.e. <code>bytes(32)</code>).</p>
+<h4 id="ecverify_secp256k1">ecverify_secp256k1</h4>
+<div class="highlight"><pre><span></span><code>Crypto.ecverify_secp256k1(msg : hash, addr : bytes(20), sig : bytes(65)) : bool
+</code></pre></div>
+<p>Verifies a signature for a msg against an Ethereum style address. Note that the
+signature should be 65 bytes and include the recovery identifier byte <code>V</code>. The
+expected organization of the signature is (<code>V || R || S</code>).</p>
+<h4 id="ecrecover_secp256k1">ecrecover_secp256k1</h4>
+<div class="highlight"><pre><span></span><code>Crypto.ecrecover_secp256k1(msg : hash, sig : bytes(65)) : option(bytes(20))
+</code></pre></div>
+<p>Recovers the Ethereum style address from a msg hash and respective
+ECDSA-signature. Note that the signature should be 65 bytes and include the
+recovery identifier byte <code>V</code>. The expected organization of the signature is (<code>V
+|| R || S</code>).</p>
+<h4 id="verify_sig_secp256k1">verify_sig_secp256k1</h4>
+<div class="highlight"><pre><span></span><code>Crypto.verify_sig_secp256k1(msg : hash, pubkey : bytes(64), sig : bytes(64)) : bool
+</code></pre></div>
+<p>Verifies a standard 64-byte ECDSA signature (<code>R || S</code>).</p>
+<h3 id="int">Int</h3>
+<h4 id="to_str_2">to_str</h4>
+<div class="highlight"><pre><span></span><code>Int.to_str(n : int) : string
+</code></pre></div>
+<p>Casts the integer to a string (in decimal representation).</p>
+<h4 id="to_bytes_1">to_bytes</h4>
+<div class="highlight"><pre><span></span><code>Int.to_bytes(n : int, size : int) : bytes()
+</code></pre></div>
+<p>Casts the integer to a byte array with <code>size</code> bytes (big endian, truncating if
+necessary not preserving signedness). I.e. if you try to squeeze <code>-129</code> into a
+single byte that will be indistinguishable from <code>127</code>.</p>
+<h3 id="map">Map</h3>
+<h4 id="lookup_1">lookup</h4>
+<p><code>Map.lookup(k : 'k, m : map('k, 'v)) : option('v)</code></p>
+<p>Returns the value under a key in given map as <code>Some</code> or <code>None</code>
+if the key is not present</p>
+<h4 id="lookup_default">lookup_default</h4>
+<p><code>Map.lookup_default(k : 'k, m : map('k, 'v), v : 'v) : 'v</code></p>
+<p>Returns the value under a key in given map or the
+default value <code>v</code> if the key is not present</p>
+<h4 id="member">member</h4>
+<p><code>Map.member(k : 'k, m : map('k, 'v)) : bool</code></p>
+<p>Checks if the key is present in the map</p>
+<h4 id="delete">delete</h4>
+<p><code>Map.delete(k : 'k, m : map('k, 'v)) : map('k, 'v)</code></p>
+<p>Removes the key from the map</p>
+<h4 id="size_1">size</h4>
+<p><code>Map.size(m : map('k, 'v)) : int</code></p>
+<p>Returns the number of elements in the map</p>
+<h4 id="to_list">to_list</h4>
+<p><code>Map.to_list(m : map('k, 'v)) : list('k * 'v)</code></p>
+<p>Returns a list containing pairs of keys and their respective elements.</p>
+<h4 id="from_list">from_list</h4>
+<p><code>Map.from_list(m : list('k * 'v)) : map('k, 'v)</code></p>
+<p>Turns a list of pairs of form <code>(key, value)</code> into a map</p>
+<h3 id="oracle">Oracle</h3>
+<h4 id="register">register</h4>
+<div class="highlight"><pre><span></span><code>Oracle.register(&lt;signature : bytes(64)&gt;, acct : address, qfee : int, ttl : Chain.ttl) : oracle(&#39;a, &#39;b)
+</code></pre></div>
+<p>Registers new oracle answering questions of type <code>'a</code> with answers of type <code>'b</code>.</p>
+<ul>
+<li>The <code>acct</code> is the address of the oracle to register (can be the same as the contract).</li>
+<li>The <a href="../sophia_features/#delegation-signature">signature</a> should be a
+  serialized structure containing <code>network id</code>, <code>account address</code>, and
+  <code>contract address</code>. Using the private key of <code>account address</code> for signing.
+  Proving you have the private key of the oracle to be. If the address is the same
+  as the contract <code>sign</code> is ignored and can be left out entirely.</li>
+<li>The <code>qfee</code> is the minimum query fee to be paid by a user when asking a question of the oracle.</li>
+<li>The <code>ttl</code> is the Time To Live for the oracle in key blocks, either relative to the current
+  key block height (<code>RelativeTTL(delta)</code>) or a fixed key block height (<code>FixedTTL(height)</code>).</li>
+<li>The type <code>'a</code> is the type of the question to ask.</li>
+<li>The type <code>'b</code> is the type of the oracle answers.</li>
+</ul>
+<p>Examples:
+<div class="highlight"><pre><span></span><code>  Oracle.register(addr0, 25, RelativeTTL(400))
+  Oracle.register(addr1, 25, RelativeTTL(500), signature = sign1)
+</code></pre></div></p>
+<h4 id="get_question">get_question</h4>
+<div class="highlight"><pre><span></span><code>Oracle.get_question(o : oracle(&#39;a, &#39;b), q : oracle_query(&#39;a, &#39;b)) : &#39;a
+</code></pre></div>
+<p>Checks what was the question of query <code>q</code> on oracle <code>o</code></p>
+<h4 id="respond">respond</h4>
+<div class="highlight"><pre><span></span><code>Oracle.respond(&lt;signature : bytes(64)&gt;, o : oracle(&#39;a, &#39;b), q : oracle_query(&#39;a, &#39;b), &#39;b) : unit
+</code></pre></div>
+<p>Responds to the question <code>q</code> on <code>o</code>.  Unless the contract address is the same
+as the oracle address the <code>signature</code> (which is an optional, named argument)
+needs to be provided. Proving that we have the private key of the oracle by
+<a href="../sophia_features/#delegation-signature">signing</a> should be a serialized
+structure containing <code>network id</code>, <code>oracle query id</code>, and <code>contract address</code>.</p>
+<h4 id="extend">extend</h4>
+<div class="highlight"><pre><span></span><code>Oracle.extend(&lt;signature : bytes(64)&gt;, o : oracle(&#39;a, &#39;b), ttl : Chain.ttl) : unit
+</code></pre></div>
+<p>Extends TTL of an oracle.
+* <code>singature</code> is a named argument and thus optional. Must be the same as for <code>Oracle.register</code>
+* <code>o</code> is the oracle being extended
+* <code>ttl</code> must be <code>RelativeTTL</code>. The time to live of <code>o</code> will be extended by this value.</p>
+<h4 id="query_fee">query_fee</h4>
+<div class="highlight"><pre><span></span><code>Oracle.query_fee(o : oracle(&#39;a, &#39;b)) : int
+</code></pre></div>
+<p>Returns the query fee of the oracle</p>
+<h4 id="query">query</h4>
+<div class="highlight"><pre><span></span><code>Oracle.query(o : oracle(&#39;a, &#39;b), q : &#39;a, qfee : int, qttl : Chain.ttl, rttl : Chain.ttl) : oracle_query(&#39;a, &#39;b)
+</code></pre></div>
+<p>Asks the oracle a question.
+* The <code>qfee</code> is the query fee debited to the contract account (<code>Contract.address</code>).
+* The <code>qttl</code> controls the last height at which the oracle can submit a response
+  and can be either fixed or relative.
+* The <code>rttl</code> must be relative and controls how long an answer is kept on the chain.
+The call fails if the oracle could expire before an answer.</p>
+<h4 id="get_answer">get_answer</h4>
+<div class="highlight"><pre><span></span><code>Oracle.get_answer(o : oracle(&#39;a, &#39;b), q : oracle_query(&#39;a, &#39;b)) : option(&#39;b)
+</code></pre></div>
+<p>Checks what is the optional query answer</p>
+<h4 id="expiry">expiry</h4>
+<div class="highlight"><pre><span></span><code>Oracle.expiry(o : oracle(&#39;a, &#39;b)) : int
+</code></pre></div>
+<p>Ask the oracle when it expires. The result is the block height at which it will happen.</p>
+<h4 id="check">check</h4>
+<div class="highlight"><pre><span></span><code>Oracle.check(o : oracle(&#39;a, &#39;b)) : bool
+</code></pre></div>
+<p>Returns <code>true</code> iff the oracle <code>o</code> exists and has correct type</p>
+<h4 id="check_query">check_query</h4>
+<div class="highlight"><pre><span></span><code>Oracle.check_query(o : oracle(&#39;a, &#39;b), q : oracle_query(&#39;a, &#39;b)) : bool
+</code></pre></div>
+<p>It returns <code>true</code> iff the oracle query exist and has the expected type.</p>
+<h2 id="includable-namespaces">Includable namespaces</h2>
+<p>These need to be explicitly included (with <code>.aes</code> suffix)</p>
+<h3 id="aenscompat">AENSCompat</h3>
+<h4 id="pointee_to_v2">pointee_to_V2</h4>
+<div class="highlight"><pre><span></span><code>AENSCompat.pointee_to_V2(p : AENS.pointee) : AENSv2.pointee
+</code></pre></div>
+<p>Translate old pointee format to new, this is always possible.</p>
+<h4 id="pointee_from_v2">pointee_from_V2</h4>
+<div class="highlight"><pre><span></span><code>AENSCompat.pointee_from_V2(p2 : AENSv2.pointee) : option(AENS.pointee)
+</code></pre></div>
+<p>Translate new pointee format to old, <code>DataPt</code> can't be translated, so <code>None</code> is returned in this case.</p>
+<h3 id="bls12_381">BLS12_381</h3>
+<h4 id="types_3">Types</h4>
+<h5 id="fr">fr</h5>
+<p>Built-in (Montgomery) integer representation 32 bytes</p>
+<h5 id="fp">fp</h5>
+<p>Built-in (Montgomery) integer representation 48 bytes</p>
+<h5 id="fp2">fp2</h5>
+<div class="highlight"><pre><span></span><code>record fp2 = { x1 : fp, x2 : fp }`
+</code></pre></div>
+<h5 id="g1">g1</h5>
+<div class="highlight"><pre><span></span><code>record g1  = { x : fp, y : fp, z : fp }
+</code></pre></div>
+<h5 id="g2">g2</h5>
+<div class="highlight"><pre><span></span><code>record g2  = { x : fp2, y : fp2, z : fp2 }
+</code></pre></div>
+<h5 id="gt">gt</h5>
+<div class="highlight"><pre><span></span><code>record gt  = { x1 : fp, x2 : fp, x3 : fp, x4 : fp, x5 : fp, x6 : fp, x7 : fp, x8 : fp, x9 : fp, x10 : fp, x11 : fp, x12 : fp }
+</code></pre></div>
+<h4 id="functions_2">Functions</h4>
+<h5 id="pairing_check">pairing_check</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.pairing_check(xs : list(g1), ys : list(g2)) : bool
+</code></pre></div>
+<p>Pairing check of a list of points, <code>xs</code> and <code>ys</code> should be of equal length.</p>
+<h5 id="int_to_fr">int_to_fr</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.int_to_fr(x : int) : fr
+</code></pre></div>
+<p>Convert an integer to an <code>fr</code> - a 32 bytes internal (Montgomery) integer representation.</p>
+<h5 id="int_to_fp">int_to_fp</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.int_to_fp(x : int) : fp
+</code></pre></div>
+<p>Convert an integer to an <code>fp</code> - a 48 bytes internal (Montgomery) integer representation.</p>
+<h5 id="fr_to_int">fr_to_int</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.fr_to_int(x : fr)  : int
+</code></pre></div>
+<p>Convert a <code>fr</code> value into an integer.</p>
+<h5 id="fp_to_int">fp_to_int</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.fp_to_int(x : fp)  : int
+</code></pre></div>
+<p>Convert a <code>fp</code> value into an integer.</p>
+<h5 id="mk_g1">mk_g1</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.mk_g1(x : int, y : int, z : int) : g1
+</code></pre></div>
+<p>Construct a <code>g1</code> point from three integers.</p>
+<h5 id="mk_g2">mk_g2</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.mk_g2(x1 : int, x2 : int, y1 : int, y2 : int, z1 : int, z2 : int) : g2
+</code></pre></div>
+<p>Construct a <code>g2</code> point from six integers.</p>
+<h5 id="g1_neg">g1_neg</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.g1_neg(p : g1) : g1
+</code></pre></div>
+<p>Negate a <code>g1</code> value.</p>
+<h5 id="g1_norm">g1_norm</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.g1_norm(p : g1) : g1
+</code></pre></div>
+<p>Normalize a <code>g1</code> value.</p>
+<h5 id="g1_valid">g1_valid</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.g1_valid(p : g1) : bool
+</code></pre></div>
+<p>Check that a <code>g1</code> value is a group member.</p>
+<h5 id="g1_is_zero">g1_is_zero</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.g1_is_zero(p : g1) : bool
+</code></pre></div>
+<p>Check if a <code>g1</code> value corresponds to the zero value of the group.</p>
+<h5 id="g1_add">g1_add</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.g1_add(p : g1, q : g1) : g1
+</code></pre></div>
+<p>Add two <code>g1</code> values.</p>
+<h5 id="g1_mul">g1_mul</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.g1_mul(k : fr, p : g1) : g1
+</code></pre></div>
+<p>Scalar multiplication for <code>g1</code>.</p>
+<h5 id="g2_neg">g2_neg</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.g2_neg(p : g2) : g2
+</code></pre></div>
+<p>Negate a <code>g2</code> value.</p>
+<h5 id="g2_norm">g2_norm</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.g2_norm(p : g2) : g2
+</code></pre></div>
+<p>Normalize a <code>g2</code> value.</p>
+<h5 id="g2_valid">g2_valid</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.g2_valid(p : g2) : bool
+</code></pre></div>
+<p>Check that a <code>g2</code> value is a group member.</p>
+<h5 id="g2_is_zero">g2_is_zero</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.g2_is_zero(p : g2) : bool
+</code></pre></div>
+<p>Check if a <code>g2</code> value corresponds to the zero value of the group.</p>
+<h5 id="g2_add">g2_add</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.g2_add(p : g2, q : g2) : g2
+</code></pre></div>
+<p>Add two <code>g2</code> values.</p>
+<h5 id="g2_mul">g2_mul</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.g2_mul(k : fr, p : g2) : g2
+</code></pre></div>
+<p>Scalar multiplication for <code>g2</code>.</p>
+<h5 id="gt_inv">gt_inv</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.gt_inv(p : gt) : gt
+</code></pre></div>
+<p>Invert a <code>gt</code> value.</p>
+<h5 id="gt_add">gt_add</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.gt_add(p : gt, q : gt) : gt
+</code></pre></div>
+<p>Add two <code>gt</code> values.</p>
+<h5 id="gt_mul">gt_mul</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.gt_mul(p : gt, q : gt) : gt
+</code></pre></div>
+<p>Multiply two <code>gt</code> values.</p>
+<h5 id="gt_pow">gt_pow</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.gt_pow(p : gt, k : fr) : gt
+</code></pre></div>
+<p>Calculate exponentiation <code>p ^ k</code>.</p>
+<h5 id="gt_is_one">gt_is_one</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.gt_is_one(p : gt) : bool
+</code></pre></div>
+<p>Compare a <code>gt</code> value to the unit value of the Gt group.</p>
+<h5 id="pairing">pairing</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.pairing(p : g1, q : g2) : gt
+</code></pre></div>
+<p>Compute the pairing of a <code>g1</code> value and a <code>g2</code> value.</p>
+<h5 id="miller_loop">miller_loop</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.miller_loop(p : g1, q : g2) : gt
+</code></pre></div>
+<p>Do the Miller loop stage of pairing for <code>g1</code> and <code>g2</code>.</p>
+<h5 id="final_exp">final_exp</h5>
+<div class="highlight"><pre><span></span><code>BLS12_381.final_exp(p : gt) : gt
+</code></pre></div>
+<p>Perform the final exponentiation step of pairing for a <code>gt</code> value.</p>
+<h3 id="func">Func</h3>
+<p>Functional combinators.</p>
+<h4 id="id">id</h4>
+<div class="highlight"><pre><span></span><code>Func.id(x : &#39;a) : &#39;a
+</code></pre></div>
+<p>Identity function. Returns its argument.</p>
+<h4 id="const">const</h4>
+<div class="highlight"><pre><span></span><code>Func.const(x : &#39;a) : &#39;b =&gt; &#39;a = (y) =&gt; x
+</code></pre></div>
+<p>Constant function constructor. Given <code>x</code> returns a function that returns <code>x</code> regardless of its argument.</p>
+<h4 id="flip">flip</h4>
+<div class="highlight"><pre><span></span><code>Func.flip(f : (&#39;a, &#39;b) =&gt; &#39;c) : (&#39;b, &#39;a) =&gt; &#39;c
+</code></pre></div>
+<p>Switches order of arguments of arity 2 function.</p>
+<h4 id="comp">comp</h4>
+<div class="highlight"><pre><span></span><code>Func.comp(f : &#39;b =&gt; &#39;c, g : &#39;a =&gt; &#39;b) : &#39;a =&gt; &#39;c
+</code></pre></div>
+<p>Function composition. <code>comp(f, g)(x) == f(g(x))</code>.</p>
+<h4 id="pipe">pipe</h4>
+<div class="highlight"><pre><span></span><code>Func.pipe(f : &#39;a =&gt; &#39;b, g : &#39;b =&gt; &#39;c) : &#39;a =&gt; &#39;c
+</code></pre></div>
+<p>Flipped function composition. <code>pipe(f, g)(x) == g(f(x))</code>.</p>
+<h4 id="rapply">rapply</h4>
+<div class="highlight"><pre><span></span><code>Func.rapply(x : &#39;a, f : &#39;a =&gt; &#39;b) : &#39;b
+</code></pre></div>
+<p>Reverse application. <code>rapply(x, f) == f(x)</code>.</p>
+<h4 id="recur">recur</h4>
+<div class="highlight"><pre><span></span><code>Func.recur(f : (&#39;arg =&gt; &#39;res, &#39;arg) =&gt; &#39;res) : &#39;arg =&gt; &#39;res
+</code></pre></div>
+<p>The Z combinator. Allows performing local recursion and having anonymous recursive lambdas. To make function <code>A =&gt; B</code> recursive the user needs to transform it to take two arguments instead – one of type <code>A =&gt; B</code> which is going to work as a self-reference, and the other one of type <code>A</code>  which is the original argument. Therefore, transformed function should have <code>(A =&gt; B, A) =&gt; B</code> signature.</p>
+<p>Example usage:
+<div class="highlight"><pre><span></span><code>let factorial = recur((fac, n) =&gt; if(n &lt; 2) 1 else n * fac(n - 1))
+</code></pre></div></p>
+<p>If the function is going to take more than one argument it will need to be either tuplified or have curried out latter arguments.</p>
+<p>Example (factorial with custom step):</p>
+<div class="highlight"><pre><span></span><code>// tuplified version
+let factorial_t(n, step) =
+  let fac(rec, args) =
+    let (n, step) = args
+    if(n &lt; 2) 1 else n * rec((n - step, step))
+  recur(fac)((n, step))
+
+// curried version
+let factorial_c(n, step) =
+  let fac(rec, n) = (step) =&gt;
+    if(n &lt; 2) 1 else n * rec(n - 1)(step)
+  recur(fac)(n)(step)
+</code></pre></div>
+<h4 id="iter">iter</h4>
+<div class="highlight"><pre><span></span><code>Func.iter(n : int, f : &#39;a =&gt; &#39;a) : &#39;a =&gt; &#39;a
+</code></pre></div>
+<p><code>n</code>th composition of f with itself, for instance <code>iter(3, f)</code> is equivalent to <code>(x) =&gt; f(f(f(x)))</code>.</p>
+<h4 id="curry">curry</h4>
+<div class="highlight"><pre><span></span><code>Func.curry2(f : (&#39;a, &#39;b) =&gt; &#39;c) : &#39;a =&gt; (&#39;b =&gt; &#39;c)
+Func.curry3(f : (&#39;a, &#39;b, &#39;c) =&gt; &#39;d) : &#39;a =&gt; (&#39;b =&gt; (&#39;c =&gt; &#39;d))
+</code></pre></div>
+<p>Turns a function that takes n arguments into a curried function that takes
+one argument and returns a function that waits for the rest in the same
+manner. For instance <code>curry2((a, b) =&gt; a + b)(1)(2) == 3</code>.</p>
+<h4 id="uncurry">uncurry</h4>
+<div class="highlight"><pre><span></span><code>Func.uncurry2(f : &#39;a =&gt; (&#39;b =&gt; &#39;c)) : (&#39;a, &#39;b) =&gt; &#39;c
+Func.uncurry3(f : &#39;a =&gt; (&#39;b =&gt; (&#39;c =&gt; &#39;d))) : (&#39;a, &#39;b, &#39;c) =&gt; &#39;d
+</code></pre></div>
+<p>Opposite to <a href="#curry">curry</a>.</p>
+<h4 id="tuplify">tuplify</h4>
+<div class="highlight"><pre><span></span><code>Func.tuplify2(f : (&#39;a, &#39;b) =&gt; &#39;c) : ((&#39;a * &#39;b)) =&gt; &#39;c
+Func.tuplify3(f : (&#39;a, &#39;b, &#39;c) =&gt; &#39;d) : &#39;a * &#39;b * &#39;c =&gt; &#39;d
+</code></pre></div>
+<p>Turns a function that takes n arguments into a function that takes an n-tuple.</p>
+<h4 id="untuplify">untuplify</h4>
+<div class="highlight"><pre><span></span><code>Func.untuplify2(f : &#39;a * &#39;b =&gt; &#39;c) : (&#39;a, &#39;b) =&gt; &#39;c
+Func.untuplify3(f : &#39;a * &#39;b * &#39;c =&gt; &#39;d) : (&#39;a, &#39;b, &#39;c) =&gt; &#39;d
+</code></pre></div>
+<p>Opposite to <a href="#tuplify">tuplify</a>.</p>
+<h3 id="frac">Frac</h3>
+<p>This namespace provides operations on rational numbers. A rational number is represented
+as a fraction of two integers which are stored internally in the <code>frac</code> datatype.</p>
+<p>The datatype consists of three constructors <code>Neg/2</code>, <code>Zero/0</code> and <code>Pos/2</code> which determine the
+sign of the number. Both values stored in <code>Neg</code> and <code>Pos</code> need to be strictly positive
+integers. However, when creating a <code>frac</code> you should never use the constructors explicitly.
+Instead of that, always use provided functions like <code>make_frac</code> or <code>from_int</code>. This helps
+keeping the internal representation well defined.</p>
+<p>The described below functions take care of the normalization of the fractions –
+they won't grow if it is unnecessary. Please note that the size of <code>frac</code> can be still
+very big while the value is actually very close to a natural number – the division of
+two extremely big prime numbers <em>will</em> be as big as both of them. To face this issue
+the <a href="#optimize">optimize</a> function is provided. It will approximate the value of the
+fraction to fit in the given error margin and to shrink its size as much as possible.</p>
+<p><strong>Important note:</strong> <code>frac</code> must <em>not</em> be compared using standard <code>&lt;</code>-like operators.
+The operator comparison is not possible to overload at this moment, nor the
+language provides checkers to prevent unintended usage of them. Therefore the typechecker
+<strong>will</strong> allow that and the results of such comparison will be unspecified.
+You should use <a href="#lt">lt</a>, <a href="#geq">geq</a>, <a href="#eq">eq</a> etc instead.</p>
+<h4 id="types_4">Types</h4>
+<h5 id="frac_1">frac</h5>
+<div class="highlight"><pre><span></span><code>datatype frac = Pos(int, int) | Zero | Neg(int, int)
+</code></pre></div>
+<p>Internal representation of fractional numbers. First integer encodes the numerator and the second the denominator –
+both must be always positive, as the sign is being handled by the choice of the constructor.</p>
+<h4 id="functions_3">Functions</h4>
+<h5 id="make_frac">make_frac</h5>
+<p><code>Frac.make_frac(n : int, d : int) : frac</code></p>
+<p>Creates a fraction out of numerator and denominator. Automatically normalizes, so
+<code>make_frac(2, 4)</code> and <code>make_frac(1, 2)</code> will yield same results.</p>
+<h5 id="num">num</h5>
+<p><code>Frac.num(f : frac) : int</code></p>
+<p>Returns the numerator of a fraction.</p>
+<h5 id="den">den</h5>
+<p><code>Frac.den(f : frac) : int</code></p>
+<p>Returns the denominator of a fraction.</p>
+<h5 id="to_pair">to_pair</h5>
+<p><code>Frac.to_pair(f : frac) : int * int</code></p>
+<p>Turns a fraction into a pair of numerator and denominator.</p>
+<h5 id="sign">sign</h5>
+<p><code>Frac.sign(f : frac) : int</code></p>
+<p>Returns the signum of a fraction, -1, 0, 1 if negative, zero, positive respectively.</p>
+<h5 id="to_str_3">to_str</h5>
+<p><code>Frac.to_str(f : frac) : string</code></p>
+<p>Conversion to string. Does not display division by 1 or denominator if equals zero.</p>
+<h5 id="simplify">simplify</h5>
+<p><code>Frac.simplify(f : frac) : frac</code></p>
+<p>Reduces fraction to normal form if for some reason it is not in it.</p>
+<h5 id="eq">eq</h5>
+<p><code>Frac.eq(a : frac, b : frac) : bool</code></p>
+<p>Checks if <code>a</code> is equal to <code>b</code>.</p>
+<h5 id="neq">neq</h5>
+<p><code>Frac.neq(a : frac, b : frac) : bool</code></p>
+<p>Checks if <code>a</code> is not equal to <code>b</code>.</p>
+<h5 id="geq">geq</h5>
+<p><code>Frac.geq(a : frac, b : frac) : bool</code></p>
+<p>Checks if <code>a</code> is greater or equal to <code>b</code>.</p>
+<h5 id="leq">leq</h5>
+<p><code>Frac.leq(a : frac, b : frac) : bool</code></p>
+<p>Checks if <code>a</code> is lesser or equal to <code>b</code>.</p>
+<h5 id="gt_1">gt</h5>
+<p><code>Frac.gt(a : frac, b : frac) : bool</code></p>
+<p>Checks if <code>a</code> is greater than <code>b</code>.</p>
+<h5 id="lt">lt</h5>
+<p><code>Frac.lt(a : frac, b : frac) : bool</code></p>
+<p>Checks if <code>a</code> is lesser than <code>b</code>.</p>
+<h5 id="min">min</h5>
+<p><code>Frac.min(a : frac, b : frac) : frac</code></p>
+<p>Chooses lesser of the two fractions.</p>
+<h5 id="max">max</h5>
+<p><code>Frac.max(a : frac, b : frac) : frac</code></p>
+<p>Chooses greater of the two fractions.</p>
+<h5 id="abs">abs</h5>
+<p><code>Frac.abs(f : frac) : frac</code></p>
+<p>Absolute value.</p>
+<h5 id="from_int">from_int</h5>
+<p><code>Frac.from_int(n : int) : frac</code></p>
+<p>From integer conversion. Effectively <code>make_frac(n, 1)</code>.</p>
+<h5 id="floor">floor</h5>
+<p><code>Frac.floor(f : frac) : int</code></p>
+<p>Rounds a fraction to the nearest lesser or equal integer.</p>
+<h5 id="ceil">ceil</h5>
+<p><code>Frac.ceil(f : frac) : int</code></p>
+<p>Rounds a fraction to the nearest greater or equal integer.</p>
+<h5 id="round_to_zero">round_to_zero</h5>
+<p><code>Frac.round_to_zero(f : frac) : int</code></p>
+<p>Rounds a fraction towards zero.
+Effectively <code>ceil</code> if lesser than zero and <code>floor</code> if greater.</p>
+<h5 id="round_from_zero">round_from_zero</h5>
+<p><code>Frac.round_from_zero(f : frac) : int</code></p>
+<p>Rounds a fraction from zero.
+Effectively <code>ceil</code> if greater than zero and <code>floor</code> if lesser.</p>
+<h5 id="round">round</h5>
+<p><code>Frac.round(f : frac) : int</code></p>
+<p>Rounds a fraction to a nearest integer. If two integers are in the same distance it
+will choose the even one.</p>
+<h5 id="add">add</h5>
+<p><code>Frac.add(a : frac, b : frac) : frac</code></p>
+<p>Sum of the fractions.</p>
+<h5 id="neg">neg</h5>
+<p><code>Frac.neg(a : frac) : frac</code></p>
+<p>Negation of the fraction.</p>
+<h5 id="sub">sub</h5>
+<p><code>Frac.sub(a : frac, b : frac) : frac</code></p>
+<p>Subtraction of two fractions.</p>
+<h5 id="inv">inv</h5>
+<p><code>Frac.inv(a : frac) : frac</code></p>
+<p>Inverts a fraction. Throws error if <code>a</code> is zero.</p>
+<h5 id="mul">mul</h5>
+<p><code>Frac.mul(a : frac, b : frac) : frac</code></p>
+<p>Multiplication of two fractions.</p>
+<h5 id="div">div</h5>
+<p><code>Frac.div(a : frac, b : frac) : frac</code></p>
+<p>Division of two fractions.</p>
+<h5 id="int_exp">int_exp</h5>
+<p><code>Frac.int_exp(b : frac, e : int) : frac</code></p>
+<p>Takes <code>b</code> to the power of <code>e</code>. The exponent can be a negative value.</p>
+<h5 id="optimize">optimize</h5>
+<p><code>Frac.optimize(f : frac, loss : frac) : frac</code></p>
+<p>Shrink the internal size of a fraction as much as possible by approximating it to the
+point where the error would exceed the <code>loss</code> value.</p>
+<h5 id="is_sane">is_sane</h5>
+<p><code>Frac.is_sane(f : frac) : bool</code></p>
+<p>For debugging. If it ever returns false in a code that doesn't call <code>frac</code> constructors or
+accept arbitrary <code>frac</code>s from the surface you should report it as a
+<a href="https://github.com/aeternity/aesophia/issues/new">bug</a></p>
+<p>If you expect getting calls with malformed <code>frac</code>s in your contract, you should use
+this function to verify the input.</p>
+<h3 id="list">List</h3>
+<p>This module contains common operations on lists like constructing, querying, traversing etc.</p>
+<h4 id="is_empty">is_empty</h4>
+<div class="highlight"><pre><span></span><code>List.is_empty(l : list(&#39;a)) : bool
+</code></pre></div>
+<p>Returns <code>true</code> iff the list is equal to <code>[]</code>.</p>
+<h4 id="first">first</h4>
+<div class="highlight"><pre><span></span><code>List.first(l : list(&#39;a)) : option(&#39;a)
+</code></pre></div>
+<p>Returns <code>Some</code> of the first element of a list or <code>None</code> if the list is empty.</p>
+<h4 id="tail">tail</h4>
+<div class="highlight"><pre><span></span><code>List.tail(l : list(&#39;a)) : option(list(&#39;a))
+</code></pre></div>
+<p>Returns <code>Some</code> of a list without its first element or <code>None</code> if the list is empty.</p>
+<h4 id="last">last</h4>
+<div class="highlight"><pre><span></span><code>List.last(l : list(&#39;a)) : option(&#39;a)
+</code></pre></div>
+<p>Returns <code>Some</code> of the last element of a list or <code>None</code> if the list is empty.</p>
+<h4 id="contains">contains</h4>
+<p><div class="highlight"><pre><span></span><code>List.contains(e : &#39;a, l : list(&#39;a)) : bool
+</code></pre></div>
+Checks if list <code>l</code> contains element <code>e</code>. Equivalent to <code>List.find(x =&gt; x == e, l) != None</code>.</p>
+<h4 id="find">find</h4>
+<div class="highlight"><pre><span></span><code>List.find(p : &#39;a =&gt; bool, l : list(&#39;a)) : option(&#39;a)
+</code></pre></div>
+<p>Finds first element of <code>l</code> fulfilling predicate <code>p</code> as <code>Some</code> or <code>None</code> if no such element exists.</p>
+<h4 id="find_indices">find_indices</h4>
+<div class="highlight"><pre><span></span><code>List.find_indices(p : &#39;a =&gt; bool, l : list(&#39;a)) : list(int)
+</code></pre></div>
+<p>Returns list of all indices of elements from <code>l</code> that fulfill the predicate <code>p</code>.</p>
+<h4 id="nth">nth</h4>
+<div class="highlight"><pre><span></span><code>List.nth(n : int, l : list(&#39;a)) : option(&#39;a)
+</code></pre></div>
+<p>Gets <code>n</code>th element of <code>l</code> as <code>Some</code> or <code>None</code> if <code>l</code> is shorter than <code>n + 1</code> or <code>n</code> is negative.</p>
+<h4 id="get">get</h4>
+<div class="highlight"><pre><span></span><code>List.get(n : int, l : list(&#39;a)) : &#39;a
+</code></pre></div>
+<p>Gets <code>n</code>th element of <code>l</code> forcefully, throwing and error if <code>l</code> is shorter than <code>n + 1</code> or <code>n</code> is negative.</p>
+<h4 id="length">length</h4>
+<div class="highlight"><pre><span></span><code>List.length(l : list(&#39;a)) : int
+</code></pre></div>
+<p>Returns length of a list.</p>
+<h4 id="from_to">from_to</h4>
+<div class="highlight"><pre><span></span><code>List.from_to(a : int, b : int) : list(int)
+</code></pre></div>
+<p>Creates an ascending sequence of all integer numbers between <code>a</code> and <code>b</code> (including <code>a</code> and <code>b</code>).</p>
+<h4 id="from_to_step">from_to_step</h4>
+<div class="highlight"><pre><span></span><code>List.from_to_step(a : int, b : int, step : int) : list(int)
+</code></pre></div>
+<p>Creates an ascending sequence of integer numbers betweeen <code>a</code> and <code>b</code> jumping by given <code>step</code>. Includes <code>a</code> and takes <code>b</code> only if <code>(b - a) mod step == 0</code>. <code>step</code> should be bigger than 0.</p>
+<h4 id="replace_at">replace_at</h4>
+<div class="highlight"><pre><span></span><code>List.replace_at(n : int, e : &#39;a, l : list(&#39;a)) : list(&#39;a)
+</code></pre></div>
+<p>Replaces <code>n</code>th element of <code>l</code> with <code>e</code>. Throws an error if <code>n</code> is negative or would cause an overflow.</p>
+<h4 id="insert_at">insert_at</h4>
+<div class="highlight"><pre><span></span><code>List.insert_at(n : int, e : &#39;a, l : list(&#39;a)) : list(&#39;a)
+</code></pre></div>
+<p>Inserts <code>e</code> into <code>l</code> to be on position <code>n</code> by shifting following elements further. For instance,
+<div class="highlight"><pre><span></span><code>insert_at(2, 9, [1,2,3,4])
+</code></pre></div>
+will yield <code>[1,2,9,3,4]</code>.</p>
+<h4 id="insert_by">insert_by</h4>
+<div class="highlight"><pre><span></span><code>List.insert_by(cmp : ((&#39;a, &#39;a) =&gt; bool), x : &#39;a, l : list(&#39;a)) : list(&#39;a)
+</code></pre></div>
+<p>Assuming that cmp represents <code>&lt;</code> comparison, inserts <code>x</code> before the first element in the list <code>l</code> which is greater than it. For instance,
+<div class="highlight"><pre><span></span><code>insert_by((a, b) =&gt; a &lt; b, 4, [1,2,3,5,6,7])
+</code></pre></div>
+will yield <code>[1,2,3,4,5,6,7]</code></p>
+<h4 id="foldr">foldr</h4>
+<div class="highlight"><pre><span></span><code>List.foldr(cons : (&#39;a, &#39;b) =&gt; &#39;b, nil : &#39;b, l : list(&#39;a)) : &#39;b
+</code></pre></div>
+<p>Right fold of a list. Assuming <code>l = [x, y, z]</code> will return <code>f(x, f(y, f(z, nil)))</code>.
+Not tail recursive.</p>
+<h4 id="foldl">foldl</h4>
+<div class="highlight"><pre><span></span><code>List.foldl(rcons : (&#39;b, &#39;a) =&gt; &#39;b, acc : &#39;b, l : list(&#39;a)) : &#39;b
+</code></pre></div>
+<p>Left fold of a list. Assuming <code>l = [x, y, z]</code> will return <code>f(f(f(acc, x), y), z)</code>.
+Tail recursive.</p>
+<h4 id="foreach">foreach</h4>
+<div class="highlight"><pre><span></span><code>List.foreach(l : list(&#39;a), f : &#39;a =&gt; unit) : unit
+</code></pre></div>
+<p>Evaluates <code>f</code> on each element of a list.</p>
+<h4 id="reverse">reverse</h4>
+<div class="highlight"><pre><span></span><code>List.reverse(l : list(&#39;a)) : list(&#39;a)
+</code></pre></div>
+<p>Returns a copy of <code>l</code> with reversed order of elements.</p>
+<h4 id="map_1">map</h4>
+<div class="highlight"><pre><span></span><code>List.map(f : &#39;a =&gt; &#39;b, l : list(&#39;a)) : list(&#39;b)
+</code></pre></div>
+<p>Maps function <code>f</code> over a list. For instance
+<div class="highlight"><pre><span></span><code>map((x) =&gt; x == 0, [1, 2, 0, 3, 0])
+</code></pre></div>
+will yield <code>[false, false, true, false, true]</code></p>
+<h4 id="flat_map">flat_map</h4>
+<div class="highlight"><pre><span></span><code>List.flat_map(f : &#39;a =&gt; list(&#39;b), l : list(&#39;a)) : list(&#39;b)
+</code></pre></div>
+<p>Maps <code>f</code> over a list and then flattens it. For instance
+<div class="highlight"><pre><span></span><code>flat_map((x) =&gt; [x, x * 10], [1, 2, 3])
+</code></pre></div>
+will yield <code>[1, 10, 2, 20, 3, 30]</code></p>
+<h4 id="filter">filter</h4>
+<div class="highlight"><pre><span></span><code>List.filter(p : &#39;a =&gt; bool, l : list(&#39;a)) : list(&#39;a)
+</code></pre></div>
+<p>Filters out elements of <code>l</code> that fulfill predicate <code>p</code>. For instance
+<div class="highlight"><pre><span></span><code>filter((x) =&gt; x &gt; 0, [-1, 1, -2, 0, 1, 2, -3])
+</code></pre></div>
+will yield <code>[1, 1, 2]</code></p>
+<h4 id="take">take</h4>
+<div class="highlight"><pre><span></span><code>List.take(n : int, l : list(&#39;a)) : list(&#39;a)
+</code></pre></div>
+<p>Takes <code>n</code> first elements of <code>l</code>. Fails if <code>n</code> is negative. If <code>n</code> is greater than length of a list it will return whole list.</p>
+<h4 id="drop">drop</h4>
+<div class="highlight"><pre><span></span><code>List.drop(n : int, l : list(&#39;a)) : list(&#39;a)
+</code></pre></div>
+<p>Removes <code>n</code> first elements of <code>l</code>. Fails if <code>n</code> is negative. If <code>n</code> is greater than length of a list it will return <code>[]</code>.</p>
+<h4 id="take_while">take_while</h4>
+<div class="highlight"><pre><span></span><code>List.take_while(p : &#39;a =&gt; bool, l : list(&#39;a)) : list(&#39;a)
+</code></pre></div>
+<p>Returns longest prefix of <code>l</code> in which all elements fulfill <code>p</code>.</p>
+<h4 id="drop_while">drop_while</h4>
+<div class="highlight"><pre><span></span><code>List.drop_while(p : &#39;a =&gt; bool, l : list(&#39;a)) : list(&#39;a)
+</code></pre></div>
+<p>Removes longest prefix from <code>l</code> in which all elements fulfill <code>p</code>.</p>
+<h4 id="partition">partition</h4>
+<div class="highlight"><pre><span></span><code>List.partition(p : &#39;a =&gt; bool, l : list(&#39;a)) : (list(&#39;a) * list(&#39;a))
+</code></pre></div>
+<p>Separates elements of <code>l</code> that fulfill <code>p</code> and these that do not. Elements fulfilling predicate will be in the right list. For instance
+<div class="highlight"><pre><span></span><code>partition((x) =&gt; x &gt; 0, [-1, 1, -2, 0, 1, 2, -3])
+</code></pre></div>
+will yield <code>([1, 1, 2], [-1, -2, 0, -3])</code></p>
+<h4 id="flatten">flatten</h4>
+<div class="highlight"><pre><span></span><code>List.flatten(ll : list(list(&#39;a))) : list(&#39;a)
+</code></pre></div>
+<p>Flattens a list of lists into a one list.</p>
+<h4 id="all_1">all</h4>
+<div class="highlight"><pre><span></span><code>List.all(p : &#39;a =&gt; bool, l : list(&#39;a)) : bool
+</code></pre></div>
+<p>Checks if all elements of a list fulfill predicate <code>p</code>.</p>
+<h4 id="any">any</h4>
+<div class="highlight"><pre><span></span><code>List.any(p : &#39;a =&gt; bool, l : list(&#39;a)) : bool
+</code></pre></div>
+<p>Checks if any element of a list fulfills predicate <code>p</code>.</p>
+<h4 id="sum_1">sum</h4>
+<div class="highlight"><pre><span></span><code>List.sum(l : list(int)) : int
+</code></pre></div>
+<p>Sums elements of a list. Returns 0 if the list is empty.</p>
+<h4 id="product">product</h4>
+<div class="highlight"><pre><span></span><code>List.product(l : list(int)) : int
+</code></pre></div>
+<p>Multiplies elements of a list. Returns 1 if the list is empty.</p>
+<h4 id="zip_with">zip_with</h4>
+<div class="highlight"><pre><span></span><code>List.zip_with(f : (&#39;a, &#39;b) =&gt; &#39;c, l1 : list(&#39;a), l2 : list(&#39;b)) : list(&#39;c)
+</code></pre></div>
+<p>"zips" two lists with a function. n-th element of resulting list will be equal to <code>f(x1, x2)</code> where <code>x1</code> and <code>x2</code> are n-th elements of <code>l1</code> and <code>l2</code> respectively. Will cut off the tail of the longer list. For instance
+<div class="highlight"><pre><span></span><code>zip_with((a, b) =&gt; a + b, [1,2], [1,2,3])
+</code></pre></div>
+will yield <code>[2,4]</code></p>
+<h4 id="zip">zip</h4>
+<div class="highlight"><pre><span></span><code>List.zip(l1 : list(&#39;a), l2 : list(&#39;b)) : list(&#39;a * &#39;b)
+</code></pre></div>
+<p>Special case of <a href="#zip_with">zip_with</a> where the zipping function is <code>(a, b) =&gt; (a, b)</code>.</p>
+<h4 id="unzip">unzip</h4>
+<div class="highlight"><pre><span></span><code>List.unzip(l : list(&#39;a * &#39;b)) : list(&#39;a) * list(&#39;b)
+</code></pre></div>
+<p>Opposite to the <code>zip</code> operation. Takes a list of pairs and returns pair of lists with respective elements on same indices.</p>
+<h4 id="merge">merge</h4>
+<div class="highlight"><pre><span></span><code>List.merge(lesser_cmp : (&#39;a, &#39;a) =&gt; bool, l1 : list(&#39;a), l2 : list(&#39;a)) : list(&#39;a)
+</code></pre></div>
+<p>Merges two sorted lists into a single sorted list. O(length(l1) + length(l2))</p>
+<h4 id="sort">sort</h4>
+<div class="highlight"><pre><span></span><code>List.sort(lesser_cmp : (&#39;a, &#39;a) =&gt; bool, l : list(&#39;a)) : list(&#39;a)
+</code></pre></div>
+<p>Sorts a list using given comparator. <code>lesser_cmp(x, y)</code> should return <code>true</code> iff <code>x &lt; y</code>. If <code>lesser_cmp</code> is not transitive or there exists an element <code>x</code> such that <code>lesser_cmp(x, x)</code> or there exists a pair of elements <code>x</code> and <code>y</code> such that <code>lesser_cmp(x, y) &amp;&amp; lesser_cmp(y, x)</code> then the result is undefined. O(length(l) * log_2(length(l))).</p>
+<h4 id="intersperse">intersperse</h4>
+<div class="highlight"><pre><span></span><code>List.intersperse(delim : &#39;a, l : list(&#39;a)) : list(&#39;a)
+</code></pre></div>
+<p>Intersperses elements of <code>l</code> with <code>delim</code>. Does nothing on empty lists and singletons. For instance
+<div class="highlight"><pre><span></span><code>intersperse(0, [1, 2, 3, 4])
+</code></pre></div>
+will yield <code>[1, 0, 2, 0, 3, 0, 4]</code></p>
+<h4 id="enumerate">enumerate</h4>
+<div class="highlight"><pre><span></span><code>List.enumerate(l : list(&#39;a)) : list(int * &#39;a)
+</code></pre></div>
+<p>Equivalent to <a href="#zip">zip</a> with <code>[0..length(l)]</code>, but slightly faster.</p>
+<h3 id="option">Option</h3>
+<p>Common operations on <code>option</code> types and lists of <code>option</code>s.</p>
+<h4 id="is_none">is_none</h4>
+<div class="highlight"><pre><span></span><code>Option.is_none(o : option(&#39;a)) : bool
+</code></pre></div>
+<p>Returns true iff <code>o == None</code></p>
+<h4 id="is_some">is_some</h4>
+<div class="highlight"><pre><span></span><code>Option.is_some(o : option(&#39;a)) : bool
+</code></pre></div>
+<p>Returns true iff <code>o</code> is not <code>None</code>.</p>
+<h4 id="match">match</h4>
+<div class="highlight"><pre><span></span><code>Option.match(n : &#39;b, s : &#39;a =&gt; &#39;b, o : option(&#39;a)) : &#39;b
+</code></pre></div>
+<p>Behaves like pattern matching on <code>option</code> using two case functions.</p>
+<h4 id="default">default</h4>
+<div class="highlight"><pre><span></span><code>Option.default(def : &#39;a, o : option(&#39;a)) : &#39;a
+</code></pre></div>
+<p>Escapes <code>option</code> wrapping by providing default value for <code>None</code>.</p>
+<h4 id="force">force</h4>
+<div class="highlight"><pre><span></span><code>Option.force(o : option(&#39;a)) : &#39;a
+</code></pre></div>
+<p>Forcefully escapes the <code>option</code> wrapping assuming it is <code>Some</code>.
+Aborts on <code>None</code>.</p>
+<h4 id="force_msg">force_msg</h4>
+<div class="highlight"><pre><span></span><code>Option.force_msg(o : option(&#39;a), err : string) : &#39;a
+</code></pre></div>
+<p>Forcefully escapes the <code>option</code> wrapping assuming it is <code>Some</code>.
+Aborts with <code>err</code> error message on <code>None</code>.</p>
+<h4 id="contains_1">contains</h4>
+<p><div class="highlight"><pre><span></span><code>Option.contains(e : &#39;a, o : option(&#39;a)) : bool
+</code></pre></div>
+Returns <code>true</code> if and only if <code>o</code> contains element equal to <code>e</code>. Equivalent to <code>Option.match(false, x =&gt; x == e, o)</code>.</p>
+<h4 id="on_elem">on_elem</h4>
+<div class="highlight"><pre><span></span><code>Option.on_elem(o : option(&#39;a), f : &#39;a =&gt; unit) : unit
+</code></pre></div>
+<p>Evaluates <code>f</code> on element under <code>Some</code>. Does nothing on <code>None</code>.</p>
+<h4 id="map_2">map</h4>
+<div class="highlight"><pre><span></span><code>Option.map(f : &#39;a =&gt; &#39;b, o : option(&#39;a)) : option(&#39;b)
+</code></pre></div>
+<p>Maps element under <code>Some</code>. Leaves <code>None</code> unchanged.</p>
+<h4 id="map2">map2</h4>
+<div class="highlight"><pre><span></span><code>Option.map2(f : (&#39;a, &#39;b) =&gt; &#39;c, o1 : option(&#39;a), o2 : option(&#39;b)) : option(&#39;c)
+</code></pre></div>
+<p>Applies arity 2 function over two <code>option</code>s' elements. Returns <code>Some</code> iff both of <code>o1</code> and <code>o2</code> were <code>Some</code>, or <code>None</code> otherwise. For instance
+<div class="highlight"><pre><span></span><code>map2((a, b) =&gt; a + b, Some(1), Some(2))
+</code></pre></div>
+will yield <code>Some(3)</code> and
+<div class="highlight"><pre><span></span><code>map2((a, b) =&gt; a + b, Some(1), None)
+</code></pre></div>
+will yield <code>None</code>.</p>
+<h4 id="map3">map3</h4>
+<div class="highlight"><pre><span></span><code>Option.map3(f : (&#39;a, &#39;b, &#39;c) =&gt; &#39;d, o1 : option(&#39;a), o2 : option(&#39;b), o3 : option(&#39;c)) : option(&#39;d)
+</code></pre></div>
+<p>Same as <a href="#map2">map2</a> but with arity 3 function.</p>
+<h4 id="app_over">app_over</h4>
+<div class="highlight"><pre><span></span><code>Option.app_over(f : option (&#39;a =&gt; &#39;b), o : option(&#39;a)) : option(&#39;b)
+</code></pre></div>
+<p>Applies function under <code>option</code> over argument under <code>option</code>. If either of them is <code>None</code> the result will be <code>None</code> as well. For instance
+<div class="highlight"><pre><span></span><code>app_over(Some((x) =&gt; x + 1), Some(1))
+</code></pre></div>
+will yield <code>Some(2)</code> and
+<div class="highlight"><pre><span></span><code>app_over(Some((x) =&gt; x + 1), None)
+</code></pre></div>
+will yield <code>None</code>.</p>
+<h4 id="flat_map_1">flat_map</h4>
+<div class="highlight"><pre><span></span><code>Option.flat_map(f : &#39;a =&gt; option(&#39;b), o : option(&#39;a)) : option(&#39;b)
+</code></pre></div>
+<p>Performs monadic bind on an <code>option</code>. Extracts element from <code>o</code> (if present) and forms new <code>option</code> from it. For instance
+<div class="highlight"><pre><span></span><code>flat_map((x) =&gt; Some(x + 1), Some(1))
+</code></pre></div>
+will yield <code>Some(2)</code> and
+<div class="highlight"><pre><span></span><code>flat_map((x) =&gt; Some(x + 1), None)
+</code></pre></div>
+will yield <code>None</code>.</p>
+<h4 id="to_list_1">to_list</h4>
+<div class="highlight"><pre><span></span><code>Option.to_list(o : option(&#39;a)) : list(&#39;a)
+</code></pre></div>
+<p>Turns <code>o</code> into an empty (if <code>None</code>) or singleton (if <code>Some</code>) list.</p>
+<h4 id="filter_options">filter_options</h4>
+<div class="highlight"><pre><span></span><code>Option.filter_options(l : list(option(&#39;a))) : list(&#39;a)
+</code></pre></div>
+<p>Removes <code>None</code>s from list and unpacks all remaining <code>Some</code>s. For instance
+<div class="highlight"><pre><span></span><code>filter_options([Some(1), None, Some(2)])
+</code></pre></div>
+will yield <code>[1, 2]</code>.</p>
+<h4 id="seq_options">seq_options</h4>
+<div class="highlight"><pre><span></span><code>Option.seq_options(l : list (option(&#39;a))) : option (list(&#39;a))
+</code></pre></div>
+<p>Tries to unpack all elements of a list from <code>Some</code>s. Returns <code>None</code> if at least element of <code>l</code> is <code>None</code>. For instance
+<div class="highlight"><pre><span></span><code>seq_options([Some(1), Some(2)])
+</code></pre></div>
+will yield <code>Some([1, 2])</code>, but
+<div class="highlight"><pre><span></span><code>seq_options([Some(1), Some(2), None])
+</code></pre></div>
+will yield <code>None</code>.</p>
+<h4 id="choose">choose</h4>
+<div class="highlight"><pre><span></span><code>Option.choose(o1 : option(&#39;a), o2 : option(&#39;a)) : option(&#39;a)
+</code></pre></div>
+<p>Out of two <code>option</code>s choose the one that is <code>Some</code>, or <code>None</code> if both are <code>None</code>s.</p>
+<h4 id="choose_first">choose_first</h4>
+<div class="highlight"><pre><span></span><code>Option.choose_first(l : list(option(&#39;a))) : option(&#39;a)
+</code></pre></div>
+<p>Same as <a href="#choose">choose</a>, but chooses from a list insted of two arguments.</p>
+<h3 id="pair">Pair</h3>
+<p>Common operations on 2-tuples.</p>
+<h4 id="fst">fst</h4>
+<div class="highlight"><pre><span></span><code>Pair.fst(t : (&#39;a * &#39;b)) : &#39;a
+</code></pre></div>
+<p>First element projection.</p>
+<h4 id="snd">snd</h4>
+<div class="highlight"><pre><span></span><code>Pair.snd(t : (&#39;a * &#39;b)) : &#39;b
+</code></pre></div>
+<p>Second element projection.</p>
+<h4 id="map1">map1</h4>
+<div class="highlight"><pre><span></span><code>Pair.map1(f : &#39;a =&gt; &#39;c, t : (&#39;a * &#39;b)) : (&#39;c * &#39;b)
+</code></pre></div>
+<p>Applies function over first element.</p>
+<h4 id="map2_1">map2</h4>
+<div class="highlight"><pre><span></span><code>Pair.map2(f : &#39;b =&gt; &#39;c, t : (&#39;a * &#39;b)) : (&#39;a * &#39;c)
+</code></pre></div>
+<p>Applies function over second element.</p>
+<h4 id="bimap">bimap</h4>
+<div class="highlight"><pre><span></span><code>Pair.bimap(f : &#39;a =&gt; &#39;c, g : &#39;b =&gt; &#39;d, t : (&#39;a * &#39;b)) : (&#39;c * &#39;d)
+</code></pre></div>
+<p>Applies functions over respective elements.</p>
+<h4 id="swap">swap</h4>
+<div class="highlight"><pre><span></span><code>Pair.swap(t : (&#39;a * &#39;b)) : (&#39;b * &#39;a)
+</code></pre></div>
+<p>Swaps elements.</p>
+<h3 id="set_1"><a name='set-stdlib'>Set</a></h3>
+<h4 id="types_5">Types</h4>
+<div class="highlight"><pre><span></span><code>record set(&#39;a) = { to_map : map(&#39;a, unit) }
+</code></pre></div>
+<h4 id="functions_4">Functions</h4>
+<h5 id="new">new</h5>
+<div class="highlight"><pre><span></span><code>Set.new() : set(&#39;a)
+</code></pre></div>
+<p>Returns an empty set</p>
+<h5 id="member_1">member</h5>
+<div class="highlight"><pre><span></span><code>member(e : &#39;a, s : set(&#39;a)) : bool
+</code></pre></div>
+<p>Checks if the element <code>e</code> is present in the set <code>s</code></p>
+<h5 id="insert">insert</h5>
+<div class="highlight"><pre><span></span><code>insert(e : &#39;a, s : set(&#39;a)) : set(&#39;a)
+</code></pre></div>
+<p>Inserts the element <code>e</code> in the set <code>s</code></p>
+<h5 id="delete_1">delete</h5>
+<div class="highlight"><pre><span></span><code>Set.delete(e : &#39;a, s : set(&#39;a)) : set(&#39;a)
+</code></pre></div>
+<p>Removes the element <code>e</code> from the set <code>s</code></p>
+<h5 id="size_2">size</h5>
+<div class="highlight"><pre><span></span><code>size(s : set(&#39;a)) : int
+</code></pre></div>
+<p>Returns the number of elements in the set <code>s</code></p>
+<h5 id="to_list_2">to_list</h5>
+<div class="highlight"><pre><span></span><code>Set.to_list(s : set(&#39;a)) : list(&#39;a)
+</code></pre></div>
+<p>Returns a list containing the elements of the set <code>s</code></p>
+<h5 id="from_list_1">from_list</h5>
+<div class="highlight"><pre><span></span><code>Set.from_list(l : list(&#39;a)) : set(&#39;a)
+</code></pre></div>
+<p>Turns the list <code>l</code> into a set</p>
+<h5 id="filter_1">filter</h5>
+<div class="highlight"><pre><span></span><code>Set.filter(p : &#39;a =&gt; bool, s : set(&#39;a)) : set(&#39;a)
+</code></pre></div>
+<p>Filters out elements of <code>s</code> that fulfill predicate <code>p</code></p>
+<h5 id="fold">fold</h5>
+<div class="highlight"><pre><span></span><code>Set.fold(f : (&#39;a, &#39;b) =&gt; &#39;b, acc : &#39;b, s : set(&#39;a)) : &#39;b
+</code></pre></div>
+<p>Folds the function <code>f</code> over every element in the set <code>s</code> and returns the final value of the accumulator <code>acc</code>.</p>
+<h5 id="subtract">subtract</h5>
+<div class="highlight"><pre><span></span><code>Set.subtract(s1 : set(&#39;a), s2 : set(&#39;a)) : set(&#39;a)
+</code></pre></div>
+<p>Returns the elements of <code>s1</code> that are not members of <code>s2</code></p>
+<h5 id="intersection_1">intersection</h5>
+<div class="highlight"><pre><span></span><code>Set.intersection(s1 : set(&#39;a), s2 : set(&#39;a)) : set(&#39;a)
+</code></pre></div>
+<p>Returns the intersection of the two sets <code>s1</code> and <code>s2</code></p>
+<h5 id="intersection_list">intersection_list</h5>
+<div class="highlight"><pre><span></span><code>Set.intersection_list(sets : list(set(&#39;a))) : set(&#39;a)
+</code></pre></div>
+<p>Returns the intersection of all the sets in the given list</p>
+<h5 id="union_1">union</h5>
+<div class="highlight"><pre><span></span><code>Set.union(s1 : set(&#39;a), s2 : set(&#39;a)) : set(&#39;a)
+</code></pre></div>
+<p>Returns the union of the two sets <code>s1</code> and <code>s2</code></p>
+<h5 id="union_list">union_list</h5>
+<div class="highlight"><pre><span></span><code>Set.union_list(sets : list(set(&#39;a))) : set(&#39;a)
+</code></pre></div>
+<p>Returns the union of all the sets in the given list</p>
+<h3 id="string">String</h3>
+<p>Operations on the <code>string</code> type. A <code>string</code> is a UTF-8 encoded byte array.</p>
+<h4 id="length_1">length</h4>
+<p><code>length(s : string) : int</code></p>
+<p>The length of a string.</p>
+<p>Note: not equivalent to byte size of the string, rather <code>List.length(String.to_list(s))</code></p>
+<h4 id="concat_1">concat</h4>
+<div class="highlight"><pre><span></span><code>concat(s1 : string, s2 : string) : string
+</code></pre></div>
+<p>Concatenates <code>s1</code> and <code>s2</code>.</p>
+<h4 id="concats">concats</h4>
+<div class="highlight"><pre><span></span><code>concats(ss : list(string)) : string
+</code></pre></div>
+<p>Concatenates a list of strings.</p>
+<h4 id="to_list_3">to_list</h4>
+<div class="highlight"><pre><span></span><code>to_list(s : string) : list(char)
+</code></pre></div>
+<p>Converts a <code>string</code> to a list of <code>char</code> - the code points are normalized, but
+composite characters are possibly converted to multiple <code>char</code>s. For example the
+string "😜i̇" is converted to <code>[128540,105,775]</code> - where the smiley is the first
+code point and the strangely dotted <code>i</code> becomes <code>[105, 775]</code>.</p>
+<h4 id="from_list_2">from_list</h4>
+<div class="highlight"><pre><span></span><code>from_list(cs : list(char)) : string
+</code></pre></div>
+<p>Converts a list of characters into a normalized UTF-8 string.</p>
+<h4 id="to_lower">to_lower</h4>
+<div class="highlight"><pre><span></span><code>to_lower(s : string) : string
+</code></pre></div>
+<p>Converts a string to lowercase.</p>
+<h4 id="to_upper">to_upper</h4>
+<div class="highlight"><pre><span></span><code>to_upper(s : string) : string
+</code></pre></div>
+<p>Converts a string to uppercase.</p>
+<h4 id="at">at</h4>
+<div class="highlight"><pre><span></span><code>at(ix : int, s : string) : option(char)
+</code></pre></div>
+<p>Returns the character/codepoint at (zero-based) index <code>ix</code>. Basically the equivalent to
+<code>List.nth(ix, String.to_list(s))</code>.</p>
+<h4 id="split_1">split</h4>
+<div class="highlight"><pre><span></span><code>split(ix : int, s:string) : string * string
+</code></pre></div>
+<p>Splits a string at (zero-based) index <code>ix</code>.</p>
+<h4 id="contains_2">contains</h4>
+<div class="highlight"><pre><span></span><code>contains(str : string, pat : string) : option(int)
+</code></pre></div>
+<p>Searches for <code>pat</code> in <code>str</code>, returning <code>Some(ix)</code> if <code>pat</code> is a substring of
+<code>str</code> starting at position <code>ix</code>, otherwise returns <code>None</code>.</p>
+<h4 id="tokens">tokens</h4>
+<div class="highlight"><pre><span></span><code>tokens(str : string, pat : string) : list(string)
+</code></pre></div>
+<p>Splits <code>str</code> into tokens, <code>pat</code> is the divider of tokens.</p>
+<h4 id="to_int_2">to_int</h4>
+<div class="highlight"><pre><span></span><code>to_int(s : string) : option(int)
+</code></pre></div>
+<p>Converts a decimal ("123", "-253") or a hexadecimal ("0xa2f", "-0xBBB") string into
+an integer. If the string doesn't contain a valid number <code>None</code> is returned.</p>
+<h4 id="to_bytes_2">to_bytes</h4>
+<div class="highlight"><pre><span></span><code>to_bytes(s : string) : bytes()
+</code></pre></div>
+<p>Converts string into byte array. String is UTF-8 encoded. I.e.
+<code>String.length(s)</code> is not guaranteed to be equal to
+<code>Bytes.size(String.to_bytes(s))</code>.</p>
+<h4 id="sha3_1">sha3</h4>
+<div class="highlight"><pre><span></span><code>sha3(s : string) : hash
+</code></pre></div>
+<p>Computes the SHA3/Keccak hash of the string.</p>
+<h4 id="sha256_1">sha256</h4>
+<div class="highlight"><pre><span></span><code>sha256(s : string) : hash
+</code></pre></div>
+<p>Computes the SHA256 hash of the string.</p>
+<h4 id="blake2b_1">blake2b</h4>
+<div class="highlight"><pre><span></span><code>blake2b(s : string) : hash
+</code></pre></div>
+<p>Computes the Blake2B hash of the string.</p>
+<h3 id="triple">Triple</h3>
+<h4 id="fst_1">fst</h4>
+<div class="highlight"><pre><span></span><code>Triple.fst(t : (&#39;a * &#39;b * &#39;c)) : &#39;a
+</code></pre></div>
+<p>First element projection.</p>
+<h4 id="snd_1">snd</h4>
+<div class="highlight"><pre><span></span><code>Triple.snd(t : (&#39;a * &#39;b * &#39;c)) : &#39;b
+</code></pre></div>
+<p>Second element projection.</p>
+<h4 id="thd">thd</h4>
+<div class="highlight"><pre><span></span><code>Triple.thd(t : (&#39;a * &#39;b * &#39;c)) : &#39;c
+</code></pre></div>
+<p>Third element projection.</p>
+<h4 id="map1_1">map1</h4>
+<div class="highlight"><pre><span></span><code>Triple.map1(f : &#39;a =&gt; &#39;m, t : (&#39;a * &#39;b * &#39;c)) : (&#39;m * &#39;b * &#39;c)
+</code></pre></div>
+<p>Applies function over first element.</p>
+<h4 id="map2_2">map2</h4>
+<div class="highlight"><pre><span></span><code>Triple.map2(f : &#39;b =&gt; &#39;m, t : (&#39;a * &#39;b * &#39;c)) : (&#39;a * &#39;m * &#39;c)
+</code></pre></div>
+<p>Applies function over second element.</p>
+<h4 id="map3_1">map3</h4>
+<div class="highlight"><pre><span></span><code>Triple.map3(f : &#39;c =&gt; &#39;m, t : (&#39;a * &#39;b * &#39;c)) : (&#39;a * &#39;b * &#39;m)
+</code></pre></div>
+<p>Applies function over third element.</p>
+<h4 id="trimap">trimap</h4>
+<div class="highlight"><pre><span></span><code>Triple.trimap(f : &#39;a =&gt; &#39;x, g : &#39;b =&gt; &#39;y, h : &#39;c =&gt; &#39;z, t : (&#39;a * &#39;b * &#39;c)) : (&#39;x * &#39;y * &#39;z)
+</code></pre></div>
+<p>Applies functions over respective elements.</p>
+<h4 id="swap_1">swap</h4>
+<div class="highlight"><pre><span></span><code>Triple.swap(t : (&#39;a * &#39;b * &#39;c)) : (&#39;c * &#39;b * &#39;a)
+</code></pre></div>
+<p>Swaps first and third element.</p>
+<h4 id="rotr">rotr</h4>
+<div class="highlight"><pre><span></span><code>Triple.rotr(t : (&#39;a * &#39;b * &#39;c)) : (&#39;c * &#39;a * &#39;b)
+</code></pre></div>
+<p>Cyclic rotation of the elements to the right.</p>
+<h4 id="rotl">rotl</h4>
+<div class="highlight"><pre><span></span><code>Triple.rotl(t : (&#39;a * &#39;b * &#39;c)) : (&#39;b * &#39;c * &#39;a)
+</code></pre></div>
+<p>Cyclic rotation of the elements to the left.</p>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var tab,labels=set.querySelector(".tabbed-labels");for(tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["content.tabs.link", "search.highlight", "search.share", "search.suggest"], "search": "../assets/javascripts/workers/search.db81ec45.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.a00a7c5e.min.js"></script>
+      
+    
+  </body>
+</html>
