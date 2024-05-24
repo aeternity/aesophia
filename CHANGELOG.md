@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 ### Removed
 
+## [8.0.1]
+### Changed
+- Upgrade aebytecode to v3.4.1 to fix C warnings
+
 ## [8.0.0]
 ### Added
 - Bitwise operations for integers: `band`, `bor`, `bxor`, `bnot`, `<<` and `>>`.
@@ -450,7 +454,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplify calldata creation - instead of passing a compiled contract, simply
   pass a (stubbed) contract string.
 
-[Unreleased]: https://github.com/aeternity/aesophia/compare/v8.0.0...HEAD
+[Unreleased]: https://github.com/aeternity/aesophia/compare/v8.0.1...HEAD
+[8.0.1]: https://github.com/aeternity/aesophia/compare/v8.0.0...v8.0.1
 [8.0.0]: https://github.com/aeternity/aesophia/compare/v7.4.1...v8.0.0
 [7.4.1]: https://github.com/aeternity/aesophia/compare/v7.4.0...v7.4.1
 [7.4.0]: https://github.com/aeternity/aesophia/compare/v7.3.0...v7.4.0
