@@ -614,14 +614,6 @@ charging the calling contract. Note that this won't be visible in `Call.value`
 in the `init` call of the new contract. It will be included in
 `Contract.balance`, however.
 
-#### poseidon
-```
-Crypto.poseidon(x1 : int, x2 : int) : int
-```
-
-Hash two integers (in the scalar field of BLS12-381) to another integer (in the scalar
-field of BLS12-281). This is a ZK/SNARK-friendly hash function.
-
 The type `'c` must be instantiated with a contract.
 
 
@@ -746,6 +738,15 @@ Chain.network\_id : string
 ```
 
 The network id of the chain.
+
+
+#### poseidon
+```
+Crypto.poseidon(x1 : int, x2 : int) : int
+```
+
+Hash two integers (in the scalar field of BLS12-381) to another integer (in the scalar
+field of BLS12-281). This is a ZK/SNARK-friendly hash function.
 
 
 ##### spend
