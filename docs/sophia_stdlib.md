@@ -687,8 +687,8 @@ Example usage:
 ```
 payable contract interface Auction =
   entrypoint init : (int, string) => void
-  stateful payable entrypoint buy : (int) => ()
-  stateful entrypoint sell : (int) => ()
+  stateful payable entrypoint buy : (int) => unit
+  stateful entrypoint sell : (int) => unit
 
 main contract Market =
   type state = list(Auction)
