@@ -540,6 +540,7 @@ Sophia has the following types:
 | Type                 | Description                                                                                 | Example                                                      |
 |----------------------|---------------------------------------------------------------------------------------------|--------------------------------------------------------------|
 | int                  | A 2-complement integer                                                                      | ```-1```                                                     |
+| char | A single character (the underlying representation is an integer) | ```'g'```
 | address              | æternity address, 32 bytes                                                                 | ```Call.origin```                                            |
 | bool                 | A Boolean                                                                                   | ```true```                                                   |
 | bits                 | A bit field                                                                                 | ```Bits.none```                                              |
@@ -555,7 +556,6 @@ Sophia has the following types:
 | event                | An append only list of blockchain events (or log entries)                                   | ```datatype event = EventX(indexed int, string)```           |
 | hash                 | A 32-byte hash - equivalent to `bytes(32)`                                                  |                                                              |
 | signature            | A signature - equivalent to `bytes(64)`                                                     |                                                              |
-| Chain.ttl            | Time-to-live (fixed height or relative to current block)                                    | ```FixedTTL(1050)``` ```RelativeTTL(50)```                   |
 | oracle('a, 'b)       | And oracle answering questions of type 'a with answers of type 'b                           | ```Oracle.register(acct, qfee, ttl)```                       |
 | oracle_query('a, 'b) | A specific oracle query                                                                     | ```Oracle.query(o, q, qfee, qttl, rttl)```                   |
 | contract             | A user defined, typed, contract address                                                     | ```function call_remote(r : RemoteContract) = r.fun()```     |
