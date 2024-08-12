@@ -1194,11 +1194,6 @@ creation transaction – it sets the initial value of the newly created contract
 charging the calling contract. Note that this won't be visible in <code>Call.value</code>
 in the <code>init</code> call of the new contract. It will be included in
 <code>Contract.balance</code>, however.</p>
-<h4 id="poseidon">poseidon</h4>
-<div class="highlight"><pre><span></span><code>Crypto.poseidon(x1 : int, x2 : int) : int
-</code></pre></div>
-<p>Hash two integers (in the scalar field of BLS12-381) to another integer (in the scalar
-field of BLS12-281). This is a ZK/SNARK-friendly hash function.</p>
 <p>The type <code>'c</code> must be instantiated with a contract.</p>
 <p>Example usage:
 <div class="highlight"><pre><span></span><code>payable contract Auction =
@@ -1286,6 +1281,11 @@ calls <code>put</code> instead. Moreover, FATE prevents even handcrafted calls t
 <div class="highlight"><pre><span></span><code>Chain.network\_id : string
 </code></pre></div>
 <p>The network id of the chain.</p>
+<h4 id="poseidon">poseidon</h4>
+<div class="highlight"><pre><span></span><code>Crypto.poseidon(x1 : int, x2 : int) : int
+</code></pre></div>
+<p>Hash two integers (in the scalar field of BLS12-381) to another integer (in the scalar
+field of BLS12-281). This is a ZK/SNARK-friendly hash function.</p>
 <h5 id="spend">spend</h5>
 <div class="highlight"><pre><span></span><code>Chain.spend(to : address, amount : int) : unit
 </code></pre></div>
