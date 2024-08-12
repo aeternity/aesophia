@@ -1248,8 +1248,8 @@ rejected by the compiler.</p>
 <p>Example usage:</p>
 <div class="highlight"><pre><span></span><code>payable contract interface Auction =
   entrypoint init : (int, string) =&gt; void
-  stateful payable entrypoint buy : (int) =&gt; ()
-  stateful entrypoint sell : (int) =&gt; ()
+  stateful payable entrypoint buy : (int) =&gt; unit
+  stateful entrypoint sell : (int) =&gt; unit
 
 main contract Market =
   type state = list(Auction)
