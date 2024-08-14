@@ -3389,7 +3389,7 @@ instantiate1(X) ->
 integer_to_tvar(X) when X < 26 ->
     [$a + X];
 integer_to_tvar(X) ->
-    [integer_to_tvar(X div 26)] ++ [$a + (X rem 26)].
+    integer_to_tvar(X div 26 - 1) ++ [$a + (X rem 26)].
 
 %% Warnings
 
