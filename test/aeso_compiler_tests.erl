@@ -1304,7 +1304,7 @@ failing_contracts() ->
                   ])
     , ?TYPE_ERROR(too_many_tvars,
                   [<<?Pos(2,3)
-                     "Too many type variables (max 255) in definition of `too_many`">>
+                     "Too many type variables (max 256) in definition of `too_many`">>
                   ])
     ].
 

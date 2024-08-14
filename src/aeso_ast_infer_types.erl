@@ -3796,7 +3796,7 @@ mk_error({type_decl, _, {id, Pos, Name}, _}) ->
                         [Name]),
     mk_t_err(pos(Pos), Msg);
 mk_error({too_many_tvars, Name, {type_sig, Pos, _, _, _, _}}) ->
-    Msg = io_lib:format("Too many type variables (max 255) in definition of `~s`", [Name]),
+    Msg = io_lib:format("Too many type variables (max 256) in definition of `~s`", [Name]),
     mk_t_err(pos(Pos), Msg);
 mk_error({stateful_not_allowed, Id, Fun}) ->
     Msg = io_lib:format("Cannot reference stateful function `~s` in the definition of non-stateful function `~s`.",
