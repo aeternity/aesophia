@@ -295,6 +295,11 @@ of `A`.
 - When a user-defined type `t('a)` is invariant in `'a`, then `t(A)` can never be
 a subtype of `t(B)`.
 
+#### Type variable limitation
+
+Because of how FATE represents types as values there is a fixed upper limit (256)
+of type variables that can be used in a single type signature.
+
 ## Mutable state
 
 Sophia does not have arbitrary mutable state, but only a limited form of state
