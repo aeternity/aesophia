@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Added a check fo number of type variables in a type signature; it is serialized using 8 bits,
+  so the upper limit is 255.
 ### Changed
 ### Removed
 
