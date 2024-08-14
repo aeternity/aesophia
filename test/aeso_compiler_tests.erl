@@ -1302,6 +1302,10 @@ failing_contracts() ->
                    <<?Pos(3,9)
                      "The name of the compile-time constant cannot have pattern matching">>
                   ])
+    , ?TYPE_ERROR(too_many_tvars,
+                  [<<?Pos(2,3)
+                     "Too many type variables (max 255) in definition of `too_many`">>
+                  ])
     ].
 
 validation_test_() ->
