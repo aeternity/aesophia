@@ -1760,7 +1760,26 @@ desugar_clauses(Ann, Fun, {type_sig, _, _, _, ArgTypes, RetType}, Clauses) ->
     end.
 
 print_typesig({Name, TypeSig}) ->
+    assert_tvars(Name, TypeSig),
     ?PRINT_TYPES("Inferred ~s : ~s\n", [Name, pp(TypeSig)]).
+
+assert_tvars(Name, TS) ->
+    TVars = assert_tvars_(TS, #{}),
+    case maps:size(TVars) > 256 of
+        true ->
+            type_error({too_many_tvars, Name, TS});
+        false ->
+            ok
+    end.
+
+assert_tvars_({tvar, _, TV}, TVars) ->
+    TVars#{TV => ok};
+assert_tvars_(T, TVars) when is_tuple(T) ->
+    assert_tvars_(tuple_to_list(T), TVars);
+assert_tvars_(Ts, TVars) when is_list(Ts) ->
+    lists:foldl(fun(T, TVars1) -> assert_tvars_(T, TVars1) end, TVars, Ts);
+assert_tvars_(_, TVars) ->
+    TVars.
 
 arg_type(ArgAnn, {id, Ann, "_"}) ->
     case aeso_syntax:get_ann(origin, Ann, user) of
@@ -3389,7 +3408,7 @@ instantiate1(X) ->
 integer_to_tvar(X) when X < 26 ->
     [$a + X];
 integer_to_tvar(X) ->
-    [integer_to_tvar(X div 26)] ++ [$a + (X rem 26)].
+    integer_to_tvar(X div 26 - 1) ++ [$a + (X rem 26)].
 
 %% Warnings
 
@@ -3775,6 +3794,9 @@ mk_error({Contract, _Pos, {con, Pos, Name}, _Impls, _Def}) when ?IS_CONTRACT_HEA
 mk_error({type_decl, _, {id, Pos, Name}, _}) ->
     Msg = io_lib:format("Empty type declarations are not supported. Type `~s` lacks a definition",
                         [Name]),
+    mk_t_err(pos(Pos), Msg);
+mk_error({too_many_tvars, Name, {type_sig, Pos, _, _, _, _}}) ->
+    Msg = io_lib:format("Too many type variables (max 256) in definition of `~s`", [Name]),
     mk_t_err(pos(Pos), Msg);
 mk_error({stateful_not_allowed, Id, Fun}) ->
     Msg = io_lib:format("Cannot reference stateful function `~s` in the definition of non-stateful function `~s`.",

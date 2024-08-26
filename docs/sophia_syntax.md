@@ -267,11 +267,11 @@ UnOp  ::= '-' | '!' | 'bnot'
 | Operators | Type
 | --- | ---
 | `-` `+` `*` `/` `mod` `^` | arithmetic operators
-| `!` `&&` `||` | logical operators
+| `!` `&&` `\|\|` | logical operators
 | `band` `bor` `bxor` `bnot` `<<` `>>` | bitwise operators
 | `==` `!=` `<` `>` `=<` `>=` | comparison operators
 | `::` `++` | list operators
-| `|>` | functional operators
+| `\|>` | functional operators
 
 ## Operator precedence
 
@@ -291,5 +291,5 @@ In order of highest to lowest precedence.
 | `bxor` | left
 | `bor` | left
 | `&&` | right
-| `||` | right
-| `|>` | left
+| `\|\|` | right
+| `\|>` | left
