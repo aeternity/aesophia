@@ -1,0 +1,7 @@
+contract interface I =
+  record state = { x : int }
+  entrypoint f : () => state
+  entrypoint init : () => state
+
+main contract C =
+  entrypoint g(c : I) : int = c.f().x
