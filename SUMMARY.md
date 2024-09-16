@@ -1,6 +1,6 @@
 # Table of contents
 
-* [aesophia](README.md)
+* [Sophia Compiler](README.md)
 * [Changelog](CHANGELOG.md)
 * [docs](docs/README.md)
   * [aeso\_aci](docs/aeso\_aci.md)
