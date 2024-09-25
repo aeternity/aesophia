@@ -52,4 +52,6 @@ nav:
   - Features: sophia_features.md
   - Standard library: sophia_stdlib.md
   - Contract examples: sophia_examples.md
+  - Compiler: aeso_compiler.md
+  - ACI: aeso_aci.md
   - Changelog: CHANGELOG.md
