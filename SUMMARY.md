@@ -1,9 +1,9 @@
 # Table of contents
 
-* [Sophia Compiler](README.md)
+* [The Sophia Language](README.md)
+* [Sophia Standard Library](sophia\_stdlib.md)
+* [Sophia Compiler](readme/README.md)
+  * [aeso\_compiler](readme/aeso\_compiler.md)
+* [ACI Interface](aeso\_aci.md)
 * [Changelog](CHANGELOG.md)
-* [docs](docs/README.md)
-  * [aeso\_aci](docs/aeso\_aci.md)
-  * [aeso\_compiler](docs/aeso\_compiler.md)
-  * [The Sophia Language](docs/sophia.md)
-  * [sophia\_stdlib](docs/sophia\_stdlib.md)
+* [docs](docs.md)
