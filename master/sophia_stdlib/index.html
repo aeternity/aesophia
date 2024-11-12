@@ -1139,21 +1139,26 @@ no-op at run-time, and only used during type checking.</p>
 <div class="highlight"><pre><span></span><code>Call.gas_price : int
 </code></pre></div>
 <p>The gas price of the current call.</p>
-<h4 id="mulmod">mulmod</h4>
-<div class="highlight"><pre><span></span><code>Int.mulmod : (a : int, b : int, q : int) : int
-</code></pre></div>
-<p>Combined multiplication and modulus, returns <code>(a * b) mod q</code>.</p>
 <h4 id="fee">fee</h4>
 <div class="highlight"><pre><span></span><code>Call.fee : int
 </code></pre></div>
 <p>The fee of the current call.</p>
 <h4 id="gas_left">gas_left</h4>
-<div class="highlight"><pre><span></span><code>Call.gas_left() : int
+<div class="highlight"><pre><span></span><code>Call.gas_left : int
 </code></pre></div>
 <p>The amount of gas left for the current call.</p>
 <h3 id="chain">Chain</h3>
 <p>Values and functions related to the chain itself and other entities that live on it.</p>
 <h4 id="types_2">Types</h4>
+<h5 id="ttl">ttl</h5>
+<p>Time-to-live (fixed height or relative to current block).</p>
+<p>Note that this type is a special case, where the type <code>ttl</code> is inside the
+<code>Chain</code> scope, but the constrctors <code>FixedTTL(int)</code> and <code>RelativeTTL(int)</code> are
+not. Meaning that the type <code>ttl</code> should be qualified with <code>Chain</code> when it is
+used (i.e. <code>Chain.ttl</code>), but the constructors should not be qualified (i.e.
+<code>FixedTTL(1050)</code> should be used rather than <code>Chain.FixedTTL(1050)</code>).</p>
+<div class="highlight"><pre><span></span><code>Chain.ttl = FixedTTL(int) | RelativeTTL(int)
+</code></pre></div>
 <h5 id="tx_1">tx</h5>
 <div class="highlight"><pre><span></span><code>record tx = { paying_for : option(Chain.paying_for_tx)
             , ga_metas : list(Chain.ga_meta_tx)
@@ -1193,7 +1198,7 @@ current height of the chain or else the function will return <code>None</code>.<
 allowed height. From FATE VM version 2 (IRIS) it will return the block hash of
 the current generation.</p>
 <h5 id="block_height">block_height</h5>
-<div class="highlight"><pre><span></span><code>Chain.block_height : int&quot;
+<div class="highlight"><pre><span></span><code>Chain.block_height : int
 </code></pre></div>
 <p>The height of the current block (i.e. the block in which the current call will be included).</p>
 <h5 id="bytecode_hash">bytecode_hash</h5>
@@ -1308,14 +1313,9 @@ calls <code>put</code> instead. Moreover, FATE prevents even handcrafted calls t
 </code></pre></div>
 <p>The gas limit of the current block.</p>
 <h5 id="network_id">network_id</h5>
-<div class="highlight"><pre><span></span><code>Chain.network\_id : string
+<div class="highlight"><pre><span></span><code>Chain.network_id : string
 </code></pre></div>
 <p>The network id of the chain.</p>
-<h4 id="poseidon">poseidon</h4>
-<div class="highlight"><pre><span></span><code>Crypto.poseidon(x1 : int, x2 : int) : int
-</code></pre></div>
-<p>Hash two integers (in the scalar field of BLS12-381) to another integer (in the scalar
-field of BLS12-281). This is a ZK/SNARK-friendly hash function.</p>
 <h5 id="spend">spend</h5>
 <div class="highlight"><pre><span></span><code>Chain.spend(to : address, amount : int) : unit
 </code></pre></div>
@@ -1327,13 +1327,12 @@ doesn't have <code>amount</code> tokens to transfer, or, if <code>to</code> is n
 <p>The timestamp of the current block (unix time, milliseconds).</p>
 <h3 id="char">Char</h3>
 <h4 id="to_int_1">to_int</h4>
-<p><code>Char.to_int(c : char) : int
-<div class="highlight"><pre><span></span><code>Returns the UTF-8 codepoint of a character
-
-
-#### from_int
+<div class="highlight"><pre><span></span><code>Char.to_int(c : char) : int
 </code></pre></div>
-Char.from_int(i : int) : option(char)</code></p>
+<p>Returns the UTF-8 codepoint of a character</p>
+<h4 id="from_int">from_int</h4>
+<div class="highlight"><pre><span></span><code>Char.from_int(i : int) : option(char)
+</code></pre></div>
 <p>Opposite of <a href="#to_int">to_int</a>. Returns <code>None</code> if the integer doesn't correspond to a single (normalized) codepoint.</p>
 <h3 id="contract">Contract</h3>
 <p>Values related to the current contract</p>
@@ -1362,6 +1361,11 @@ Char.from_int(i : int) : option(char)</code></p>
 <div class="highlight"><pre><span></span><code>Crypto.blake2b(x : &#39;a) : hash
 </code></pre></div>
 <p>Hash any object to blake2b</p>
+<h4 id="poseidon">poseidon</h4>
+<div class="highlight"><pre><span></span><code>Crypto.poseidon(x1 : int, x2 : int) : int
+</code></pre></div>
+<p>Hash two integers (in the scalar field of BLS12-381) to another integer (in the scalar
+field of BLS12-281). This is a ZK/SNARK-friendly hash function.</p>
 <h4 id="verify_sig">verify_sig</h4>
 <div class="highlight"><pre><span></span><code>Crypto.verify_sig(msg : bytes(), pubkey : address, sig : signature) : bool
 </code></pre></div>
@@ -1386,6 +1390,10 @@ recovery identifier byte <code>V</code>. The expected organization of the signat
 </code></pre></div>
 <p>Verifies a standard 64-byte ECDSA signature (<code>R || S</code>).</p>
 <h3 id="int">Int</h3>
+<h4 id="mulmod">mulmod</h4>
+<div class="highlight"><pre><span></span><code>Int.mulmod : (a : int, b : int, q : int) : int
+</code></pre></div>
+<p>Combined multiplication and modulus, returns <code>(a * b) mod q</code>.</p>
 <h4 id="to_str_2">to_str</h4>
 <div class="highlight"><pre><span></span><code>Int.to_str(n : int) : string
 </code></pre></div>
@@ -1777,7 +1785,7 @@ both must be always positive, as the sign is being handled by the choice of the 
 <h5 id="abs">abs</h5>
 <p><code>Frac.abs(f : frac) : frac</code></p>
 <p>Absolute value.</p>
-<h5 id="from_int">from_int</h5>
+<h5 id="from_int_1">from_int</h5>
 <p><code>Frac.from_int(n : int) : frac</code></p>
 <p>From integer conversion. Effectively <code>make_frac(n, 1)</code>.</p>
 <h5 id="floor">floor</h5>

@@ -1641,6 +1641,11 @@ Others like <code>List</code>, <code>Frac</code>, <code>Option</code> need to be
 <td><code>-1</code></td>
 </tr>
 <tr>
+<td>char</td>
+<td>A single character (the underlying representation is an integer)</td>
+<td><code>'g'</code></td>
+</tr>
+<tr>
 <td>address</td>
 <td>æternity address, 32 bytes</td>
 <td><code>Call.origin</code></td>
@@ -1714,11 +1719,6 @@ Others like <code>List</code>, <code>Frac</code>, <code>Option</code> need to be
 <td>signature</td>
 <td>A signature - equivalent to <code>bytes(64)</code></td>
 <td></td>
-</tr>
-<tr>
-<td>Chain.ttl</td>
-<td>Time-to-live (fixed height or relative to current block)</td>
-<td><code>FixedTTL(1050)</code> <code>RelativeTTL(50)</code></td>
 </tr>
 <tr>
 <td>oracle('a, 'b)</td>
