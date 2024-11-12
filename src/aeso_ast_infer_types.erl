@@ -28,6 +28,7 @@
 -type utype() :: {fun_t, aeso_syntax:ann(), named_args_t(), [utype()] | var_args, utype()}
                | {app_t, aeso_syntax:ann(), utype(), [utype()]}
                | {tuple_t, aeso_syntax:ann(), [utype()]}
+               | {bytes_t, aeso_syntax:ann(), non_neg_integer() | any}
                | aeso_syntax:id()  | aeso_syntax:qid()
                | aeso_syntax:con() | aeso_syntax:qcon()  %% contracts
                | aeso_syntax:tvar()

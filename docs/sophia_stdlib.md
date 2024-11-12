@@ -484,13 +484,6 @@ Call.gas_price : int
 
 The gas price of the current call.
 
-#### mulmod
-```
-Int.mulmod : (a : int, b : int, q : int) : int
-```
-
-Combined multiplication and modulus, returns `(a * b) mod q`.
-
 #### fee
 ```
 Call.fee : int
@@ -501,7 +494,7 @@ The fee of the current call.
 
 #### gas_left
 ```
-Call.gas_left() : int
+Call.gas_left : int
 ```
 
 The amount of gas left for the current call.
@@ -512,6 +505,20 @@ The amount of gas left for the current call.
 Values and functions related to the chain itself and other entities that live on it.
 
 #### Types
+
+##### ttl
+
+Time-to-live (fixed height or relative to current block).
+
+Note that this type is a special case, where the type `ttl` is inside the
+`Chain` scope, but the constrctors `FixedTTL(int)` and `RelativeTTL(int)` are
+not. Meaning that the type `ttl` should be qualified with `Chain` when it is
+used (i.e. `Chain.ttl`), but the constructors should not be qualified (i.e.
+`FixedTTL(1050)` should be used rather than `Chain.FixedTTL(1050)`).
+
+```
+Chain.ttl = FixedTTL(int) | RelativeTTL(int)
+```
 
 ##### tx
 ```
@@ -573,7 +580,7 @@ the current generation.
 
 ##### block_height
 ```
-Chain.block_height : int"
+Chain.block_height : int
 ```
 
 The height of the current block (i.e. the block in which the current call will be included).
@@ -732,21 +739,12 @@ Chain.gas_limit : int
 The gas limit of the current block.
 
 
-##### network\_id
+##### network_id
 ```
-Chain.network\_id : string
+Chain.network_id : string
 ```
 
 The network id of the chain.
-
-
-#### poseidon
-```
-Crypto.poseidon(x1 : int, x2 : int) : int
-```
-
-Hash two integers (in the scalar field of BLS12-381) to another integer (in the scalar
-field of BLS12-281). This is a ZK/SNARK-friendly hash function.
 
 
 ##### spend
@@ -769,7 +767,7 @@ The timestamp of the current block (unix time, milliseconds).
 ### Char
 
 #### to_int
- ```
+```
 Char.to_int(c : char) : int
 ```
 
@@ -780,7 +778,7 @@ Returns the UTF-8 codepoint of a character
 
 ```
 Char.from_int(i : int) : option(char)
- ```
+```
 
 Opposite of [to_int](#to_int). Returns `None` if the integer doesn't correspond to a single (normalized) codepoint.
 
@@ -839,6 +837,15 @@ Crypto.blake2b(x : 'a) : hash
 Hash any object to blake2b
 
 
+#### poseidon
+```
+Crypto.poseidon(x1 : int, x2 : int) : int
+```
+
+Hash two integers (in the scalar field of BLS12-381) to another integer (in the scalar
+field of BLS12-281). This is a ZK/SNARK-friendly hash function.
+
+
 #### verify_sig
 ```
 Crypto.verify_sig(msg : bytes(), pubkey : address, sig : signature) : bool
@@ -880,6 +887,13 @@ Verifies a standard 64-byte ECDSA signature (`R || S`).
 
 
 ### Int
+
+#### mulmod
+```
+Int.mulmod : (a : int, b : int, q : int) : int
+```
+
+Combined multiplication and modulus, returns `(a * b) mod q`.
 
 #### to\_str
 ```
