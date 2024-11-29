@@ -1964,7 +1964,7 @@ will yield <code>[1, 1, 2]</code></p>
 <h4 id="partition">partition</h4>
 <div class="highlight"><pre><span></span><code>List.partition(p : &#39;a =&gt; bool, l : list(&#39;a)) : (list(&#39;a) * list(&#39;a))
 </code></pre></div>
-<p>Separates elements of <code>l</code> that fulfill <code>p</code> and these that do not. Elements fulfilling predicate will be in the right list. For instance
+<p>Separates elements of <code>l</code> that fulfill <code>p</code> and these that do not. Elements fulfilling the predicate will be in the first element of the returned tuple. For instance
 <div class="highlight"><pre><span></span><code>partition((x) =&gt; x &gt; 0, [-1, 1, -2, 0, 1, 2, -3])
 </code></pre></div>
 will yield <code>([1, 1, 2], [-1, -2, 0, -3])</code></p>
