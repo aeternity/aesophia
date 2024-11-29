@@ -1921,7 +1921,7 @@ Removes longest prefix from `l` in which all elements fulfill `p`.
 List.partition(p : 'a => bool, l : list('a)) : (list('a) * list('a))
 ```
 
-Separates elements of `l` that fulfill `p` and these that do not. Elements fulfilling predicate will be in the right list. For instance
+Separates elements of `l` that fulfill `p` and these that do not. Elements fulfilling the predicate will be in the first element of the returned tuple. For instance
 ```
 partition((x) => x > 0, [-1, 1, -2, 0, 1, 2, -3])
 ```
