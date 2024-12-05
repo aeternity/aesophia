@@ -1168,7 +1168,7 @@ infer_contract(Env0, What, Defs0, Options) ->
     %% Remove namespaces used in the current namespace
     Env5 = Env4#env{ used_namespaces = OldUsedNamespaces },
     %% Check that `init` doesn't read or write the state and that `init` is not missing
-    check_state(Env4, Defs1),
+    check_state(Env4, Defs1, Decls, What),
     %% Check that entrypoints have first-order arg types and return types
     check_entrypoints(Defs1),
     destroy_and_report_type_errors(Env4),
@@ -1901,13 +1901,17 @@ check_state_init(Env) ->
 
 %% Check that `init` doesn't read or write the state and that `init` is defined
 %% when the state type is not unit
-check_state(Env, Defs) ->
+check_state(Env, Defs, Decls, What) ->
     Top       = Env#env.namespace,
     GetState  = Top ++ ["state"],
     SetState  = Top ++ ["put"],
     Init      = Top ++ ["init"],
     UsedNames = fun(X) -> [{Xs, Ann} || {{term, Xs}, Ann} <- aeso_syntax_utils:used(X)] end,
-    Funs      = [ {Top ++ [Name], Fun} || Fun = {letfun, _, {id, _, Name}, _Args, _Type, _GuardedBodies} <- Defs ],
+    Funs      = case What of
+        contract -> [ {Top ++ [Name], Fun} || Fun = {letfun, _, {id, _, Name}, _Args, _Type, _GuardedBodies} <- Defs ];
+        contract_interface -> [ {Top ++ [Name], Fun} || Fun = {fun_decl, _, {id, _, Name}, _Type} <- Decls ];
+        namespace -> []
+    end,
     Deps      = maps:from_list([{Name, UsedNames(Def)} || {Name, Def} <- Funs]),
     case maps:get(Init, Deps, false) of
         false -> get_option(no_code, false) orelse check_state_init(Env);
