@@ -545,6 +545,7 @@ Sophia has the following types:
 | bool                 | A Boolean                                                                                   | ```true```                                                   |
 | bits                 | A bit field                                                                                 | ```Bits.none```                                              |
 | bytes(n)             | A byte array with `n` bytes                                                                 | ```#fedcba9876543210```                                      |
+| bytes()              | A byte array of unspecified size                                                             | ```#fedcba9876543210```                                      |
 | string               | An array of bytes                                                                           | ```"Foo"```                                                  |
 | list                 | A homogeneous immutable singly linked list.                                                 | ```[1, 2, 3]```                                              |
 | ('a, 'b) => 'c       | A function. Parentheses can be skipped if there is only one argument                        | ```(x : int, y : int) => x + y```                            |
@@ -569,6 +570,7 @@ Sophia has the following types:
 | bool                 | `true`, `false`                                                                                                                     |
 | bits                 | `Bits.none`, `Bits.all`                                                                                                             |
 | bytes(8)             | `#fedcba9876543210`                                                                                                                 |
+| bytes()              | `#fedcba9876543210`                                                                                                                 |
 | string               | `"This is a string"`                                                                                                                |
 | list                 | `[1, 2, 3]`, `[(true, 24), (false, 19), (false, -42)]`                                                                              |
 | tuple                | `(42, "Foo", true)`                                                                                                                 |
@@ -872,9 +874,12 @@ Please refer to the `Char` [library documentation](sophia_stdlib.md#char).
 
 ## Byte arrays
 
-Byte arrays are fixed size arrays of 8-bit integers. They are described in hexadecimal system,
-for example the literal `#cafe` creates a two-element array of bytes `ca` (202) and `fe` (254)
-and thus is a value of type `bytes(2)`.
+Byte arrays are to be understood as immutable and continuous arrays of 8-bit integers. They are described in hexadecimal system,
+for example the literal `#cafe` creates a two-element array of bytes `ca` (202) and `fe` (254).
+
+The type of a byte array is written as `bytes(n)`, where `n` is the size of the array. For instance,
+the type of the literal mentioned above (`#cafe`) is `bytes(2)`, as it consists of two bytes (`ca` and `fe`).
+Size information can be also omitted (i.e. `bytes()`) to specify the type of a byte array of arbitrary/unknown length. In other words, for any `n`, `bytes(n)` is a subtype of `bytes()`.
 
 Please refer to the `Bytes` [library documentation](sophia_stdlib.md#bytes).
 
