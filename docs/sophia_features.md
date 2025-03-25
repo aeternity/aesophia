@@ -856,8 +856,8 @@ it.
 
 There is a builtin type `string`, which can be seen as an array of bytes.
 Strings can be compared for equality (`==`, `!=`), used as keys in maps and
-records, and used in builtin functions `String.length`, `String.concat` and
-the hash functions described below.
+records, and used in standard library functions `String.length`,
+`String.concat`, etc, and the hash functions described below.
 
 Please refer to the `String` [library documentation](sophia_stdlib.md#string).
 
