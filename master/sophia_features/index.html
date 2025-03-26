@@ -1666,6 +1666,11 @@ Others like <code>List</code>, <code>Frac</code>, <code>Option</code> need to be
 <td><code>#fedcba9876543210</code></td>
 </tr>
 <tr>
+<td>bytes()</td>
+<td>A byte array of unspecified size</td>
+<td><code>#fedcba9876543210</code></td>
+</tr>
+<tr>
 <td>string</td>
 <td>An array of bytes</td>
 <td><code>"Foo"</code></td>
@@ -1768,6 +1773,10 @@ Others like <code>List</code>, <code>Frac</code>, <code>Option</code> need to be
 </tr>
 <tr>
 <td>bytes(8)</td>
+<td><code>#fedcba9876543210</code></td>
+</tr>
+<tr>
+<td>bytes()</td>
 <td><code>#fedcba9876543210</code></td>
 </tr>
 <tr>
@@ -2032,9 +2041,11 @@ mainly used to manipulate strings via <code>String.to_list</code>/<code>String.f
 <p>Characters can also be introduced as character literals (`'x', '+', ...).</p>
 <p>Please refer to the <code>Char</code> <a href="../sophia_stdlib/#char">library documentation</a>.</p>
 <h2 id="byte-arrays">Byte arrays</h2>
-<p>Byte arrays are fixed size arrays of 8-bit integers. They are described in hexadecimal system,
-for example the literal <code>#cafe</code> creates a two-element array of bytes <code>ca</code> (202) and <code>fe</code> (254)
-and thus is a value of type <code>bytes(2)</code>.</p>
+<p>Byte arrays are to be understood as immutable and continuous arrays of 8-bit integers. They are described in hexadecimal system,
+for example the literal <code>#cafe</code> creates a two-element array of bytes <code>ca</code> (202) and <code>fe</code> (254).</p>
+<p>The type of a byte array is written as <code>bytes(n)</code>, where <code>n</code> is the size of the array. For instance,
+the type of the literal mentioned above (<code>#cafe</code>) is <code>bytes(2)</code>, as it consists of two bytes (<code>ca</code> and <code>fe</code>).
+Size information can be also omitted (i.e. <code>bytes()</code>) to specify the type of a byte array of arbitrary/unknown length. In other words, for any <code>n</code>, <code>bytes(n)</code> is a subtype of <code>bytes()</code>.</p>
 <p>Please refer to the <code>Bytes</code> <a href="../sophia_stdlib/#bytes">library documentation</a>.</p>
 <h2 id="cryptographic-builtins">Cryptographic builtins</h2>
 <p>Libraries <a href="../sophia_stdlib/#crypto">Crypto</a> and <a href="../sophia_stdlib/#string">String</a> provide functions to
