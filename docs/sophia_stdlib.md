@@ -1077,6 +1077,8 @@ These need to be explicitly included (with `.aes` suffix)
 
 ### AENSCompat
 
+Note: to use `AENSCompat` functions you need to `include "AENSCompat.aes"`
+
 #### pointee\_to\_V2
 ```
 AENSCompat.pointee_to_V2(p : AENS.pointee) : AENSv2.pointee
@@ -1093,6 +1095,8 @@ Translate new pointee format to old, `DataPt` can't be translated, so `None` is 
 
 
 ### BLS12\_381
+
+Note: to use `BLS12\_381` functions you need to `include "BLS12\_381.aes"`
 
 #### Types
 
@@ -1325,6 +1329,8 @@ Perform the final exponentiation step of pairing for a `gt` value.
 
 Functional combinators.
 
+Note: to use `Func` functions you need to `include "Func.aes"`
+
 #### id
 ```
 Func.id(x : 'a) : 'a
@@ -1474,6 +1480,8 @@ The operator comparison is not possible to overload at this moment, nor the
 language provides checkers to prevent unintended usage of them. Therefore the typechecker
 **will** allow that and the results of such comparison will be unspecified.
 You should use [lt](#lt), [geq](#geq), [eq](#eq) etc instead.
+
+Note: to use `Frac` functions you need to `include "Frac.aes"`
 
 #### Types
 
@@ -1687,6 +1695,8 @@ this function to verify the input.
 ### List
 
 This module contains common operations on lists like constructing, querying, traversing etc.
+
+Note: to use `List` functions you need to `include "List.aes"`
 
 #### is_empty
 ```
@@ -2035,6 +2045,8 @@ Equivalent to [zip](#zip) with `[0..length(l)]`, but slightly faster.
 
 Common operations on `option` types and lists of `option`s.
 
+Note: to use `Option` functions you need to `include "Option.aes"`
+
 #### is_none
 ```
 Option.is_none(o : option('a)) : bool
@@ -2220,6 +2232,8 @@ Same as [choose](#choose), but chooses from a list insted of two arguments.
 
 Common operations on 2-tuples.
 
+Note: to use `Pair` functions you need to `include "Pair.aes"`
+
 #### fst
 ```
 Pair.fst(t : ('a * 'b)) : 'a
@@ -2269,6 +2283,8 @@ Swaps elements.
 
 
 ### <a name='set-stdlib'>Set</a>
+
+Note: to use `Set` functions you need to `include "Set.aes"`
 
 #### Types
 
@@ -2395,6 +2411,8 @@ Returns the union of all the sets in the given list
 
 Operations on the `string` type. A `string` is a UTF-8 encoded byte array.
 
+Note: to use `String` functions you need to `include "String.aes"`
+
 #### length
 `length(s : string) : int`
 
@@ -2517,6 +2535,8 @@ Computes the Blake2B hash of the string.
 
 
 ### Triple
+
+Note: to use `Triple` functions you need to `include "Triple.aes"`
 
 #### fst
 ```
