@@ -227,6 +227,7 @@ compilable_contracts() ->
      "resolve_field_constraint_by_arity",
      "toplevel_constants",
      "ceres",
+     "delayed_field_constraint_bug",
      "test" % Custom general-purpose test file. Keep it last on the list.
     ].
 
