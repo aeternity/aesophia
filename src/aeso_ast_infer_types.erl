@@ -2717,11 +2717,11 @@ solve_constraint(Env, {add_bytes, Ann, Action, A0, B0, C0}) ->
     end;
 solve_constraint(_, _) -> false.
 
-one_shot_field_constraint(Env, #field_constraint{record_t = RecordType,
-                                                 field    = Field = {id, _As, FieldName},
-                                                 field_t  = FieldType,
-                                                 kind     = Kind,
-                                                 context  = When}) ->
+one_shot_field_constraint(Env, C = #field_constraint{record_t = RecordType,
+                                                     field    = Field = {id, _As, FieldName},
+                                                     field_t  = FieldType,
+                                                     kind     = Kind,
+                                                     context  = When}) ->
     Arity = fun_arity(dereference_deep(FieldType)),
     FieldInfos = case Arity of
                      none -> lookup_record_field(Env, FieldName, Kind);
@@ -2736,7 +2736,7 @@ one_shot_field_constraint(Env, #field_constraint{record_t = RecordType,
             solve_field_constraint(Env, FieldType, FldType, RecordType, RecType, When),
             true;
         _ ->
-            false
+            solve_constraint(Env, C)
     end;
 one_shot_field_constraint(_Env, _Constraint) ->
     false.
