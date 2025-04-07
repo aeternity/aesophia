@@ -1,0 +1,16 @@
+contract interface Pool =
+  entrypoint member : (address) => bool
+
+main contract PoolMan =
+  record state =
+    { pools : list(Pool) }
+
+  entrypoint init() =
+    { pools = [] }
+
+  entrypoint pools() = 42
+
+  entrypoint member(worker_address : address) =
+    filter((p) => p.member(worker_address), state.pools)
+
+  function filter(p : 'a => bool, s : list('a)) : list('a) = []
