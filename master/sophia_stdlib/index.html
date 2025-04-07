@@ -1501,6 +1501,7 @@ The call fails if the oracle could expire before an answer.</p>
 <h2 id="includable-namespaces">Includable namespaces</h2>
 <p>These need to be explicitly included (with <code>.aes</code> suffix)</p>
 <h3 id="aenscompat">AENSCompat</h3>
+<p>Note: to use <code>AENSCompat</code> functions you need to <code>include "AENSCompat.aes"</code></p>
 <h4 id="pointee_to_v2">pointee_to_V2</h4>
 <div class="highlight"><pre><span></span><code>AENSCompat.pointee_to_V2(p : AENS.pointee) : AENSv2.pointee
 </code></pre></div>
@@ -1510,6 +1511,7 @@ The call fails if the oracle could expire before an answer.</p>
 </code></pre></div>
 <p>Translate new pointee format to old, <code>DataPt</code> can't be translated, so <code>None</code> is returned in this case.</p>
 <h3 id="bls12_381">BLS12_381</h3>
+<p>Note: to use <code>BLS12\_381</code> functions you need to <code>include "BLS12\_381.aes"</code></p>
 <h4 id="types_3">Types</h4>
 <h5 id="fr">fr</h5>
 <p>Built-in (Montgomery) integer representation 32 bytes</p>
@@ -1638,6 +1640,7 @@ The call fails if the oracle could expire before an answer.</p>
 <p>Perform the final exponentiation step of pairing for a <code>gt</code> value.</p>
 <h3 id="func">Func</h3>
 <p>Functional combinators.</p>
+<p>Note: to use <code>Func</code> functions you need to <code>include "Func.aes"</code></p>
 <h4 id="id">id</h4>
 <div class="highlight"><pre><span></span><code>Func.id(x : &#39;a) : &#39;a
 </code></pre></div>
@@ -1729,6 +1732,7 @@ The operator comparison is not possible to overload at this moment, nor the
 language provides checkers to prevent unintended usage of them. Therefore the typechecker
 <strong>will</strong> allow that and the results of such comparison will be unspecified.
 You should use <a href="#lt">lt</a>, <a href="#geq">geq</a>, <a href="#eq">eq</a> etc instead.</p>
+<p>Note: to use <code>Frac</code> functions you need to <code>include "Frac.aes"</code></p>
 <h4 id="types_4">Types</h4>
 <h5 id="frac_1">frac</h5>
 <div class="highlight"><pre><span></span><code>datatype frac = Pos(int, int) | Zero | Neg(int, int)
@@ -1840,6 +1844,7 @@ accept arbitrary <code>frac</code>s from the surface you should report it as a
 this function to verify the input.</p>
 <h3 id="list">List</h3>
 <p>This module contains common operations on lists like constructing, querying, traversing etc.</p>
+<p>Note: to use <code>List</code> functions you need to <code>include "List.aes"</code></p>
 <h4 id="is_empty">is_empty</h4>
 <div class="highlight"><pre><span></span><code>List.is_empty(l : list(&#39;a)) : bool
 </code></pre></div>
@@ -2024,6 +2029,7 @@ will yield <code>[1, 0, 2, 0, 3, 0, 4]</code></p>
 <p>Equivalent to <a href="#zip">zip</a> with <code>[0..length(l)]</code>, but slightly faster.</p>
 <h3 id="option">Option</h3>
 <p>Common operations on <code>option</code> types and lists of <code>option</code>s.</p>
+<p>Note: to use <code>Option</code> functions you need to <code>include "Option.aes"</code></p>
 <h4 id="is_none">is_none</h4>
 <div class="highlight"><pre><span></span><code>Option.is_none(o : option(&#39;a)) : bool
 </code></pre></div>
@@ -2127,6 +2133,7 @@ will yield <code>None</code>.</p>
 <p>Same as <a href="#choose">choose</a>, but chooses from a list insted of two arguments.</p>
 <h3 id="pair">Pair</h3>
 <p>Common operations on 2-tuples.</p>
+<p>Note: to use <code>Pair</code> functions you need to <code>include "Pair.aes"</code></p>
 <h4 id="fst">fst</h4>
 <div class="highlight"><pre><span></span><code>Pair.fst(t : (&#39;a * &#39;b)) : &#39;a
 </code></pre></div>
@@ -2152,6 +2159,7 @@ will yield <code>None</code>.</p>
 </code></pre></div>
 <p>Swaps elements.</p>
 <h3 id="set_1"><a name='set-stdlib'>Set</a></h3>
+<p>Note: to use <code>Set</code> functions you need to <code>include "Set.aes"</code></p>
 <h4 id="types_5">Types</h4>
 <div class="highlight"><pre><span></span><code>record set(&#39;a) = { to_map : map(&#39;a, unit) }
 </code></pre></div>
@@ -2214,6 +2222,7 @@ will yield <code>None</code>.</p>
 <p>Returns the union of all the sets in the given list</p>
 <h3 id="string">String</h3>
 <p>Operations on the <code>string</code> type. A <code>string</code> is a UTF-8 encoded byte array.</p>
+<p>Note: to use <code>String</code> functions you need to <code>include "String.aes"</code></p>
 <h4 id="length_1">length</h4>
 <p><code>length(s : string) : int</code></p>
 <p>The length of a string.</p>
@@ -2287,6 +2296,7 @@ an integer. If the string doesn't contain a valid number <code>None</code> is re
 </code></pre></div>
 <p>Computes the Blake2B hash of the string.</p>
 <h3 id="triple">Triple</h3>
+<p>Note: to use <code>Triple</code> functions you need to <code>include "Triple.aes"</code></p>
 <h4 id="fst_1">fst</h4>
 <div class="highlight"><pre><span></span><code>Triple.fst(t : (&#39;a * &#39;b * &#39;c)) : &#39;a
 </code></pre></div>
