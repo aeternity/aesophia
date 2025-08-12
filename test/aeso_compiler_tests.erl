@@ -267,35 +267,35 @@ warnings() ->
         "The file `Triple.aes` is included but not used.">>,
       <<?PosW(13, 3)
         "The function `h` is defined but never used.">>,
-      <<?PosW(19, 3)
+      <<?PosW(25, 3)
         "The type `unused_type` is defined but never used.">>,
-      <<?PosW(23, 54)
+      <<?PosW(29, 54)
         "Negative spend.">>,
-      <<?PosW(27, 9)
-        "The definition of `x` shadows an older definition at line 26, column 9.">>,
-      <<?PosW(30, 36)
+      <<?PosW(33, 9)
+        "The definition of `x` shadows an older definition at line 32, column 9.">>,
+      <<?PosW(36, 36)
         "Division by zero.">>,
-      <<?PosW(32, 3)
+      <<?PosW(38, 3)
         "The function `unused_stateful` is unnecessarily marked as stateful.">>,
-      <<?PosW(35, 31)
+      <<?PosW(41, 31)
         "The variable `unused_arg` is defined but never used.">>,
-      <<?PosW(36, 9)
+      <<?PosW(42, 9)
         "The variable `unused_var` is defined but never used.">>,
-      <<?PosW(41, 3)
+      <<?PosW(47, 3)
         "The function `unused_function` is defined but never used.">>,
-      <<?PosW(42, 3)
+      <<?PosW(48, 3)
         "The function `recursive_unused_function` is defined but never used.">>,
-      <<?PosW(43, 3)
+      <<?PosW(49, 3)
         "The function `called_unused_function1` is defined but never used.">>,
-      <<?PosW(44, 3)
+      <<?PosW(50, 3)
         "The function `called_unused_function2` is defined but never used.">>,
-      <<?PosW(48, 5)
+      <<?PosW(54, 5)
         "Unused return value.">>,
-      <<?PosW(60, 5)
+      <<?PosW(66, 5)
         "The function `dec` is defined but never used.">>,
-      <<?PosW(73, 9)
-        "The definition of `const` shadows an older definition at line 70, column 3.">>,
-      <<?PosW(84, 7)
+      <<?PosW(79, 9)
+        "The definition of `const` shadows an older definition at line 76, column 3.">>,
+      <<?PosW(90, 7)
         "The constant `c` is defined but never used.">>
      ]).
 
@@ -860,35 +860,35 @@ failing_contracts() ->
                       "The file `Triple.aes` is included but not used.">>,
                    <<?Pos(13, 3)
                      "The function `h` is defined but never used.">>,
-                   <<?Pos(19, 3)
+                   <<?Pos(25, 3)
                      "The type `unused_type` is defined but never used.">>,
-                   <<?Pos(23, 54)
+                   <<?Pos(29, 54)
                      "Negative spend.">>,
-                   <<?Pos(27, 9)
-                     "The definition of `x` shadows an older definition at line 26, column 9.">>,
-                   <<?Pos(30, 36)
+                   <<?Pos(33, 9)
+                     "The definition of `x` shadows an older definition at line 32, column 9.">>,
+                   <<?Pos(36, 36)
                      "Division by zero.">>,
-                   <<?Pos(32, 3)
+                   <<?Pos(38, 3)
                      "The function `unused_stateful` is unnecessarily marked as stateful.">>,
-                   <<?Pos(35, 31)
+                   <<?Pos(41, 31)
                      "The variable `unused_arg` is defined but never used.">>,
-                   <<?Pos(36, 9)
+                   <<?Pos(42, 9)
                      "The variable `unused_var` is defined but never used.">>,
-                   <<?Pos(41, 3)
+                   <<?Pos(47, 3)
                      "The function `unused_function` is defined but never used.">>,
-                   <<?Pos(42, 3)
+                   <<?Pos(48, 3)
                      "The function `recursive_unused_function` is defined but never used.">>,
-                   <<?Pos(43, 3)
+                   <<?Pos(49, 3)
                      "The function `called_unused_function1` is defined but never used.">>,
-                   <<?Pos(44, 3)
+                   <<?Pos(50, 3)
                      "The function `called_unused_function2` is defined but never used.">>,
-                   <<?Pos(48, 5)
+                   <<?Pos(54, 5)
                      "Unused return value.">>,
-                   <<?Pos(60, 5)
+                   <<?Pos(66, 5)
                      "The function `dec` is defined but never used.">>,
-                   <<?Pos(73, 9)
-                     "The definition of `const` shadows an older definition at line 70, column 3.">>,
-                   <<?Pos(84, 7)
+                   <<?Pos(79, 9)
+                     "The definition of `const` shadows an older definition at line 76, column 3.">>,
+                   <<?Pos(90, 7)
                      "The constant `c` is defined but never used.">>
                   ])
     , ?TYPE_ERROR(polymorphism_contract_interface_recursive,
