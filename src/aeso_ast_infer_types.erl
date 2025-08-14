@@ -3478,8 +3478,14 @@ used_stateful(Fun) ->
 %% Warnings (Unused type defs)
 
 potential_unused_typedefs(Namespace, TypeDefs) ->
-    lists:map(fun({type_def, Ann, Id, Args, _}) ->
-        ets_insert(warnings, {unused_typedef, Ann, Namespace ++ qname(Id), length(Args)}) end, TypeDefs).
+    lists:map(
+      fun({type_def, _Ann, {id, _, "event"}, _Args, _}) ->
+              ok;
+         ({type_def, Ann, Id, Args, _}) ->
+              ets_insert(warnings, {unused_typedef, Ann, Namespace ++ qname(Id), length(Args)})
+      end,
+      TypeDefs
+     ).
 
 used_typedef(TypeAliasId, Arity) ->
     ets_match_delete(warnings, {unused_typedef, '_', qname(TypeAliasId), Arity}).

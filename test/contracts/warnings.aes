@@ -12,7 +12,13 @@ namespace UnusedNamespace =
   // Unused
   private function h() = 3
 
+contract interface Eventer =
+  datatype event = RemoteEvent(int)
+  entrypoint emitEvents : () => unit
+
 main contract Warnings =
+
+  datatype event = Event(int)
 
   type state = int
 
