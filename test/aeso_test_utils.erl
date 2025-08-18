@@ -11,7 +11,8 @@
 -export([read_contract/1, contract_path/0]).
 
 contract_path() ->
-    filename:join(code:lib_dir(aesophia, test), "contracts").
+    Root = code:lib_dir(aesophia),
+    filename:join(Root, "test/contracts").
 
 %% Read a contract file from the test/contracts directory.
 -spec read_contract(string() | atom()) -> string().

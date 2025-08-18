@@ -21,147 +21,20 @@
         , lookup_env1/4
         , name/1
         , qname/1
+        , type_error/1
+        , pp_when/1
+        , instantiate/1
+        , pp_expr/1
+        , pp_expr/2
+        , pp_loc/1
+        , pos/1
+        , pos/2
+        , typesig_to_fun_t/1
         ]).
 
 -include("aeso_utils.hrl").
-
--type utype() :: {fun_t, aeso_syntax:ann(), named_args_t(), [utype()] | var_args, utype()}
-               | {app_t, aeso_syntax:ann(), utype(), [utype()]}
-               | {tuple_t, aeso_syntax:ann(), [utype()]}
-               | {bytes_t, aeso_syntax:ann(), non_neg_integer() | any}
-               | aeso_syntax:id()  | aeso_syntax:qid()
-               | aeso_syntax:con() | aeso_syntax:qcon()  %% contracts
-               | aeso_syntax:tvar()
-               | {if_t, aeso_syntax:ann(), aeso_syntax:id(), utype(), utype()}  %% Can branch on named argument (protected)
-               | uvar().
-
--type uvar() :: {uvar, aeso_syntax:ann(), reference()}.
-
--type named_args_t() :: uvar() | [{named_arg_t, aeso_syntax:ann(), aeso_syntax:id(), utype(), aeso_syntax:expr()}].
-
--type type_id() :: aeso_syntax:id() | aeso_syntax:qid() | aeso_syntax:con() | aeso_syntax:qcon().
-
--define(is_type_id(T), element(1, T) =:= id orelse
-                       element(1, T) =:= qid orelse
-                       element(1, T) =:= con orelse
-                       element(1, T) =:= qcon).
-
--type why_record() :: aeso_syntax:field(aeso_syntax:expr())
-                    | {var_args, aeso_syntax:ann(), aeso_syntax:expr()}
-                    | {proj, aeso_syntax:ann(), aeso_syntax:expr(), aeso_syntax:id()}.
-
--type pos() :: aeso_errors:pos().
-
--record(named_argument_constraint,
-    {args :: named_args_t(),
-     name :: aeso_syntax:id(),
-     type :: utype()}).
-
--record(dependent_type_constraint,
-    { named_args_t     :: named_args_t()
-    , named_args       :: [aeso_syntax:arg_expr()]
-    , general_type     :: utype()
-    , specialized_type :: utype()
-    , context          :: term() }).
-
--type named_argument_constraint() :: #named_argument_constraint{} | #dependent_type_constraint{}.
-
--record(field_constraint,
-    { record_t :: utype()
-    , field    :: aeso_syntax:id()
-    , field_t  :: utype()
-    , kind     :: project | create | update %% Projection constraints can match contract
-    , context  :: why_record() }).          %% types, but field constraints only record types.
-
-%% Constraint checking that 'record_t' has precisely 'fields'.
--record(record_create_constraint,
-    { record_t :: utype()
-    , fields   :: [aeso_syntax:id()]
-    , context  :: why_record() }).
-
--record(is_contract_constraint,
-    { contract_t :: utype(),
-      context    :: {contract_literal, aeso_syntax:expr()} |
-                    {address_to_contract, aeso_syntax:ann()} |
-                    {bytecode_hash, aeso_syntax:ann()} |
-                    {var_args, aeso_syntax:ann(), aeso_syntax:expr()},
-      force_def = false :: boolean()
-    }).
-
--type field_constraint() :: #field_constraint{} | #record_create_constraint{} | #is_contract_constraint{}.
-
--type byte_constraint() :: {is_bytes, term(), utype()}
-                         | {is_fixed_bytes, term(), utype()}
-                         | {add_bytes, aeso_syntax:ann(), concat | split | split_any, utype(), utype(), utype()}.
-
--type aens_resolve_constraint() :: {aens_resolve_type, utype()}.
--type oracle_type_constraint() :: {oracle_type, aeso_syntax:ann(), utype()}.
-
--type constraint() :: named_argument_constraint() | field_constraint() | byte_constraint()
-                    | aens_resolve_constraint() | oracle_type_constraint().
-
--record(field_info,
-    { ann      :: aeso_syntax:ann()
-    , field_t  :: utype()
-    , record_t :: utype()
-    , kind     :: contract | record }).
-
--type field_info() :: #field_info{}.
-
--type access() :: public | private | internal.
-
--type typedef() :: {[aeso_syntax:tvar()], aeso_syntax:typedef() | {contract_t, [aeso_syntax:field_t()]}}
-                 | {builtin, non_neg_integer()}.
-
--type type() :: aeso_syntax:type().
--type name() :: string().
--type qname() :: [string()].
--type typesig() :: {type_sig, aeso_syntax:ann(), type_constraints(), [aeso_syntax:named_arg_t()], [type()], type()}.
-
--type namespace_alias() :: none | name().
--type namespace_parts() :: none | {for, [name()]} | {hiding, [name()]}.
--type used_namespaces() :: [{qname(), namespace_alias(), namespace_parts()}].
-
--type type_constraints() :: none | bytes_concat | bytes_split | address_to_contract | bytecode_hash.
-
--type variance() :: invariant | covariant | contravariant | bivariant.
-
--type fun_info()   :: {aeso_syntax:ann(), typesig() | type()}.
--type type_info()  :: {aeso_syntax:ann(), typedef()}.
--type const_info() :: {aeso_syntax:ann(), type()}.
--type var_info()   :: {aeso_syntax:ann(), utype()}.
-
--type fun_env()   :: [{name(), fun_info()}].
--type type_env()  :: [{name(), type_info()}].
--type const_env() :: [{name(), const_info()}].
-
--record(scope, { funs   = [] :: fun_env()
-               , types  = [] :: type_env()
-               , consts = [] :: const_env()
-               , access = public :: access()
-               , kind   = namespace :: namespace | contract
-               , ann    = [{origin, system}] :: aeso_syntax:ann()
-               }).
-
--type scope() :: #scope{}.
-
--record(env,
-    { scopes           = #{ [] => #scope{}} :: #{ qname() => scope() }
-    , vars             = []                 :: [{name(), var_info()}]
-    , typevars         = unrestricted       :: unrestricted | [name()]
-    , fields           = #{}                :: #{ name() => [field_info()] }    %% fields are global
-    , contract_parents = #{}                :: #{ name() => [name()] }
-    , namespace        = []                 :: qname()
-    , used_namespaces  = []                 :: used_namespaces()
-    , in_pattern       = false              :: boolean()
-    , in_guard         = false              :: boolean()
-    , stateful         = false              :: boolean()
-    , current_const    = none               :: none | aeso_syntax:id()
-    , current_function = none               :: none | aeso_syntax:id()
-    , what             = top                :: top | namespace | contract | contract_interface
-    }).
-
--type env() :: #env{}.
+-include("aeso_typing.hrl").
+%% Types and records moved to aeso_typing.hrl
 
 -define(PRINT_TYPES(Fmt, Args),
         when_option(pp_types, fun () -> io:format(Fmt, Args) end)).
@@ -916,8 +789,6 @@ map_t(As, K, V) -> {app_t, As, {id, As, "map"}, [K, V]}.
 infer(Contracts) ->
     infer(Contracts, []).
 
--type option() :: return_env | dont_unfold | no_code | debug_mode | term().
-
 -spec init_env(list(option())) -> env().
 init_env(_Options) -> global_env().
 
@@ -1111,7 +982,7 @@ check_scope_name_clash(Env, Kind, Name) ->
     {env(), [aeso_syntax:decl()]}.
 infer_contract_top(Env, Kind, Defs0, Options) ->
     create_type_errors(),
-    Defs = desugar(Defs0),
+    Defs = aeso_typing_desugar:desugar(Defs0),
     destroy_and_report_type_errors(Env),
     infer_contract(Env, Kind, Defs, Options).
 
@@ -1750,7 +1621,7 @@ desugar_clauses(Ann, Fun, {type_sig, _, _, _, ArgTypes, RetType}, Clauses) ->
         true  ->
             NoAnn = [{origin, system}],
             Args = [ {typed, NoAnn, {id, NoAnn, "x#" ++ integer_to_list(I)}, Type}
-                     || {I, Type} <- indexed(1, ArgTypes) ],
+                     || {I, Type} <- lists:zip(lists:seq(1, length(ArgTypes)), ArgTypes) ],
             Tuple = fun([X]) -> X;
                        (As) -> {typed, NoAnn, {tuple, NoAnn, As}, {tuple_t, NoAnn, ArgTypes}}
                     end,
@@ -2672,7 +2543,7 @@ solve_unknown_record_constraints(Env, Constraints) ->
     end.
 
 %% -- Simple constraints --
-%% Returns true if solved (unified or type error)
+%% Returns true if solved (unified or type error), false otherwise
 solve_constraint(_Env, #field_constraint{record_t = {uvar, _, _}}) ->
     false;
 solve_constraint(Env, #field_constraint{record_t = RecordType,
@@ -3661,8 +3532,8 @@ mk_error({cannot_unify, A, B, Cxt, When}) ->
                           _    -> io_lib:format(" in a ~p context", [Cxt])
                       end,
     Msg = io_lib:format("Cannot unify `~s` and `~s`" ++ VarianceContext,
-                        [pp(instantiate(A)), pp(instantiate(B))]),
-    {Pos, Ctxt} = pp_when(When),
+                        [aeso_types_pp:pp(instantiate(A)), aeso_types_pp:pp(instantiate(B))]),
+    {Pos, Ctxt} = aeso_types_pp:pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
 mk_error({hole_found, Ann, Type}) ->
     Msg = io_lib:format("Found a hole of type `~s`", [pp(instantiate(Type))]),
@@ -3758,7 +3629,7 @@ mk_error({event_0_to_1_string_values, Constr}) ->
     mk_t_err(pos(Constr), Msg);
 mk_error({repeated_constructor, Cs}) ->
     Msg = io_lib:format("Variant types must have distinct constructor names~s",
-                        [[ io_lib:format("\n`~s`  (at ~s)", [pp_typed("  - ", C, T), pp_loc(C)]) || {C, T} <- Cs ]]),
+                        [[ io_lib:format("\n`~s`  (at ~s)", [aeso_types_pp:pp_typed("  - ", C, T), pp_loc(C)]) || {C, T} <- Cs ]]),
     mk_t_err(pos(element(1, hd(Cs))), Msg);
 mk_error({bad_named_argument, [], Name}) ->
     Msg = io_lib:format("Named argument ~s supplied to function expecting no named arguments.",
@@ -3766,13 +3637,13 @@ mk_error({bad_named_argument, [], Name}) ->
     mk_t_err(pos(Name), Msg);
 mk_error({bad_named_argument, Args, Name}) ->
     Msg = io_lib:format("Named argument `~s` is not one of the expected named arguments~s",
-                        [pp(Name),
-                        [ io_lib:format("\n  - `~s`", [pp_typed("", Arg, Type)])
+                        [aeso_types_pp:pp(Name),
+                        [ io_lib:format("\n  - `~s`", [aeso_types_pp:pp_typed("", Arg, Type)])
                           || {named_arg_t, _, Arg, Type, _} <- Args ]]),
     mk_t_err(pos(Name), Msg);
 mk_error({unsolved_named_argument_constraint, #named_argument_constraint{name = Name, type = Type}}) ->
     Msg = io_lib:format("Named argument ~s supplied to function with unknown named arguments.",
-                        [pp_typed("", Name, Type)]),
+                        [aeso_types_pp:pp_typed("", Name, Type)]),
     mk_t_err(pos(Name), Msg);
 mk_error({reserved_entrypoint, Name, Def}) ->
     Msg = io_lib:format("The name '~s' is reserved and cannot be used for a "
@@ -3963,7 +3834,7 @@ mk_error({multiple_main_contracts, Ann}) ->
     mk_t_err(pos(Ann), Msg);
 mk_error({unify_varargs, When}) ->
     Msg = "Cannot infer types for variable argument list.",
-    {Pos, Ctxt} = pp_when(When),
+    {Pos, Ctxt} = aeso_types_pp:pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
 mk_error({clone_no_contract, Ann}) ->
     Msg = "Chain.clone requires `ref` named argument of contract type.",
@@ -3971,7 +3842,7 @@ mk_error({clone_no_contract, Ann}) ->
 mk_error({contract_lacks_definition, Type, When}) ->
     Msg = io_lib:format(
             "~s is not implemented.",
-            [pp_type(Type)]
+            [aeso_types_pp:pp_type(Type)]
            ),
     {Pos, Ctxt} = pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
@@ -4015,8 +3886,8 @@ mk_error({missing_init_function, Con}) ->
 mk_error({higher_order_entrypoint, Ann, {id, _, Name}, Thing}) ->
     What = "higher-order (contains function types)",
     ThingS = case Thing of
-                 {argument, X, T} -> io_lib:format("argument\n~s`\n", [pp_typed("  `", X, T)]);
-                 {result, T}      -> io_lib:format("return type\n~s`\n", [pp_type("  `", T)])
+                 {argument, X, T} -> io_lib:format("argument\n~s`\n", [aeso_types_pp:pp_typed("  `", X, T)]);
+                 {result, T}      -> io_lib:format("return type\n~s`\n", [aeso_types_pp:pp_type("  `", T)])
              end,
     Bad = case Thing of
               {argument, _, _} -> io_lib:format("has a ~s type", [What]);
@@ -4126,25 +3997,12 @@ mk_entrypoint(Decl) ->
                             aeso_syntax:get_ann(Decl))) -- [public, private]],
     aeso_syntax:set_ann(Ann, Decl).
 
-pp_when({todo, What}) -> {pos(0, 0), io_lib:format("[TODO] ~p", [What])};
-pp_when({at, Ann}) -> {pos(Ann), io_lib:format("at ~s", [pp_loc(Ann)])};
+pp_when({todo, What}) -> aeso_types_pp:pp_when({todo, What});
+pp_when({at, Ann}) -> aeso_types_pp:pp_when({at, Ann});
 pp_when({check_typesig, Name, Inferred, Given}) ->
-    {pos(Given),
-     io_lib:format("when checking the definition of `~s`\n"
-                   "  inferred type: `~s`\n"
-                   "  given type:    `~s`",
-         [Name, pp(instantiate(Inferred)), pp(instantiate(Given))])};
+    aeso_types_pp:pp_when({check_typesig, Name, Inferred, Given});
 pp_when({infer_app, Fun, NamedArgs, Args, Inferred0, ArgTypes0}) ->
-    Inferred = instantiate(Inferred0),
-    ArgTypes = instantiate(ArgTypes0),
-    {pos(Fun),
-     io_lib:format("when checking the application of\n"
-                   "  `~s`\n"
-                   "to arguments~s",
-                   [pp_typed("", Fun, Inferred),
-                    [ ["\n  ", "`" ++ pp_expr(NamedArg) ++ "`"] || NamedArg <- NamedArgs ] ++
-                    [ ["\n  ", "`" ++ pp_typed("", Arg, ArgT) ++ "`"]
-                       || {Arg, ArgT} <- lists:zip(Args, ArgTypes) ] ])};
+    aeso_types_pp:pp_when({infer_app, Fun, NamedArgs, Args, Inferred0, ArgTypes0});
 pp_when({field_constraint, FieldType0, InferredType0, Fld}) ->
     FieldType    = instantiate(FieldType0),
     InferredType = instantiate(InferredType0),
@@ -4167,8 +4025,8 @@ pp_when({field_constraint, FieldType0, InferredType0, Fld}) ->
                   pp_typed("", E, InferredType)]);
          {proj, _Ann, _Rec, _Fld} ->
              io_lib:format("when checking the record projection `~s` against the expected type `~s`",
-                 [pp_typed("  ", Fld, FieldType),
-                  pp_type("  ", InferredType)])
+                 [aeso_types_pp:pp_typed("  ", Fld, FieldType),
+                  aeso_types_pp:pp_type("  ", InferredType)])
      end};
 pp_when({record_constraint, RecType0, InferredType0, Fld}) ->
     RecType      = instantiate(RecType0),
@@ -4209,13 +4067,13 @@ pp_when({case_pat, Pat, PatType0, ExprType0}) ->
     {PatType, ExprType} = instantiate({PatType0, ExprType0}),
     {pos(Pat),
      io_lib:format("when checking the type of the pattern `~s` against the expected type `~s`",
-                   [pp_typed("", Pat, PatType),
-                    pp_type(ExprType)])};
+                   [aeso_types_pp:pp_typed("", Pat, PatType),
+                    aeso_types_pp:pp_type(ExprType)])};
 pp_when({check_expr, Expr, Inferred0, Expected0}) ->
     {Inferred, Expected} = instantiate({Inferred0, Expected0}),
     {pos(Expr),
      io_lib:format("when checking the type of the expression `~s` against the expected type `~s`",
-                   [pp_typed("", Expr, Inferred), pp_type(Expected)])};
+                   [aeso_types_pp:pp_typed("", Expr, Inferred), aeso_types_pp:pp_type(Expected)])};
 pp_when({checking_init_type, Ann}) ->
     {pos(Ann),
      io_lib:format("when checking that `init` returns a value of type `state`", [])};
@@ -4223,12 +4081,12 @@ pp_when({list_comp, BindExpr, Inferred0, Expected0}) ->
     {Inferred, Expected} = instantiate({Inferred0, Expected0}),
     {pos(BindExpr),
      io_lib:format("when checking rvalue of list comprehension binding `~s` against type `~s`",
-                   [pp_typed("", BindExpr, Inferred), pp_type(Expected)])};
+                   [aeso_types_pp:pp_typed("", BindExpr, Inferred), aeso_types_pp:pp_type(Expected)])};
 pp_when({check_named_arg_constraint, C}) ->
     {id, _, Name} = Arg = C#named_argument_constraint.name,
     [Type | _] = [ Type || {named_arg_t, _, {id, _, Name1}, Type, _} <- C#named_argument_constraint.args, Name1 == Name ],
     Err = io_lib:format("when checking named argument `~s` against inferred type `~s`",
-                        [pp_typed("", Arg, Type), pp_type(C#named_argument_constraint.type)]),
+                        [aeso_types_pp:pp_typed("", Arg, Type), aeso_types_pp:pp_type(C#named_argument_constraint.type)]),
     {pos(Arg), Err};
 pp_when({checking_init_args, Ann, Con0, ArgTypes0}) ->
     Con = instantiate(Con0),
@@ -4240,7 +4098,7 @@ pp_when({checking_init_args, Ann, Con0, ArgTypes0}) ->
 pp_when({return_contract, App, Con0}) ->
     Con = instantiate(Con0),
     {pos(App)
-    , io_lib:format("when checking that expression returns contract of type `~s`", [pp_type(Con)])
+    , io_lib:format("when checking that expression returns contract of type `~s`", [aeso_types_pp:pp_type(Con)])
     };
 pp_when({arg_name, Id1, Id2, When}) ->
     {Pos, Ctx} = pp_when(When),
@@ -4283,21 +4141,15 @@ if_branches(If = {'if', Ann, _, Then, Else}) ->
     end;
 if_branches(E) -> [E].
 
-pp_typed(Label, E, T = {type_sig, _, _, _, _, _}) -> pp_typed(Label, E, typesig_to_fun_t(T));
-pp_typed(Label, {typed, _, Expr, _}, Type) ->
-    pp_typed(Label, Expr, Type);
-pp_typed(Label, Expr, Type) ->
-    pp_expr(Label, {typed, [], Expr, Type}).
+pp_typed(Label, E, T) -> aeso_types_pp:pp_typed(Label, E, T).
 
 pp_expr(Expr) ->
     pp_expr("", Expr).
 pp_expr(Label, Expr) ->
     prettypr:format(prettypr:beside(prettypr:text(Label), aeso_pretty:expr(Expr, [show_generated])), 80, 80).
 
-pp_type(Type) ->
-    pp_type("", Type).
-pp_type(Label, Type) ->
-    prettypr:format(prettypr:beside(prettypr:text(Label), aeso_pretty:type(Type, [show_generated])), 80, 80).
+pp_type(Type) -> aeso_types_pp:pp_type(Type).
+pp_type(Label, Type) -> aeso_types_pp:pp_type(Label, Type).
 
 
 pp_context([{fun_name, Id}]) -> ["a call to ", pp(Id)];
@@ -4335,127 +4187,8 @@ pp_loc(T) ->
 plural(No, _Yes, [_]) -> No;
 plural(_No, Yes, _)   -> Yes.
 
-pp(T = {type_sig, _, _, _, _, _}) ->
-    pp(typesig_to_fun_t(T));
-pp([]) ->
-    "";
-pp([T]) ->
-    pp(T);
-pp([T|Ts]) ->
-    [pp(T), ", "|pp(Ts)];
-pp({id, _, Name}) ->
-    Name;
-pp({qid, _, Name}) ->
-    string:join(Name, ".");
-pp({con, _, Name}) ->
-    Name;
-pp({qcon, _, Name}) ->
-    string:join(Name, ".");
-pp({uvar, _, Ref}) ->
-    %% Show some unique representation
-    ["?u" | integer_to_list(erlang:phash2(Ref, 16384)) ];
-pp({tvar, _, Name}) ->
-    Name;
-pp({if_t, _, Id, Then, Else}) ->
-    ["if(", pp([Id, Then, Else]), ")"];
-pp({tuple_t, _, []}) ->
-    "unit";
-pp({tuple_t, _, Cpts}) ->
-    ["(", string:join(lists:map(fun pp/1, Cpts), " * "), ")"];
-pp({bytes_t, _, any}) -> "bytes()";
-pp({bytes_t, _, Len}) ->
-    ["bytes(", integer_to_list(Len), ")"];
-pp({app_t, _, T, []}) ->
-    pp(T);
-pp({app_t, _, Type, Args}) ->
-    [pp(Type), "(", pp(Args), ")"];
-pp({named_arg_t, _, Name, Type, _Default}) ->
-    [pp(Name), " : ", pp(Type)];
-pp({fun_t, _, Named = {uvar, _, _}, As, B}) ->
-    ["(", pp(Named), " | ", pp(As), ") => ", pp(B)];
-pp({fun_t, _, Named, As, B}) when is_list(Named) ->
-    ["(", pp(Named ++ As), ") => ", pp(B)];
-pp(Other) ->
-    io_lib:format("~p", [Other]).
+pp(Term) -> aeso_types_pp:pp(Term).
 
 %% -- Pre-type checking desugaring -------------------------------------------
-
-%% Desugars nested record/map updates as follows:
-%%  { x.y = v1, x.z @ z = f(z) } becomes { x @ __x = __x { y = v1, z @ z = f(z) } }
-%%  { [k1].x = v1, [k2].y = v2 } becomes { [k1] @ __x = __x { x = v1 }, [k2] @ __x = __x { y = v2 } }
-%% There's no comparison of k1 and k2 to group the updates if they are equal.
-desugar({record, Ann, Rec, Updates}) ->
-    {record, Ann, Rec, desugar_updates(Updates)};
-desugar({map, Ann, Map, Updates}) ->
-    {map, Ann, Map, desugar_updates(Updates)};
-desugar([H|T]) ->
-  [desugar(H) | desugar(T)];
-desugar(T) when is_tuple(T) ->
-  list_to_tuple(desugar(tuple_to_list(T)));
-desugar(X) -> X.
-
-desugar_updates([]) -> [];
-desugar_updates([Upd | Updates]) ->
-    {Key, MakeField, Rest} = update_key(Upd),
-    {More, Updates1}       = updates_key(Key, Updates),
-    %% Check conflicts
-    case length([ [] || [] <- [Rest | More] ]) of
-        N when N > 1 -> type_error({conflicting_updates_for_field, Upd, Key});
-        _ -> ok
-    end,
-    [MakeField(lists:append([Rest | More])) | desugar_updates(Updates1)].
-
-%% TODO: refactor representation to make this not horrible
-update_key(Fld = {field, _, [Elim], _}) ->
-    {elim_key(Elim), fun(_) -> Fld end, []};
-update_key(Fld = {field, _, [Elim], _, _}) ->
-    {elim_key(Elim), fun(_) -> Fld end, []};
-update_key({field, Ann, [P = {proj, _, {id, _, Name}} | Rest], Value}) ->
-    {Name, fun(Flds) -> {field, Ann, [P], {id, [], "__x"},
-                            desugar(map_or_record(Ann, {id, [], "__x"}, Flds))}
-           end, [{field, Ann, Rest, Value}]};
-update_key({field, Ann, [P = {proj, _, {id, _, Name}} | Rest], Id, Value}) ->
-    {Name, fun(Flds) -> {field, Ann, [P], {id, [], "__x"},
-                            desugar(map_or_record(Ann, {id, [], "__x"}, Flds))}
-           end, [{field, Ann, Rest, Id, Value}]};
-update_key({field, Ann, [K = {map_get, _, _} | Rest], Value}) ->
-    {map_key, fun(Flds) -> {field, Ann, [K], {id, [], "__x"},
-                            desugar(map_or_record(Ann, {id, [], "__x"}, Flds))}
-              end, [{field, Ann, Rest, Value}]};
-update_key({field, Ann, [K = {map_get, _, _, _} | Rest], Value}) ->
-    {map_key, fun(Flds) -> {field, Ann, [K], {id, [], "__x"},
-                            desugar(map_or_record(Ann, {id, [], "__x"}, Flds))}
-              end, [{field, Ann, Rest, Value}]};
-update_key({field, Ann, [K = {map_get, _, _, _} | Rest], Id, Value}) ->
-    {map_key, fun(Flds) -> {field, Ann, [K], {id, [], "__x"},
-                            desugar(map_or_record(Ann, {id, [], "__x"}, Flds))}
-              end, [{field, Ann, Rest, Id, Value}]};
-update_key({field, Ann, [K = {map_get, _, _} | Rest], Id, Value}) ->
-    {map_key, fun(Flds) -> {field, Ann, [K], {id, [], "__x"},
-                            desugar(map_or_record(Ann, {id, [], "__x"}, Flds))}
-              end, [{field, Ann, Rest, Id, Value}]}.
-
-map_or_record(Ann, Val, Flds = [Fld | _]) ->
-    Kind = case element(3, Fld) of
-             [{proj, _, _}       | _] -> record;
-             [{map_get, _, _}    | _] -> map;
-             [{map_get, _, _, _} | _] -> map
-           end,
-    {Kind, Ann, Val, Flds}.
-
-elim_key({proj, _, {id, _, Name}}) -> Name;
-elim_key({map_get, _, _, _})       -> map_key;  %% no grouping on map keys (yet)
-elim_key({map_get, _, _})          -> map_key.
-
-updates_key(map_key, Updates) -> {[], Updates};
-updates_key(Name, Updates) ->
-    Xs = [ {Upd, Name1 == Name, Rest}
-           || Upd <- Updates,
-              {Name1, _, Rest} <- [update_key(Upd)] ],
-    Updates1 = [ Upd  || {Upd, false, _} <- Xs ],
-    More     = [ Rest || {_, true, Rest} <- Xs ],
-    {More, Updates1}.
-
-indexed(I, Xs) ->
-    lists:zip(lists:seq(I, I + length(Xs) - 1), Xs).
+%% Moved to aeso_typing_desugar.
 

@@ -72,7 +72,14 @@ token(Tag, Fun) ->
 %%      tag and no value.
 -spec symbol() -> token_action().
 symbol() ->
-    fun(S, P) -> {{token, {list_to_atom(S), P}}, none} end.
+    fun(S, P) ->
+        %% Avoid creating new atoms from untrusted input. Map only to existing atoms;
+        %% otherwise tag as 'unknown_symbol' to force a parse error without atom growth.
+        Tag = try list_to_existing_atom(S)
+              catch _:_ -> unknown_symbol
+              end,
+        {{token, {Tag, P}}, none}
+    end.
 
 %% @doc Skip the matched string, producing no token.
 -spec skip() -> token_action().
