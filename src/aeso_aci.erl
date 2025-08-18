@@ -223,7 +223,8 @@ do_render_aci_json(Json) ->
             JArray when is_list(JArray)  -> JArray;
             JObject when is_map(JObject) -> [JObject];
             JText when is_binary(JText)  ->
-                case jsx:decode(Json, [{labels, atom}, return_maps]) of
+                %% Use binary labels to avoid creating atoms from untrusted JSON
+                case jsx:decode(Json, [{labels, binary}, return_maps]) of
                     JArray when is_list(JArray)  -> JArray;
                     JObject when is_map(JObject) -> [JObject];
                     _                            -> error(bad_aci_json)

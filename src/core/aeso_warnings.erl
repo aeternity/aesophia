@@ -1,3 +1,6 @@
+%%%-------------------------------------------------------------------
+%%% @doc Warning value type and helpers (formatting, sorting, conversion)
+%%%-------------------------------------------------------------------
 -module(aeso_warnings).
 
 -record(warn, { pos     :: aeso_errors:pos()

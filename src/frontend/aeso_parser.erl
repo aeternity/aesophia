@@ -1,6 +1,8 @@
 %%% File        : aeso_parser.erl
 %%% Author      : Ulf Norell
-%%% Description :
+%%% Description : Parser for the Sophia language used by the compiler frontend.
+%%%               Turns source text into an abstract syntax tree (AST), handles
+%%%               includes, and reports scan/parse errors with source positions.
 %%% Created     : 1 Mar 2018 by Ulf Norell
 -module(aeso_parser).
 -compile({no_auto_import,[map_get/2]}).
@@ -9,13 +11,15 @@
          string/2,
          string/3,
          auto_imports/1,
-         hash_include/2,
          decl/0,
          type/0,
          body/0,
          maybe_block/1,
          run_parser/2,
-         run_parser/3]).
+         run_parser/3,
+         file/0,
+         parse_and_scan/3,
+         ann_pos/1]).
 
 -include("aeso_parse_lib.hrl").
 -import(aeso_parse_lib, [current_file/0, set_current_file/1,
@@ -46,7 +50,7 @@ string(String, Opts) ->
 -spec string(string(), sets:set(include_hash()), aeso_compiler:options()) -> parse_result().
 string(String, Included, Opts) ->
     AST = run_parser(file(), String, Opts),
-    case expand_includes(AST, Included, Opts) of
+    case aeso_include:expand_includes(AST, Included, Opts) of
         {ok, AST1}   -> AST1;
         {error, Err} -> parse_error(Err)
     end.
@@ -690,133 +694,21 @@ bad_expr_err(Reason, E) ->
 
 %% -- Helper functions -------------------------------------------------------
 
-expand_includes(AST, Included, Opts) ->
-    Ann  = [{origin, system}],
-    AST1 = [ {include, Ann, {string, Ann, File}}
-             || File <- lists:usort(auto_imports(AST)) ] ++ AST,
-    expand_includes(AST1, Included, [], Opts).
+%% include handling moved to aeso_include
 
-expand_includes([], Included, Acc, Opts) ->
-    case lists:member(keep_included, Opts) of
-        false ->
-            {ok, lists:reverse(Acc)};
-        true ->
-            {ok, {lists:reverse(Acc), Included}}
-    end;
-expand_includes([{include, Ann, {string, _SAnn, File}} | AST], Included, Acc, Opts) ->
-    case get_include_code(File, Ann, Opts) of
-        {ok, AbsDir, Code} ->
-            Hashed = hash_include(File, Code),
-            case sets:is_element(Hashed, Included) of
-                false ->
-                    SrcFile = proplists:get_value(src_file, Opts, no_file),
-                    IncludeType = case proplists:get_value(file, Ann) of
-                                      SrcFile -> direct;
-                                      _       -> indirect
-                                  end,
-                    Opts1 = lists:keystore(src_file, 1, Opts, {src_file, File}),
-                    Opts2 = lists:keystore(src_dir, 1, Opts1, {src_dir, AbsDir}),
-                    Opts3 = lists:keystore(include_type, 1, Opts2, {include_type, IncludeType}),
-                    Included1 = sets:add_element(Hashed, Included),
-                    case parse_and_scan(file(), Code, Opts3) of
-                        {ok, AST1} ->
-                            expand_includes(AST1 ++ AST, Included1, Acc, Opts);
-                        Err = {error, _} ->
-                            Err
-                    end;
-                true ->
-                    expand_includes(AST, Included, Acc, Opts)
-            end;
-        Err = {error, _} ->
-            Err
-    end;
-expand_includes([E | AST], Included, Acc, Opts) ->
-    expand_includes(AST, Included, [E | Acc], Opts).
+%% read_file moved to aeso_source
 
-read_file(File, Opts) ->
-    case proplists:get_value(include, Opts, {explicit_files, #{}}) of
-        {file_system, Paths} ->
-            lists:foldr(fun(Path, {error, _}) -> read_file_(Path, File);
-                           (_Path, OK)        -> OK end, {error, not_found}, Paths);
-        {explicit_files, Files} ->
-            case maps:get(binary_to_list(File), Files, not_found) of
-                not_found -> {error, not_found};
-                Src       -> {ok, File, Src}
-            end;
-        escript ->
-            try
-                Escript        = escript:script_name(),
-                {ok, Sections} = escript:extract(Escript, []),
-                Archive        = proplists:get_value(archive, Sections),
-                FileName       = binary_to_list(filename:join([aesophia, priv, stdlib, File])),
-                case zip:extract(Archive, [{file_list, [FileName]}, memory]) of
-                    {ok, [{_, Src}]} -> {ok, escript, Src};
-                    _                -> {error, not_found}
-                end
-            catch _:_ ->
-                {error, not_found}
-            end
-    end.
+%% read_file_ moved to aeso_source
 
-read_file_(Path, File) ->
-    AbsFile = filename:join(Path, File),
-    case file:read_file(AbsFile) of
-        {ok, Bin} -> {ok, aeso_utils:canonical_dir(filename:dirname(AbsFile)), Bin};
-        Err       -> Err
-    end.
+%% stdlib_options moved to aeso_source
 
-stdlib_options() ->
-    StdLibDir = aeso_stdlib:stdlib_include_path(),
-    case filelib:is_dir(StdLibDir) of
-        true  -> [{include, {file_system, [StdLibDir]}}];
-        false -> [{include, escript}]
-    end.
+%% get_include_code moved to aeso_source
 
-get_include_code(File, Ann, Opts) ->
-    %% Temporarily extend include paths with the directory of the current file
-    Opts1 = include_current_file_dir(Opts, Ann),
-    case {read_file(File, Opts1), read_file(File, stdlib_options())} of
-        {{ok, Dir, Bin}, {ok, _}} ->
-            case filename:basename(File) == File of
-                true -> { error
-                        , fail( ann_pos(Ann)
-                              , "Illegal redefinition of standard library " ++ binary_to_list(File))};
-                %% If a path is provided then the stdlib takes lower priority
-                false -> {ok, Dir, binary_to_list(Bin)}
-            end;
-        {_, {ok, _, Bin}} ->
-            {ok, stdlib, binary_to_list(Bin)};
-        {{ok, Dir, Bin}, _} ->
-            {ok, Dir, binary_to_list(Bin)};
-        {_, _} ->
-            {error, {ann_pos(Ann), include_error, File}}
-    end.
+%% include_current_file_dir moved to aeso_source
 
-include_current_file_dir(Opts, Ann) ->
-    case {proplists:get_value(dir, Ann, undefined),
-          proplists:get_value(include, Opts, undefined)} of
-        {undefined, _} -> Opts;
-        {CurrDir, {file_system, Paths}} ->
-            case lists:member(CurrDir, Paths) of
-                false -> [{include, {file_system, [CurrDir | Paths]}} | Opts];
-                true  -> Opts
-            end;
-        {_, _} -> Opts
-    end.
+%% hash_include moved to aeso_source
 
--spec hash_include(string() | binary(), string()) -> include_hash().
-hash_include(File, Code) when is_binary(File) ->
-    hash_include(binary_to_list(File), Code);
-hash_include(File, Code) when is_list(File) ->
-    {filename:basename(File), crypto:hash(sha256, Code)}.
-
-auto_imports({comprehension_bind, _, _}) -> [<<"ListInternal.aes">>];
-auto_imports({'..', _})                  -> [<<"ListInternal.aes">>];
-auto_imports(L) when is_list(L) ->
-    lists:flatmap(fun auto_imports/1, L);
-auto_imports(T) when is_tuple(T) ->
-    auto_imports(tuple_to_list(T));
-auto_imports(_) -> [].
+auto_imports(Node) -> aeso_include:auto_imports(Node).
 
 any_bytes({id, Ann, "bytes"})                 -> {bytes_t, Ann, any};
 any_bytes({app_t, _, {id, Ann, "bytes"}, []}) -> {bytes_t, Ann, any};

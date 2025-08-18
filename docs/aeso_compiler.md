@@ -1,101 +1,112 @@
 # aeso_compiler
 
-### Module
+### What this is
 
-### aeso_compiler
+`aeso_compiler` is the high-level API to compile Sophia smart contracts to FATE bytecode. Think of it as a library that takes source code through the classic compiler stages (parse, type check, IR, backend) and gives you both intermediate results and final bytecode.
 
-The Sophia compiler
+### The compilation pipeline
 
-### Description
-
-This module provides the interface to the standard Sophia compiler. It
-returns the compiled module in a map which can then be loaded.
-
-### Types
-``` erlang
-contract_string() = string() | binary()
-contract_map() = #{bytecode => binary(),
-                   compiler_version => binary(),
-                   contract_souce => string(),
-                   type_info => type_info()}
-type_info()
-errorstring() = binary()
 ```
-### Exports
-
-#### file(File)
-#### file(File, Options) -> CompRet
-#### from_string(ContractString, Options) -> CompRet
-
-Types
-
-``` erlang
-ContractString = contract_string()
-Options = [Option]
-CompRet = {ok,ContractMap} | {error,ErrorString}
-ContractMap = contract_map()
-ErrorString = errorstring()
+Source (.aes)
+   │
+   ├─ Parse → AST
+   │
+   ├─ Type inference → Typed AST
+   │
+   ├─ IR Lowering → fcode + env
+   │
+   └─ Backend → FATE → Serialized bytecode
 ```
 
-Compile a contract defined in a file or in a string.
+- The orchestration lives in `src/pipeline/aeso_pipeline.erl`.
+- Frontend parsing is in `src/frontend` (scanner, parser, includes, pretty printing).
+- Typing lives in `src/typing`.
+- Backends (e.g., FATE) live in `src/backend`.
 
-The **pp_** options all print to standard output the following:
+### Quick start: compile from a file or string
 
-`pp_sophia_code` - print the input Sophia code.
+```erlang
+{ok, Map} = aeso_compiler:file("contracts/simple.aes").
+%% Map contains keys like: byte_code, fate_code, compiler_version, warnings
 
-`pp_ast` - print the AST of the code
-
-`pp_types` - print information about the types
-
-`pp_typed_ast` - print the AST with type information at each node
-
-`pp_assembler` - print the generated assembler code
-
-The option `include_child_contract_symbols` includes the symbols of child contracts functions in the generated fate code. It is turned off by default to avoid making contracts bigger on chain.
-
-#### Options to control which compiler optimizations should run:
-
-By default all optimizations are turned on, to disable an optimization, it should be
-explicitly set to false and passed as a compiler option.
-
-List of optimizations:
-
-- optimize_inliner
-- optimize_inline_local_functions
-- optimize_bind_subexpressions
-- optimize_let_floating
-- optimize_simplifier
-- optimize_drop_unused_lets
-- optimize_push_consume
-- optimize_one_shot_var
-- optimize_write_to_dead_var
-- optimize_inline_switch_target
-- optimize_swap_push
-- optimize_swap_pop
-- optimize_swap_write
-- optimize_constant_propagation
-- optimize_prune_impossible_branches
-- optimize_single_successful_branch
-- optimize_inline_store
-- optimize_float_switch_bod
-
-#### check_call(ContractString, Options) -> CheckRet
-
-Types
-```
-ContractString = string() | binary()
-CheckRet = {ok,string(),{Types,Type | any()},Terms} | {error,Term}
-Types = [Type]
-Type = term()
-```
-Check a call in contract through the `__call` function.
-
-#### version() -> {ok, Version} | {error, term()}
-
-Types
-
-``` erlang
-Version = binary()
+Source = "contract Simple =\n  entrypoint add(x : int, y : int) = x + y\n".
+{ok, Map2} = aeso_compiler:from_string(Source, []).
 ```
 
-Get the current version of the Sophia compiler.
+Get intermediate representations without producing bytecode:
+
+```erlang
+IR = aeso_compiler:string_to_code(Source, []).
+%% IR#{ast := Ast, unfolded_typed_ast := TypedAst, fcode := FCode, warnings := Warnings}
+```
+
+### Value and calldata helpers
+
+- Build calldata for an entrypoint call:
+```erlang
+{ok, Calldata} = aeso_compiler:create_calldata(Source, "add", ["1", "2"], []).
+```
+- Decode calldata (types and values):
+```erlang
+{ok, Types, Values} = aeso_compiler:decode_calldata(Source, "add", Calldata, []).
+```
+- Encode/decode individual values:
+```erlang
+FateVal = aeso_compiler:encode_value(Source, "int", 42, []).
+SophiaVal = aeso_compiler:decode_value(Source, "int", FateVal, []).
+```
+- Decode a contract call result back to a Sophia expression:
+```erlang
+{ok, Expr} = aeso_compiler:to_sophia_value(Source, "add", ok, FateBinary, []).
+```
+
+### Printing helpers (developer visibility)
+
+Pass any of these atoms inside the `Options` list to print intermediate forms:
+- `pp_sophia_code`: input Sophia code
+- `pp_ast`: AST
+- `pp_types`: type information
+- `pp_typed_ast`: typed AST
+- `pp_assembler`: generated assembler/FATE code
+
+Example:
+```erlang
+Opts = [pp_sophia_code, pp_ast, pp_types, pp_typed_ast, pp_assembler].
+{ok, _} = aeso_compiler:from_string(Source, Opts).
+```
+
+### Options overview
+
+Common options you may use:
+- `{include, {file_system, [Dir1, Dir2, ...]}}`: where to look for includes
+- `{src_file, string()}` and `{src_dir, string()}`: source metadata for better errors
+- `{aci, Type}`: include ACI (contract interface) in result; see `aeso_aci`
+- `no_code`: skip code emission when you only analyze
+- `keep_included`: keep included files in certain outputs
+- `debug_mode`: enable extra diagnostics (when supported)
+
+Note: Additional backend and optimization flags may exist; see source for specifics.
+
+### API reference (selected)
+
+- `file(File) -> {ok, Map} | {error, Errors}`
+- `file(File, Options) -> {ok, Map} | {error, Errors}`
+- `from_string(ContractString, Options) -> {ok, Map} | {error, Errors}`
+- `string_to_code(ContractString, Options) -> Map` (ASTs, fcode, env, warnings)
+- `create_calldata(Code, Fun, ArgStrings[, Options]) -> {ok, binary()} | {error, Errors}`
+- `decode_calldata(Code, Fun, Calldata[, Options]) -> {ok, [Type], [Expr]} | {error, Errors}`
+- `encode_value(Code, Type, Value, Options)` / `decode_value(Code, Type, FateValue, Options)`
+- `to_sophia_value(Code, Fun, ok|error|revert, Binary[, Options]) -> {ok, Expr} | {error, Errors}`
+- `version() -> {ok, VersionBin} | {error, term()}`
+
+### Errors and warnings
+
+Most functions return either `{ok, ...}` or `{error, [aeso_errors:error()]}`. Warnings are returned in the result maps under the `warnings` key, not as errors. Parse/type/validation errors include precise source positions where possible.
+
+### See also
+
+- `src/pipeline/aeso_pipeline.erl`: the orchestrator for the stages
+- `src/frontend/aeso_parser.erl`: parsing and includes
+- `src/typing/aeso_ast_infer_types.erl`: type inference
+- `src/ir/aeso_ast_to_fcode.erl`: IR lowering
+- `src/backend/fate/*`: FATE backend and serialization
