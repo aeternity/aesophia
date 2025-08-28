@@ -25,6 +25,7 @@
 
 -include("aeso_utils.hrl").
 
+
 -type utype() :: {fun_t, aeso_syntax:ann(), named_args_t(), [utype()] | var_args, utype()}
                | {app_t, aeso_syntax:ann(), utype(), [utype()]}
                | {tuple_t, aeso_syntax:ann(), [utype()]}
@@ -928,21 +929,21 @@ infer([], Options) ->
     type_error({no_decls, proplists:get_value(src_file, Options, no_file)}),
     destroy_and_report_type_errors(init_env(Options));
 infer(Contracts, Options) ->
-    ets_init(), %% Init the ETS table state
+    aeso_infer_ets:init(), %% Init the ETS table state
     try
         Env = init_env(Options),
         create_options(Options),
-        ets_new(defined_contracts, [bag]),
-        ets_new(type_vars, [set]),
-        ets_new(warnings, [bag]),
-        ets_new(type_vars_variance, [set]),
-        ets_new(functions_to_implement, [set]),
+        aeso_infer_ets:new(defined_contracts, [bag]),
+        aeso_infer_ets:new(type_vars, [set]),
+        aeso_infer_ets:new(warnings, [bag]),
+        aeso_infer_ets:new(type_vars_variance, [set]),
+        aeso_infer_ets:new(functions_to_implement, [set]),
         %% Set the variance for builtin types
-        ets_insert(type_vars_variance, {"list", [covariant]}),
-        ets_insert(type_vars_variance, {"option", [covariant]}),
-        ets_insert(type_vars_variance, {"map", [covariant, covariant]}),
-        ets_insert(type_vars_variance, {"oracle", [contravariant, covariant]}),
-        ets_insert(type_vars_variance, {"oracle_query", [covariant, covariant]}),
+        aeso_infer_ets:insert(type_vars_variance, {"list", [covariant]}),
+        aeso_infer_ets:insert(type_vars_variance, {"option", [covariant]}),
+        aeso_infer_ets:insert(type_vars_variance, {"map", [covariant, covariant]}),
+        aeso_infer_ets:insert(type_vars_variance, {"oracle", [contravariant, covariant]}),
+        aeso_infer_ets:insert(type_vars_variance, {"oracle_query", [covariant, covariant]}),
 
         when_warning(warn_unused_functions, fun() -> create_unused_functions() end),
         check_modifiers(Env, Contracts),
@@ -958,7 +959,7 @@ infer(Contracts, Options) ->
                 false -> E = on_scopes(Env1, fun(Scope) -> unfold_record_types(Env1, Scope) end),
                          {E, Decls, unfold_record_types(E, Decls)}
             end,
-        WarningsUnsorted = lists:map(fun mk_warning/1, ets_tab2list(warnings)),
+        WarningsUnsorted = lists:map(fun mk_warning/1, aeso_infer_ets:tab2list(warnings)),
         Warnings = aeso_warnings:sort_warnings(WarningsUnsorted),
         case proplists:get_value(return_env, Options, false) of
             false -> {DeclsFolded, DeclsUnfolded, Warnings};
@@ -984,7 +985,7 @@ infer1(Env0, [Contract0 = {Contract, Ann, ConName, Impls, Code} | Rest], Acc, Op
                contract_interface -> contract_interface
            end,
     case What of
-        contract -> ets_insert(defined_contracts, {qname(ConName)});
+        contract -> aeso_infer_ets:insert(defined_contracts, {qname(ConName)});
         contract_interface -> ok
     end,
     check_contract_preserved_payability(Env, ConName, Ann, Impls, Acc, What),
@@ -1038,7 +1039,7 @@ check_contract_preserved_payability(Env, ContractName, ContractAnn, Impls, Defin
 report_unimplemented_functions(Env, ContractName) ->
     create_type_errors(),
     [ type_error({unimplemented_interface_function, ContractName, name(I), FunName})
-      || {FunName, I, _} <- ets_tab2list(functions_to_implement) ],
+      || {FunName, I, _} <- aeso_infer_ets:tab2list(functions_to_implement) ],
     destroy_and_report_type_errors(Env).
 
 %% Return a list of all function declarations to be implemented, given the list
@@ -1073,8 +1074,8 @@ functions_to_implement(Impls, DefinedContracts) ->
 populate_functions_to_implement(Env, ContractName, Impls, DefinedContracts) ->
     create_type_errors(),
     [ begin
-        Inserted = ets_insert_new(functions_to_implement, {name(Id), I, Decl}),
-        [{_, I2, _}] = ets_lookup(functions_to_implement, name(Id)),
+        Inserted = aeso_infer_ets:insert_new(functions_to_implement, {name(Id), I, Decl}),
+        [{_, I2, _}] = aeso_infer_ets:lookup(functions_to_implement, name(Id)),
         Inserted orelse type_error({interface_implementation_conflict, ContractName, I, I2, Id})
       end || {I, Decl = {fun_decl, _, Id, _}} <- functions_to_implement(Impls, DefinedContracts) ],
     destroy_and_report_type_errors(Env).
@@ -1247,14 +1248,14 @@ check_typedef_sccs(Env, TypeMap, [{acyclic, Name} | SCCs], Acc) ->
                     type_error({empty_record_definition, Ann, Name}),
                     check_typedef_sccs(Env1, TypeMap, SCCs, Acc1);
                 {record_t, Fields} ->
-                    ets_insert(type_vars_variance, {Env#env.namespace ++ qname(D),
+                    aeso_infer_ets:insert(type_vars_variance, {Env#env.namespace ++ qname(D),
                                                     infer_type_vars_variance(Xs, Fields)}),
                     %% check_type to get qualified name
                     RecTy = check_type(Env1, app_t(Ann, D, Xs)),
                     Env2 = check_fields(Env1, TypeMap, RecTy, Fields),
                     check_typedef_sccs(Env2, TypeMap, SCCs, Acc1);
                 {variant_t, Cons} ->
-                    ets_insert(type_vars_variance, {Env#env.namespace ++ qname(D),
+                    aeso_infer_ets:insert(type_vars_variance, {Env#env.namespace ++ qname(D),
                                                     infer_type_vars_variance(Xs, Cons)}),
                     Target   = check_type(Env1, app_t(Ann, D, Xs)),
                     ConType  = fun([]) -> Target; (Args) -> {type_sig, Ann, none, [], Args, Target} end,
@@ -1303,7 +1304,7 @@ infer_type_vars_variance(Types)
   when is_list(Types) ->
     lists:flatten([infer_type_vars_variance(T) || T <- Types]);
 infer_type_vars_variance({app_t, _, Type, Args}) ->
-    Variances = case ets_lookup(type_vars_variance, qname(Type)) of
+    Variances = case aeso_infer_ets:lookup(type_vars_variance, qname(Type)) of
                     [{_, Vs}] -> Vs;
                     _ -> lists:duplicate(length(Args), covariant)
                 end,
@@ -1622,7 +1623,7 @@ check_fundecl(Env, {fun_decl, Ann, Id = {id, _, Name}, Type}) ->
       FunSig :: typesig().
 register_implementation(Env, Id, Sig) ->
     Name = name(Id),
-    case ets_lookup(functions_to_implement, Name) of
+    case aeso_infer_ets:lookup(functions_to_implement, Name) of
         [{Name, Interface, Decl = {fun_decl, _, DeclId, FunT}}] ->
             When = {implement_interface_fun, aeso_syntax:get_ann(Sig), Name, name(Interface)},
             unify(Env, typesig_to_fun_t(Sig), FunT, When),
@@ -1643,7 +1644,7 @@ register_implementation(Env, Id, Sig) ->
             [ type_error({entrypoint_must_be_payable, Id, DeclId, Interface})
                 || not SigPayable andalso DeclPayable ],
 
-            ets_delete(functions_to_implement, Name);
+            aeso_infer_ets:delete(functions_to_implement, Name);
         [] ->
             true;
         _ ->
@@ -2516,15 +2517,6 @@ free_vars(L) when is_list(L) ->
     [V || Elem <- L,
           V <- free_vars(Elem)].
 
-next_count() ->
-    V = case get(counter) of
-            undefined ->
-                0;
-            X -> X
-        end,
-    put(counter, V + 1),
-    V.
-
 %% Clean up all the ets tables (in case of an exception)
 
 ets_tables() ->
@@ -2533,85 +2525,21 @@ ets_tables() ->
      type_vars_variance, functions_to_implement].
 
 clean_up_ets() ->
-    [ catch ets_delete(Tab) || Tab <- ets_tables() ],
+    [ catch aeso_infer_ets:delete(Tab) || Tab <- ets_tables() ],
     ok.
 
-%% Named interface to ETS tables implemented without names.
-%% The interface functions behave as the standard ETS interface.
-
-ets_init() ->
-    put(aeso_ast_infer_types, #{}).
-
-ets_tab_exists(Name) ->
-    Tabs = get(aeso_ast_infer_types),
-    case maps:find(Name, Tabs) of
-        {ok, _} -> true;
-        error   -> false
-    end.
-
-ets_tabid(Name) ->
-    #{Name := TabId} = get(aeso_ast_infer_types),
-    TabId.
-
-ets_new(Name, Opts) ->
-    %% Ensure the table is NOT named!
-    TabId = ets:new(Name, Opts -- [named_table]),
-    Tabs = get(aeso_ast_infer_types),
-    put(aeso_ast_infer_types, Tabs#{Name => TabId}),
-    Name.
-
-ets_delete(Name) ->
-    Tabs = get(aeso_ast_infer_types),
-    #{Name := TabId} = Tabs,
-    put(aeso_ast_infer_types, maps:remove(Name, Tabs)),
-    ets:delete(TabId).
-
-ets_delete(Name, Key) ->
-    TabId = ets_tabid(Name),
-    ets:delete(TabId, Key).
-
-ets_insert(Name, Object) ->
-    TabId = ets_tabid(Name),
-    ets:insert(TabId, Object).
-
-ets_insert_new(Name, Object) ->
-    TabId = ets_tabid(Name),
-    ets:insert_new(TabId, Object).
-
-ets_lookup(Name, Key) ->
-    TabId = ets_tabid(Name),
-    ets:lookup(TabId, Key).
-
-ets_match_delete(Name, Pattern) ->
-    TabId = ets_tabid(Name),
-    ets:match_delete(TabId, Pattern).
-
-ets_tab2list(Name) ->
-    TabId = ets_tabid(Name),
-    ets:tab2list(TabId).
-
-ets_insert_ordered(_, []) -> true;
-ets_insert_ordered(Name, [H|T]) ->
-    ets_insert_ordered(Name, H),
-    ets_insert_ordered(Name, T);
-ets_insert_ordered(Name, Object) ->
-    Count = next_count(),
-    TabId = ets_tabid(Name),
-    ets:insert(TabId, {Count, Object}).
-
-ets_tab2list_ordered(Name) ->
-    [E || {_, E} <- ets_tab2list(Name)].
+%% ETS helpers moved to `aeso_infer_ets`
 
 %% Options
 
 create_options(Options) ->
-    ets_new(options, [set]),
+    aeso_infer_ets:new(options, [set]),
     Tup = fun(Opt) when is_atom(Opt) -> {Opt, true};
              (Opt) when is_tuple(Opt) -> Opt end,
-    ets_insert(options, lists:map(Tup, Options)).
+    aeso_infer_ets:insert(options, lists:map(Tup, Options)).
 
 get_option(Key, Default) ->
-    case ets_lookup(options, Key) of
+    case aeso_infer_ets:lookup(options, Key) of
         [{Key, Val}] -> Val;
         _            -> Default
     end.
@@ -2622,17 +2550,17 @@ when_option(Opt, Do) ->
 %% -- Constraints --
 
 create_constraints() ->
-    ets_new(constraints, [ordered_set]).
+    aeso_infer_ets:new(constraints, [ordered_set]).
 
 -spec add_constraint(constraint() | [constraint()]) -> true.
 add_constraint(Constraint) ->
-    ets_insert_ordered(constraints, Constraint).
+    aeso_infer_ets:insert_ordered(constraints, Constraint).
 
 get_constraints() ->
-    ets_tab2list_ordered(constraints).
+    aeso_infer_ets:tab2list_ordered(constraints).
 
 destroy_constraints() ->
-    ets_delete(constraints).
+    aeso_infer_ets:delete(constraints).
 
 %% Solve all constraints by iterating until no-progress
 
@@ -2955,7 +2883,7 @@ check_record_create_constraints(Env, [C | Cs]) ->
     check_record_create_constraints(Env, Cs).
 
 is_contract_defined(C) ->
-    ets_lookup(defined_contracts, qname(C)) =/= [].
+    aeso_infer_ets:lookup(defined_contracts, qname(C)) =/= [].
 
 check_is_contract_constraints(_Env, []) -> ok;
 check_is_contract_constraints(Env, [C | Cs]) ->
@@ -3163,7 +3091,7 @@ unify1(_Env, {uvar, A, R}, T, _Variance, When) ->
             cannot_unify({uvar, A, R}, T, none, When),
             false;
         false ->
-            ets_insert(type_vars, {R, T}),
+            aeso_infer_ets:insert(type_vars, {R, T}),
             true
     end;
 unify1(Env, T, {uvar, A, R}, Variance, When) ->
@@ -3219,7 +3147,7 @@ unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result
     unify0(Env, Result1, Result2, Variance, When);
 unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, Variance, When)
   when length(Args1) == length(Args2), Tag == id orelse Tag == qid ->
-    Variances = case ets_lookup(type_vars_variance, F) of
+    Variances = case aeso_infer_ets:lookup(type_vars_variance, F) of
                     [{_, Vs}] ->
                         case Variance of
                             contravariant -> lists:map(fun opposite_variance/1, Vs);
@@ -3270,7 +3198,7 @@ is_subtype(Env, Child, Base) ->
     end.
 
 dereference(T = {uvar, _, R}) ->
-    case ets_lookup(type_vars, R) of
+    case aeso_infer_ets:lookup(type_vars, R) of
         [] ->
             T;
         [{R, Type}] ->
@@ -3319,10 +3247,10 @@ fresh_uvar(Attrs) ->
     {uvar, Attrs, make_ref()}.
 
 create_freshen_tvars() ->
-    ets_new(freshen_tvars, [set]).
+    aeso_infer_ets:new(freshen_tvars, [set]).
 
 destroy_freshen_tvars() ->
-    ets_delete(freshen_tvars).
+    aeso_infer_ets:delete(freshen_tvars).
 
 freshen_type(Ann, Type, Ctx) ->
     create_freshen_tvars(),
@@ -3334,11 +3262,11 @@ freshen(Type) ->
     freshen(aeso_syntax:get_ann(Type), Type, none).
 
 freshen(Ann, {tvar, _, Name}, _Ctx) ->
-    NewT = case ets_lookup(freshen_tvars, Name) of
+    NewT = case aeso_infer_ets:lookup(freshen_tvars, Name) of
                []          -> fresh_uvar(Ann);
                [{Name, T}] -> T
            end,
-    ets_insert(freshen_tvars, {Name, NewT}),
+    aeso_infer_ets:insert(freshen_tvars, {Name, NewT}),
     NewT;
 freshen(Ann, {bytes_t, _, '_'}, Ctx) ->
     X = fresh_uvar(Ann),
@@ -3385,16 +3313,16 @@ instantiate(E) ->
     instantiate1(dereference(E)).
 
 instantiate1({uvar, Attr, R}) ->
-    Next = proplists:get_value(next, ets_lookup(type_vars, next), 0),
+    Next = proplists:get_value(next, aeso_infer_ets:lookup(type_vars, next), 0),
     TVar = {tvar, Attr, "'" ++ integer_to_tvar(Next)},
-    ets_insert(type_vars, [{next, Next + 1}, {R, TVar}]),
+    aeso_infer_ets:insert(type_vars, [{next, Next + 1}, {R, TVar}]),
     TVar;
 instantiate1({fun_t, Ann, Named, Args, Ret}) ->
     case dereference(Named) of
         {uvar, _, R} ->
             %% Uninstantiated named args map to the empty list
             NoNames = [],
-            ets_insert(type_vars, [{R, NoNames}]),
+            aeso_infer_ets:insert(type_vars, [{R, NoNames}]),
             {fun_t, Ann, NoNames, instantiate(Args), instantiate(Ret)};
         Named1 ->
             {fun_t, Ann, instantiate1(Named1), instantiate(Args), instantiate(Ret)}
@@ -3432,7 +3360,7 @@ when_warning(Warn, Do) ->
             type_error({unknown_warning, Warn}),
             destroy_and_report_type_errors(global_env());
         true ->
-            case ets_tab_exists(warnings) of
+            case aeso_infer_ets:tab_exists(warnings) of
                 true ->
                     IsEnabled = get_option(Warn, false),
                     IsAll = get_option(warn_all, false) andalso lists:member(Warn, all_warnings()),
@@ -3454,14 +3382,14 @@ potential_unused_include(Ann, SrcFile) ->
         true  ->
             case aeso_syntax:get_ann(file, Ann, no_file) of
                 no_file -> ok;
-                File    -> ets_insert(warnings, {unused_include, File, SrcFile})
+                File    -> aeso_infer_ets:insert(warnings, {unused_include, File, SrcFile})
             end
     end.
 
 used_include(Ann) ->
     case aeso_syntax:get_ann(file, Ann, no_file) of
         no_file -> ok;
-        File    -> ets_match_delete(warnings, {unused_include, File, '_'})
+        File    -> aeso_infer_ets:match_delete(warnings, {unused_include, File, '_'})
     end.
 
 %% Warnings (Unused stateful)
@@ -3469,11 +3397,11 @@ used_include(Ann) ->
 potential_unused_stateful(Ann, Fun) ->
     case aeso_syntax:get_ann(stateful, Ann, false) of
         false -> ok;
-        true  -> ets_insert(warnings, {unused_stateful, Ann, Fun})
+        true  -> aeso_infer_ets:insert(warnings, {unused_stateful, Ann, Fun})
     end.
 
 used_stateful(Fun) ->
-    ets_match_delete(warnings, {unused_stateful, '_', Fun}).
+    aeso_infer_ets:match_delete(warnings, {unused_stateful, '_', Fun}).
 
 %% Warnings (Unused type defs)
 
@@ -3482,23 +3410,23 @@ potential_unused_typedefs(Namespace, TypeDefs) ->
       fun({type_def, _Ann, {id, _, "event"}, _Args, _}) ->
               ok;
          ({type_def, Ann, Id, Args, _}) ->
-              ets_insert(warnings, {unused_typedef, Ann, Namespace ++ qname(Id), length(Args)})
+              aeso_infer_ets:insert(warnings, {unused_typedef, Ann, Namespace ++ qname(Id), length(Args)})
       end,
       TypeDefs
      ).
 
 used_typedef(TypeAliasId, Arity) ->
-    ets_match_delete(warnings, {unused_typedef, '_', qname(TypeAliasId), Arity}).
+    aeso_infer_ets:match_delete(warnings, {unused_typedef, '_', qname(TypeAliasId), Arity}).
 
 %% Warnings (Unused variables)
 
 potential_unused_variables(Namespace, Fun, Vars0) ->
     Vars = [ Var || Var = {id, _, VarName} <- Vars0, VarName /= "_" ],
     lists:map(fun({id, Ann, VarName}) ->
-        ets_insert(warnings, {unused_variable, Ann, Namespace, Fun, VarName}) end, Vars).
+        aeso_infer_ets:insert(warnings, {unused_variable, Ann, Namespace, Fun, VarName}) end, Vars).
 
 used_variable(Namespace, Fun, [VarName]) ->
-    ets_match_delete(warnings, {unused_variable, '_', Namespace, Fun, VarName});
+    aeso_infer_ets:match_delete(warnings, {unused_variable, '_', Namespace, Fun, VarName});
 used_variable(_, _, _) -> ok.
 
 %% Warnings (Unused constants)
@@ -3506,35 +3434,35 @@ used_variable(_, _, _) -> ok.
 potential_unused_constants(#env{ what = namespace }, _Consts) ->
     [];
 potential_unused_constants(#env{ namespace = Namespace }, Consts) ->
-    [ ets_insert(warnings, {unused_constant, Ann, Namespace, Name}) || {letval, _, {id, Ann, Name}, _} <- Consts ].
+    [ aeso_infer_ets:insert(warnings, {unused_constant, Ann, Namespace, Name}) || {letval, _, {id, Ann, Name}, _} <- Consts ].
 
 used_constant(Namespace = [Contract], [Contract, ConstName]) ->
-    ets_match_delete(warnings, {unused_constant, '_', Namespace, ConstName});
+    aeso_infer_ets:match_delete(warnings, {unused_constant, '_', Namespace, ConstName});
 used_constant(_, _) -> ok.
 
 %% Warnings (Unused return value)
 
 potential_unused_return_value({typed, Ann, {app, _, {typed, _, _, {fun_t, _, _, _, {id, _, Type}}}, _}, _}) when Type /= "unit" ->
-    ets_insert(warnings, {unused_return_value, Ann});
+    aeso_infer_ets:insert(warnings, {unused_return_value, Ann});
 potential_unused_return_value(_) -> ok.
 
 %% Warnings (Unused functions)
 
 create_unused_functions() ->
-    ets_new(function_calls, [bag]),
-    ets_new(all_functions, [set]).
+    aeso_infer_ets:new(function_calls, [bag]),
+    aeso_infer_ets:new(all_functions, [set]).
 
 register_function_call(Caller, Callee) ->
-    ets_insert(function_calls, {Caller, Callee}).
+    aeso_infer_ets:insert(function_calls, {Caller, Callee}).
 
 potential_unused_function(#env{ what = namespace }, Ann, FunQName, FunId) ->
-    ets_insert(all_functions, {Ann, FunQName, FunId, not aeso_syntax:get_ann(private, Ann, false)});
+    aeso_infer_ets:insert(all_functions, {Ann, FunQName, FunId, not aeso_syntax:get_ann(private, Ann, false)});
 potential_unused_function(_Env, Ann, FunQName, FunId) ->
-    ets_insert(all_functions, {Ann, FunQName, FunId, aeso_syntax:get_ann(entrypoint, Ann, false)}).
+    aeso_infer_ets:insert(all_functions, {Ann, FunQName, FunId, aeso_syntax:get_ann(entrypoint, Ann, false)}).
 
 remove_used_funs(All) ->
     {Used, Unused} = lists:partition(fun({_, _, _, IsUsed}) -> IsUsed end, All),
-    CallsByUsed = lists:flatmap(fun({_, F, _, _}) -> ets_lookup(function_calls, F) end, Used),
+    CallsByUsed = lists:flatmap(fun({_, F, _, _}) -> aeso_infer_ets:lookup(function_calls, F) end, Used),
     CalledFuns = sets:from_list(lists:map(fun({_, Callee}) -> Callee end, CallsByUsed)),
     MarkUsedFun = fun(Fun, Acc) ->
                       case lists:keyfind(Fun, 2, Acc) of
@@ -3549,11 +3477,11 @@ remove_used_funs(All) ->
     end.
 
 destroy_and_report_unused_functions() ->
-    AllFuns = ets_tab2list(all_functions),
-    lists:map(fun({Ann, _, FunId, _}) -> ets_insert(warnings, {unused_function, Ann, name(FunId)}) end,
+    AllFuns = aeso_infer_ets:tab2list(all_functions),
+    lists:map(fun({Ann, _, FunId, _}) -> aeso_infer_ets:insert(warnings, {unused_function, Ann, name(FunId)}) end,
               remove_used_funs(AllFuns)),
-    ets_delete(all_functions),
-    ets_delete(function_calls).
+    aeso_infer_ets:delete(all_functions),
+    aeso_infer_ets:delete(function_calls).
 
 %% Warnings (Shadowing)
 
@@ -3563,14 +3491,14 @@ warn_potential_shadowing(Env = #env{ vars = Vars }, Ann, Name) ->
     Consts = CurrentScope#scope.consts,
     case proplists:get_value(Name, Vars ++ Consts, false) of
         false -> ok;
-        {AnnOld, _} -> ets_insert(warnings, {shadowing, Ann, Name, AnnOld})
+        {AnnOld, _} -> aeso_infer_ets:insert(warnings, {shadowing, Ann, Name, AnnOld})
     end.
 
 %% Warnings (Division by zero)
 
 warn_potential_division_by_zero(Ann, Op, Args) ->
     case {Op, Args} of
-        {{'/', _}, [_, {int, _, 0}]} -> ets_insert(warnings, {division_by_zero, Ann});
+        {{'/', _}, [_, {int, _, 0}]} -> aeso_infer_ets:insert(warnings, {division_by_zero, Ann});
         _ -> ok
     end.
 
@@ -3580,7 +3508,7 @@ warn_potential_negative_spend(Ann, Fun, Args) ->
     case {Fun, Args} of
         { {typed, _, {qid, _, ["Chain", "spend"]}, _}
         , [_, {typed, _, {app, _, {'-', _}, [{typed, _, {int, _, X}, _}]}, _}]} when X > 0 ->
-            ets_insert(warnings, {negative_spend, Ann});
+            aeso_infer_ets:insert(warnings, {negative_spend, Ann});
         _ -> ok
     end.
 
@@ -3590,19 +3518,19 @@ cannot_unify(A, B, Cxt, When) ->
     type_error({cannot_unify, A, B, Cxt, When}).
 
 type_error(Err) ->
-    ets_insert(type_errors, Err).
+    aeso_infer_ets:insert(type_errors, Err).
 
 create_type_errors() ->
-    ets_new(type_errors, [bag]).
+    aeso_infer_ets:new(type_errors, [bag]).
 
 destroy_and_report_type_errors(Env) ->
-    Errors0 = lists:reverse(ets_tab2list(type_errors)),
-    ets_delete(type_errors),
+    Errors0 = lists:reverse(aeso_infer_ets:tab2list(type_errors)),
+    aeso_infer_ets:delete(type_errors),
     Errors  = [ mk_error(unqualify(Env, Err)) || Err <- Errors0 ],
     aeso_errors:throw(Errors).  %% No-op if Errors == []
 
 destroy_and_report_warnings_as_type_errors() ->
-    Warnings = [ mk_warning(Warn) || Warn <- ets_tab2list(warnings) ],
+    Warnings = [ mk_warning(Warn) || Warn <- aeso_infer_ets:tab2list(warnings) ],
     Errors = lists:map(fun mk_t_err_from_warn/1, Warnings),
     aeso_errors:throw(Errors).  %% No-op if Warnings == []
 
