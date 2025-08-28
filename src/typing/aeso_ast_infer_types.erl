@@ -23,7 +23,7 @@
         , qname/1
         ]).
 
--include("aeso_utils.hrl").
+-include("../aeso_utils.hrl").
 
 
 -type utype() :: {fun_t, aeso_syntax:ann(), named_args_t(), [utype()] | var_args, utype()}
