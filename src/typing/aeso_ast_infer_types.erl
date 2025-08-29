@@ -4186,22 +4186,7 @@ pp_when({implement_interface_fun, Ann, Entrypoint, Interface}) ->
 pp_when(unknown) -> {pos(0,0), ""}.
 
 -spec pp_why_record(why_record()) -> {pos(), iolist()}.
-pp_why_record({var_args, Ann, Fun}) ->
-    {pos(Ann),
-     io_lib:format("arising from resolution of variadic function `~s`",
-                   [pp_expr(Fun)])};
-pp_why_record(Fld = {field, _Ann, LV, _E}) ->
-    {pos(Fld),
-     io_lib:format("arising from an assignment of the field `~s`",
-                   [pp_expr({lvalue, [], LV})])};
-pp_why_record(Fld = {field, _Ann, LV, _Alias, _E}) ->
-    {pos(Fld),
-     io_lib:format("arising from an assignment of the field `~s`",
-                   [pp_expr({lvalue, [], LV})])};
-pp_why_record({proj, _Ann, Rec, FldName}) ->
-    {pos(Rec),
-     io_lib:format("arising from the projection of the field `~s`",
-         [pp(FldName)])}.
+pp_why_record(Why) -> aeso_type_when_pretty:pp_why_record(Why).
 
 
 if_branches(If = {'if', Ann, _, Then, Else}) ->
