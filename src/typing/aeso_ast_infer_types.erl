@@ -3080,6 +3080,15 @@ unify0(Env, A, B, Variance, When) ->
     B1 = dereference(unfold_types_in_type(Env, B, Options)),
     unify1(Env, A1, B1, Variance, When).
 
+%% Delegate simple functions to aeso_type_unify module
+dereference(T) -> aeso_type_unify:dereference(T).
+dereference_deep(T) -> aeso_type_unify:dereference_deep(T).
+instantiate(E) -> aeso_type_unify:instantiate(E).
+occurs_check(R, T) -> aeso_type_unify:occurs_check(R, T).
+fresh_uvar(Attrs) -> aeso_type_unify:fresh_uvar(Attrs).
+
+
+%% Keep complex unification logic here due to dependencies
 unify1(_Env, {uvar, _, R}, {uvar, _, R}, _Variance, _When) ->
     true;
 unify1(_Env, {uvar, _, _}, {fun_t, _, _, var_args, _}, _Variance, When) ->
@@ -3197,54 +3206,7 @@ is_subtype(Env, Child, Base) ->
             end
     end.
 
-dereference(T = {uvar, _, R}) ->
-    case aeso_infer_ets:lookup(type_vars, R) of
-        [] ->
-            T;
-        [{R, Type}] ->
-            dereference(Type)
-    end;
-dereference(T) ->
-    T.
 
-dereference_deep(Type) ->
-    case dereference(Type) of
-        Tup when is_tuple(Tup) ->
-            list_to_tuple(dereference_deep(tuple_to_list(Tup)));
-        [H | T] -> [dereference_deep(H) | dereference_deep(T)];
-        T -> T
-    end.
-
-occurs_check(R, T) ->
-    occurs_check1(R, dereference(T)).
-
-occurs_check1(R, {uvar, _, R1}) -> R == R1;
-occurs_check1(_, {id, _, _}) -> false;
-occurs_check1(_, {con, _, _}) -> false;
-occurs_check1(_, {qid, _, _}) -> false;
-occurs_check1(_, {qcon, _, _}) -> false;
-occurs_check1(_, {tvar, _, _}) -> false;
-occurs_check1(_, {bytes_t, _, _}) -> false;
-occurs_check1(R, {fun_t, _, Named, Args, Res}) ->
-    occurs_check(R, [Res, Named | Args]);
-occurs_check1(R, {app_t, _, T, Ts}) ->
-    occurs_check(R, [T | Ts]);
-occurs_check1(R, {tuple_t, _, Ts}) ->
-    occurs_check(R, Ts);
-occurs_check1(R, {named_arg_t, _, _, T, _}) ->
-    occurs_check(R, T);
-occurs_check1(R, {record_t, Fields}) ->
-    occurs_check(R, Fields);
-occurs_check1(R, {field_t, _, _, T}) ->
-    occurs_check(R, T);
-occurs_check1(R, {if_t, _, _, Then, Else}) ->
-    occurs_check(R, [Then, Else]);
-occurs_check1(R, [H | T]) ->
-    occurs_check(R, H) orelse occurs_check(R, T);
-occurs_check1(_, []) -> false.
-
-fresh_uvar(Attrs) ->
-    {uvar, Attrs, make_ref()}.
 
 create_freshen_tvars() ->
     aeso_infer_ets:new(freshen_tvars, [set]).
@@ -3305,39 +3267,6 @@ apply_typesig_constraint(Ann, bytes_split, {fun_t, _, [], [C], {tuple_t, _, [A, 
 apply_typesig_constraint(Ann, bytecode_hash, {fun_t, _, _, [Con], _}) ->
     add_constraint([#is_contract_constraint{ contract_t = Con,
                                              context    = {bytecode_hash, Ann} }]).
-
-
-%% Dereferences all uvars and replaces the uninstantiated ones with a
-%% succession of tvars.
-instantiate(E) ->
-    instantiate1(dereference(E)).
-
-instantiate1({uvar, Attr, R}) ->
-    Next = proplists:get_value(next, aeso_infer_ets:lookup(type_vars, next), 0),
-    TVar = {tvar, Attr, "'" ++ integer_to_tvar(Next)},
-    aeso_infer_ets:insert(type_vars, [{next, Next + 1}, {R, TVar}]),
-    TVar;
-instantiate1({fun_t, Ann, Named, Args, Ret}) ->
-    case dereference(Named) of
-        {uvar, _, R} ->
-            %% Uninstantiated named args map to the empty list
-            NoNames = [],
-            aeso_infer_ets:insert(type_vars, [{R, NoNames}]),
-            {fun_t, Ann, NoNames, instantiate(Args), instantiate(Ret)};
-        Named1 ->
-            {fun_t, Ann, instantiate1(Named1), instantiate(Args), instantiate(Ret)}
-    end;
-instantiate1(T) when is_tuple(T) ->
-    list_to_tuple(instantiate1(tuple_to_list(T)));
-instantiate1([A|B]) ->
-    [instantiate(A)|instantiate(B)];
-instantiate1(X) ->
-    X.
-
-integer_to_tvar(X) when X < 26 ->
-    [$a + X];
-integer_to_tvar(X) ->
-    integer_to_tvar(X div 26 - 1) ++ [$a + (X rem 26)].
 
 %% Warnings
 
