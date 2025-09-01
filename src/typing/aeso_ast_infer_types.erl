@@ -957,7 +957,7 @@ infer(Contracts, Options) ->
                 false -> E = on_scopes(Env1, fun(Scope) -> unfold_record_types(Env1, Scope) end),
                          {E, Decls, unfold_record_types(E, Decls)}
             end,
-        WarningsUnsorted = lists:map(fun mk_warning/1, aeso_infer_ets:tab2list(warnings)),
+        WarningsUnsorted = lists:map(fun aeso_type_warnings:mk_warning/1, aeso_infer_ets:tab2list(warnings)),
         Warnings = aeso_warnings:sort_warnings(WarningsUnsorted),
         case proplists:get_value(return_env, Options, false) of
             false -> {DeclsFolded, DeclsUnfolded, Warnings};
@@ -3457,7 +3457,7 @@ destroy_and_report_type_errors(Env) ->
     aeso_errors:throw(Errors).  %% No-op if Errors == []
 
 destroy_and_report_warnings_as_type_errors() ->
-    Warnings = [ mk_warning(Warn) || Warn <- aeso_infer_ets:tab2list(warnings) ],
+    Warnings = [ aeso_type_warnings:mk_warning(Warn) || Warn <- aeso_infer_ets:tab2list(warnings) ],
     Errors = lists:map(fun mk_t_err_from_warn/1, Warnings),
     aeso_errors:throw(Errors).  %% No-op if Warnings == []
 
@@ -3478,57 +3478,8 @@ unqualify1(NS, Xs) ->
     catch _:_ -> Xs
     end.
 
-
-
 mk_t_err_from_warn(Warn) ->
     aeso_warnings:warn_to_err(type_error, Warn).
-
-
-mk_warning({unused_include, FileName, SrcFile}) ->
-    Msg = io_lib:format("The file `~s` is included but not used.", [FileName]),
-    aeso_warnings:new(aeso_errors:pos(SrcFile, 0, 0), Msg);
-mk_warning({unused_stateful, Ann, FunName}) ->
-    Msg = io_lib:format("The function `~s` is unnecessarily marked as stateful.", [name(FunName)]),
-    aeso_warnings:new(pos(Ann), Msg);
-mk_warning({unused_variable, Ann, _Namespace, _Fun, VarName}) ->
-    Msg = io_lib:format("The variable `~s` is defined but never used.", [VarName]),
-    aeso_warnings:new(pos(Ann), Msg);
-mk_warning({unused_constant, Ann, _Namespace, ConstName}) ->
-    Msg = io_lib:format("The constant `~s` is defined but never used.", [ConstName]),
-    aeso_warnings:new(pos(Ann), Msg);
-mk_warning({unused_typedef, Ann, QName, _Arity}) ->
-    Msg = io_lib:format("The type `~s` is defined but never used.", [lists:last(QName)]),
-    aeso_warnings:new(pos(Ann), Msg);
-mk_warning({unused_return_value, Ann}) ->
-    Msg = io_lib:format("Unused return value.", []),
-    aeso_warnings:new(pos(Ann), Msg);
-mk_warning({unused_function, Ann, FunName}) ->
-    Msg = io_lib:format("The function `~s` is defined but never used.", [FunName]),
-    aeso_warnings:new(pos(Ann), Msg);
-mk_warning({shadowing, Ann, VarName, AnnOld}) ->
-    Msg = io_lib:format("The definition of `~s` shadows an older definition at ~s.", [VarName, pp_loc(AnnOld)]),
-    aeso_warnings:new(pos(Ann), Msg);
-mk_warning({division_by_zero, Ann}) ->
-    Msg = io_lib:format("Division by zero.", []),
-    aeso_warnings:new(pos(Ann), Msg);
-mk_warning({negative_spend, Ann}) ->
-    Msg = io_lib:format("Negative spend.", []),
-    aeso_warnings:new(pos(Ann), Msg);
-mk_warning(Warn) ->
-    Msg = io_lib:format("Unknown warning: ~p", [Warn]),
-    aeso_warnings:new(Msg).
-
-
-
-
-
-
-
-pos(T)    -> aeso_errors:pos(aeso_syntax:get_ann(file, T, no_file),
-                             aeso_syntax:get_ann(line, T, 0),
-                             aeso_syntax:get_ann(col, T, 0)).
-
-pp_loc(T) -> aeso_type_pretty:pp_loc(T).
 
 pp_type(Label, Type) -> aeso_type_pretty:pp_type(Label, Type).
 
