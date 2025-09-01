@@ -47,7 +47,7 @@ name({con, _, X}) -> X.
 
 instantiate(E) -> aeso_type_unify:instantiate(E).
 
-pp_why_record(Why) -> aeso_type_when_pretty:pp_why_record(Why).
+pp_why_record(Why) -> aeso_type_pretty:pp_why_record(Why).
 
 mk_entrypoint(Decl) ->
     Ann   = [entrypoint | lists:keydelete(public, 1,
@@ -87,7 +87,7 @@ mk_error({cannot_unify, A, B, Cxt, When}) ->
                       end,
     Msg = io_lib:format("Cannot unify `~s` and `~s`" ++ VarianceContext,
                         [pp(instantiate(A)), pp(instantiate(B))]),
-         {Pos, Ctxt} = aeso_pp_when:pp_when(When),
+         {Pos, Ctxt} = aeso_type_pretty:pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
 mk_error({hole_found, Ann, Type}) ->
     Msg = io_lib:format("Found a hole of type `~s`", [pp(instantiate(Type))]),
@@ -388,7 +388,7 @@ mk_error({multiple_main_contracts, Ann}) ->
     mk_t_err(pos(Ann), Msg);
 mk_error({unify_varargs, When}) ->
     Msg = "Cannot infer types for variable argument list.",
-         {Pos, Ctxt} = aeso_pp_when:pp_when(When),
+         {Pos, Ctxt} = aeso_type_pretty:pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
 mk_error({clone_no_contract, Ann}) ->
     Msg = "Chain.clone requires `ref` named argument of contract type.",
@@ -398,7 +398,7 @@ mk_error({contract_lacks_definition, Type, When}) ->
             "~s is not implemented.",
             [pp_type(Type)]
            ),
-         {Pos, Ctxt} = aeso_pp_when:pp_when(When),
+         {Pos, Ctxt} = aeso_type_pretty:pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
 mk_error({ambiguous_name, Name, QIds}) ->
     Msg = io_lib:format("Ambiguous name `~s` could be one of~s",
