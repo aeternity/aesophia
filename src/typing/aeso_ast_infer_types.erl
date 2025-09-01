@@ -3519,7 +3519,7 @@ mk_error({cannot_unify, A, B, Cxt, When}) ->
                       end,
     Msg = io_lib:format("Cannot unify `~s` and `~s`" ++ VarianceContext,
                         [pp(instantiate(A)), pp(instantiate(B))]),
-    {Pos, Ctxt} = pp_when(When),
+         {Pos, Ctxt} = aeso_pp_when:pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
 mk_error({hole_found, Ann, Type}) ->
     Msg = io_lib:format("Found a hole of type `~s`", [pp(instantiate(Type))]),
@@ -3820,7 +3820,7 @@ mk_error({multiple_main_contracts, Ann}) ->
     mk_t_err(pos(Ann), Msg);
 mk_error({unify_varargs, When}) ->
     Msg = "Cannot infer types for variable argument list.",
-    {Pos, Ctxt} = pp_when(When),
+         {Pos, Ctxt} = aeso_pp_when:pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
 mk_error({clone_no_contract, Ann}) ->
     Msg = "Chain.clone requires `ref` named argument of contract type.",
@@ -3830,7 +3830,7 @@ mk_error({contract_lacks_definition, Type, When}) ->
             "~s is not implemented.",
             [pp_type(Type)]
            ),
-    {Pos, Ctxt} = pp_when(When),
+         {Pos, Ctxt} = aeso_pp_when:pp_when(When),
     mk_t_err(Pos, Msg, Ctxt);
 mk_error({ambiguous_name, Name, QIds}) ->
     Msg = io_lib:format("Ambiguous name `~s` could be one of~s",
@@ -3983,147 +3983,13 @@ mk_entrypoint(Decl) ->
                             aeso_syntax:get_ann(Decl))) -- [public, private]],
     aeso_syntax:set_ann(Ann, Decl).
 
-pp_when({todo, What}) -> {pos(0, 0), io_lib:format("[TODO] ~p", [What])};
-pp_when({at, Ann}) -> {pos(Ann), io_lib:format("at ~s", [pp_loc(Ann)])};
-pp_when({check_typesig, Name, Inferred, Given}) ->
-    {pos(Given),
-     io_lib:format("when checking the definition of `~s`\n"
-                   "  inferred type: `~s`\n"
-                   "  given type:    `~s`",
-         [Name, pp(instantiate(Inferred)), pp(instantiate(Given))])};
-pp_when({infer_app, Fun, NamedArgs, Args, Inferred0, ArgTypes0}) ->
-    Inferred = instantiate(Inferred0),
-    ArgTypes = instantiate(ArgTypes0),
-    {pos(Fun),
-     io_lib:format("when checking the application of\n"
-                   "  `~s`\n"
-                   "to arguments~s",
-                   [pp_typed("", Fun, Inferred),
-                    [ ["\n  ", "`" ++ pp_expr(NamedArg) ++ "`"] || NamedArg <- NamedArgs ] ++
-                    [ ["\n  ", "`" ++ pp_typed("", Arg, ArgT) ++ "`"]
-                       || {Arg, ArgT} <- lists:zip(Args, ArgTypes) ] ])};
-pp_when({field_constraint, FieldType0, InferredType0, Fld}) ->
-    FieldType    = instantiate(FieldType0),
-    InferredType = instantiate(InferredType0),
-    {pos(Fld),
-     case Fld of
-         {var_args, _Ann, _Fun} ->
-             io_lib:format("when checking contract construction of type\n~s (at ~s)\nagainst the expected type\n~s\n",
-                          [pp_type("  ", FieldType),
-                           pp_loc(Fld),
-                           pp_type("  ", InferredType)
-                          ]);
-         {field, _Ann, LV, Id, E} ->
-             io_lib:format("when checking the assignment of the field `~s` to the old value `~s` and the new value `~s`",
-                 [pp_typed("", {lvalue, [], LV}, FieldType),
-                  pp(Id),
-                  pp_typed("", E, InferredType)]);
-         {field, _Ann, LV, E} ->
-             io_lib:format("when checking the assignment of the field `~s` to the value `~s`",
-                 [pp_typed("", {lvalue, [], LV}, FieldType),
-                  pp_typed("", E, InferredType)]);
-         {proj, _Ann, _Rec, _Fld} ->
-             io_lib:format("when checking the record projection `~s` against the expected type `~s`",
-                 [pp_typed("  ", Fld, FieldType),
-                  pp_type("  ", InferredType)])
-     end};
-pp_when({record_constraint, RecType0, InferredType0, Fld}) ->
-    RecType      = instantiate(RecType0),
-    InferredType = instantiate(InferredType0),
-    {Pos, WhyRec} = pp_why_record(Fld),
-    case Fld of
-        {var_args, _Ann, _Fun} ->
-            {Pos,
-             io_lib:format("when checking that contract construction of type\n~s\n~s\n"
-                           "matches the expected type\n~s",
-                           [pp_type("  ", RecType), WhyRec, pp_type("  ", InferredType)]
-                          )
-            };
-        {field, _Ann, _LV, _Id, _E} ->
-            {Pos,
-             io_lib:format("when checking that the record type\n~s\n~s\n"
-                           "matches the expected type\n~s",
-                 [pp_type("  ", RecType), WhyRec, pp_type("  ", InferredType)])};
-        {field, _Ann, _LV, _E} ->
-            {Pos,
-             io_lib:format("when checking that the record type\n~s\n~s\n"
-                           "matches the expected type\n~s",
-                 [pp_type("  ", RecType), WhyRec, pp_type("  ", InferredType)])};
-        {proj, _Ann, Rec, _FldName} ->
-            {pos(Rec),
-             io_lib:format("when checking that the expression\n~s (at ~s)\nhas type\n~s\n~s",
-                 [pp_typed("  ", Rec, InferredType), pp_loc(Rec),
-                  pp_type("  ", RecType), WhyRec])}
-    end;
-pp_when({if_branches, Then, ThenType0, Else, ElseType0}) ->
-    {ThenType, ElseType} = instantiate({ThenType0, ElseType0}),
-    Branches = [ {Then, ThenType} | [ {B, ElseType} || B <- if_branches(Else) ] ],
-    {pos(element(1, hd(Branches))),
-     io_lib:format("when comparing the types of the if-branches\n"
-                   "~s", [string:join([ io_lib:format("~s (at ~s)", [pp_typed("  - ", B, BType), pp_loc(B)])
-                                       || {B, BType} <- Branches ], "\n")])};
-pp_when({case_pat, Pat, PatType0, ExprType0}) ->
-    {PatType, ExprType} = instantiate({PatType0, ExprType0}),
-    {pos(Pat),
-     io_lib:format("when checking the type of the pattern `~s` against the expected type `~s`",
-                   [pp_typed("", Pat, PatType),
-                    pp_type(ExprType)])};
-pp_when({check_expr, Expr, Inferred0, Expected0}) ->
-    {Inferred, Expected} = instantiate({Inferred0, Expected0}),
-    {pos(Expr),
-     io_lib:format("when checking the type of the expression `~s` against the expected type `~s`",
-                   [pp_typed("", Expr, Inferred), pp_type(Expected)])};
-pp_when({checking_init_type, Ann}) ->
-    {pos(Ann),
-     io_lib:format("when checking that `init` returns a value of type `state`", [])};
-pp_when({list_comp, BindExpr, Inferred0, Expected0}) ->
-    {Inferred, Expected} = instantiate({Inferred0, Expected0}),
-    {pos(BindExpr),
-     io_lib:format("when checking rvalue of list comprehension binding `~s` against type `~s`",
-                   [pp_typed("", BindExpr, Inferred), pp_type(Expected)])};
-pp_when({check_named_arg_constraint, C}) ->
-    {id, _, Name} = Arg = C#named_argument_constraint.name,
-    [Type | _] = [ Type || {named_arg_t, _, {id, _, Name1}, Type, _} <- C#named_argument_constraint.args, Name1 == Name ],
-    Err = io_lib:format("when checking named argument `~s` against inferred type `~s`",
-                        [pp_typed("", Arg, Type), pp_type(C#named_argument_constraint.type)]),
-    {pos(Arg), Err};
-pp_when({checking_init_args, Ann, Con0, ArgTypes0}) ->
-    Con = instantiate(Con0),
-    ArgTypes = instantiate(ArgTypes0),
-    {pos(Ann),
-     io_lib:format("when checking arguments of `~s`'s init entrypoint to match\n(~s)",
-                   [pp_type(Con), string:join([pp_type(A) || A <- ArgTypes], ", ")])
-    };
-pp_when({return_contract, App, Con0}) ->
-    Con = instantiate(Con0),
-    {pos(App)
-    , io_lib:format("when checking that expression returns contract of type `~s`", [pp_type(Con)])
-    };
-pp_when({arg_name, Id1, Id2, When}) ->
-    {Pos, Ctx} = pp_when(When),
-    {Pos
-    , io_lib:format("when unifying names of named arguments: `~s` and `~s`\n~s", [pp_expr(Id1), pp_expr(Id2), Ctx])
-    };
-pp_when({var_args, Ann, Fun}) ->
-    {pos(Ann)
-    , io_lib:format("when resolving arguments of variadic function `~s`", [pp_expr(Fun)])
-    };
-pp_when({implement_interface_fun, Ann, Entrypoint, Interface}) ->
-    { pos(Ann)
-    , io_lib:format("when implementing the entrypoint `~s` from the interface `~s`", [Entrypoint, Interface])
-    };
-pp_when(unknown) -> {pos(0,0), ""}.
+
 
 -spec pp_why_record(why_record()) -> {pos(), iolist()}.
 pp_why_record(Why) -> aeso_type_when_pretty:pp_why_record(Why).
 
 
-if_branches(If = {'if', Ann, _, Then, Else}) ->
-    case proplists:get_value(format, Ann) of
-        elif -> [Then | if_branches(Else)];
-        _    -> [If]
-    end;
-if_branches(E) -> [E].
+
 
 pp_typed(Label, E, T) -> aeso_type_pretty:pp_typed(Label, E, T).
 
