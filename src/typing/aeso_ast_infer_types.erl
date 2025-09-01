@@ -2960,39 +2960,22 @@ warn_potential_negative_spend(Ann, Fun, Args) ->
 cannot_unify(A, B, Cxt, When) ->
     type_error({cannot_unify, A, B, Cxt, When}).
 
-type_error(Err) ->
-    aeso_infer_ets:insert(type_errors, Err).
-
+%% Delegation wrappers to aeso_type_errors
 create_type_errors() ->
-    aeso_infer_ets:new(type_errors, [bag]).
+    aeso_type_errors:create_type_errors().
+
+type_error(Err) ->
+    aeso_type_errors:type_error(Err).
 
 destroy_and_report_type_errors(Env) ->
-    Errors0 = lists:reverse(aeso_infer_ets:tab2list(type_errors)),
-    aeso_infer_ets:delete(type_errors),
-    Errors  = [ aeso_type_errors:mk_error(unqualify(Env, Err)) || Err <- Errors0 ],
-    aeso_errors:throw(Errors).  %% No-op if Errors == []
+    aeso_type_errors:destroy_and_report_type_errors(Env).
 
 destroy_and_report_warnings_as_type_errors() ->
     Warnings = [ aeso_type_warnings:mk_warning(Warn) || Warn <- aeso_infer_ets:tab2list(warnings) ],
     Errors = lists:map(fun mk_t_err_from_warn/1, Warnings),
     aeso_errors:throw(Errors).  %% No-op if Warnings == []
 
-%% Strip current namespace from error message for nicer printing.
-unqualify(#env{ namespace = NS }, {qid, Ann, Xs}) ->
-    qid(Ann, unqualify1(NS, Xs));
-unqualify(#env{ namespace = NS }, {qcon, Ann, Xs}) ->
-    qcon(Ann, unqualify1(NS, Xs));
-unqualify(Env, T) when is_tuple(T) ->
-    list_to_tuple(unqualify(Env, tuple_to_list(T)));
-unqualify(Env, [H | T]) -> [unqualify(Env, H) | unqualify(Env, T)];
-unqualify(_Env, X) -> X.
 
-unqualify1(NS, Xs) ->
-    try lists:split(length(NS), Xs) of
-        {NS, Ys} -> Ys;
-        _        -> Xs
-    catch _:_ -> Xs
-    end.
 
 mk_t_err_from_warn(Warn) ->
     aeso_warnings:warn_to_err(type_error, Warn).
