@@ -1,8 +1,13 @@
 -module(aeso_type_env).
 
--export([global_env/0]).
+-export([global_env/0, get_current_scope/1]).
 
 -include("aeso_types.hrl").
+
+%% Get current scope from environment
+-spec get_current_scope(env()) -> scope().
+get_current_scope(#env{ namespace = NS, scopes = Scopes }) ->
+    maps:get(NS, Scopes).
 
 %% Environment containing language primitives
 -spec global_env() -> env().

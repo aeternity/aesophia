@@ -58,13 +58,10 @@ pop_scope(Env) ->
 get_scope(#env{ scopes = Scopes }, Name) ->
     maps:get(Name, Scopes, false).
 
--spec get_current_scope(env()) -> scope().
-get_current_scope(#env{ namespace = NS, scopes = Scopes }) ->
-    maps:get(NS, Scopes).
 
 -spec on_current_scope(env(), fun((scope()) -> scope())) -> env().
 on_current_scope(Env = #env{ namespace = NS, scopes = Scopes }, Fun) ->
-    Scope = get_current_scope(Env),
+    Scope = aeso_type_env:get_current_scope(Env),
     Env#env{ scopes = Scopes#{ NS => Fun(Scope) } }.
 
 -spec on_scopes(env(), fun((scope()) -> scope())) -> env().
@@ -2933,7 +2930,7 @@ destroy_and_report_unused_functions() ->
 
 warn_potential_shadowing(_, _, "_") -> ok;
 warn_potential_shadowing(Env = #env{ vars = Vars }, Ann, Name) ->
-    CurrentScope = get_current_scope(Env),
+    CurrentScope = aeso_type_env:get_current_scope(Env),
     Consts = CurrentScope#scope.consts,
     case proplists:get_value(Name, Vars ++ Consts, false) of
         false -> ok;
