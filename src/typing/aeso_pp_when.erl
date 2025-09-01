@@ -8,11 +8,7 @@
 
 -module(aeso_pp_when).
 
-%% Record definitions needed for pp_when
--record(named_argument_constraint,
-    {args :: list(),
-     name :: tuple(),
-     type :: tuple()}).
+-include("aeso_type_records.hrl").
 
 -export([
     pp_when/1
