@@ -1,0 +1,219 @@
+%%%-------------------------------------------------------------------
+%%% @copyright (C) 2025, Aeternity Anstalt
+%%% @doc
+%%%     Unused warning functions for Sophia type checker.
+%%%     Handles tracking of various unused constructs (includes, stateful,
+%%%     typedefs).
+%%% @end
+%%%-------------------------------------------------------------------
+
+-module(aeso_unused_warnings).
+
+-include("aeso_types.hrl").
+
+-export([
+    potential_unused_include/2,
+    used_include/1,
+    potential_unused_stateful/2,
+    used_stateful/1,
+    potential_unused_typedefs/2,
+    used_typedef/2,
+    potential_unused_variables/3,
+    used_variable/3,
+    potential_unused_constants/2,
+    used_constant/2,
+    potential_unused_return_value/1,
+    warn_potential_division_by_zero/3,
+    warn_potential_negative_spend/3,
+    warn_potential_shadowing/3,
+    when_warning/2,
+    create_unused_functions/0,
+    register_function_call/2,
+    potential_unused_function/4,
+    remove_used_funs/1,
+    destroy_and_report_unused_functions/0
+]).
+
+%% -------------------------------------------------------------------
+%% Exported Functions
+%% -------------------------------------------------------------------
+
+%% Include warnings
+potential_unused_include(Ann, SrcFile) ->
+    IsIncluded = aeso_syntax:get_ann(include_type, Ann, none) =/= none,
+    case IsIncluded of
+        false -> ok;
+        true  ->
+            case aeso_syntax:get_ann(file, Ann, no_file) of
+                no_file -> ok;
+                File    -> aeso_infer_ets:insert(warnings, {unused_include, File, SrcFile})
+            end
+    end.
+
+used_include(Ann) ->
+    case aeso_syntax:get_ann(file, Ann, no_file) of
+        no_file -> ok;
+        File    -> aeso_infer_ets:match_delete(warnings, {unused_include, File, '_'})
+    end.
+
+%% Stateful warnings
+potential_unused_stateful(Ann, Fun) ->
+    case aeso_syntax:get_ann(stateful, Ann, false) of
+        false -> ok;
+        true  -> aeso_infer_ets:insert(warnings, {unused_stateful, Ann, Fun})
+    end.
+
+used_stateful(Fun) ->
+    aeso_infer_ets:match_delete(warnings, {unused_stateful, '_', Fun}).
+
+%% Typedef warnings
+potential_unused_typedefs(Namespace, TypeDefs) ->
+    lists:map(
+      fun({type_def, _Ann, {id, _, "event"}, _Args, _}) ->
+              ok;
+         ({type_def, Ann, Id, Args, _}) ->
+              aeso_infer_ets:insert(warnings, {unused_typedef, Ann, Namespace ++ qname(Id), length(Args)})
+      end,
+      TypeDefs
+     ).
+
+used_typedef(TypeAliasId, Arity) ->
+    aeso_infer_ets:match_delete(warnings, {unused_typedef, '_', qname(TypeAliasId), Arity}).
+
+%% Variable warnings
+potential_unused_variables(Namespace, Fun, Vars0) ->
+    Vars = [ Var || Var = {id, _, VarName} <- Vars0, VarName /= "_" ],
+    lists:map(fun({id, Ann, VarName}) ->
+        aeso_infer_ets:insert(warnings, {unused_variable, Ann, Namespace, Fun, VarName}) end, Vars).
+
+used_variable(Namespace, Fun, [VarName]) ->
+    aeso_infer_ets:match_delete(warnings, {unused_variable, '_', Namespace, Fun, VarName});
+used_variable(_, _, _) -> ok.
+
+%% Constant warnings
+potential_unused_constants(#env{ what = namespace }, _Consts) ->
+    [];
+potential_unused_constants(#env{ namespace = Namespace }, Consts) ->
+    [ aeso_infer_ets:insert(warnings, {unused_constant, Ann, Namespace, Name}) || {letval, _, {id, Ann, Name}, _} <- Consts ].
+
+used_constant(Namespace = [Contract], [Contract, ConstName]) ->
+    aeso_infer_ets:match_delete(warnings, {unused_constant, '_', Namespace, ConstName});
+used_constant(_, _) -> ok.
+
+%% Return value warnings
+potential_unused_return_value({typed, Ann, {app, _, {typed, _, _, {fun_t, _, _, _, {id, _, Type}}}, _}, _}) when Type /= "unit" ->
+    aeso_infer_ets:insert(warnings, {unused_return_value, Ann});
+potential_unused_return_value(_) -> ok.
+
+%% Division by zero warnings
+warn_potential_division_by_zero(Ann, Op, Args) ->
+    case {Op, Args} of
+        {{'/', _}, [_, {int, _, 0}]} -> aeso_infer_ets:insert(warnings, {division_by_zero, Ann});
+        _ -> ok
+    end.
+
+%% Negative spend warnings
+warn_potential_negative_spend(Ann, Fun, Args) ->
+    case {Fun, Args} of
+        { {typed, _, {qid, _, ["Chain", "spend"]}, _}
+        , [_, {typed, _, {app, _, {'-', _}, [{typed, _, {int, _, X}, _}]}, _}]} when X > 0 ->
+            aeso_infer_ets:insert(warnings, {negative_spend, Ann});
+        _ -> ok
+    end.
+
+%% Unused function warnings
+create_unused_functions() ->
+    aeso_infer_ets:new(function_calls, [bag]),
+    aeso_infer_ets:new(all_functions, [set]).
+
+register_function_call(Caller, Callee) ->
+    aeso_infer_ets:insert(function_calls, {Caller, Callee}).
+
+potential_unused_function(#env{ what = namespace }, Ann, FunQName, FunId) ->
+    aeso_infer_ets:insert(all_functions, {Ann, FunQName, FunId, not aeso_syntax:get_ann(private, Ann, false)});
+potential_unused_function(_Env, Ann, FunQName, FunId) ->
+    aeso_infer_ets:insert(all_functions, {Ann, FunQName, FunId, aeso_syntax:get_ann(entrypoint, Ann, false)}).
+
+remove_used_funs(All) ->
+    {Used, Unused} = lists:partition(fun({_, _, _, IsUsed}) -> IsUsed end, All),
+    CallsByUsed = lists:flatmap(fun({_, F, _, _}) -> aeso_infer_ets:lookup(function_calls, F) end, Used),
+    CalledFuns = sets:from_list(lists:map(fun({_, Callee}) -> Callee end, CallsByUsed)),
+    MarkUsedFun = fun(Fun, Acc) ->
+                      case lists:keyfind(Fun, 2, Acc) of
+                          false -> Acc;
+                          T     -> lists:keyreplace(Fun, 2, Acc, setelement(4, T, true))
+                      end
+                  end,
+    NewUnused = sets:fold(MarkUsedFun, Unused, CalledFuns),
+    case lists:keyfind(true, 4, NewUnused) of
+        false -> NewUnused;
+        _     -> remove_used_funs(NewUnused)
+    end.
+
+destroy_and_report_unused_functions() ->
+    AllFuns = aeso_infer_ets:tab2list(all_functions),
+    lists:map(fun({Ann, _, FunId, _}) -> aeso_infer_ets:insert(warnings, {unused_function, Ann, name(FunId)}) end,
+              remove_used_funs(AllFuns)),
+    aeso_infer_ets:delete(all_functions),
+    aeso_infer_ets:delete(function_calls).
+
+%% Warning for potential variable shadowing
+warn_potential_shadowing(_, _, "_") -> ok;
+warn_potential_shadowing(Env = #env{ vars = Vars }, Ann, Name) ->
+    CurrentScope = aeso_type_env:get_current_scope(Env),
+    Consts = CurrentScope#scope.consts,
+    case proplists:get_value(Name, Vars ++ Consts, false) of
+        false -> ok;
+        {AnnOld, _} -> aeso_infer_ets:insert(warnings, {shadowing, Ann, Name, AnnOld})
+    end.
+
+%% Helper functions
+
+name({typed, _, X, _}) -> name(X);
+name({id, _, X}) -> X;
+name({con, _, X}) -> X.
+
+qname({id, _, Name}) -> [Name];
+qname({qid, _, Names}) -> Names;
+qname({con, _, Name}) -> [Name];
+qname({qcon, _, Names}) -> Names.
+
+%% Warning management functions
+all_warnings() ->
+    [ warn_unused_includes
+    , warn_unused_stateful
+    , warn_unused_variables
+    , warn_unused_constants
+    , warn_unused_typedefs
+    , warn_unused_return_value
+    , warn_unused_functions
+    , warn_shadowing
+    , warn_division_by_zero
+    , warn_negative_spend ].
+
+when_warning(Warn, Do) ->
+    case lists:member(Warn, all_warnings()) of
+        false ->
+            aeso_type_errors:create_type_errors(),
+            aeso_type_errors:type_error({unknown_warning, Warn}),
+            aeso_type_errors:destroy_and_report_type_errors(aeso_type_env:global_env());
+        true ->
+            case aeso_infer_ets:tab_exists(warnings) of
+                true ->
+                    IsEnabled = get_option(Warn, false),
+                    IsAll = get_option(warn_all, false) andalso lists:member(Warn, all_warnings()),
+                    if
+                        IsEnabled orelse IsAll -> Do();
+                        true -> ok
+                    end;
+                false ->
+                    ok
+            end
+    end.
+
+%% Options management (duplicated from aeso_ast_infer_types to avoid dependency)
+get_option(Key, Default) ->
+    case aeso_infer_ets:lookup(options, Key) of
+        [{Key, Val}] -> Val;
+        _            -> Default
+    end.
