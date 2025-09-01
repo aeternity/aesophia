@@ -5,8 +5,7 @@
 %%%-------------------------------------------------------------------
 -module(aeso_type_pretty).
 
--include("aeso_why_record.hrl").
--include("aeso_type_records.hrl").
+-include("aeso_types.hrl").
 
 -export([
     pp/1,

@@ -12,7 +12,7 @@
 -export([mk_error/1]).
 
 -include("../aeso_utils.hrl").
--include("aeso_type_records.hrl").
+-include("aeso_types.hrl").
 
 %% Independent helper functions for mk_error
 mk_t_err(Pos, Msg) ->
