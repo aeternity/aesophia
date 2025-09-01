@@ -5,13 +5,11 @@
 %%%-------------------------------------------------------------------
 -module(aeso_type_when_pretty).
 
+-include("aeso_why_record.hrl").
+
 -export([
     pp_why_record/1
 ]).
-
--type why_record() :: aeso_syntax:field(aeso_syntax:expr())
-                    | {var_args, aeso_syntax:ann(), aeso_syntax:expr()}
-                    | {proj, aeso_syntax:ann(), aeso_syntax:expr(), aeso_syntax:id()}.
 
 -spec pp_why_record(why_record()) -> {aeso_errors:pos(), iolist()}.
 pp_why_record({var_args, Ann, Fun}) ->

@@ -25,6 +25,7 @@
 
 -include("../aeso_utils.hrl").
 -include("aeso_type_records.hrl").
+-include("aeso_why_record.hrl").
 
 -type type_id() :: aeso_syntax:id() | aeso_syntax:qid() | aeso_syntax:con() | aeso_syntax:qcon().
 
@@ -32,12 +33,6 @@
                        element(1, T) =:= qid orelse
                        element(1, T) =:= con orelse
                        element(1, T) =:= qcon).
-
--type why_record() :: aeso_syntax:field(aeso_syntax:expr())
-                    | {var_args, aeso_syntax:ann(), aeso_syntax:expr()}
-                    | {proj, aeso_syntax:ann(), aeso_syntax:expr(), aeso_syntax:id()}.
-
-
 
 -record(dependent_type_constraint,
     { named_args_t     :: named_args_t()
