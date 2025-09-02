@@ -151,7 +151,7 @@ string_to_code(ContractString, Options) ->
     Ast = parse(ContractString, Options),
     pp_sophia_code(Ast, Options),
     pp_ast(Ast, Options),
-    {TypeEnv, FoldedTypedAst, UnfoldedTypedAst, Warnings} = aeso_ast_infer_types:infer(Ast, [return_env | Options]),
+    {TypeEnv, FoldedTypedAst, UnfoldedTypedAst, Warnings} = aeso_type_infer:infer(Ast, [return_env | Options]),
     pp_typed_ast(UnfoldedTypedAst, Options),
     {Env, Fcode} = aeso_ast_to_fcode:ast_to_fcode(UnfoldedTypedAst, [{original_src, ContractString}|Options]),
     #{ fcode => Fcode

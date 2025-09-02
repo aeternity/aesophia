@@ -7,10 +7,10 @@
 
 %%% All state is kept in a set of ETS tables. These are NOT named
 %%% tables and the table ids are kept in process dictionary in a map
-%%% under the key 'aeso_ast_infer_types'. This allows multiple
+%%% under the key 'aeso_type_infer'. This allows multiple
 %%% instances of the compiler to be run in parallel.
 
--module(aeso_ast_infer_types).
+-module(aeso_type_infer).
 
 -export([ infer/1
         , infer/2

@@ -3,7 +3,7 @@
 %%% @doc
 %%%     Type error generation for Sophia type checker.
 %%%     This module provides error creation functions independent of
-%%%     aeso_ast_infer_types.
+%%%     aeso_type_infer.
 %%% @end
 %%%-------------------------------------------------------------------
 

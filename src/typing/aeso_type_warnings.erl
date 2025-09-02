@@ -258,7 +258,7 @@ when_warning(Warn, Do) ->
             end
     end.
 
-%% Options management (duplicated from aeso_ast_infer_types to avoid dependency)
+%% Options management (duplicated from aeso_type_infer to avoid dependency)
 get_option(Key, Default) ->
     case aeso_type_ets:lookup(options, Key) of
         [{Key, Val}] -> Val;
