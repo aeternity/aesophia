@@ -14,6 +14,7 @@
         , get_current_scope/1
         , get_scope/2
         , global_env/0
+        , init_env/1
         , lookup_env/4
         , lookup_record_field/2
         , lookup_record_field/3
@@ -382,6 +383,10 @@ global_env() ->
              maps:from_list([{N, [#field_info{ ann = [], field_t = T, record_t = Tx, kind = record }]}
                              || {N, T} <- TxFlds ])
         }.
+
+%% Initialize environment with options
+-spec init_env(list(option())) -> env().
+init_env(_Options) -> global_env().
 
 %% -- Environment lookup functions -------------------------------------------
 

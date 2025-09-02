@@ -43,21 +43,20 @@ map_t(As, K, V) -> {app_t, As, {id, As, "map"}, [K, V]}.
 infer(Contracts) ->
     infer(Contracts, []).
 
--type option() :: return_env | dont_unfold | no_code | debug_mode | term().
 
--spec init_env(list(option())) -> env().
-init_env(_Options) -> aeso_type_env:global_env().
+
+
 
 -spec infer(aeso_syntax:ast(), list(option())) ->
   {aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]} | {env(), aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]}.
 infer([], Options) ->
     create_type_errors(),
     type_error({no_decls, proplists:get_value(src_file, Options, no_file)}),
-    destroy_and_report_type_errors(init_env(Options));
+    destroy_and_report_type_errors(aeso_type_env:init_env(Options));
 infer(Contracts, Options) ->
     aeso_infer_ets:init(), %% Init the ETS table state
     try
-        Env = init_env(Options),
+        Env = aeso_type_env:init_env(Options),
         create_options(Options),
         aeso_infer_ets:new(defined_contracts, [bag]),
         aeso_infer_ets:new(type_vars, [set]),

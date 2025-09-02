@@ -23,6 +23,9 @@
 
 -type named_args_t() :: uvar() | [{named_arg_t, aeso_syntax:ann(), aeso_syntax:id(), utype(), aeso_syntax:expr()}].
 
+%% Compiler options type
+-type option() :: return_env | dont_unfold | no_code | debug_mode | term().
+
 %% Record context information
 -type why_record() :: aeso_syntax:field(aeso_syntax:expr())
                     | {var_args, aeso_syntax:ann(), aeso_syntax:expr()}
