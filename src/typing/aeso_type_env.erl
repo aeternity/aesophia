@@ -587,7 +587,7 @@ force_bind_fun(X, Type, Env = #env{ what = What }) ->
 %% -- Options access ---------------------------------------------------------
 
 get_option(Key, Default) ->
-    case aeso_infer_ets:lookup(options, Key) of
+    case aeso_type_ets:lookup(options, Key) of
         [{Key, Val}] -> Val;
         _            -> Default
     end.

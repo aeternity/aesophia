@@ -1,4 +1,4 @@
--module(aeso_infer_ets).
+-module(aeso_type_ets).
 
 -export([
     init/0,
@@ -20,30 +20,30 @@
 %% The interface functions behave as the standard ETS interface.
 
 init() ->
-    put(aeso_infer_ets, #{}).
+    put(aeso_type_ets, #{}).
 
 tab_exists(Name) ->
-    Tabs = get(aeso_infer_ets),
+    Tabs = get(aeso_type_ets),
     case maps:find(Name, Tabs) of
         {ok, _} -> true;
         error   -> false
     end.
 
 tabid(Name) ->
-    #{Name := TabId} = get(aeso_infer_ets),
+    #{Name := TabId} = get(aeso_type_ets),
     TabId.
 
 new(Name, Opts) ->
     %% Ensure the table is NOT named!
     TabId = ets:new(Name, Opts -- [named_table]),
-    Tabs = get(aeso_infer_ets),
-    put(aeso_infer_ets, Tabs#{Name => TabId}),
+    Tabs = get(aeso_type_ets),
+    put(aeso_type_ets, Tabs#{Name => TabId}),
     Name.
 
 delete(Name) ->
-    Tabs = get(aeso_infer_ets),
+    Tabs = get(aeso_type_ets),
     #{Name := TabId} = Tabs,
-    put(aeso_infer_ets, maps:remove(Name, Tabs)),
+    put(aeso_type_ets, maps:remove(Name, Tabs)),
     ets:delete(TabId).
 
 delete(Name, Key) ->

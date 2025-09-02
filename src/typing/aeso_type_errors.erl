@@ -513,14 +513,14 @@ mk_error(Err) ->
 
 %% Type error management functions
 create_type_errors() ->
-    aeso_infer_ets:new(type_errors, [bag]).
+    aeso_type_ets:new(type_errors, [bag]).
 
 type_error(Err) ->
-    aeso_infer_ets:insert(type_errors, Err).
+    aeso_type_ets:insert(type_errors, Err).
 
 destroy_and_report_type_errors(Env) ->
-    Errors0 = lists:reverse(aeso_infer_ets:tab2list(type_errors)),
-    aeso_infer_ets:delete(type_errors),
+    Errors0 = lists:reverse(aeso_type_ets:tab2list(type_errors)),
+    aeso_type_ets:delete(type_errors),
     Errors  = [ mk_error(unqualify(Env, Err)) || Err <- Errors0 ],
     aeso_errors:throw(Errors).  %% No-op if Errors == []
 

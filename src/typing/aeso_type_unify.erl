@@ -22,7 +22,7 @@
 %% -------------------------------------------------------------------
 
 dereference(T = {uvar, _, R}) ->
-    case aeso_infer_ets:lookup(type_vars, R) of
+    case aeso_type_ets:lookup(type_vars, R) of
         [] ->
             T;
         [{R, Type}] ->
@@ -88,16 +88,16 @@ instantiate(E) ->
     instantiate1(dereference(E)).
 
 instantiate1({uvar, Attr, R}) ->
-    Next = proplists:get_value(next, aeso_infer_ets:lookup(type_vars, next), 0),
+    Next = proplists:get_value(next, aeso_type_ets:lookup(type_vars, next), 0),
     TVar = {tvar, Attr, "'" ++ integer_to_tvar(Next)},
-    aeso_infer_ets:insert(type_vars, [{next, Next + 1}, {R, TVar}]),
+    aeso_type_ets:insert(type_vars, [{next, Next + 1}, {R, TVar}]),
     TVar;
 instantiate1({fun_t, Ann, Named, Args, Ret}) ->
     case dereference(Named) of
         {uvar, _, R} ->
             %% Uninstantiated named args map to the empty list
             NoNames = [],
-            aeso_infer_ets:insert(type_vars, [{R, NoNames}]),
+            aeso_type_ets:insert(type_vars, [{R, NoNames}]),
             {fun_t, Ann, NoNames, instantiate(Args), instantiate(Ret)};
         Named1 ->
             {fun_t, Ann, instantiate1(Named1), instantiate(Args), instantiate(Ret)}
@@ -143,7 +143,7 @@ unify1(_Env, {uvar, A, R}, T, _Variance, When) ->
             cannot_unify({uvar, A, R}, T, none, When),
             false;
         false ->
-            aeso_infer_ets:insert(type_vars, {R, T}),
+            aeso_type_ets:insert(type_vars, {R, T}),
             true
     end;
 unify1(Env, T, {uvar, A, R}, Variance, When) ->
@@ -199,7 +199,7 @@ unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result
     unify0(Env, Result1, Result2, Variance, When);
 unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, Variance, When)
   when length(Args1) == length(Args2), Tag == id orelse Tag == qid ->
-    Variances = case aeso_infer_ets:lookup(type_vars_variance, F) of
+    Variances = case aeso_type_ets:lookup(type_vars_variance, F) of
                     [{_, Vs}] ->
                         case Variance of
                             contravariant -> lists:map(fun opposite_variance/1, Vs);
