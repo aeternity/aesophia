@@ -1,8 +1,33 @@
 -module(aeso_type_env).
 
--export([global_env/0, get_current_scope/1]).
+-export([ bind_const/4
+        , bind_contract/3
+        , bind_field_append/3
+        , bind_fun/3
+        , bind_funs/2
+        , bind_state/1
+        , bind_tvars/2
+        , bind_type/4
+        , bind_var/3
+        , bind_vars/2
+        , check_tvar/2
+        , get_current_scope/1
+        , get_scope/2
+        , global_env/0
+        , lookup_env/4
+        , lookup_record_field/2
+        , lookup_record_field/3
+        , lookup_record_field_arity/4
+        , lookup_type/2
+        , on_scopes/2
+        , pop_scope/1
+        , push_scope/3
+        ]).
 
+-include("../aeso_utils.hrl").
 -include("aeso_types.hrl").
+
+-define(CONSTRUCTOR_MOCK_NAME, "#__constructor__#").
 
 %% Get current scope from environment
 -spec get_current_scope(env()) -> scope().
@@ -357,3 +382,353 @@ global_env() ->
              maps:from_list([{N, [#field_info{ ann = [], field_t = T, record_t = Tx, kind = record }]}
                              || {N, T} <- TxFlds ])
         }.
+
+%% -- Environment lookup functions -------------------------------------------
+
+-spec get_scope(env(), qname()) -> false | scope().
+get_scope(#env{ scopes = Scopes }, Name) ->
+    maps:get(Name, Scopes, false).
+
+-spec lookup_type(env(), type_id()) -> false | {qname(), type_info()}.
+lookup_type(Env, Id) ->
+    lookup_env(Env, type, aeso_syntax:get_ann(Id), aeso_type_helpers:qname(Id)).
+
+-spec lookup_env(env(), term, aeso_syntax:ann(), qname()) -> false | {qname(), fun_info()};
+                (env(), type, aeso_syntax:ann(), qname()) -> false | {qname(), type_info()}.
+lookup_env(Env, Kind, Ann, Name) ->
+    Var = case Name of
+            [X] when Kind == term -> proplists:get_value(X, Env#env.vars, false);
+            _                     -> false
+          end,
+    case Var of
+        {Ann1, Type} -> {Name, {Ann1, Type}};
+        false ->
+            Names = [ Qual ++ [lists:last(Name)] || Qual <- possible_scopes(Env, Name) ],
+            case [ Res || QName <- Names, Res <- [lookup_env1(Env, Kind, Ann, QName)], Res /= false] of
+                []    -> false;
+                [Res = {_, {AnnR, _}}] ->
+                    aeso_unused_warnings:when_warning(warn_unused_includes,
+                                 fun() ->
+                                         %% If a file is used from a different file, we
+                                         %% can then mark it as used
+                                         F1 = proplists:get_value(file, Ann, no_file),
+                                         F2 = proplists:get_value(file, AnnR, no_file),
+                                         if
+                                             F1 /= F2 ->
+                                                 aeso_unused_warnings:used_include(AnnR);
+                                             true ->
+                                                 ok
+                                         end
+                                 end),
+                    Res;
+                Many  ->
+                    aeso_type_errors:type_error({ambiguous_name, aeso_type_helpers:qid(Ann, Name), [{qid, A, Q} || {Q, {A, _}} <- Many]}),
+                    false
+            end
+    end.
+
+-spec lookup_env1(env(), type | term, aeso_syntax:ann(), qname()) -> false | {qname(), fun_info() | type_info()}.
+lookup_env1(#env{ namespace = Current, used_namespaces = UsedNamespaces, scopes = Scopes }, Kind, Ann, QName) ->
+    Qual = lists:droplast(QName),
+    Name = lists:last(QName),
+    QNameIsEvent = lists:suffix(["Chain", "event"], QName),
+    AllowPrivate = lists:prefix(Qual, Current),
+    %% Get the scope
+    case maps:get(Qual, Scopes, false) of
+        false -> false; %% TODO: return reason for not in scope
+        #scope{ funs = Funs, types = Types, consts = Consts, kind = ScopeKind } ->
+            Defs = case Kind of
+                     type -> Types;
+                     term -> Funs
+                   end,
+            %% Look up the unqualified name
+            case proplists:get_value(Name, Defs, false) of
+                false ->
+                    case proplists:get_value(Name, Consts, false) of
+                        false ->
+                            false;
+                        Const when AllowPrivate; ScopeKind == namespace ->
+                            {QName, Const};
+                        Const ->
+                            aeso_type_errors:type_error({contract_treated_as_namespace_constant, Ann, QName}),
+                            {QName, Const}
+                    end;
+                {reserved_init, Ann1, Type} ->
+                    aeso_type_errors:type_error({cannot_call_init_function, Ann}),
+                    {QName, {Ann1, Type}};  %% Return the type to avoid an extra not-in-scope error
+                {contract_fun, Ann1, Type} when AllowPrivate orelse QNameIsEvent ->
+                    {QName, {Ann1, Type}};
+                {contract_fun, Ann1, Type} ->
+                    aeso_type_errors:type_error({contract_treated_as_namespace_entrypoint, Ann, QName}),
+                    {QName, {Ann1, Type}};
+                {Ann1, _} = E ->
+                    %% Check that it's not private (or we can see private funs)
+                    case not is_private(Ann1) orelse AllowPrivate of
+                        true  ->
+                            case visible_in_used_namespaces(UsedNamespaces, QName) of
+                                true -> {QName, E};
+                                false -> false
+                            end;
+                        false -> false
+                    end
+            end
+    end.
+
+%% What scopes could a given name come from?
+-spec possible_scopes(env(), qname()) -> [qname()].
+possible_scopes(#env{ namespace = Current, used_namespaces = UsedNamespaces }, Name) ->
+    Qual = lists:droplast(Name),
+    NewQuals = case lists:filter(fun(X) -> element(2, X) == Qual end, UsedNamespaces) of
+                   [] ->
+                       [Qual];
+                   Namespaces ->
+                       lists:map(fun(X) -> element(1, X) end, Namespaces)
+               end,
+    Ret1 = [ lists:sublist(Current, I) ++ Q || I <- lists:seq(0, length(Current)), Q <- NewQuals ],
+    Ret2 = [ Namespace ++ Q || {Namespace, none, _} <- UsedNamespaces, Q <- NewQuals ],
+    lists:usort(Ret1 ++ Ret2).
+
+-spec visible_in_used_namespaces(used_namespaces(), qname()) -> boolean().
+visible_in_used_namespaces(UsedNamespaces, QName) ->
+    Qual = lists:droplast(QName),
+    Name = lists:last(QName),
+    case lists:filter(fun({Ns, _, _}) -> Qual == Ns end, UsedNamespaces) of
+        [] ->
+            true;
+        Namespaces ->
+            IsVisible = fun(Namespace) ->
+                            case Namespace of
+                                {_, _, {for, Names}} ->
+                                    lists:member(Name, Names);
+                                {_, _, {hiding, Names}} ->
+                                    not lists:member(Name, Names);
+                                _ ->
+                                    true
+                            end
+                        end,
+            lists:any(IsVisible, Namespaces)
+    end.
+
+is_private(Ann) -> proplists:get_value(private, Ann, false).
+
+%% Name manipulation functions moved to aeso_type_helpers
+
+%% -- Environment manipulation -----------------------------------------------
+
+-spec push_scope(namespace | contract, aeso_syntax:con(), env()) -> env().
+push_scope(Kind, Con, Env) ->
+    Ann  = aeso_syntax:get_ann(Con),
+    Name = aeso_type_helpers:name(Con),
+    New  = Env#env.namespace ++ [Name],
+    Env#env{ namespace = New, scopes = (Env#env.scopes)#{ New => #scope{ kind = Kind, ann = Ann } } }.
+
+-spec pop_scope(env()) -> env().
+pop_scope(Env) ->
+    Env#env{ namespace = lists:droplast(Env#env.namespace) }.
+
+-spec on_current_scope(env(), fun((scope()) -> scope())) -> env().
+on_current_scope(Env = #env{ namespace = NS, scopes = Scopes }, Fun) ->
+    Scope = get_current_scope(Env),
+    Env#env{ scopes = Scopes#{ NS => Fun(Scope) } }.
+
+-spec on_scopes(env(), fun((scope()) -> scope())) -> env().
+on_scopes(Env = #env{ scopes = Scopes }, Fun) ->
+    Env#env{ scopes = maps:map(fun(_, Scope) -> Fun(Scope) end, Scopes) }.
+
+-spec bind_var(aeso_syntax:id(), utype(), env()) -> env().
+bind_var({id, Ann, X}, T, Env) ->
+    aeso_unused_warnings:when_warning(warn_shadowing, fun() -> aeso_unused_warnings:warn_potential_shadowing(Env, Ann, X) end),
+    Env#env{ vars = [{X, {Ann, T}} | Env#env.vars] }.
+
+-spec bind_vars([{aeso_syntax:id(), utype()}], env()) -> env().
+bind_vars([], Env) -> Env;
+bind_vars([{X, T} | Vars], Env) ->
+    bind_vars(Vars, bind_var(X, T, Env)).
+
+-spec bind_tvars([aeso_syntax:tvar()], env()) -> env().
+bind_tvars(Xs, Env) ->
+    Env#env{ typevars = [X || {tvar, _, X} <- Xs] }.
+
+-spec check_tvar(env(), aeso_syntax:tvar()) -> aeso_syntax:tvar() | no_return().
+check_tvar(#env{ typevars = TVars}, T = {tvar, _, X}) ->
+    case TVars == unrestricted orelse lists:member(X, TVars) of
+        true  -> ok;
+        false -> aeso_type_errors:type_error({unbound_type, T})
+    end,
+    T.
+
+-spec bind_fun(name(), type() | typesig(), env()) -> env().
+bind_fun(X, Type, Env) ->
+    case lookup_env(Env, term, [], [X]) of
+        false -> force_bind_fun(X, Type, Env);
+        {_QId, {Ann1, _}} ->
+            aeso_type_errors:type_error({duplicate_definition, X, [Ann1, aeso_syntax:get_ann(Type)]}),
+            Env
+    end.
+
+-spec force_bind_fun(name(), type() | typesig(), env()) -> env().
+force_bind_fun(X, Type, Env = #env{ what = What }) ->
+    Ann    = aeso_syntax:get_ann(Type),
+    NoCode = get_option(no_code, false),
+    Entry = if X == "init", What == contract, not NoCode ->
+                    {reserved_init, Ann, Type};
+               What == contract; What == contract_interface -> {contract_fun, Ann, Type};
+               true -> {Ann, Type}
+            end,
+    on_current_scope(Env, fun(Scope = #scope{ funs = Funs }) ->
+                            Scope#scope{ funs = [{X, Entry} | Funs] }
+                          end).
+
+%% -- Options access ---------------------------------------------------------
+
+get_option(Key, Default) ->
+    case aeso_infer_ets:lookup(options, Key) of
+        [{Key, Val}] -> Val;
+        _            -> Default
+    end.
+
+%% -- Additional binding functions -------------------------------------------
+
+-spec bind_funs([{name(), type() | typesig()}], env()) -> env().
+bind_funs([], Env) -> Env;
+bind_funs([{Id, Type} | Rest], Env) ->
+    bind_funs(Rest, bind_fun(Id, Type, Env)).
+
+-spec bind_type(name(), aeso_syntax:ann(), typedef(), env()) -> env().
+bind_type(X, Ann, Def, Env) ->
+    on_current_scope(Env, fun(Scope = #scope{ types = Types }) ->
+                            Scope#scope{ types = [{X, {Ann, Def}} | Types] }
+                          end).
+
+-spec bind_const(name(), aeso_syntax:ann(), type(), env()) -> env().
+bind_const(X, Ann, Type, Env) ->
+    case lookup_env(Env, term, Ann, [X]) of
+        false ->
+            on_current_scope(Env, fun(Scope = #scope{ consts = Consts }) ->
+                                    Scope#scope{ consts = [{X, {Ann, Type}} | Consts] }
+                                end);
+        _ ->
+            aeso_type_errors:type_error({duplicate_definition, X, [Ann, aeso_syntax:get_ann(Type)]}),
+            Env
+    end.
+
+
+
+%% Bind state primitives
+-spec bind_state(env()) -> env().
+bind_state(Env) ->
+    Ann   = [{origin, system}],
+    Unit  = {tuple_t, Ann, []},
+    State =
+        case lookup_type(Env, {id, Ann, "state"}) of
+            {S, _} -> {qid, Ann, S};
+            false  -> Unit
+        end,
+    Env1 = bind_funs([{"state", State},
+                      {"put", {type_sig, [stateful | Ann], none, [], [State], Unit}}], Env),
+
+    case lookup_type(Env, {id, Ann, "event"}) of
+        {E, _} ->
+            %% We bind Chain.event in a local 'Chain' namespace.
+            Event = {qid, Ann, E},
+            pop_scope(
+              bind_fun("event", {fun_t, Ann, [], [Event], Unit},
+              push_scope(namespace, {con, Ann, "Chain"}, Env1)));
+        false  -> Env1
+    end.
+
+-spec bind_field_append(name(), field_info(), env()) -> env().
+bind_field_append(X, Info, Env = #env{ fields = Fields }) ->
+    Fields1 = maps:update_with(X, fun(Infos) -> [Info | Infos] end, [Info], Fields),
+    Env#env{ fields = Fields1 }.
+
+-spec bind_field_update(name(), field_info(), env()) -> env().
+bind_field_update(X, Info, Env = #env{ fields = Fields }) ->
+    Fields1 = maps:update_with(X, fun([_ | Infos]) -> [Info | Infos]; ([]) -> [Info] end, [Info], Fields),
+    Env#env{ fields = Fields1 }.
+
+-spec bind_fields([{name(), field_info()}], typed | untyped, env()) -> env().
+bind_fields([], _Typing, Env) -> Env;
+bind_fields([{Id, Info} | Rest], Typing, Env) ->
+    NewEnv = case Typing of
+                 untyped -> bind_field_append(Id, Info, Env);
+                 typed   -> bind_field_update(Id, Info, Env)
+             end,
+    bind_fields(Rest, Typing, NewEnv).
+
+%% Contract entrypoints take three named arguments
+%%  gas       : int  = Call.gas_left()
+%%  value     : int  = 0
+%%  protected : bool = false
+contract_call_type({fun_t, Ann, [], Args, Ret}) ->
+    Id    = fun(X) -> {id, Ann, X} end,
+    Int   = Id("int"),
+    Typed = fun(E, T) -> {typed, Ann, E, T} end,
+    Named = fun(Name, Default = {typed, _, _, T}) -> {named_arg_t, Ann, Id(Name), T, Default} end,
+    {fun_t, Ann, [Named("gas",   Typed({app, Ann, Typed({qid, Ann, ["Call", "gas_left"]},
+                                                        {fun_t, Ann, [], [], Int}),
+                                        []}, Int)),
+                  Named("value", Typed({int, Ann, 0}, Int)),
+                  Named("protected", Typed({bool, Ann, false}, Id("bool")))],
+     Args, {if_t, Ann, Id("protected"), {app_t, Ann, {id, Ann, "option"}, [Ret]}, Ret}}.
+
+-spec bind_contract(typed | untyped, aeso_syntax:decl(), env()) -> env().
+bind_contract(Typing, {Contract, Ann, Id, _Impls, Contents}, Env)
+  when ?IS_CONTRACT_HEAD(Contract) ->
+    Key         = aeso_type_helpers:name(Id),
+    Sys         = [{origin, system}],
+    TypeOrFresh = fun({typed, _, _, Type}) -> Type; (_) -> aeso_type_unify:fresh_uvar(Sys) end,
+    Fields      =
+        [ {field_t, AnnF, Entrypoint, contract_call_type(aeso_syntax:set_ann(Sys, Type))}
+          || {fun_decl, AnnF, Entrypoint, Type = {fun_t, _, _, _, _}} <- Contents ] ++
+        [ {field_t, AnnF, Entrypoint,
+           contract_call_type(
+             {fun_t, Sys, [], [TypeOrFresh(Arg) || Arg <- Args], TypeOrFresh(Ret)})
+          }
+          || {letfun, AnnF, Entrypoint = {id, _, Name}, Args, _Type, [{guarded, _, [], Ret}]} <- Contents,
+             Name =/= "init"
+        ] ++
+        %% Predefined fields
+        [ {field_t, Sys, {id, Sys, "address"}, {id, Sys, "address"}} ] ++
+        [ {field_t, Sys, {id, Sys, ?CONSTRUCTOR_MOCK_NAME},
+           contract_call_type(
+             case [ [TypeOrFresh(Arg) || Arg <- Args]
+                    || {letfun, AnnF, {id, _, "init"}, Args, _, _} <- Contents,
+                       aeso_syntax:get_ann(entrypoint, AnnF, false)]
+                 ++ [ Args
+                      || {fun_decl, AnnF, {id, _, "init"}, {fun_t, _, _, Args, _}} <- Contents,
+                         aeso_syntax:get_ann(entrypoint, AnnF, false)]
+                 ++ [ Args
+                      || {fun_decl, AnnF, {id, _, "init"}, {type_sig, _, _, _, Args, _}} <- Contents,
+                         aeso_syntax:get_ann(entrypoint, AnnF, false)]
+             of
+                 [] -> {fun_t, [stateful,payable|Sys], [], [], {id, Sys, "void"}};
+                 [Args] -> {fun_t, [stateful,payable|Sys], [], Args, {id, Sys, "void"}}
+             end
+            )
+          }
+        ],
+    FieldInfo = [ {Entrypoint, #field_info{ ann      = FieldAnn,
+                                            kind     = contract,
+                                            field_t  = Type,
+                                            record_t = Id }}
+                || {field_t, _, {id, FieldAnn, Entrypoint}, Type} <- Fields ],
+    bind_type(Key, Ann, {[], {contract_t, Fields}},
+        bind_fields(FieldInfo, Typing, Env)).
+
+%% -- Record field lookup functions ------------------------------------------
+
+-spec lookup_record_field(env(), name()) -> [field_info()].
+lookup_record_field(Env, FieldName) ->
+    maps:get(FieldName, Env#env.fields, []).
+
+%% For 'create' or 'update' constraints we don't consider contract types.
+-spec lookup_record_field(env(), name(), create | project | update) -> [field_info()].
+lookup_record_field(Env, FieldName, Kind) ->
+    [ Fld || Fld = #field_info{ kind = K } <- lookup_record_field(Env, FieldName),
+             Kind == project orelse K /= contract ].
+
+lookup_record_field_arity(Env, FieldName, Arity, Kind) ->
+    Fields = lookup_record_field(Env, FieldName, Kind),
+    [ Fld || Fld = #field_info{ field_t = FldType } <- Fields,
+             aeso_type_helpers:fun_arity(aeso_type_unify:dereference_deep(FldType)) == Arity ].

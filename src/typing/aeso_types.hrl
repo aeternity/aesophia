@@ -32,6 +32,7 @@
 -type typedef() :: {[aeso_syntax:tvar()], aeso_syntax:typedef() | {contract_t, [aeso_syntax:field_t()]}}
                  | {builtin, non_neg_integer()}.
 -type type() :: aeso_syntax:type().
+-type type_id() :: aeso_syntax:id() | aeso_syntax:qid() | aeso_syntax:con() | aeso_syntax:qcon().
 -type name() :: string().
 -type qname() :: [string()].
 -type typesig() :: {type_sig, aeso_syntax:ann(), type_constraints(), [aeso_syntax:named_arg_t()], [type()], type()}.
