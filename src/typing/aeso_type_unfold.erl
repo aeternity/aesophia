@@ -12,7 +12,6 @@
         , unfold_types_in_type/3
         ]).
 
--include("../aeso_utils.hrl").
 -include("aeso_types.hrl").
 
 %% -- Type unfolding ---------------------------------------------------------

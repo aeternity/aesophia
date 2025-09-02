@@ -441,14 +441,11 @@ infer_type_vars_variance({tvar, _, TVar}) -> [{TVar, covariant}];
 infer_type_vars_variance({fun_t, _, [], Args, Res}) ->
     ArgsVariance = infer_type_vars_variance(Args),
     ResVariance = infer_type_vars_variance(Res),
-    FlippedArgsVariance = lists:map(fun({TVar, Variance}) -> {TVar, opposite_variance(Variance)} end, ArgsVariance),
+    FlippedArgsVariance = lists:map(fun({TVar, Variance}) -> {TVar, aeso_type_unify:opposite_variance(Variance)} end, ArgsVariance),
     FlippedArgsVariance ++ ResVariance;
 infer_type_vars_variance(_) -> [].
 
-opposite_variance(invariant) -> invariant;
-opposite_variance(covariant) -> contravariant;
-opposite_variance(contravariant) -> covariant;
-opposite_variance(bivariant) -> bivariant.
+
 
 -spec check_constants(env(), [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
 check_constants(Env = #env{ what = What }, Consts) ->
@@ -2126,147 +2123,17 @@ unfold_types(_Env, X, _Options) ->
     X.
 
 
-%% Unification
+%% Unification - delegate to aeso_type_unify module
 
-unify(Env, A, B, When) -> unify0(Env, A, B, covariant, When).
-
-unify0(_, {id, _, "_"}, _, _Variance, _When) -> true;
-unify0(_, _, {id, _, "_"}, _Variance, _When) -> true;
-unify0(Env, A, B, Variance, When) ->
-    Options =
-        case When of    %% Improve source location for map_in_map_key errors
-            {check_expr, E, _, _} -> [{ann, aeso_syntax:get_ann(E)}];
-            _                     -> []
-        end,
-    A1 = dereference(aeso_type_unfold:unfold_types_in_type(Env, A, Options)),
-    B1 = dereference(aeso_type_unfold:unfold_types_in_type(Env, B, Options)),
-    unify1(Env, A1, B1, Variance, When).
-
-%% Delegate simple functions to aeso_type_unify module
+unify(Env, A, B, When) -> aeso_type_unify:unify(Env, A, B, When).
 dereference(T) -> aeso_type_unify:dereference(T).
 dereference_deep(T) -> aeso_type_unify:dereference_deep(T).
 instantiate(E) -> aeso_type_unify:instantiate(E).
-occurs_check(R, T) -> aeso_type_unify:occurs_check(R, T).
+
 fresh_uvar(Attrs) -> aeso_type_unify:fresh_uvar(Attrs).
 
 
-%% Keep complex unification logic here due to dependencies
-unify1(_Env, {uvar, _, R}, {uvar, _, R}, _Variance, _When) ->
-    true;
-unify1(_Env, {uvar, _, _}, {fun_t, _, _, var_args, _}, _Variance, When) ->
-    type_error({unify_varargs, When}),
-    false;
-unify1(_Env, {uvar, A, R}, T, _Variance, When) ->
-    case occurs_check(R, T) of
-        true ->
-            cannot_unify({uvar, A, R}, T, none, When),
-            false;
-        false ->
-            aeso_infer_ets:insert(type_vars, {R, T}),
-            true
-    end;
-unify1(Env, T, {uvar, A, R}, Variance, When) ->
-    unify1(Env, {uvar, A, R}, T, Variance, When);
-unify1(_Env, {tvar, _, X}, {tvar, _, X}, _Variance, _When) -> true; %% Rigid type variables
-unify1(Env, [A|B], [C|D], [V|Variances], When) ->
-    unify0(Env, A, C, V, When) and unify0(Env, B, D, Variances, When);
-unify1(Env, [A|B], [C|D], Variance, When) ->
-    unify0(Env, A, C, Variance, When) and unify0(Env, B, D, Variance, When);
-unify1(_Env, X, X, _Variance, _When) ->
-    true;
-unify1(_Env, _A, {id, _, "void"}, Variance, _When)
-  when Variance == covariant orelse Variance == bivariant ->
-    true;
-unify1(_Env, {id, _, "void"}, _B, Variance, _When)
-  when Variance == contravariant orelse Variance == bivariant ->
-    true;
-unify1(_Env, {id, _, Name}, {id, _, Name}, _Variance, _When) ->
-    true;
-unify1(Env, A = {con, _, NameA}, B = {con, _, NameB}, Variance, When) ->
-    case is_subtype(Env, NameA, NameB, Variance) of
-        true -> true;
-        false ->
-            IsSubtype = is_subtype(Env, NameA, NameB, contravariant) orelse
-                        is_subtype(Env, NameA, NameB, covariant),
-            Cxt = case IsSubtype of
-                      true  -> Variance;
-                      false -> none
-                  end,
-            cannot_unify(A, B, Cxt, When),
-            false
-    end;
-unify1(_Env, {qid, _, Name}, {qid, _, Name}, _Variance, _When) ->
-    true;
-unify1(_Env, {qcon, _, Name}, {qcon, _, Name}, _Variance, _When) ->
-    true;
-unify1(_Env, {bytes_t, _, Len}, {bytes_t, _, Len}, _Variance, _When) ->
-    true;
-unify1(Env, {if_t, _, {id, _, Id}, Then1, Else1}, {if_t, _, {id, _, Id}, Then2, Else2}, Variance, When) ->
-    unify0(Env, Then1, Then2, Variance, When) andalso
-    unify0(Env, Else1, Else2, Variance, When);
 
-unify1(_Env, {fun_t, _, _, _, _}, {fun_t, _, _, var_args, _}, _Variance, When) ->
-    type_error({unify_varargs, When}),
-    false;
-unify1(_Env, {fun_t, _, _, var_args, _}, {fun_t, _, _, _, _}, _Variance, When) ->
-    type_error({unify_varargs, When}),
-    false;
-unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, Variance, When)
-  when length(Args1) == length(Args2) ->
-    unify0(Env, Named1, Named2, opposite_variance(Variance), When) and
-    unify0(Env, Args1, Args2, opposite_variance(Variance), When) and
-    unify0(Env, Result1, Result2, Variance, When);
-unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, Variance, When)
-  when length(Args1) == length(Args2), Tag == id orelse Tag == qid ->
-    Variances = case aeso_infer_ets:lookup(type_vars_variance, F) of
-                    [{_, Vs}] ->
-                        case Variance of
-                            contravariant -> lists:map(fun opposite_variance/1, Vs);
-                            invariant     -> invariant;
-                            _             -> Vs
-                        end;
-                    _ -> invariant
-                end,
-    unify1(Env, Args1, Args2, Variances, When);
-unify1(Env, {tuple_t, _, As}, {tuple_t, _, Bs}, Variance, When)
-  when length(As) == length(Bs) ->
-    unify0(Env, As, Bs, Variance, When);
-unify1(Env, {named_arg_t, _, Id1, Type1, _}, {named_arg_t, _, Id2, Type2, _}, Variance, When) ->
-    unify1(Env, Id1, Id2, Variance, {arg_name, Id1, Id2, When}) andalso
-    unify1(Env, Type1, Type2, Variance, When);
-%% The grammar is a bit inconsistent about whether types without
-%% arguments are represented as applications to an empty list of
-%% parameters or not. We therefore allow them to unify.
-unify1(Env, {app_t, _, T, []}, B, Variance, When) ->
-    unify0(Env, T, B, Variance, When);
-unify1(Env, A, {app_t, _, T, []}, Variance, When) ->
-    unify0(Env, A, T, Variance, When);
-unify1(_Env, A, B, _Variance, When) ->
-    cannot_unify(A, B, none, When),
-    false.
-
-is_subtype(_Env, NameA, NameB, invariant) ->
-    NameA == NameB;
-is_subtype(Env, NameA, NameB, covariant) ->
-    is_subtype(Env, NameA, NameB);
-is_subtype(Env, NameA, NameB, contravariant) ->
-    is_subtype(Env, NameB, NameA);
-is_subtype(Env, NameA, NameB, bivariant) ->
-    is_subtype(Env, NameA, NameB) orelse is_subtype(Env, NameB, NameA).
-
-is_subtype(Env, Child, Base) ->
-    Parents = maps:get(Child, Env#env.contract_parents, []),
-    if
-        Child == Base ->
-            true;
-        Parents == [] ->
-            false;
-        true ->
-            case lists:member(Base, Parents) of
-                true -> true;
-                false -> lists:any(fun(Parent) -> is_subtype(Env, Parent, Base) end, Parents)
-            end
-    end.
 
 
 
@@ -2335,10 +2202,7 @@ apply_typesig_constraint(Ann, bytecode_hash, {fun_t, _, _, [Con], _}) ->
 when_warning(Warn, Do) ->
     aeso_unused_warnings:when_warning(Warn, Do).
 
-%% Save unification failures for error messages.
 
-cannot_unify(A, B, Cxt, When) ->
-    type_error({cannot_unify, A, B, Cxt, When}).
 
 %% Delegation wrappers to aeso_type_errors
 create_type_errors() ->
