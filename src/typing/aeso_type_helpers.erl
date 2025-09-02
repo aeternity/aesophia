@@ -7,7 +7,15 @@
 
 -module(aeso_type_helpers).
 
--export([fun_arity/1, name/1, option_t/2, qid/2, qname/1, typesig_to_fun_t/1]).
+-export([ fun_arity/1
+        , name/1
+        , option_t/2
+        , qcon/2
+        , qid/2
+        , qname/1
+        , set_qname/2
+        , typesig_to_fun_t/1
+        ]).
 
 -include("aeso_types.hrl").
 
@@ -35,6 +43,16 @@ name({con, _, X}) -> X.
 -spec qid(aeso_syntax:ann(), qname()) -> aeso_syntax:id() | aeso_syntax:qid().
 qid(Ann, [X]) -> {id, Ann, X};
 qid(Ann, Xs)  -> {qid, Ann, Xs}.
+
+-spec qcon(aeso_syntax:ann(), qname()) -> aeso_syntax:con() | aeso_syntax:qcon().
+qcon(Ann, [X]) -> {con, Ann, X};
+qcon(Ann, Xs)  -> {qcon, Ann, Xs}.
+
+-spec set_qname(qname(), type_id()) -> type_id().
+set_qname(Xs, {id,   Ann, _}) -> qid(Ann, Xs);
+set_qname(Xs, {qid,  Ann, _}) -> qid(Ann, Xs);
+set_qname(Xs, {con,  Ann, _}) -> qcon(Ann, Xs);
+set_qname(Xs, {qcon, Ann, _}) -> qcon(Ann, Xs).
 
 %% -- Type utilities ---------------------------------------------------------
 

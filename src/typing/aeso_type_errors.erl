@@ -530,7 +530,7 @@ destroy_and_report_type_errors(Env) ->
 unqualify(#env{ namespace = NS }, {qid, Ann, Xs}) ->
     qid(Ann, unqualify1(NS, Xs));
 unqualify(#env{ namespace = NS }, {qcon, Ann, Xs}) ->
-    qcon(Ann, unqualify1(NS, Xs));
+    aeso_type_helpers:qcon(Ann, unqualify1(NS, Xs));
 unqualify(Env, T) when is_tuple(T) ->
     list_to_tuple(unqualify(Env, tuple_to_list(T)));
 unqualify(Env, [H | T]) -> [unqualify(Env, H) | unqualify(Env, T)];
@@ -545,6 +545,3 @@ unqualify1(NS, Xs) ->
 
 qid(Ann, [X]) -> {id, Ann, X};
 qid(Ann, Xs)  -> {qid, Ann, Xs}.
-
-qcon(Ann, [X]) -> {con, Ann, X};
-qcon(Ann, Xs)  -> {qcon, Ann, Xs}.

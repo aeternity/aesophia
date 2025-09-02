@@ -23,17 +23,7 @@
         when_option(pp_types, fun () -> io:format(Fmt, Args) end)).
 -define(CONSTRUCTOR_MOCK_NAME, "#__constructor__#").
 
-%% -- Name manipulation ------------------------------------------------------
 
--spec qcon(aeso_syntax:ann(), qname()) -> aeso_syntax:con() | aeso_syntax:qcon().
-qcon(Ann, [X]) -> {con, Ann, X};
-qcon(Ann, Xs)  -> {qcon, Ann, Xs}.
-
--spec set_qname(qname(), type_id()) -> type_id().
-set_qname(Xs, {id,   Ann, _}) -> aeso_type_helpers:qid(Ann, Xs);
-set_qname(Xs, {qid,  Ann, _}) -> aeso_type_helpers:qid(Ann, Xs);
-set_qname(Xs, {con,  Ann, _}) -> qcon(Ann, Xs);
-set_qname(Xs, {qcon, Ann, _}) -> qcon(Ann, Xs).
 
 %% -- The rest ---------------------------------------------------------------
 
@@ -612,7 +602,7 @@ check_type(Env, X = {Tag, _, _}, Arity) when Tag == con; Tag == qcon; Tag == id;
                         {Args, _}     -> length(Args)
                      end,
             [ type_error({wrong_type_arguments, X, Arity, Arity1}) || Arity /= Arity1 ],
-            set_qname(Q, X);
+            aeso_type_helpers:set_qname(Q, X);
         false  -> type_error({unbound_type, X}), X
     end;
 check_type(Env, Type = {tuple_t, Ann, Types}, Arity) ->
@@ -965,7 +955,7 @@ lookup_name(Env = #env{ namespace = NS, current_function = CurFn }, As, Id, Opti
                     _ when Freshen            -> freshen_type(As, Ty, [{fun_name, Id}]);
                     _                         -> Ty
                   end,
-            {set_qname(QId, Id), Ty1}
+            {aeso_type_helpers:set_qname(QId, Id), Ty1}
     end.
 
 check_stateful(#env{ in_guard = true }, Id, Type = {type_sig, _, _, _, _, _}) ->
