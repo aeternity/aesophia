@@ -137,3 +137,10 @@
     }).
 
 -type env() :: #env{}.
+
+%% -- Macros -----------------------------------------------------------------
+
+-define(is_type_id(T), element(1, T) =:= id orelse
+                       element(1, T) =:= qid orelse
+                       element(1, T) =:= con orelse
+                       element(1, T) =:= qcon).

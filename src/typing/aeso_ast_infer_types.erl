@@ -14,17 +14,10 @@
 
 -export([ infer/1
         , infer/2
-        , unfold_types_in_type/2
-        , unfold_types_in_type/3
         ]).
 
 -include("../aeso_utils.hrl").
 -include("aeso_types.hrl").
-
--define(is_type_id(T), element(1, T) =:= id orelse
-                       element(1, T) =:= qid orelse
-                       element(1, T) =:= con orelse
-                       element(1, T) =:= qcon).
 
 -define(PRINT_TYPES(Fmt, Args),
         when_option(pp_types, fun () -> io:format(Fmt, Args) end)).
@@ -684,7 +677,7 @@ check_event(_Env, _Name, _Ann, Def) -> Def.
 
 check_event_con(Env, {constr_t, Ann, Con, Args}) ->
     IsIndexed  = fun(T) ->
-                     T1 = unfold_types_in_type(Env, T),
+                     T1 = aeso_type_unfold:unfold_types_in_type(Env, T),
                      %% `indexed` is optional but if used it has to be correctly used
                      case {is_word_type(T1), is_string_type(T1), aeso_syntax:get_ann(indexed, T, false)} of
                          {true, _, _}        -> indexed;
@@ -1041,7 +1034,7 @@ is_monomorphic(_)                      -> true.
 check_state_init(Env) ->
     Top = Env#env.namespace,
     StateType = aeso_type_env:lookup_type(Env, {id, [{origin, system}], "state"}),
-    case unfold_types_in_type(Env, StateType) of
+    case aeso_type_unfold:unfold_types_in_type(Env, StateType) of
         false  ->
             ok;
         {_, {_, {_, {alias_t, {tuple_t, _, []}}}}} ->  %% type state = ()
@@ -1245,7 +1238,7 @@ infer_expr(Env, {record, Attrs, Fields}) ->
     RecordType = fresh_uvar(Attrs),
     NewFields = [{field, A, FieldName, infer_expr(Env, Expr)}
                  || {field, A, FieldName, Expr} <- Fields],
-    RecordType1 = unfold_types_in_type(Env, RecordType),
+    RecordType1 = aeso_type_unfold:unfold_types_in_type(Env, RecordType),
     add_constraint([ #record_create_constraint{
                          record_t = RecordType1,
                          fields   = [ FieldName || {field, _, [{proj, _, FieldName}], _} <- Fields ],
@@ -1268,7 +1261,7 @@ infer_expr(Env, {proj, Attrs, Record, FieldName}) ->
     NewRecord = {typed, _, _, RecordType} = infer_expr(Env, Record),
     FieldType = fresh_uvar(Attrs),
     add_constraint([#field_constraint{
-        record_t = unfold_types_in_type(Env, RecordType),
+        record_t = aeso_type_unfold:unfold_types_in_type(Env, RecordType),
         field    = FieldName,
         field_t  = FieldType,
         kind     = project,
@@ -1451,7 +1444,7 @@ check_contract_construction(Env, ForceDef, ContractT, Fun, NamedArgsT, ArgTypes,
     unify(Env, RetT, ContractT, {return_contract, Fun, ContractT}),
     add_constraint(
       [ #field_constraint{
-           record_t = unfold_types_in_type(Env, ContractT),
+           record_t = aeso_type_unfold:unfold_types_in_type(Env, ContractT),
            field    = {id, Ann, ?CONSTRUCTOR_MOCK_NAME},
            field_t  = InitT,
            kind     = project,
@@ -1510,7 +1503,7 @@ check_record_update(Env, RecordType, Fld) ->
                 {field_upd, Ann, LV, check_expr(Env, Fun, FunType)}
         end,
     add_constraint([#field_constraint{
-        record_t = unfold_types_in_type(Env, RecordType),
+        record_t = aeso_type_unfold:unfold_types_in_type(Env, RecordType),
         field    = FieldName,
         field_t  = FldType,
         kind     = update,
@@ -1780,9 +1773,9 @@ solve_constraint(Env, C = #named_argument_constraint{}) ->
 solve_constraint(_Env, {is_bytes, _, _}) -> false;
 solve_constraint(_Env, {is_fixed_bytes, _, _}) -> false;
 solve_constraint(Env, {add_bytes, Ann, Action, A0, B0, C0}) ->
-    A = unfold_types_in_type(Env, dereference(A0)),
-    B = unfold_types_in_type(Env, dereference(B0)),
-    C = unfold_types_in_type(Env, dereference(C0)),
+    A = aeso_type_unfold:unfold_types_in_type(Env, dereference(A0)),
+    B = aeso_type_unfold:unfold_types_in_type(Env, dereference(B0)),
+    C = aeso_type_unfold:unfold_types_in_type(Env, dereference(C0)),
     case {A, B, C} of
         {{bytes_t, _, M}, {bytes_t, _, N}, _} when is_integer(M), is_integer(N) ->
             unify(Env, {bytes_t, Ann, M + N}, C, {at, Ann});
@@ -1960,23 +1953,23 @@ check_bytes_constraints(Env, Constraints) ->
     [ check_bytes_constraint(Env, C) || C <- Constraints, not Skip(C) ].
 
 check_bytes_constraint(Env, {is_bytes, Ann, Type}) ->
-    Type1 = unfold_types_in_type(Env, instantiate(Type)),
+    Type1 = aeso_type_unfold:unfold_types_in_type(Env, instantiate(Type)),
     case Type1 of
         {bytes_t, _, N} when is_integer(N); N == any -> ok;
         _               ->
             type_error({unknown_byte_type, Ann, Type})
     end;
 check_bytes_constraint(Env, {is_fixed_bytes, Ann, Type}) ->
-    Type1 = unfold_types_in_type(Env, instantiate(Type)),
+    Type1 = aeso_type_unfold:unfold_types_in_type(Env, instantiate(Type)),
     case Type1 of
         {bytes_t, _, N} when is_integer(N) -> ok;
         _                                  ->
             type_error({unknown_byte_length, Ann, Type})
     end;
 check_bytes_constraint(Env, {add_bytes, Ann, Fun, A0, B0, C0}) ->
-    A = unfold_types_in_type(Env, instantiate(A0)),
-    B = unfold_types_in_type(Env, instantiate(B0)),
-    C = unfold_types_in_type(Env, instantiate(C0)),
+    A = aeso_type_unfold:unfold_types_in_type(Env, instantiate(A0)),
+    B = aeso_type_unfold:unfold_types_in_type(Env, instantiate(B0)),
+    C = aeso_type_unfold:unfold_types_in_type(Env, instantiate(C0)),
     case {A, B, C} of
         {{bytes_t, _, _M}, {bytes_t, _, _N}, {bytes_t, _, _R}} ->
             ok; %% If all are solved we checked M + N == R in solve_constraint.
@@ -1986,7 +1979,7 @@ check_bytes_constraint(Env, {add_bytes, Ann, Fun, A0, B0, C0}) ->
 check_aens_resolve_constraints(_Env, []) ->
     ok;
 check_aens_resolve_constraints(Env, [{aens_resolve_type, Type} | Rest]) ->
-    Type1 = unfold_types_in_type(Env, instantiate(Type)),
+    Type1 = aeso_type_unfold:unfold_types_in_type(Env, instantiate(Type)),
     {app_t, _, {id, _, "option"}, [Type2]} = Type1,
     case Type2 of
         {id, _, "string"} -> ok;
@@ -2001,7 +1994,7 @@ check_aens_resolve_constraints(Env, [{aens_resolve_type, Type} | Rest]) ->
 check_oracle_type_constraints(_Env, []) ->
     ok;
 check_oracle_type_constraints(Env, [{oracle_type, Ann, OType} | Rest]) ->
-    Type = unfold_types_in_type(Env, instantiate(OType)),
+    Type = aeso_type_unfold:unfold_types_in_type(Env, instantiate(OType)),
     {app_t, _, {id, _, "oracle"}, [QType, RType]} = Type,
     ensure_monomorphic(QType, {invalid_oracle_type, polymorphic,  query,    Ann, Type}),
     ensure_monomorphic(RType, {invalid_oracle_type, polymorphic,  response, Ann, Type}),
@@ -2017,7 +2010,7 @@ check_record_create_constraints(Env, [C | Cs]) ->
         record_t = Type,
         fields   = Fields,
         context  = When } = C,
-    Type1 = unfold_types_in_type(Env, instantiate(Type)),
+    Type1 = aeso_type_unfold:unfold_types_in_type(Env, instantiate(Type)),
     try aeso_type_env:lookup_type(Env, record_type_name(Type1)) of
         {_QId, {_Ann, {_Args, {record_t, RecFields}}}} ->
             ActualNames = [ Fld || {field_t, _, {id, _, Fld}, _} <- RecFields ],
@@ -2039,7 +2032,7 @@ is_contract_defined(C) ->
 check_is_contract_constraints(_Env, []) -> ok;
 check_is_contract_constraints(Env, [C | Cs]) ->
     #is_contract_constraint{ contract_t = Type, context = Cxt, force_def = ForceDef } = C,
-    Type1 = unfold_types_in_type(Env, instantiate(Type)),
+    Type1 = aeso_type_unfold:unfold_types_in_type(Env, instantiate(Type)),
     TypeName = record_type_name(Type1),
     case aeso_type_env:lookup_type(Env, TypeName) of
         {_, {_Ann, {[], {contract_t, _}}}} ->
@@ -2111,20 +2104,20 @@ unfold_record_types(Env, T) ->
 
 unfold_types(Env, {typed, Attr, E, Type}, Options) ->
     Options1 = [{ann, Attr} | lists:keydelete(ann, 1, Options)],
-    {typed, Attr, unfold_types(Env, E, Options), unfold_types_in_type(Env, Type, Options1)};
+    {typed, Attr, unfold_types(Env, E, Options), aeso_type_unfold:unfold_types_in_type(Env, Type, Options1)};
 unfold_types(Env, {arg, Attr, Id, Type}, Options) ->
-    {arg, Attr, Id, unfold_types_in_type(Env, Type, Options)};
+    {arg, Attr, Id, aeso_type_unfold:unfold_types_in_type(Env, Type, Options)};
 unfold_types(Env, {type_sig, Ann, Constr, NamedArgs, Args, Ret}, Options) ->
     {type_sig, Ann, Constr,
-               unfold_types_in_type(Env, NamedArgs, Options),
-               unfold_types_in_type(Env, Args, Options),
-               unfold_types_in_type(Env, Ret, Options)};
+               aeso_type_unfold:unfold_types_in_type(Env, NamedArgs, Options),
+               aeso_type_unfold:unfold_types_in_type(Env, Args, Options),
+               aeso_type_unfold:unfold_types_in_type(Env, Ret, Options)};
 unfold_types(Env, {type_def, Ann, Name, Args, Def}, Options) ->
-    {type_def, Ann, Name, Args, unfold_types_in_type(Env, Def, Options)};
+    {type_def, Ann, Name, Args, aeso_type_unfold:unfold_types_in_type(Env, Def, Options)};
 unfold_types(Env, {fun_decl, Ann, Name, Type}, Options) ->
     {fun_decl, Ann, Name, unfold_types(Env, Type, Options)};
 unfold_types(Env, {letfun, Ann, Name, Args, Type, [{guarded, AnnG, [], Body}]}, Options) ->
-    {letfun, Ann, Name, unfold_types(Env, Args, Options), unfold_types_in_type(Env, Type, Options), [{guarded, AnnG, [], unfold_types(Env, Body, Options)}]};
+    {letfun, Ann, Name, unfold_types(Env, Args, Options), aeso_type_unfold:unfold_types_in_type(Env, Type, Options), [{guarded, AnnG, [], unfold_types(Env, Body, Options)}]};
 unfold_types(Env, T, Options) when is_tuple(T) ->
     list_to_tuple(unfold_types(Env, tuple_to_list(T), Options));
 unfold_types(Env, [H|T], Options) ->
@@ -2132,88 +2125,6 @@ unfold_types(Env, [H|T], Options) ->
 unfold_types(_Env, X, _Options) ->
     X.
 
-unfold_types_in_type(Env, T) ->
-    unfold_types_in_type(Env, T, []).
-
-unfold_types_in_type(Env, {app_t, Ann, Id = {id, _, "map"}, Args = [KeyType0, _]}, Options) ->
-    Args1 = [KeyType, _] = unfold_types_in_type(Env, Args, Options),
-    Ann1 = proplists:get_value(ann, Options, aeso_syntax:get_ann(KeyType0)),
-    [ type_error({map_in_map_key, Ann1, KeyType0}) || has_maps(KeyType) ],
-    {app_t, Ann, Id, Args1};
-unfold_types_in_type(Env, {app_t, Ann, Id, Args}, Options) when ?is_type_id(Id) ->
-    when_warning(warn_unused_typedefs, fun() -> aeso_unused_warnings:used_typedef(Id, length(Args)) end),
-    UnfoldRecords  = proplists:get_value(unfold_record_types, Options, false),
-    UnfoldVariants = proplists:get_value(unfold_variant_types, Options, false),
-    case aeso_type_env:lookup_type(Env, Id) of
-        {_, {_, {Formals, {record_t, Fields}}}} when UnfoldRecords, length(Formals) == length(Args) ->
-            {record_t,
-             unfold_types_in_type(Env,
-               subst_tvars(lists:zip(Formals, Args), Fields), Options)};
-        {_, {_, {Formals, {alias_t, Type}}}} when length(Formals) == length(Args) ->
-            unfold_types_in_type(Env, subst_tvars(lists:zip(Formals, Args), Type), Options);
-        {_, {_, {Formals, {variant_t, Constrs}}}} when UnfoldVariants, length(Formals) == length(Args) ->
-            %% TODO: unfolding variant types will not work well if we add recursive types!
-            {variant_t,
-             unfold_types_in_type(Env,
-                subst_tvars(lists:zip(Formals, Args), Constrs), Options)};
-        _ ->
-            %% Not a record type, or ill-formed record type.
-            {app_t, Ann, Id, unfold_types_in_type(Env, Args, Options)}
-    end;
-unfold_types_in_type(Env, Id, Options) when ?is_type_id(Id) ->
-    %% Like the case above, but for types without parameters.
-    when_warning(warn_unused_typedefs, fun() -> aeso_unused_warnings:used_typedef(Id, 0) end),
-    UnfoldSysAlias = not proplists:get_value(not_unfold_system_alias_types, Options, false),
-    UnfoldRecords  = proplists:get_value(unfold_record_types, Options, false),
-    UnfoldVariants = proplists:get_value(unfold_variant_types, Options, false),
-    case aeso_type_env:lookup_type(Env, Id) of
-        {_, {_, {[], {record_t, Fields}}}} when UnfoldRecords ->
-            {record_t, unfold_types_in_type(Env, Fields, Options)};
-        {_, {_, {[], {variant_t, Constrs}}}} when UnfoldVariants ->
-            {variant_t, unfold_types_in_type(Env, Constrs, Options)};
-        {_, {_, {[], {alias_t, Type1}}}} ->
-            case aeso_syntax:get_ann(Type1) of
-                [{origin, system}] when not UnfoldSysAlias ->
-                    Id;
-                _ ->
-                    unfold_types_in_type(Env, Type1, Options)
-            end;
-        _ ->
-            %% Not a record type, or ill-formed record type
-            Id
-    end;
-unfold_types_in_type(Env, {field_t, Attr, Name, Type}, Options) ->
-    {field_t, Attr, Name, unfold_types_in_type(Env, Type, Options)};
-unfold_types_in_type(Env, {constr_t, Ann, Con, Types}, Options) ->
-    {constr_t, Ann, Con, unfold_types_in_type(Env, Types, Options)};
-unfold_types_in_type(Env, {named_arg_t, Ann, Con, Types, Default}, Options) ->
-    {named_arg_t, Ann, Con, unfold_types_in_type(Env, Types, Options), Default};
-unfold_types_in_type(Env, T, Options) when is_tuple(T) ->
-    list_to_tuple(unfold_types_in_type(Env, tuple_to_list(T), Options));
-unfold_types_in_type(Env, [H|T], Options) ->
-    [unfold_types_in_type(Env, H, Options)|unfold_types_in_type(Env, T, Options)];
-unfold_types_in_type(_Env, X, _Options) ->
-    X.
-
-has_maps({app_t, _, {id, _, "map"}, _}) ->
-    true;
-has_maps(L) when is_list(L) ->
-    lists:any(fun has_maps/1, L);
-has_maps(T) when is_tuple(T) ->
-    has_maps(tuple_to_list(T));
-has_maps(_) -> false.
-
-subst_tvars(Env, Type) ->
-    subst_tvars1([{V, T} || {{tvar, _, V}, T} <- Env], Type).
-
-subst_tvars1(Env, T={tvar, _, Name}) ->
-    proplists:get_value(Name, Env, T);
-subst_tvars1(Env, [H|T]) ->
-    [subst_tvars1(Env, H)|subst_tvars1(Env, T)];
-subst_tvars1(Env, Type) when is_tuple(Type) ->
-    list_to_tuple(subst_tvars1(Env, tuple_to_list(Type)));
-subst_tvars1(_Env, X) ->
-    X.
 
 %% Unification
 
@@ -2227,8 +2138,8 @@ unify0(Env, A, B, Variance, When) ->
             {check_expr, E, _, _} -> [{ann, aeso_syntax:get_ann(E)}];
             _                     -> []
         end,
-    A1 = dereference(unfold_types_in_type(Env, A, Options)),
-    B1 = dereference(unfold_types_in_type(Env, B, Options)),
+    A1 = dereference(aeso_type_unfold:unfold_types_in_type(Env, A, Options)),
+    B1 = dereference(aeso_type_unfold:unfold_types_in_type(Env, B, Options)),
     unify1(Env, A1, B1, Variance, When).
 
 %% Delegate simple functions to aeso_type_unify module

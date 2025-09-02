@@ -231,7 +231,7 @@ decode_value(Contract0, Type, FateValue, Options) ->
             #{ folded_typed_ast := TypedAst
              , type_env         := TypeEnv} = Code,
             {ok, _, Type0} = get_decode_type(CallName, TypedAst),
-            Type1 = aeso_ast_infer_types:unfold_types_in_type(TypeEnv, Type0,
+            Type1 = aeso_type_unfold:unfold_types_in_type(TypeEnv, Type0,
                                                               [ unfold_record_types
                                                               , unfold_variant_types
                                                               , not_unfold_system_alias_types ]),
@@ -316,7 +316,7 @@ to_sophia_value(ContractString, FunName, ok, Data, Options0) ->
         Code = string_to_code(ContractString, Options),
         #{ folded_typed_ast := TypedAst, type_env := TypeEnv} = Code,
         {ok, _, Type0} = get_decode_type(FunName, TypedAst),
-        Type = aeso_ast_infer_types:unfold_types_in_type(TypeEnv, Type0,
+        Type = aeso_type_unfold:unfold_types_in_type(TypeEnv, Type0,
                                                          [ unfold_record_types
                                                          , unfold_variant_types
                                                          , not_unfold_system_alias_types]),
@@ -373,7 +373,7 @@ decode_calldata(ContractString, FunName, Calldata, Options0) ->
         ArgTypes      = lists:map(GetType, Args),
         Type0         = {tuple_t, [], ArgTypes},
         %% user defined data types such as variants needed to match against
-        Type          = aeso_ast_infer_types:unfold_types_in_type(TypeEnv, Type0,
+        Type          = aeso_type_unfold:unfold_types_in_type(TypeEnv, Type0,
                                                                   [ unfold_record_types
                                                                   , unfold_variant_types
                                                                   , not_unfold_system_alias_types]),
