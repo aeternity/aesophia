@@ -412,7 +412,7 @@ lookup_env(Env, Kind, Ann, Name) ->
             case [ Res || QName <- Names, Res <- [lookup_env1(Env, Kind, Ann, QName)], Res /= false] of
                 []    -> false;
                 [Res = {_, {AnnR, _}}] ->
-                    aeso_unused_warnings:when_warning(warn_unused_includes,
+                    aeso_type_warnings:when_warning(warn_unused_includes,
                                  fun() ->
                                          %% If a file is used from a different file, we
                                          %% can then mark it as used
@@ -420,7 +420,7 @@ lookup_env(Env, Kind, Ann, Name) ->
                                          F2 = proplists:get_value(file, AnnR, no_file),
                                          if
                                              F1 /= F2 ->
-                                                 aeso_unused_warnings:used_include(AnnR);
+                                                 aeso_type_warnings:used_include(AnnR);
                                              true ->
                                                  ok
                                          end
@@ -542,7 +542,7 @@ on_scopes(Env = #env{ scopes = Scopes }, Fun) ->
 
 -spec bind_var(aeso_syntax:id(), utype(), env()) -> env().
 bind_var({id, Ann, X}, T, Env) ->
-    aeso_unused_warnings:when_warning(warn_shadowing, fun() -> aeso_unused_warnings:warn_potential_shadowing(Env, Ann, X) end),
+    aeso_type_warnings:when_warning(warn_shadowing, fun() -> aeso_type_warnings:warn_potential_shadowing(Env, Ann, X) end),
     Env#env{ vars = [{X, {Ann, T}} | Env#env.vars] }.
 
 -spec bind_vars([{aeso_syntax:id(), utype()}], env()) -> env().

@@ -70,13 +70,13 @@ infer(Contracts, Options) ->
         aeso_infer_ets:insert(type_vars_variance, {"oracle", [contravariant, covariant]}),
         aeso_infer_ets:insert(type_vars_variance, {"oracle_query", [covariant, covariant]}),
 
-        when_warning(warn_unused_functions, fun() -> aeso_unused_warnings:create_unused_functions() end),
+        when_warning(warn_unused_functions, fun() -> aeso_type_warnings:create_unused_functions() end),
         check_modifiers(Env, Contracts),
         create_type_errors(),
         Contracts1 = identify_main_contract(Contracts, Options),
         destroy_and_report_type_errors(Env),
         {Env1, Decls} = infer1(Env, Contracts1, [], Options),
-        when_warning(warn_unused_functions, fun() -> aeso_unused_warnings:destroy_and_report_unused_functions() end),
+        when_warning(warn_unused_functions, fun() -> aeso_type_warnings:destroy_and_report_unused_functions() end),
         when_option(warn_error, fun() -> destroy_and_report_warnings_as_type_errors() end),
         {Env2, DeclsFolded, DeclsUnfolded} =
             case proplists:get_value(dont_unfold, Options, false) of
@@ -127,7 +127,7 @@ infer1(Env, [{namespace, Ann, Name, Code} | Rest], Acc, Options) ->
     when_warning(warn_unused_includes,
                  fun() ->
                      SrcFile = proplists:get_value(src_file, Options, no_file),
-                     aeso_unused_warnings:potential_unused_include(Ann, SrcFile)
+                     aeso_type_warnings:potential_unused_include(Ann, SrcFile)
                  end),
     check_scope_name_clash(Env, namespace, Name),
     {Env1, Code1} = infer_contract_top(aeso_type_env:push_scope(namespace, Name, Env), namespace, Code, Options),
@@ -265,7 +265,7 @@ infer_contract(Env0, What, Defs0, Options) ->
     OldUsedNamespaces = Env#env.used_namespaces,
     Env01 = check_usings(Env, Get(using, Defs)),
     {Env1, TypeDefs} = check_typedefs(Env01, Get(type, Defs)),
-    when_warning(warn_unused_typedefs, fun() -> aeso_unused_warnings:potential_unused_typedefs(Env#env.namespace, TypeDefs) end),
+    when_warning(warn_unused_typedefs, fun() -> aeso_type_warnings:potential_unused_typedefs(Env#env.namespace, TypeDefs) end),
     create_type_errors(),
     check_unexpected(Get(unexpected, Defs)),
     Env2 =
@@ -455,7 +455,7 @@ check_constants(Env = #env{ what = What }, Consts) ->
     {Valid, Invalid} = lists:partition(HasValidId, Consts),
     [ type_error({invalid_const_id, aeso_syntax:get_ann(Pat)}) || {letval, _, Pat, _} <- Invalid ],
     [ type_error({illegal_const_in_interface, Ann}) || {letval, Ann, _, _} <- Valid, What == contract_interface ],
-    when_warning(warn_unused_constants, fun() -> aeso_unused_warnings:potential_unused_constants(Env, Valid) end),
+    when_warning(warn_unused_constants, fun() -> aeso_type_warnings:potential_unused_constants(Env, Valid) end),
     ConstMap = maps:from_list([ {aeso_type_helpers:name(Id), Const} || Const = {letval, _, Id, _} <- Valid ]),
     DepGraph = maps:map(fun(_, Const) -> aeso_syntax_utils:used_ids(Const) end, ConstMap),
     SCCs = aeso_utils:scc(DepGraph),
@@ -841,9 +841,9 @@ infer_letrec(Env, Defs) ->
     {TypeSigs, NewDefs}.
 
 infer_letfun(Env = #env{ namespace = Namespace }, {fun_clauses, Ann, Fun = {id, _, Name}, Type, Clauses}) ->
-    when_warning(warn_unused_stateful, fun() -> aeso_unused_warnings:potential_unused_stateful(Ann, Fun) end),
+    when_warning(warn_unused_stateful, fun() -> aeso_type_warnings:potential_unused_stateful(Ann, Fun) end),
     when_warning(warn_unused_functions,
-                 fun() -> aeso_unused_warnings:potential_unused_function(Env, Ann, Namespace ++ aeso_type_helpers:qname(Fun), Fun) end),
+                 fun() -> aeso_type_warnings:potential_unused_function(Env, Ann, Namespace ++ aeso_type_helpers:qname(Fun), Fun) end),
     Type1 = check_type(Env, Type),
     {NameSigs, Clauses1} = lists:unzip([ infer_letfun1(Env, Clause) || Clause <- Clauses ]),
     {_, Sigs = [Sig | _]} = lists:unzip(NameSigs),
@@ -853,8 +853,8 @@ infer_letfun(Env = #env{ namespace = Namespace }, {fun_clauses, Ann, Fun = {id, 
           end || ClauseSig <- Sigs ],
     {{Name, Sig}, desugar_clauses(Ann, Fun, Sig, Clauses1)};
 infer_letfun(Env = #env{ namespace = Namespace }, LetFun = {letfun, Ann, Fun, _, _, _}) ->
-    when_warning(warn_unused_stateful, fun() -> aeso_unused_warnings:potential_unused_stateful(Ann, Fun) end),
-    when_warning(warn_unused_functions, fun() -> aeso_unused_warnings:potential_unused_function(Env, Ann, Namespace ++ aeso_type_helpers:qname(Fun), Fun) end),
+    when_warning(warn_unused_stateful, fun() -> aeso_type_warnings:potential_unused_stateful(Ann, Fun) end),
+    when_warning(warn_unused_functions, fun() -> aeso_type_warnings:potential_unused_function(Env, Ann, Namespace ++ aeso_type_helpers:qname(Fun), Fun) end),
     {{Name, Sig}, Clause} = infer_letfun1(Env, LetFun),
     {{Name, Sig}, desugar_clauses(Ann, Fun, Sig, [Clause])}.
 
@@ -862,7 +862,7 @@ infer_letfun1(Env0 = #env{ namespace = NS }, {letfun, Attrib, Fun = {id, NameAtt
     Env = Env0#env{ stateful = aeso_syntax:get_ann(stateful, Attrib, false),
                     current_function = Fun },
     {NewEnv, {typed, _, {tuple, _, TypedArgs}, {tuple_t, _, ArgTypes}}} = infer_pattern(Env, {tuple, [{origin, system} | NameAttrib], Args}),
-    when_warning(warn_unused_variables, fun() -> aeso_unused_warnings:potential_unused_variables(NS, Name, free_vars(Args)) end),
+    when_warning(warn_unused_variables, fun() -> aeso_type_warnings:potential_unused_variables(NS, Name, free_vars(Args)) end),
     ExpectedType = check_type(Env, arg_type(NameAttrib, What)),
     InferGuardedBodies = fun({guarded, Ann, Guards, Body}) ->
         NewGuards = lists:map(fun(Guard) ->
@@ -950,13 +950,13 @@ lookup_name(Env = #env{ namespace = NS, current_function = CurFn }, As, Id, Opti
             [ begin
                 when_warning(
                     warn_unused_variables,
-                    fun() -> aeso_unused_warnings:used_variable(NS, aeso_type_helpers:name(CurFn), QId) end),
+                    fun() -> aeso_type_warnings:used_variable(NS, aeso_type_helpers:name(CurFn), QId) end),
                 when_warning(
                     warn_unused_functions,
-                    fun() -> aeso_unused_warnings:register_function_call(NS ++ aeso_type_helpers:qname(CurFn), QId) end)
+                    fun() -> aeso_type_warnings:register_function_call(NS ++ aeso_type_helpers:qname(CurFn), QId) end)
               end || CurFn =/= none ],
 
-            when_warning(warn_unused_constants, fun() -> aeso_unused_warnings:used_constant(NS, QId) end),
+            when_warning(warn_unused_constants, fun() -> aeso_type_warnings:used_constant(NS, QId) end),
 
             Freshen = proplists:get_value(freshen, Options, false),
             check_stateful(Env, Id, Ty),
@@ -981,7 +981,7 @@ check_stateful(#env{ stateful = false, current_function = Fun }, Id, Type = {typ
             type_error({stateful_not_allowed, Id, Fun})
     end;
 check_stateful(#env { current_function = Fun }, _Id, _Type) ->
-    when_warning(warn_unused_stateful, fun() -> aeso_unused_warnings:used_stateful(Fun) end),
+    when_warning(warn_unused_stateful, fun() -> aeso_type_warnings:used_stateful(Fun) end),
     ok.
 
 %% Hack: don't allow passing the 'value' named arg if not stateful. This only
@@ -991,7 +991,7 @@ check_stateful_named_arg(#env{ stateful = Stateful, current_function = Fun }, {i
         {int, _, 0} -> ok;
         _           ->
             case Stateful of
-                true  -> when_warning(warn_unused_stateful, fun() -> aeso_unused_warnings:used_stateful(Fun) end);
+                true  -> when_warning(warn_unused_stateful, fun() -> aeso_type_warnings:used_stateful(Fun) end);
                 false -> type_error({value_arg_not_allowed, Default, Fun})
             end
     end;
@@ -1204,7 +1204,7 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
             GeneralResultType = fresh_uvar(Ann),
             ResultType = fresh_uvar(Ann),
             unify(Env, FunType, {fun_t, [], NamedArgsVar, ArgTypes, GeneralResultType}, When),
-            when_warning(warn_negative_spend, fun() -> aeso_unused_warnings:warn_potential_negative_spend(Ann, NewFun1, NewArgs) end),
+            when_warning(warn_negative_spend, fun() -> aeso_type_warnings:warn_potential_negative_spend(Ann, NewFun1, NewArgs) end),
             [ add_constraint({aens_resolve_type, GeneralResultType})
               || element(3, FunName) =:= ["AENSv2", "resolve"] ],
             [ add_constraint({oracle_type, Ann, OType})
@@ -1511,7 +1511,7 @@ infer_op(Env, As, Op, Args, InferOp) ->
     ArgTypes = [T || {typed, _, _, T} <- TypedArgs],
     Inferred = {fun_t, _, _, OperandTypes, ResultType} = InferOp(Op),
     unify(Env, ArgTypes, OperandTypes, {infer_app, Op, [], Args, Inferred, ArgTypes}),
-    when_warning(warn_division_by_zero, fun() -> aeso_unused_warnings:warn_potential_division_by_zero(As, Op, Args) end),
+    when_warning(warn_division_by_zero, fun() -> aeso_type_warnings:warn_potential_division_by_zero(As, Op, Args) end),
     {typed, As, {app, As, Op, TypedArgs}, ResultType}.
 
 infer_pattern(Env, Pattern) ->
@@ -1530,7 +1530,7 @@ infer_case(Env = #env{ namespace = NS, current_function = FunId }, Attrs, Patter
 
     %% Make sure we are inside a function before warning about potentially unused var
     [ when_warning(warn_unused_variables,
-                   fun() -> aeso_unused_warnings:potential_unused_variables(NS, Fun, free_vars(Pattern)) end)
+                   fun() -> aeso_type_warnings:potential_unused_variables(NS, Fun, free_vars(Pattern)) end)
       || {id, _, Fun} <- [FunId] ],
 
     InferGuardedBranches = fun({guarded, Ann, Guards, Branch}) ->
@@ -1563,7 +1563,7 @@ infer_block(Env, Attrs, [Using = {using, _, _, _, _} | Rest], BlockType) ->
     infer_block(check_usings(Env, Using), Attrs, Rest, BlockType);
 infer_block(Env, Attrs, [E|Rest], BlockType) ->
     NewE = infer_expr(Env, E),
-    when_warning(warn_unused_return_value, fun() -> aeso_unused_warnings:potential_unused_return_value(NewE) end),
+    when_warning(warn_unused_return_value, fun() -> aeso_type_warnings:potential_unused_return_value(NewE) end),
     [NewE|infer_block(Env, Attrs, Rest, BlockType)].
 
 infer_const(Env, {letval, Ann, TypedId = {typed, _, Id = {id, _, _}, Type}, Expr}) ->
@@ -2199,7 +2199,7 @@ apply_typesig_constraint(Ann, bytecode_hash, {fun_t, _, _, [Con], _}) ->
 %% Warnings
 
 when_warning(Warn, Do) ->
-    aeso_unused_warnings:when_warning(Warn, Do).
+    aeso_type_warnings:when_warning(Warn, Do).
 
 
 

@@ -27,7 +27,7 @@ unfold_types_in_type(Env, {app_t, Ann, Id = {id, _, "map"}, Args = [KeyType0, _]
     [ aeso_type_errors:type_error({map_in_map_key, Ann1, KeyType0}) || has_maps(KeyType) ],
     {app_t, Ann, Id, Args1};
 unfold_types_in_type(Env, {app_t, Ann, Id, Args}, Options) when ?is_type_id(Id) ->
-    aeso_unused_warnings:when_warning(warn_unused_typedefs, fun() -> aeso_unused_warnings:used_typedef(Id, length(Args)) end),
+    aeso_type_warnings:when_warning(warn_unused_typedefs, fun() -> aeso_type_warnings:used_typedef(Id, length(Args)) end),
     UnfoldRecords  = proplists:get_value(unfold_record_types, Options, false),
     UnfoldVariants = proplists:get_value(unfold_variant_types, Options, false),
     case aeso_type_env:lookup_type(Env, Id) of
@@ -48,7 +48,7 @@ unfold_types_in_type(Env, {app_t, Ann, Id, Args}, Options) when ?is_type_id(Id) 
     end;
 unfold_types_in_type(Env, Id, Options) when ?is_type_id(Id) ->
     %% Like the case above, but for types without parameters.
-    aeso_unused_warnings:when_warning(warn_unused_typedefs, fun() -> aeso_unused_warnings:used_typedef(Id, 0) end),
+    aeso_type_warnings:when_warning(warn_unused_typedefs, fun() -> aeso_type_warnings:used_typedef(Id, 0) end),
     UnfoldSysAlias = not proplists:get_value(not_unfold_system_alias_types, Options, false),
     UnfoldRecords  = proplists:get_value(unfold_record_types, Options, false),
     UnfoldVariants = proplists:get_value(unfold_variant_types, Options, false),
