@@ -74,7 +74,7 @@ infer(Contracts, Options) ->
                 false -> E = aeso_type_env:on_scopes(Env1, fun(Scope) -> aeso_type_unfold:unfold_record_types(Env1, Scope) end),
                          {E, Decls, aeso_type_unfold:unfold_record_types(E, Decls)}
             end,
-        WarningsUnsorted = lists:map(fun aeso_type_warnings:mk_warning/1, aeso_type_ets:tab2list(warnings)),
+        WarningsUnsorted = lists:map(fun aeso_type_fmt_warnings:mk_warning/1, aeso_type_ets:tab2list(warnings)),
         Warnings = aeso_warnings:sort_warnings(WarningsUnsorted),
         case proplists:get_value(return_env, Options, false) of
             false -> {DeclsFolded, DeclsUnfolded, Warnings};
@@ -1710,18 +1710,42 @@ when_warning(Warn, Do) ->
 
 
 
-%% Delegation wrappers to aeso_type_errors
 create_type_errors() ->
-    aeso_type_errors:create_type_errors().
+    aeso_type_ets:new(type_errors, [bag]).
 
 type_error(Err) ->
     aeso_type_helpers:type_error(Err).
 
 destroy_and_report_type_errors(Env) ->
-    aeso_type_errors:destroy_and_report_type_errors(Env).
+    Errors0 = lists:reverse(aeso_type_ets:tab2list(type_errors)),
+    aeso_type_ets:delete(type_errors),
+    Errors  = [ aeso_type_fmt_errors:mk_error(unqualify(Env, Err)) || Err <- Errors0 ],
+    aeso_errors:throw(Errors).  %% No-op if Errors == []
+
+%% Helper functions for error processing (moved from aeso_type_fmt_errors)
+
+%% Strip current namespace from error message for nicer printing.
+unqualify(#env{ namespace = NS }, {qid, Ann, Xs}) ->
+    qid(Ann, unqualify1(NS, Xs));
+unqualify(#env{ namespace = NS }, {qcon, Ann, Xs}) ->
+    aeso_type_helpers:qcon(Ann, unqualify1(NS, Xs));
+unqualify(Env, T) when is_tuple(T) ->
+    list_to_tuple(unqualify(Env, tuple_to_list(T)));
+unqualify(Env, [H | T]) -> [unqualify(Env, H) | unqualify(Env, T)];
+unqualify(_Env, X) -> X.
+
+unqualify1(NS, Xs) ->
+    try lists:split(length(NS), Xs) of
+        {NS, Ys} -> Ys;
+        _        -> Xs
+    catch _:_ -> Xs
+    end.
+
+qid(Ann, [X]) -> {id, Ann, X};
+qid(Ann, Xs)  -> {qid, Ann, Xs}.
 
 destroy_and_report_warnings_as_type_errors() ->
-    Warnings = [ aeso_type_warnings:mk_warning(Warn) || Warn <- aeso_type_ets:tab2list(warnings) ],
+    Warnings = [ aeso_type_fmt_warnings:mk_warning(Warn) || Warn <- aeso_type_ets:tab2list(warnings) ],
     Errors = lists:map(fun mk_t_err_from_warn/1, Warnings),
     aeso_errors:throw(Errors).  %% No-op if Warnings == []
 

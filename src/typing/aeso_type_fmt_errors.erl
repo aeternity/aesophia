@@ -7,9 +7,9 @@
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(aeso_type_errors).
+-module(aeso_type_fmt_errors).
 
--export([mk_error/1, create_type_errors/0, destroy_and_report_type_errors/1]).
+-export([mk_error/1]).
 
 -include("../aeso_utils.hrl").
 -include("aeso_types.hrl").
@@ -511,34 +511,4 @@ mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),
     mk_t_err(pos(0, 0), Msg).
 
-%% Type error management functions
-create_type_errors() ->
-    aeso_type_ets:new(type_errors, [bag]).
 
-destroy_and_report_type_errors(Env) ->
-    Errors0 = lists:reverse(aeso_type_ets:tab2list(type_errors)),
-    aeso_type_ets:delete(type_errors),
-    Errors  = [ mk_error(unqualify(Env, Err)) || Err <- Errors0 ],
-    aeso_errors:throw(Errors).  %% No-op if Errors == []
-
-%% Helper functions for error processing
-
-%% Strip current namespace from error message for nicer printing.
-unqualify(#env{ namespace = NS }, {qid, Ann, Xs}) ->
-    qid(Ann, unqualify1(NS, Xs));
-unqualify(#env{ namespace = NS }, {qcon, Ann, Xs}) ->
-    aeso_type_helpers:qcon(Ann, unqualify1(NS, Xs));
-unqualify(Env, T) when is_tuple(T) ->
-    list_to_tuple(unqualify(Env, tuple_to_list(T)));
-unqualify(Env, [H | T]) -> [unqualify(Env, H) | unqualify(Env, T)];
-unqualify(_Env, X) -> X.
-
-unqualify1(NS, Xs) ->
-    try lists:split(length(NS), Xs) of
-        {NS, Ys} -> Ys;
-        _        -> Xs
-    catch _:_ -> Xs
-    end.
-
-qid(Ann, [X]) -> {id, Ann, X};
-qid(Ann, Xs)  -> {qid, Ann, Xs}.
