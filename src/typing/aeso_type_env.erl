@@ -427,7 +427,7 @@ lookup_env(Env, Kind, Ann, Name) ->
                                  end),
                     Res;
                 Many  ->
-                    aeso_type_errors:type_error({ambiguous_name, aeso_type_helpers:qid(Ann, Name), [{qid, A, Q} || {Q, {A, _}} <- Many]}),
+                    aeso_type_helpers:type_error({ambiguous_name, aeso_type_helpers:qid(Ann, Name), [{qid, A, Q} || {Q, {A, _}} <- Many]}),
                     false
             end
     end.
@@ -455,16 +455,16 @@ lookup_env1(#env{ namespace = Current, used_namespaces = UsedNamespaces, scopes 
                         Const when AllowPrivate; ScopeKind == namespace ->
                             {QName, Const};
                         Const ->
-                            aeso_type_errors:type_error({contract_treated_as_namespace_constant, Ann, QName}),
+                            aeso_type_helpers:type_error({contract_treated_as_namespace_constant, Ann, QName}),
                             {QName, Const}
                     end;
                 {reserved_init, Ann1, Type} ->
-                    aeso_type_errors:type_error({cannot_call_init_function, Ann}),
+                    aeso_type_helpers:type_error({cannot_call_init_function, Ann}),
                     {QName, {Ann1, Type}};  %% Return the type to avoid an extra not-in-scope error
                 {contract_fun, Ann1, Type} when AllowPrivate orelse QNameIsEvent ->
                     {QName, {Ann1, Type}};
                 {contract_fun, Ann1, Type} ->
-                    aeso_type_errors:type_error({contract_treated_as_namespace_entrypoint, Ann, QName}),
+                    aeso_type_helpers:type_error({contract_treated_as_namespace_entrypoint, Ann, QName}),
                     {QName, {Ann1, Type}};
                 {Ann1, _} = E ->
                     %% Check that it's not private (or we can see private funs)
@@ -558,7 +558,7 @@ bind_tvars(Xs, Env) ->
 check_tvar(#env{ typevars = TVars}, T = {tvar, _, X}) ->
     case TVars == unrestricted orelse lists:member(X, TVars) of
         true  -> ok;
-        false -> aeso_type_errors:type_error({unbound_type, T})
+        false -> aeso_type_helpers:type_error({unbound_type, T})
     end,
     T.
 
@@ -567,7 +567,7 @@ bind_fun(X, Type, Env) ->
     case lookup_env(Env, term, [], [X]) of
         false -> force_bind_fun(X, Type, Env);
         {_QId, {Ann1, _}} ->
-            aeso_type_errors:type_error({duplicate_definition, X, [Ann1, aeso_syntax:get_ann(Type)]}),
+            aeso_type_helpers:type_error({duplicate_definition, X, [Ann1, aeso_syntax:get_ann(Type)]}),
             Env
     end.
 
@@ -613,7 +613,7 @@ bind_const(X, Ann, Type, Env) ->
                                     Scope#scope{ consts = [{X, {Ann, Type}} | Consts] }
                                 end);
         _ ->
-            aeso_type_errors:type_error({duplicate_definition, X, [Ann, aeso_syntax:get_ann(Type)]}),
+            aeso_type_helpers:type_error({duplicate_definition, X, [Ann, aeso_syntax:get_ann(Type)]}),
             Env
     end.
 

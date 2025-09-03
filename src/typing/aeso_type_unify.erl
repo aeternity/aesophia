@@ -135,7 +135,7 @@ unify0(Env, A, B, Variance, When) ->
 unify1(_Env, {uvar, _, R}, {uvar, _, R}, _Variance, _When) ->
     true;
 unify1(_Env, {uvar, _, _}, {fun_t, _, _, var_args, _}, _Variance, When) ->
-    aeso_type_errors:type_error({unify_varargs, When}),
+    aeso_type_helpers:type_error({unify_varargs, When}),
     false;
 unify1(_Env, {uvar, A, R}, T, _Variance, When) ->
     case occurs_check(R, T) of
@@ -187,10 +187,10 @@ unify1(Env, {if_t, _, {id, _, Id}, Then1, Else1}, {if_t, _, {id, _, Id}, Then2, 
     unify0(Env, Else1, Else2, Variance, When);
 
 unify1(_Env, {fun_t, _, _, _, _}, {fun_t, _, _, var_args, _}, _Variance, When) ->
-    aeso_type_errors:type_error({unify_varargs, When}),
+    aeso_type_helpers:type_error({unify_varargs, When}),
     false;
 unify1(_Env, {fun_t, _, _, var_args, _}, {fun_t, _, _, _, _}, _Variance, When) ->
-    aeso_type_errors:type_error({unify_varargs, When}),
+    aeso_type_helpers:type_error({unify_varargs, When}),
     false;
 unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, Variance, When)
   when length(Args1) == length(Args2) ->
@@ -268,4 +268,4 @@ opposite_variance(bivariant) -> bivariant.
 
 %% Save unification failures for error messages.
 cannot_unify(A, B, Cxt, When) ->
-    aeso_type_errors:type_error({cannot_unify, A, B, Cxt, When}).
+    aeso_type_helpers:type_error({cannot_unify, A, B, Cxt, When}).

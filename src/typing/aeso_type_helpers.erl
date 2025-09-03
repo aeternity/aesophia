@@ -14,6 +14,7 @@
         , qid/2
         , qname/1
         , set_qname/2
+        , type_error/1
         , typesig_to_fun_t/1
         ]).
 
@@ -58,3 +59,9 @@ set_qname(Xs, {qcon, Ann, _}) -> qcon(Ann, Xs).
 
 fun_arity({fun_t, _, _, Args, _}) -> length(Args);
 fun_arity(_)                      -> none.
+
+%% -- Error management -------------------------------------------------------
+
+-spec type_error(term()) -> true.
+type_error(Err) ->
+    aeso_type_ets:insert(type_errors, Err).

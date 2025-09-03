@@ -2198,7 +2198,7 @@ create_type_errors() ->
     aeso_type_errors:create_type_errors().
 
 type_error(Err) ->
-    aeso_type_errors:type_error(Err).
+    aeso_type_helpers:type_error(Err).
 
 destroy_and_report_type_errors(Env) ->
     aeso_type_errors:destroy_and_report_type_errors(Env).

@@ -242,7 +242,7 @@ when_warning(Warn, Do) ->
     case lists:member(Warn, all_warnings()) of
         false ->
             aeso_type_errors:create_type_errors(),
-            aeso_type_errors:type_error({unknown_warning, Warn}),
+            aeso_type_helpers:type_error({unknown_warning, Warn}),
             aeso_type_errors:destroy_and_report_type_errors(aeso_type_env:global_env());
         true ->
             case aeso_type_ets:tab_exists(warnings) of

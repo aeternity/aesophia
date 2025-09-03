@@ -9,7 +9,7 @@
 
 -module(aeso_type_errors).
 
--export([mk_error/1, create_type_errors/0, type_error/1, destroy_and_report_type_errors/1]).
+-export([mk_error/1, create_type_errors/0, destroy_and_report_type_errors/1]).
 
 -include("../aeso_utils.hrl").
 -include("aeso_types.hrl").
@@ -514,9 +514,6 @@ mk_error(Err) ->
 %% Type error management functions
 create_type_errors() ->
     aeso_type_ets:new(type_errors, [bag]).
-
-type_error(Err) ->
-    aeso_type_ets:insert(type_errors, Err).
 
 destroy_and_report_type_errors(Env) ->
     Errors0 = lists:reverse(aeso_type_ets:tab2list(type_errors)),

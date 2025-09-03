@@ -24,7 +24,7 @@ unfold_types_in_type(Env, T) ->
 unfold_types_in_type(Env, {app_t, Ann, Id = {id, _, "map"}, Args = [KeyType0, _]}, Options) ->
     Args1 = [KeyType, _] = unfold_types_in_type(Env, Args, Options),
     Ann1 = proplists:get_value(ann, Options, aeso_syntax:get_ann(KeyType0)),
-    [ aeso_type_errors:type_error({map_in_map_key, Ann1, KeyType0}) || has_maps(KeyType) ],
+    [ aeso_type_helpers:type_error({map_in_map_key, Ann1, KeyType0}) || has_maps(KeyType) ],
     {app_t, Ann, Id, Args1};
 unfold_types_in_type(Env, {app_t, Ann, Id, Args}, Options) when ?is_type_id(Id) ->
     aeso_type_warnings:when_warning(warn_unused_typedefs, fun() -> aeso_type_warnings:used_typedef(Id, length(Args)) end),
