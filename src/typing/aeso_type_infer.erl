@@ -71,8 +71,8 @@ infer(Contracts, Options) ->
         {Env2, DeclsFolded, DeclsUnfolded} =
             case proplists:get_value(dont_unfold, Options, false) of
                 true  -> {Env1, Decls, Decls};
-                false -> E = aeso_type_env:on_scopes(Env1, fun(Scope) -> unfold_record_types(Env1, Scope) end),
-                         {E, Decls, unfold_record_types(E, Decls)}
+                false -> E = aeso_type_env:on_scopes(Env1, fun(Scope) -> aeso_type_unfold:unfold_record_types(Env1, Scope) end),
+                         {E, Decls, aeso_type_unfold:unfold_record_types(E, Decls)}
             end,
         WarningsUnsorted = lists:map(fun aeso_type_warnings:mk_warning/1, aeso_type_ets:tab2list(warnings)),
         Warnings = aeso_warnings:sort_warnings(WarningsUnsorted),
@@ -2081,35 +2081,7 @@ solve_for_uvar(Env, UVar = {uvar, Attrs, _}, Fields0) ->
             {ambiguous_record, Fields, StillPossible}
     end.
 
-%% During type inference, record types are represented by their
-%% names. But, before we pass the typed program to the code generator,
-%% we replace record types annotating expressions with their
-%% definition. This enables the code generator to see the fields.
-unfold_record_types(Env, T) ->
-    unfold_types(Env, T, [unfold_record_types]).
 
-unfold_types(Env, {typed, Attr, E, Type}, Options) ->
-    Options1 = [{ann, Attr} | lists:keydelete(ann, 1, Options)],
-    {typed, Attr, unfold_types(Env, E, Options), aeso_type_unfold:unfold_types_in_type(Env, Type, Options1)};
-unfold_types(Env, {arg, Attr, Id, Type}, Options) ->
-    {arg, Attr, Id, aeso_type_unfold:unfold_types_in_type(Env, Type, Options)};
-unfold_types(Env, {type_sig, Ann, Constr, NamedArgs, Args, Ret}, Options) ->
-    {type_sig, Ann, Constr,
-               aeso_type_unfold:unfold_types_in_type(Env, NamedArgs, Options),
-               aeso_type_unfold:unfold_types_in_type(Env, Args, Options),
-               aeso_type_unfold:unfold_types_in_type(Env, Ret, Options)};
-unfold_types(Env, {type_def, Ann, Name, Args, Def}, Options) ->
-    {type_def, Ann, Name, Args, aeso_type_unfold:unfold_types_in_type(Env, Def, Options)};
-unfold_types(Env, {fun_decl, Ann, Name, Type}, Options) ->
-    {fun_decl, Ann, Name, unfold_types(Env, Type, Options)};
-unfold_types(Env, {letfun, Ann, Name, Args, Type, [{guarded, AnnG, [], Body}]}, Options) ->
-    {letfun, Ann, Name, unfold_types(Env, Args, Options), aeso_type_unfold:unfold_types_in_type(Env, Type, Options), [{guarded, AnnG, [], unfold_types(Env, Body, Options)}]};
-unfold_types(Env, T, Options) when is_tuple(T) ->
-    list_to_tuple(unfold_types(Env, tuple_to_list(T), Options));
-unfold_types(Env, [H|T], Options) ->
-    [unfold_types(Env, H, Options)|unfold_types(Env, T, Options)];
-unfold_types(_Env, X, _Options) ->
-    X.
 
 
 %% Unification - delegate to aeso_type_unify module
