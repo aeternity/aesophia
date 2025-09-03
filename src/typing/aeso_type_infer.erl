@@ -430,7 +430,7 @@ infer_type_vars_variance({tvar, _, TVar}) -> [{TVar, covariant}];
 infer_type_vars_variance({fun_t, _, [], Args, Res}) ->
     ArgsVariance = infer_type_vars_variance(Args),
     ResVariance = infer_type_vars_variance(Res),
-    FlippedArgsVariance = lists:map(fun({TVar, Variance}) -> {TVar, aeso_type_unify:opposite_variance(Variance)} end, ArgsVariance),
+    FlippedArgsVariance = lists:map(fun({TVar, Variance}) -> {TVar, aeso_type_helpers:opposite_variance(Variance)} end, ArgsVariance),
     FlippedArgsVariance ++ ResVariance;
 infer_type_vars_variance(_) -> [].
 
@@ -2087,11 +2087,11 @@ solve_for_uvar(Env, UVar = {uvar, Attrs, _}, Fields0) ->
 %% Unification - delegate to aeso_type_unify module
 
 unify(Env, A, B, When) -> aeso_type_unify:unify(Env, A, B, When).
-dereference(T) -> aeso_type_unify:dereference(T).
-dereference_deep(T) -> aeso_type_unify:dereference_deep(T).
+dereference(T) -> aeso_type_helpers:dereference(T).
+dereference_deep(T) -> aeso_type_helpers:dereference_deep(T).
 instantiate(E) -> aeso_type_unify:instantiate(E).
 
-fresh_uvar(Attrs) -> aeso_type_unify:fresh_uvar(Attrs).
+fresh_uvar(Attrs) -> aeso_type_helpers:fresh_uvar(Attrs).
 
 
 

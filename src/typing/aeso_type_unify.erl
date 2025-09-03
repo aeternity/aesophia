@@ -9,42 +9,17 @@
 -include("aeso_types.hrl").
 
 -export([
-    dereference/1,
-    dereference_deep/1,
-    fresh_uvar/1,
     instantiate/1,
-    opposite_variance/1,
     unify/4
 ]).
 
-%% -------------------------------------------------------------------
-%% Dereferencing
-%% -------------------------------------------------------------------
-
-dereference(T = {uvar, _, R}) ->
-    case aeso_type_ets:lookup(type_vars, R) of
-        [] ->
-            T;
-        [{R, Type}] ->
-            dereference(Type)
-    end;
-dereference(T) ->
-    T.
-
-dereference_deep(Type) ->
-    case dereference(Type) of
-        Tup when is_tuple(Tup) ->
-            list_to_tuple(dereference_deep(tuple_to_list(Tup)));
-        [H | T] -> [dereference_deep(H) | dereference_deep(T)];
-        T -> T
-    end.
 
 %% -------------------------------------------------------------------
 %% Occurs check
 %% -------------------------------------------------------------------
 
 occurs_check(R, T) ->
-    occurs_check1(R, dereference(T)).
+    occurs_check1(R, aeso_type_helpers:dereference(T)).
 
 occurs_check1(R, {uvar, _, R1}) -> R == R1;
 occurs_check1(_, {id, _, _}) -> false;
@@ -71,12 +46,6 @@ occurs_check1(R, [H | T]) ->
     occurs_check(R, H) orelse occurs_check(R, T);
 occurs_check1(_, []) -> false.
 
-%% -------------------------------------------------------------------
-%% Fresh variables
-%% -------------------------------------------------------------------
-
-fresh_uvar(Attrs) ->
-    {uvar, Attrs, make_ref()}.
 
 %% -------------------------------------------------------------------
 %% Instantiation
@@ -85,7 +54,7 @@ fresh_uvar(Attrs) ->
 %% Dereferences all uvars and replaces the uninstantiated ones with a
 %% succession of tvars.
 instantiate(E) ->
-    instantiate1(dereference(E)).
+    instantiate1(aeso_type_helpers:dereference(E)).
 
 instantiate1({uvar, Attr, R}) ->
     Next = proplists:get_value(next, aeso_type_ets:lookup(type_vars, next), 0),
@@ -93,7 +62,7 @@ instantiate1({uvar, Attr, R}) ->
     aeso_type_ets:insert(type_vars, [{next, Next + 1}, {R, TVar}]),
     TVar;
 instantiate1({fun_t, Ann, Named, Args, Ret}) ->
-    case dereference(Named) of
+    case aeso_type_helpers:dereference(Named) of
         {uvar, _, R} ->
             %% Uninstantiated named args map to the empty list
             NoNames = [],
@@ -128,8 +97,8 @@ unify0(Env, A, B, Variance, When) ->
             {check_expr, E, _, _} -> [{ann, aeso_syntax:get_ann(E)}];
             _                     -> []
         end,
-    A1 = dereference(aeso_type_unfold:unfold_types_in_type(Env, A, Options)),
-    B1 = dereference(aeso_type_unfold:unfold_types_in_type(Env, B, Options)),
+    A1 = aeso_type_helpers:dereference(aeso_type_unfold:unfold_types_in_type(Env, A, Options)),
+    B1 = aeso_type_helpers:dereference(aeso_type_unfold:unfold_types_in_type(Env, B, Options)),
     unify1(Env, A1, B1, Variance, When).
 
 unify1(_Env, {uvar, _, R}, {uvar, _, R}, _Variance, _When) ->
@@ -194,15 +163,15 @@ unify1(_Env, {fun_t, _, _, var_args, _}, {fun_t, _, _, _, _}, _Variance, When) -
     false;
 unify1(Env, {fun_t, _, Named1, Args1, Result1}, {fun_t, _, Named2, Args2, Result2}, Variance, When)
   when length(Args1) == length(Args2) ->
-    unify0(Env, Named1, Named2, opposite_variance(Variance), When) and
-    unify0(Env, Args1, Args2, opposite_variance(Variance), When) and
+    unify0(Env, Named1, Named2, aeso_type_helpers:opposite_variance(Variance), When) and
+    unify0(Env, Args1, Args2, aeso_type_helpers:opposite_variance(Variance), When) and
     unify0(Env, Result1, Result2, Variance, When);
 unify1(Env, {app_t, _, {Tag, _, F}, Args1}, {app_t, _, {Tag, _, F}, Args2}, Variance, When)
   when length(Args1) == length(Args2), Tag == id orelse Tag == qid ->
     Variances = case aeso_type_ets:lookup(type_vars_variance, F) of
                     [{_, Vs}] ->
                         case Variance of
-                            contravariant -> lists:map(fun opposite_variance/1, Vs);
+                            contravariant -> lists:map(fun aeso_type_helpers:opposite_variance/1, Vs);
                             invariant     -> invariant;
                             _             -> Vs
                         end;
@@ -253,14 +222,6 @@ is_subtype(Env, Child, Base) ->
             end
     end.
 
-%% -------------------------------------------------------------------
-%% Variance helpers
-%% -------------------------------------------------------------------
-
-opposite_variance(invariant) -> invariant;
-opposite_variance(covariant) -> contravariant;
-opposite_variance(contravariant) -> covariant;
-opposite_variance(bivariant) -> bivariant.
 
 %% -------------------------------------------------------------------
 %% Error reporting

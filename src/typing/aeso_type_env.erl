@@ -683,7 +683,7 @@ bind_contract(Typing, {Contract, Ann, Id, _Impls, Contents}, Env)
   when ?IS_CONTRACT_HEAD(Contract) ->
     Key         = aeso_type_helpers:name(Id),
     Sys         = [{origin, system}],
-    TypeOrFresh = fun({typed, _, _, Type}) -> Type; (_) -> aeso_type_unify:fresh_uvar(Sys) end,
+    TypeOrFresh = fun({typed, _, _, Type}) -> Type; (_) -> aeso_type_helpers:fresh_uvar(Sys) end,
     Fields      =
         [ {field_t, AnnF, Entrypoint, contract_call_type(aeso_syntax:set_ann(Sys, Type))}
           || {fun_decl, AnnF, Entrypoint, Type = {fun_t, _, _, _, _}} <- Contents ] ++
@@ -737,7 +737,7 @@ lookup_record_field(Env, FieldName, Kind) ->
 lookup_record_field_arity(Env, FieldName, Arity, Kind) ->
     Fields = lookup_record_field(Env, FieldName, Kind),
     [ Fld || Fld = #field_info{ field_t = FldType } <- Fields,
-             aeso_type_helpers:fun_arity(aeso_type_unify:dereference_deep(FldType)) == Arity ].
+             aeso_type_helpers:fun_arity(aeso_type_helpers:dereference_deep(FldType)) == Arity ].
 
 %% -- Warning management functions -------------------------------------------
 

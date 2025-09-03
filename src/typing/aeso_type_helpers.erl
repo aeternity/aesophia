@@ -7,13 +7,17 @@
 
 -module(aeso_type_helpers).
 
--export([ fun_arity/1
+-export([ dereference/1
+        , dereference_deep/1
+        , fun_arity/1
         , name/1
         , option_t/2
+        , opposite_variance/1
         , qcon/2
         , qid/2
         , qname/1
         , set_qname/2
+        , fresh_uvar/1
         , type_error/1
         , typesig_to_fun_t/1
         ]).
@@ -57,8 +61,42 @@ set_qname(Xs, {qcon, Ann, _}) -> qcon(Ann, Xs).
 
 %% -- Type utilities ---------------------------------------------------------
 
+%% Dereference a unification variable to its current binding
+-spec dereference(utype()) -> utype().
+dereference(T = {uvar, _, R}) ->
+    case aeso_type_ets:lookup(type_vars, R) of
+        [] ->
+            T;
+        [{R, Type}] ->
+            dereference(Type)
+    end;
+dereference(T) ->
+    T.
+
+%% Deep dereference - recursively dereference all unification variables in a type
+-spec dereference_deep(utype()) -> utype().
+dereference_deep(Type) ->
+    case dereference(Type) of
+        Tup when is_tuple(Tup) ->
+            list_to_tuple(dereference_deep(tuple_to_list(Tup)));
+        [H | T] -> [dereference_deep(H) | dereference_deep(T)];
+        T -> T
+    end.
+
+%% Create a fresh unification variable with given annotations
+-spec fresh_uvar(aeso_syntax:ann()) -> utype().
+fresh_uvar(Attrs) -> {uvar, Attrs, make_ref()}.
+
 fun_arity({fun_t, _, _, Args, _}) -> length(Args);
 fun_arity(_)                      -> none.
+
+%% Flip variance for contravariant positions
+-spec opposite_variance(covariant | contravariant | invariant | bivariant) -> 
+                       covariant | contravariant | invariant | bivariant.
+opposite_variance(invariant) -> invariant;
+opposite_variance(covariant) -> contravariant;
+opposite_variance(contravariant) -> covariant;
+opposite_variance(bivariant) -> bivariant.
 
 %% -- Error management -------------------------------------------------------
 
