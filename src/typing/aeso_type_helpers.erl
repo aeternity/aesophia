@@ -20,6 +20,7 @@
         , fresh_uvar/1
         , type_error/1
         , typesig_to_fun_t/1
+        , get_oracle_type/3
         ]).
 
 -include("aeso_types.hrl").
@@ -103,3 +104,14 @@ opposite_variance(bivariant) -> bivariant.
 -spec type_error(term()) -> true.
 type_error(Err) ->
     aeso_type_ets:insert(type_errors, Err).
+
+%% -- Oracle type helpers ----------------------------------------------------
+
+get_oracle_type({qid, _, ["Oracle", "register"]},      _        , OType) -> OType;
+get_oracle_type({qid, _, ["Oracle", "query"]},        [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "get_question"]}, [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "get_answer"]},   [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "check"]},        [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "check_query"]},  [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "respond"]},      [OType| _], _    ) -> OType;
+get_oracle_type(_Fun, _Args, _Ret) -> false.
