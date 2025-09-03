@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @copyright (C) 2018, Aeternity Anstalt
+%%% @copyright (C) 2025, Aeternity Anstalt
 %%% @doc
 %%%     Type error and warning formatting functions for Sophia type checker.
 %%%     This module provides error and warning message formatting functionality.
@@ -19,10 +19,8 @@ mk_t_err(Pos, Msg) ->
 mk_t_err(Pos, Msg, Ctxt) ->
     aeso_errors:new(type_error, Pos, lists:flatten(Msg), lists:flatten(Ctxt)).
 
-pos(T)    -> aeso_errors:pos(aeso_syntax:get_ann(file, T, no_file),
-                             aeso_syntax:get_ann(line, T, 0),
-                             aeso_syntax:get_ann(col, T, 0)).
-pos(L, C) -> aeso_errors:pos(L, C).
+pos(T) -> aeso_type_helpers:pos(T).
+pos(L, C) -> aeso_type_helpers:pos(L, C).
 
 pp(T) -> aeso_type_pretty:pp(T).
 

@@ -21,6 +21,8 @@
         , type_error/1
         , typesig_to_fun_t/1
         , get_oracle_type/3
+        , pos/1
+        , pos/2
         ]).
 
 -include("aeso_types.hrl").
@@ -98,6 +100,18 @@ opposite_variance(invariant) -> invariant;
 opposite_variance(covariant) -> contravariant;
 opposite_variance(contravariant) -> covariant;
 opposite_variance(bivariant) -> bivariant.
+
+%% -- Position utilities ------------------------------------------------------
+
+-spec pos(aeso_syntax:ann() | tuple()) -> aeso_errors:pos().
+pos(T) ->
+    aeso_errors:pos(aeso_syntax:get_ann(file, T, no_file),
+                    aeso_syntax:get_ann(line, T, 0),
+                    aeso_syntax:get_ann(col, T, 0)).
+
+-spec pos(non_neg_integer(), non_neg_integer()) -> aeso_errors:pos().
+pos(L, C) ->
+    aeso_errors:pos(L, C).
 
 %% -- Error management -------------------------------------------------------
 

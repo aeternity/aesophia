@@ -274,10 +274,9 @@ loc(T) ->
 
 %% Position utility functions
 pos(T) ->
-    aeso_errors:pos(aeso_syntax:get_ann(file, T, no_file),
-                    aeso_syntax:get_ann(line, T, 0),
-                    aeso_syntax:get_ann(col, T, 0)).
-pos(L, C) -> aeso_errors:pos(L, C).
+    aeso_type_helpers:pos(T).
+pos(L, C) ->
+    aeso_type_helpers:pos(L, C).
 
 %% If-branch handling helper
 if_branches(If = {'if', Ann, _, Then, Else}) ->
