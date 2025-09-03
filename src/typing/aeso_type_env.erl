@@ -542,7 +542,7 @@ on_scopes(Env = #env{ scopes = Scopes }, Fun) ->
 
 -spec bind_var(aeso_syntax:id(), utype(), env()) -> env().
 bind_var({id, Ann, X}, T, Env) ->
-    aeso_type_warnings:when_warning(warn_shadowing, fun() -> aeso_type_warnings:warn_potential_shadowing(Env, Ann, X) end),
+    aeso_type_warnings:when_warning(warn_shadowing, fun() -> aeso_type_warnings:warn_potential_shadowing(get_current_scope(Env), Env#env.vars, Ann, X) end),
     Env#env{ vars = [{X, {Ann, T}} | Env#env.vars] }.
 
 -spec bind_vars([{aeso_syntax:id(), utype()}], env()) -> env().

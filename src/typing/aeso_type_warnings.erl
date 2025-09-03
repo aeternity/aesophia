@@ -26,7 +26,7 @@
     potential_unused_return_value/1,
     warn_potential_division_by_zero/3,
     warn_potential_negative_spend/3,
-    warn_potential_shadowing/3,
+    warn_potential_shadowing/4,
     when_warning/2,
     create_unused_functions/0,
     register_function_call/2,
@@ -207,9 +207,8 @@ destroy_and_report_unused_functions() ->
     aeso_type_ets:delete(function_calls).
 
 %% Warning for potential variable shadowing
-warn_potential_shadowing(_, _, "_") -> ok;
-warn_potential_shadowing(Env = #env{ vars = Vars }, Ann, Name) ->
-    CurrentScope = aeso_type_env:get_current_scope(Env),
+warn_potential_shadowing(_, _, _, "_") -> ok;
+warn_potential_shadowing(CurrentScope, Vars, Ann, Name) ->
     Consts = CurrentScope#scope.consts,
     case proplists:get_value(Name, Vars ++ Consts, false) of
         false -> ok;
