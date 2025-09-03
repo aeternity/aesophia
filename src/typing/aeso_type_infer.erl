@@ -74,7 +74,7 @@ infer(Contracts, Options) ->
                 false -> E = aeso_type_env:on_scopes(Env1, fun(Scope) -> aeso_type_unfold:unfold_record_types(Env1, Scope) end),
                          {E, Decls, aeso_type_unfold:unfold_record_types(E, Decls)}
             end,
-        WarningsUnsorted = lists:map(fun aeso_type_fmt_warnings:mk_warning/1, aeso_type_ets:tab2list(warnings)),
+        WarningsUnsorted = lists:map(fun aeso_type_fmt:mk_warning/1, aeso_type_ets:tab2list(warnings)),
         Warnings = aeso_warnings:sort_warnings(WarningsUnsorted),
         case proplists:get_value(return_env, Options, false) of
             false -> {DeclsFolded, DeclsUnfolded, Warnings};
@@ -1719,10 +1719,10 @@ type_error(Err) ->
 destroy_and_report_type_errors(Env) ->
     Errors0 = lists:reverse(aeso_type_ets:tab2list(type_errors)),
     aeso_type_ets:delete(type_errors),
-    Errors  = [ aeso_type_fmt_errors:mk_error(unqualify(Env, Err)) || Err <- Errors0 ],
+    Errors  = [ aeso_type_fmt:mk_error(unqualify(Env, Err)) || Err <- Errors0 ],
     aeso_errors:throw(Errors).  %% No-op if Errors == []
 
-%% Helper functions for error processing (moved from aeso_type_fmt_errors)
+%% Helper functions for error processing (moved from aeso_type_fmt_errors, now in aeso_type_fmt)
 
 %% Strip current namespace from error message for nicer printing.
 unqualify(#env{ namespace = NS }, {qid, Ann, Xs}) ->
@@ -1745,7 +1745,7 @@ qid(Ann, [X]) -> {id, Ann, X};
 qid(Ann, Xs)  -> {qid, Ann, Xs}.
 
 destroy_and_report_warnings_as_type_errors() ->
-    Warnings = [ aeso_type_fmt_warnings:mk_warning(Warn) || Warn <- aeso_type_ets:tab2list(warnings) ],
+    Warnings = [ aeso_type_fmt:mk_warning(Warn) || Warn <- aeso_type_ets:tab2list(warnings) ],
     Errors = lists:map(fun mk_t_err_from_warn/1, Warnings),
     aeso_errors:throw(Errors).  %% No-op if Warnings == []
 

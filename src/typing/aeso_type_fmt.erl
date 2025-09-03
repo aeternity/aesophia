@@ -1,20 +1,19 @@
 %%%-------------------------------------------------------------------
 %%% @copyright (C) 2018, Aeternity Anstalt
 %%% @doc
-%%%     Type error generation for Sophia type checker.
-%%%     This module provides error creation functions independent of
-%%%     aeso_type_infer.
+%%%     Type error and warning formatting functions for Sophia type checker.
+%%%     This module provides error and warning message formatting functionality.
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(aeso_type_fmt_errors).
+-module(aeso_type_fmt).
 
--export([mk_error/1]).
+-export([mk_error/1, mk_warning/1]).
 
 -include("../aeso_utils.hrl").
 -include("aeso_types.hrl").
 
-%% Independent helper functions for mk_error
+%% Common helper functions
 mk_t_err(Pos, Msg) ->
     aeso_errors:new(type_error, Pos, lists:flatten(Msg)).
 mk_t_err(Pos, Msg, Ctxt) ->
@@ -55,7 +54,42 @@ mk_entrypoint(Decl) ->
                             aeso_syntax:get_ann(Decl))) -- [public, private]],
     aeso_syntax:set_ann(Ann, Decl).
 
-%% Main error creation function
+%% Warning creation function
+mk_warning({unused_include, FileName, SrcFile}) ->
+    Msg = io_lib:format("The file `~s` is included but not used.", [FileName]),
+    aeso_warnings:new(aeso_errors:pos(SrcFile, 0, 0), Msg);
+mk_warning({unused_stateful, Ann, FunName}) ->
+    Msg = io_lib:format("The function `~s` is unnecessarily marked as stateful.", [name(FunName)]),
+    aeso_warnings:new(pos(Ann), Msg);
+mk_warning({unused_variable, Ann, _Namespace, _Fun, VarName}) ->
+    Msg = io_lib:format("The variable `~s` is defined but never used.", [VarName]),
+    aeso_warnings:new(pos(Ann), Msg);
+mk_warning({unused_constant, Ann, _Namespace, ConstName}) ->
+    Msg = io_lib:format("The constant `~s` is defined but never used.", [ConstName]),
+    aeso_warnings:new(pos(Ann), Msg);
+mk_warning({unused_typedef, Ann, QName, _Arity}) ->
+    Msg = io_lib:format("The type `~s` is defined but never used.", [lists:last(QName)]),
+    aeso_warnings:new(pos(Ann), Msg);
+mk_warning({unused_return_value, Ann}) ->
+    Msg = io_lib:format("Unused return value.", []),
+    aeso_warnings:new(pos(Ann), Msg);
+mk_warning({unused_function, Ann, FunName}) ->
+    Msg = io_lib:format("The function `~s` is defined but never used.", [FunName]),
+    aeso_warnings:new(pos(Ann), Msg);
+mk_warning({shadowing, Ann, VarName, AnnOld}) ->
+    Msg = io_lib:format("The definition of `~s` shadows an older definition at ~s.", [VarName, pp_loc(AnnOld)]),
+    aeso_warnings:new(pos(Ann), Msg);
+mk_warning({division_by_zero, Ann}) ->
+    Msg = io_lib:format("Division by zero.", []),
+    aeso_warnings:new(pos(Ann), Msg);
+mk_warning({negative_spend, Ann}) ->
+    Msg = io_lib:format("Negative spend.", []),
+    aeso_warnings:new(pos(Ann), Msg);
+mk_warning(Warn) ->
+    Msg = io_lib:format("Unknown warning: ~p", [Warn]),
+    aeso_warnings:new(Msg).
+
+%% Error creation function
 mk_error({no_decls, File}) ->
     Pos = aeso_errors:pos(File, 0, 0),
     mk_t_err(Pos, "Empty contract");
@@ -510,5 +544,3 @@ mk_error({illegal_const_in_interface, Ann}) ->
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),
     mk_t_err(pos(0, 0), Msg).
-
-
