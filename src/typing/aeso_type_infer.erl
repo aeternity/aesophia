@@ -2189,7 +2189,7 @@ apply_typesig_constraint(Ann, bytecode_hash, {fun_t, _, _, [Con], _}) ->
 %% Warnings
 
 when_warning(Warn, Do) ->
-    aeso_type_warnings:when_warning(Warn, Do).
+    aeso_type_env:when_warning(Warn, Do).
 
 
 

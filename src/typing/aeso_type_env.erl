@@ -23,6 +23,7 @@
         , on_scopes/2
         , pop_scope/1
         , push_scope/3
+        , when_warning/2
         ]).
 
 -include("../aeso_utils.hrl").
@@ -412,7 +413,7 @@ lookup_env(Env, Kind, Ann, Name) ->
             case [ Res || QName <- Names, Res <- [lookup_env1(Env, Kind, Ann, QName)], Res /= false] of
                 []    -> false;
                 [Res = {_, {AnnR, _}}] ->
-                    aeso_type_warnings:when_warning(warn_unused_includes,
+                    when_warning(warn_unused_includes,
                                  fun() ->
                                          %% If a file is used from a different file, we
                                          %% can then mark it as used
@@ -542,7 +543,7 @@ on_scopes(Env = #env{ scopes = Scopes }, Fun) ->
 
 -spec bind_var(aeso_syntax:id(), utype(), env()) -> env().
 bind_var({id, Ann, X}, T, Env) ->
-    aeso_type_warnings:when_warning(warn_shadowing, fun() -> aeso_type_warnings:warn_potential_shadowing(get_current_scope(Env), Env#env.vars, Ann, X) end),
+    when_warning(warn_shadowing, fun() -> aeso_type_warnings:warn_potential_shadowing(get_current_scope(Env), Env#env.vars, Ann, X) end),
     Env#env{ vars = [{X, {Ann, T}} | Env#env.vars] }.
 
 -spec bind_vars([{aeso_syntax:id(), utype()}], env()) -> env().
@@ -737,3 +738,39 @@ lookup_record_field_arity(Env, FieldName, Arity, Kind) ->
     Fields = lookup_record_field(Env, FieldName, Kind),
     [ Fld || Fld = #field_info{ field_t = FldType } <- Fields,
              aeso_type_helpers:fun_arity(aeso_type_unify:dereference_deep(FldType)) == Arity ].
+
+%% -- Warning management functions -------------------------------------------
+
+%% Warning management functions
+all_warnings() ->
+    [ warn_unused_includes
+    , warn_unused_stateful
+    , warn_unused_variables
+    , warn_unused_constants
+    , warn_unused_typedefs
+    , warn_unused_return_value
+    , warn_unused_functions
+    , warn_shadowing
+    , warn_division_by_zero
+    , warn_negative_spend ].
+
+when_warning(Warn, Do) ->
+    case lists:member(Warn, all_warnings()) of
+        false ->
+            aeso_type_errors:create_type_errors(),
+            aeso_type_helpers:type_error({unknown_warning, Warn}),
+            aeso_type_errors:destroy_and_report_type_errors(global_env());
+        true ->
+            case aeso_type_ets:tab_exists(warnings) of
+                true ->
+                    IsEnabled = get_option(Warn, false),
+                    IsAll = get_option(warn_all, false) andalso lists:member(Warn, all_warnings()),
+                    if
+                        IsEnabled orelse IsAll -> Do();
+                        true -> ok
+                    end;
+                false ->
+                    ok
+            end
+    end.
+
