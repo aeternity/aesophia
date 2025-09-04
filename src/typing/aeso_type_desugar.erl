@@ -28,6 +28,27 @@ desugar(T) when is_tuple(T) ->
   list_to_tuple(desugar(tuple_to_list(T)));
 desugar(X) -> X.
 
+desugar_clauses(Ann, Fun, {type_sig, _, _, _, ArgTypes, RetType}, Clauses) ->
+    NeedDesugar =
+        case Clauses of
+            [{letfun, _, _, As, _, [{guarded, _, [], _}]}] -> lists:any(fun({typed, _, {id, _, _}, _}) -> false; (_) -> true end, As);
+            _                                              -> true
+        end,
+    case NeedDesugar of
+        false -> [Clause] = Clauses, Clause;
+        true  ->
+            NoAnn = [{origin, system}],
+            Args = [ {typed, NoAnn, {id, NoAnn, "x#" ++ integer_to_list(I)}, Type}
+                     || {I, Type} <- indexed(1, ArgTypes) ],
+            Tuple = fun([X]) -> X;
+                       (As) -> {typed, NoAnn, {tuple, NoAnn, As}, {tuple_t, NoAnn, ArgTypes}}
+                    end,
+            {letfun, Ann, Fun, Args, RetType, [{guarded, NoAnn, [], {typed, NoAnn,
+               {switch, NoAnn, Tuple(Args),
+                 [ {'case', AnnC, Tuple(ArgsC), GuardedBodies}
+                 || {letfun, AnnC, _, ArgsC, _, GuardedBodies} <- Clauses ]}, RetType}}]}
+    end.
+
 desugar_updates([]) -> [];
 desugar_updates([Upd | Updates]) ->
     {Key, MakeField, Rest} = update_key(Upd),
@@ -89,27 +110,6 @@ updates_key(Name, Updates) ->
     Updates1 = [ Upd  || {Upd, false, _} <- Xs ],
     More     = [ Rest || {_, true, Rest} <- Xs ],
     {More, Updates1}.
-
-desugar_clauses(Ann, Fun, {type_sig, _, _, _, ArgTypes, RetType}, Clauses) ->
-    NeedDesugar =
-        case Clauses of
-            [{letfun, _, _, As, _, [{guarded, _, [], _}]}] -> lists:any(fun({typed, _, {id, _, _}, _}) -> false; (_) -> true end, As);
-            _                                              -> true
-        end,
-    case NeedDesugar of
-        false -> [Clause] = Clauses, Clause;
-        true  ->
-            NoAnn = [{origin, system}],
-            Args = [ {typed, NoAnn, {id, NoAnn, "x#" ++ integer_to_list(I)}, Type}
-                     || {I, Type} <- indexed(1, ArgTypes) ],
-            Tuple = fun([X]) -> X;
-                       (As) -> {typed, NoAnn, {tuple, NoAnn, As}, {tuple_t, NoAnn, ArgTypes}}
-                    end,
-            {letfun, Ann, Fun, Args, RetType, [{guarded, NoAnn, [], {typed, NoAnn,
-               {switch, NoAnn, Tuple(Args),
-                 [ {'case', AnnC, Tuple(ArgsC), GuardedBodies}
-                 || {letfun, AnnC, _, ArgsC, _, GuardedBodies} <- Clauses ]}, RetType}}]}
-    end.
 
 indexed(I, Xs) ->
     lists:zip(lists:seq(I, I + length(Xs) - 1), Xs).
