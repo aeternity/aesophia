@@ -1,6 +1,7 @@
 -module(aeso_type_ets).
 
 -export([
+    clean_up_ets/0,
     delete/1,
     delete/2,
     init/0,
@@ -89,3 +90,14 @@ next_count() ->
         end,
     put(counter, V + 1),
     V.
+
+%% Cleanup
+
+ets_tables() ->
+    [options, type_vars, constraints, freshen_tvars, type_errors,
+     defined_contracts, warnings, function_calls, all_functions,
+     type_vars_variance, functions_to_implement].
+
+clean_up_ets() ->
+    [ catch delete(Tab) || Tab <- ets_tables() ],
+    ok.

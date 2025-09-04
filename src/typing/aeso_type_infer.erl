@@ -81,7 +81,7 @@ infer(Contracts, Options) ->
             true  -> {Env2, DeclsFolded, DeclsUnfolded, Warnings}
         end
     after
-        clean_up_ets()
+        aeso_type_ets:clean_up_ets()
     end.
 
 -spec infer1(env(), [aeso_syntax:decl()], [aeso_syntax:decl()], list(option())) ->
@@ -1640,18 +1640,6 @@ free_vars({letpat, _, Id, Pat}) ->
 free_vars(L) when is_list(L) ->
     [V || Elem <- L,
           V <- free_vars(Elem)].
-
-%% Clean up all the ets tables (in case of an exception)
-
-ets_tables() ->
-    [options, type_vars, constraints, freshen_tvars, type_errors,
-     defined_contracts, warnings, function_calls, all_functions,
-     type_vars_variance, functions_to_implement].
-
-clean_up_ets() ->
-    [ catch aeso_type_ets:delete(Tab) || Tab <- ets_tables() ],
-    ok.
-
 
 unify(Env, A, B, When) -> aeso_type_unify:unify(Env, A, B, When).
 dereference(T) -> aeso_type_helpers:dereference(T).
