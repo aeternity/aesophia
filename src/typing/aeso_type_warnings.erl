@@ -30,7 +30,8 @@
     register_function_call/2,
     potential_unused_function/4,
     remove_used_funs/1,
-    destroy_and_report_unused_functions/0
+    destroy_and_report_unused_functions/0,
+    when_warning/2
 ]).
 
 %% Unused include warnings
@@ -159,4 +160,38 @@ warn_potential_shadowing(CurrentScope, Vars, Ann, Name) ->
     case proplists:get_value(Name, Vars ++ Consts, false) of
         false -> ok;
         {AnnOld, _} -> aeso_type_ets:insert(warnings, {shadowing, Ann, Name, AnnOld})
+    end.
+
+%% -- Warning management functions -------------------------------------------
+
+%% List all available warning types
+all_warnings() ->
+    [ warn_unused_includes
+    , warn_unused_stateful
+    , warn_unused_variables
+    , warn_unused_constants
+    , warn_unused_typedefs
+    , warn_unused_return_value
+    , warn_unused_functions
+    , warn_shadowing
+    , warn_division_by_zero
+    , warn_negative_spend ].
+
+%% Execute function conditionally based on warning settings
+when_warning(Warn, Do) ->
+    case lists:member(Warn, all_warnings()) of
+        false ->
+            aeso_errors:throw({unknown_warning, Warn});
+        true ->
+            case aeso_type_ets:tab_exists(warnings) of
+                true ->
+                    IsEnabled = aeso_type_helpers:get_option(Warn, false),
+                    IsAll = aeso_type_helpers:get_option(warn_all, false) andalso lists:member(Warn, all_warnings()),
+                    if
+                        IsEnabled orelse IsAll -> Do();
+                        true -> ok
+                    end;
+                false ->
+                    ok
+            end
     end.

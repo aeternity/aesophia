@@ -1665,7 +1665,7 @@ solve_then_destroy_and_report_unsolved_constraints(Env) -> aeso_type_constraints
 freshen_type(Ann, Type, Ctx) -> aeso_type_constraints:freshen_type(Ann, Type, Ctx).
 freshen_type_sig(Ann, TypeSig, Ctx) -> aeso_type_constraints:freshen_type_sig(Ann, TypeSig, Ctx).
 get_oracle_type(Fun, Args, Ret) -> aeso_type_helpers:get_oracle_type(Fun, Args, Ret).
-when_warning(Warn, Do) -> aeso_type_env:when_warning(Warn, Do).
+when_warning(Warn, Do) -> aeso_type_warnings:when_warning(Warn, Do).
 type_error(Err) -> aeso_type_helpers:type_error(Err).
 
 create_type_errors() ->
@@ -1787,4 +1787,3 @@ updates_key(Name, Updates) ->
 
 indexed(I, Xs) ->
     lists:zip(lists:seq(I, I + length(Xs) - 1), Xs).
-
