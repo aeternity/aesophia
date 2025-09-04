@@ -90,5 +90,3 @@ next_count() ->
         end,
     put(counter, V + 1),
     V.
-
-

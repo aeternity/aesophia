@@ -5,14 +5,12 @@
 %%%-------------------------------------------------------------------
 -module(aeso_type_unify).
 
-
 -include("aeso_types.hrl").
 
 -export([
     instantiate/1,
     unify/4
 ]).
-
 
 %% -------------------------------------------------------------------
 %% Occurs check
@@ -45,7 +43,6 @@ occurs_check1(R, {if_t, _, _, Then, Else}) ->
 occurs_check1(R, [H | T]) ->
     occurs_check(R, H) orelse occurs_check(R, T);
 occurs_check1(_, []) -> false.
-
 
 %% -------------------------------------------------------------------
 %% Instantiation
@@ -154,7 +151,6 @@ unify1(_Env, {bytes_t, _, Len}, {bytes_t, _, Len}, _Variance, _When) ->
 unify1(Env, {if_t, _, {id, _, Id}, Then1, Else1}, {if_t, _, {id, _, Id}, Then2, Else2}, Variance, When) ->
     unify0(Env, Then1, Then2, Variance, When) andalso
     unify0(Env, Else1, Else2, Variance, When);
-
 unify1(_Env, {fun_t, _, _, _, _}, {fun_t, _, _, var_args, _}, _Variance, When) ->
     aeso_type_helpers:type_error({unify_varargs, When}),
     false;
@@ -221,7 +217,6 @@ is_subtype(Env, Child, Base) ->
                 false -> lists:any(fun(Parent) -> is_subtype(Env, Parent, Base) end, Parents)
             end
     end.
-
 
 %% -------------------------------------------------------------------
 %% Error reporting
