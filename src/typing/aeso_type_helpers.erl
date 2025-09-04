@@ -26,6 +26,7 @@
         , create_options/1
         , get_option/2
         , when_option/2
+        , unqualify/2
         ]).
 
 -include("aeso_types.hrl").
@@ -149,3 +150,22 @@ get_option(Key, Default) ->
 
 when_option(Opt, Do) ->
     get_option(Opt, false) andalso Do().
+
+%% -- Namespace utilities ----------------------------------------------------
+
+%% Strip current namespace from error message for nicer printing.
+unqualify(#env{ namespace = NS }, {qid, Ann, Xs}) ->
+    qid(Ann, unqualify1(NS, Xs));
+unqualify(#env{ namespace = NS }, {qcon, Ann, Xs}) ->
+    qcon(Ann, unqualify1(NS, Xs));
+unqualify(Env, T) when is_tuple(T) ->
+    list_to_tuple(unqualify(Env, tuple_to_list(T)));
+unqualify(Env, [H | T]) -> [unqualify(Env, H) | unqualify(Env, T)];
+unqualify(_Env, X) -> X.
+
+unqualify1(NS, Xs) ->
+    try lists:split(length(NS), Xs) of
+        {NS, Ys} -> Ys;
+        _        -> Xs
+    catch _:_ -> Xs
+    end.

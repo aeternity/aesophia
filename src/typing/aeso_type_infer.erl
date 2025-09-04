@@ -1675,27 +1675,9 @@ create_type_errors() ->
 destroy_and_report_type_errors(Env) ->
     Errors0 = lists:reverse(aeso_type_ets:tab2list(type_errors)),
     aeso_type_ets:delete(type_errors),
-    Errors  = [ aeso_type_fmt:mk_error(unqualify(Env, Err)) || Err <- Errors0 ],
+    Errors  = [ aeso_type_fmt:mk_error(aeso_type_helpers:unqualify(Env, Err)) || Err <- Errors0 ],
     aeso_errors:throw(Errors).  %% No-op if Errors == []
 
-%% Helper functions for error processing (moved from aeso_type_fmt_errors, now in aeso_type_fmt)
-
-%% Strip current namespace from error message for nicer printing.
-unqualify(#env{ namespace = NS }, {qid, Ann, Xs}) ->
-    aeso_type_helpers:qid(Ann, unqualify1(NS, Xs));
-unqualify(#env{ namespace = NS }, {qcon, Ann, Xs}) ->
-    aeso_type_helpers:qcon(Ann, unqualify1(NS, Xs));
-unqualify(Env, T) when is_tuple(T) ->
-    list_to_tuple(unqualify(Env, tuple_to_list(T)));
-unqualify(Env, [H | T]) -> [unqualify(Env, H) | unqualify(Env, T)];
-unqualify(_Env, X) -> X.
-
-unqualify1(NS, Xs) ->
-    try lists:split(length(NS), Xs) of
-        {NS, Ys} -> Ys;
-        _        -> Xs
-    catch _:_ -> Xs
-    end.
 
 destroy_and_report_warnings_as_type_errors() ->
     Warnings = [ aeso_type_fmt:mk_warning(Warn) || Warn <- aeso_type_ets:tab2list(warnings) ],
