@@ -87,7 +87,7 @@ solve_constraint(Env, #field_constraint{record_t = RecordType,
                 undefined ->
                     type_error({missing_field, Field, RecId});
                 FldType ->
-                    solve_field_constraint(Env, FieldType, FldType, RecordType, app_t(Attrs, RecId, Formals), When)
+                    solve_field_constraint(Env, FieldType, FldType, RecordType, aeso_type_helpers:app_t(Attrs, RecId, Formals), When)
             end;
         _ ->
             type_error({not_a_record_type, instantiate(RecordType), When})
@@ -313,10 +313,10 @@ check_oracle_type_constraints(_Env, []) ->
 check_oracle_type_constraints(Env, [{oracle_type, Ann, OType} | Rest]) ->
     Type = aeso_type_unfold:unfold_types_in_type(Env, instantiate(OType)),
     {app_t, _, {id, _, "oracle"}, [QType, RType]} = Type,
-    ensure_monomorphic(QType, {invalid_oracle_type, polymorphic,  query,    Ann, Type}),
-    ensure_monomorphic(RType, {invalid_oracle_type, polymorphic,  response, Ann, Type}),
-    ensure_first_order(QType, {invalid_oracle_type, higher_order, query,    Ann, Type}),
-    ensure_first_order(RType, {invalid_oracle_type, higher_order, response, Ann, Type}),
+    aeso_type_helpers:ensure_monomorphic(QType, {invalid_oracle_type, polymorphic,  query,    Ann, Type}),
+    aeso_type_helpers:ensure_monomorphic(RType, {invalid_oracle_type, polymorphic,  response, Ann, Type}),
+    aeso_type_helpers:ensure_first_order(QType, {invalid_oracle_type, higher_order, query,    Ann, Type}),
+    aeso_type_helpers:ensure_first_order(RType, {invalid_oracle_type, higher_order, response, Ann, Type}),
     check_oracle_type_constraints(Env, Rest).
 
 %% -- Field constraints --
@@ -404,7 +404,7 @@ solve_for_uvar(Env, UVar = {uvar, Attrs, _}, Fields0) ->
             RecName = record_type_name(RecType),
             {_, {_, {Formals, {_RecOrCon, _}}}} = aeso_type_env:lookup_type(Env, RecName),
             create_freshen_tvars(),
-            FreshRecType = freshen(app_t(Attrs, RecName, Formals)),
+            FreshRecType = freshen(aeso_type_helpers:app_t(Attrs, RecName, Formals)),
             destroy_freshen_tvars(),
             unify(Env, UVar, FreshRecType, {solve_rec_type, UVar, Fields}),
             true;
@@ -425,8 +425,6 @@ apply_typesig_constraint(Ann, bytes_split, {fun_t, _, [], [C], {tuple_t, _, [A, 
 apply_typesig_constraint(Ann, bytecode_hash, {fun_t, _, _, [Con], _}) ->
     add_constraint([#is_contract_constraint{ contract_t = Con,
                                              context    = {bytecode_hash, Ann} }]).
-
-
 
 %% -- Freshen functionality --
 
@@ -477,27 +475,6 @@ freshen_type_sig(Ann, TypeSig = {type_sig, _, Constr, _, _, _}, Ctx) ->
     FunT = freshen_type(Ann, aeso_type_helpers:typesig_to_fun_t(TypeSig), Ctx),
     apply_typesig_constraint(Ann, Constr, FunT),
     FunT.
-
-%% -- Helper functions --
-
-app_t(_Ann, Name, [])  -> Name;
-app_t(Ann, Name, Args) -> {app_t, Ann, Name, Args}.
-
-ensure_first_order(Type, Err) ->
-    is_first_order(Type) orelse type_error(Err).
-
-is_first_order({fun_t, _, _, _, _})    -> false;
-is_first_order(Ts) when is_list(Ts)    -> lists:all(fun is_first_order/1, Ts);
-is_first_order(Tup) when is_tuple(Tup) -> is_first_order(tuple_to_list(Tup));
-is_first_order(_)                      -> true.
-
-ensure_monomorphic(Type, Err) ->
-    is_monomorphic(Type) orelse type_error(Err).
-
-is_monomorphic({tvar, _, _})           -> false;
-is_monomorphic(Ts) when is_list(Ts)    -> lists:all(fun is_monomorphic/1, Ts);
-is_monomorphic(Tup) when is_tuple(Tup) -> is_monomorphic(tuple_to_list(Tup));
-is_monomorphic(_)                      -> true.
 
 %% -- Delegation functions --
 

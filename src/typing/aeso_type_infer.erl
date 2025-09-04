@@ -23,19 +23,9 @@
         aeso_type_helpers:when_option(pp_types, fun () -> io:format(Fmt, Args) end)).
 -define(CONSTRUCTOR_MOCK_NAME, "#__constructor__#").
 
-
-
-%% -- The rest ---------------------------------------------------------------
-
-map_t(As, K, V) -> {app_t, As, {id, As, "map"}, [K, V]}.
-
 -spec infer(aeso_syntax:ast()) -> {aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]} | {env(), aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]}.
 infer(Contracts) ->
     infer(Contracts, []).
-
-
-
-
 
 -spec infer(aeso_syntax:ast(), list(option())) ->
   {aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]} | {env(), aeso_syntax:ast(), aeso_syntax:ast(), [aeso_warnings:warning()]}.
@@ -366,13 +356,13 @@ check_typedef_sccs(Env, TypeMap, [{acyclic, Name} | SCCs], Acc) ->
                     aeso_type_ets:insert(type_vars_variance, {Env#env.namespace ++ aeso_type_helpers:qname(D),
                                                     infer_type_vars_variance(Xs, Fields)}),
                     %% check_type to get qualified name
-                    RecTy = check_type(Env1, app_t(Ann, D, Xs)),
+                    RecTy = check_type(Env1, aeso_type_helpers:app_t(Ann, D, Xs)),
                     Env2 = check_fields(Env1, TypeMap, RecTy, Fields),
                     check_typedef_sccs(Env2, TypeMap, SCCs, Acc1);
                 {variant_t, Cons} ->
                     aeso_type_ets:insert(type_vars_variance, {Env#env.namespace ++ aeso_type_helpers:qname(D),
                                                     infer_type_vars_variance(Xs, Cons)}),
-                    Target   = check_type(Env1, app_t(Ann, D, Xs)),
+                    Target   = check_type(Env1, aeso_type_helpers:app_t(Ann, D, Xs)),
                     ConType  = fun([]) -> Target; (Args) -> {type_sig, Ann, none, [], Args, Target} end,
                     ConTypes = [ begin
                                     {constr_t, _, {con, _, Con}, Args} = ConDef,
@@ -433,8 +423,6 @@ infer_type_vars_variance({fun_t, _, [], Args, Res}) ->
     FlippedArgsVariance = lists:map(fun({TVar, Variance}) -> {TVar, aeso_type_helpers:opposite_variance(Variance)} end, ArgsVariance),
     FlippedArgsVariance ++ ResVariance;
 infer_type_vars_variance(_) -> [].
-
-
 
 -spec check_constants(env(), [aeso_syntax:decl()]) -> {env(), [aeso_syntax:decl()]}.
 check_constants(Env = #env{ what = What }, Consts) ->
@@ -665,7 +653,7 @@ check_event_con(Env, {constr_t, Ann, Con, Args}) ->
     IsIndexed  = fun(T) ->
                      T1 = aeso_type_unfold:unfold_types_in_type(Env, T),
                      %% `indexed` is optional but if used it has to be correctly used
-                     case {is_word_type(T1), is_string_type(T1), aeso_syntax:get_ann(indexed, T, false)} of
+                     case {aeso_type_helpers:is_word_type(T1), aeso_type_helpers:is_string_type(T1), aeso_syntax:get_ann(indexed, T, false)} of
                          {true, _, _}        -> indexed;
                          {false, true, true} -> type_error({indexed_type_must_be_word, T, T1});
                          {false, true, _}    -> notindexed;
@@ -680,18 +668,6 @@ check_event_con(Env, {constr_t, Ann, Con, Args}) ->
     {constr_t, [{indices, Indices} | Ann], Con, Args}.
 
 %% Not so nice.
-is_word_type({id, _, Name}) ->
-    lists:member(Name, ["int", "address", "hash", "bits", "bool"]);
-is_word_type({app_t, _, {id, _, Name}, [_, _]}) ->
-    lists:member(Name, ["oracle", "oracle_query"]);
-is_word_type({bytes_t, _, N}) -> N =< 32;
-is_word_type({con, _, _}) -> true;
-is_word_type({qcon, _, _}) -> true;
-is_word_type(_) -> false.
-
-is_string_type({id, _, "string"}) -> true;
-is_string_type({bytes_t, _, N}) -> N > 32;
-is_string_type(_) -> false.
 
 -spec check_constructor_overlap(env(), aeso_syntax:con(), type()) -> ok | no_return().
 check_constructor_overlap(Env, Con = {con, Ann, Name}, NewType) ->
@@ -783,12 +759,12 @@ register_implementation(Env, Id, Sig) ->
     end.
 
 infer_nonrec(Env, LetFun) ->
-    create_constraints(),
+    aeso_type_constraints:create_constraints(),
     NewLetFun = {{_, Sig}, _} = infer_letfun(Env, LetFun),
     check_special_funs(Env, NewLetFun),
-    register_implementation(Env, get_letfun_id(LetFun), Sig),
-    solve_then_destroy_and_report_unsolved_constraints(Env),
-    Result = {TypeSig, _} = instantiate(NewLetFun),
+    register_implementation(Env, aeso_type_helpers:get_letfun_id(LetFun), Sig),
+    aeso_type_constraints:solve_then_destroy_and_report_unsolved_constraints(Env),
+    Result = {TypeSig, _} = aeso_type_unify:instantiate(NewLetFun),
     print_typesig(TypeSig),
     Result.
 
@@ -804,10 +780,8 @@ check_special_funs(Env, {{"init", Type}, _}) ->
     unify(Env, Res, State, {checking_init_type, Ann});
 check_special_funs(_, _) -> ok.
 
-
-
 infer_letrec(Env, Defs) ->
-    create_constraints(),
+    aeso_type_constraints:create_constraints(),
     Funs = lists:map(fun({letfun, _, {id, Ann, Name}, _, _, _})   -> {Name, fresh_uvar(Ann)};
                         ({fun_clauses, _, {id, Ann, Name}, _, _}) -> {Name, fresh_uvar(Ann)}
                      end, Defs),
@@ -815,18 +789,18 @@ infer_letrec(Env, Defs) ->
     Inferred =
         [ begin
             Res    = {{Name, TypeSig}, LetFun} = infer_letfun(ExtendEnv, LF),
-            register_implementation(Env, get_letfun_id(LetFun), TypeSig),
+            register_implementation(Env, aeso_type_helpers:get_letfun_id(LetFun), TypeSig),
             Got    = proplists:get_value(Name, Funs),
             Expect = aeso_type_helpers:typesig_to_fun_t(TypeSig),
             unify(Env, Got, Expect, {check_typesig, Name, Got, Expect}),
-            solve_all_constraints(Env),
+            aeso_type_constraints:solve_all_constraints(Env),
             ?PRINT_TYPES("Checked ~s : ~s\n",
-                         [Name, pp(dereference_deep(Got))]),
+                         [Name, aeso_type_pretty:pp(aeso_type_helpers:dereference_deep(Got))]),
             Res
           end || LF <- Defs ],
-    solve_then_destroy_and_report_unsolved_constraints(Env),
-    TypeSigs = instantiate([Sig || {Sig, _} <- Inferred]),
-    NewDefs  = instantiate([D || {_, D} <- Inferred]),
+    aeso_type_constraints:solve_then_destroy_and_report_unsolved_constraints(Env),
+    TypeSigs = aeso_type_unify:instantiate([Sig || {Sig, _} <- Inferred]),
+    NewDefs  = aeso_type_unify:instantiate([D || {_, D} <- Inferred]),
     [print_typesig(S) || S <- TypeSigs],
     {TypeSigs, NewDefs}.
 
@@ -867,12 +841,9 @@ infer_letfun1(Env0 = #env{ namespace = NS }, {letfun, Attrib, Fun = {id, NameAtt
     {{Name, TypeSig},
      {letfun, Attrib, {id, NameAttrib, Name}, TypedArgs, ResultType, NewGuardedBodies}}.
 
-get_letfun_id({fun_clauses, _, Id, _, _}) -> Id;
-get_letfun_id({letfun, _, Id, _, _, _})   -> Id.
-
 print_typesig({Name, TypeSig}) ->
     assert_tvars(Name, TypeSig),
-    ?PRINT_TYPES("Inferred ~s : ~s\n", [Name, pp(TypeSig)]).
+    ?PRINT_TYPES("Inferred ~s : ~s\n", [Name, aeso_type_prety:pp(TypeSig)]).
 
 assert_tvars(Name, TS) ->
     TVars = assert_tvars_(TS, #{}),
@@ -902,9 +873,6 @@ arg_type(ArgAnn, {app_t, Attrs, Name, Args}) ->
 arg_type(_, T) ->
     T.
 
-app_t(_Ann, Name, [])  -> Name;
-app_t(Ann, Name, Args) -> {app_t, Ann, Name, Args}.
-
 lookup_name(Env, As, Name) ->
     lookup_name(Env, As, Name, []).
 
@@ -930,8 +898,8 @@ lookup_name(Env = #env{ namespace = NS, current_function = CurFn }, As, Id, Opti
             Freshen = proplists:get_value(freshen, Options, false),
             check_stateful(Env, Id, Ty),
             Ty1 = case Ty of
-                    {type_sig, _, _, _, _, _} -> freshen_type_sig(As, Ty, [{fun_name, Id}]);
-                    _ when Freshen            -> freshen_type(As, Ty, [{fun_name, Id}]);
+                    {type_sig, _, _, _, _, _} -> aeso_type_constraints:freshen_type_sig(As, Ty, [{fun_name, Id}]);
+                    _ when Freshen            -> aeso_type_constraints:freshen_type(As, Ty, [{fun_name, Id}]);
                     _                         -> Ty
                   end,
             {aeso_type_helpers:set_qname(QId, Id), Ty1}
@@ -967,27 +935,10 @@ check_stateful_named_arg(#env{ stateful = Stateful, current_function = Fun }, {i
 check_stateful_named_arg(_, _, _) -> ok.
 
 check_entrypoints(Defs) ->
-    [ ensure_first_order_entrypoint(LetFun)
+    [ aeso_type_helpers:ensure_first_order_entrypoint(LetFun)
       || LetFun <- Defs,
          aeso_syntax:get_ann(entrypoint, LetFun, false),
          aeso_type_helpers:get_option(allow_higher_order_entrypoints, false) =:= false ].
-
-ensure_first_order_entrypoint({letfun, Ann, Id = {id, _, Name}, Args, Ret, _}) ->
-    [ ensure_first_order(ArgType, {higher_order_entrypoint, AnnArg, Id, {argument, ArgId, ArgType}})
-      || {typed, AnnArg, ArgId, ArgType} <- Args ],
-    [ ensure_first_order(Ret, {higher_order_entrypoint, Ann, Id, {result, Ret}})
-      || Name /= "init" ],  %% init can return higher-order values, since they're written to the store
-                            %% rather than being returned.
-    ok.
-
-ensure_first_order(Type, Err) ->
-    is_first_order(Type) orelse type_error(Err).
-
-is_first_order({fun_t, _, _, _, _})    -> false;
-is_first_order(Ts) when is_list(Ts)    -> lists:all(fun is_first_order/1, Ts);
-is_first_order(Tup) when is_tuple(Tup) -> is_first_order(tuple_to_list(Tup));
-is_first_order(_)                      -> true.
-
 
 
 check_state_init(Env) ->
@@ -1150,7 +1101,7 @@ infer_expr(Env, {typed, As, Body, Type}) ->
     {typed, _, NewBody, NewType} = check_expr(Env, Body, Type1),
     {typed, As, NewBody, NewType};
 infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
-    {NamedArgs, Args} = split_args(Args0),
+    {NamedArgs, Args} = aeso_type_helpers:split_args(Args0),
     case aeso_syntax:get_ann(format, Ann) of
         infix ->
             infer_op(Env, Ann, Fun, Args, fun infer_infix/1);
@@ -1171,7 +1122,7 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
             [ add_constraint({aens_resolve_type, GeneralResultType})
               || element(3, FunName) =:= ["AENSv2", "resolve"] ],
             [ add_constraint({oracle_type, Ann, OType})
-              || OType <- [get_oracle_type(FunName, ArgTypes, GeneralResultType)],
+              || OType <- [aeso_type_helpers:get_oracle_type(FunName, ArgTypes, GeneralResultType)],
                  OType =/= false ],
             add_constraint(
               #dependent_type_constraint{ named_args_t = NamedArgsVar,
@@ -1179,7 +1130,7 @@ infer_expr(Env, {app, Ann, Fun, Args0} = App) ->
                                           general_type = GeneralResultType,
                                           specialized_type = ResultType,
                                           context = {check_return, App} }),
-            {typed, Ann, {app, Ann, NewFun1, NamedArgs1 ++ NewArgs}, dereference(ResultType)}
+            {typed, Ann, {app, Ann, NewFun1, NamedArgs1 ++ NewArgs}, aeso_type_helpers:dereference(ResultType)}
     end;
 infer_expr(Env, {'if', Attrs, Cond, Then, Else}) ->
     NewCond = check_expr(Env, Cond, {id, Attrs, "bool"}),
@@ -1230,14 +1181,14 @@ infer_expr(Env, {proj, Attrs, Record, FieldName}) ->
 infer_expr(Env, {map_get, Attrs, Map, Key}) ->  %% map lookup
     KeyType = fresh_uvar(Attrs),
     ValType = fresh_uvar(Attrs),
-    MapType = map_t(Attrs, KeyType, ValType),
+    MapType = aeso_type_helpers:map_t(Attrs, KeyType, ValType),
     Map1 = check_expr(Env, Map, MapType),
     Key1 = check_expr(Env, Key, KeyType),
     {typed, Attrs, {map_get, Attrs, Map1, Key1}, ValType};
 infer_expr(Env, {map_get, Attrs, Map, Key, Val}) ->  %% map lookup with default
     KeyType = fresh_uvar(Attrs),
     ValType = fresh_uvar(Attrs),
-    MapType = map_t(Attrs, KeyType, ValType),
+    MapType = aeso_type_helpers:map_t(Attrs, KeyType, ValType),
     Map1 = check_expr(Env, Map, MapType),
     Key1 = check_expr(Env, Key, KeyType),
     Val1 = check_expr(Env, Val, ValType),
@@ -1247,11 +1198,11 @@ infer_expr(Env, {map, Attrs, KVs}) ->   %% map construction
     ValType = fresh_uvar(Attrs),
     KVs1 = [ {check_expr(Env, K, KeyType), check_expr(Env, V, ValType)}
              || {K, V} <- KVs ],
-    {typed, Attrs, {map, Attrs, KVs1}, map_t(Attrs, KeyType, ValType)};
+    {typed, Attrs, {map, Attrs, KVs1}, aeso_type_helpers:map_t(Attrs, KeyType, ValType)};
 infer_expr(Env, {map, Attrs, Map, Updates}) -> %% map update
     KeyType  = fresh_uvar(Attrs),
     ValType  = fresh_uvar(Attrs),
-    MapType  = map_t(Attrs, KeyType, ValType),
+    MapType  = aeso_type_helpers:map_t(Attrs, KeyType, ValType),
     Map1     = check_expr(Env, Map, MapType),
     Updates1 = [ check_map_update(Env, Upd, KeyType, ValType) || Upd <- Updates ],
     {typed, Attrs, {map, Attrs, Map1, Updates1}, MapType};
@@ -1320,7 +1271,7 @@ check_valid_const_expr({list_comp, _, _, _}) ->
 check_valid_const_expr({typed, _, Body, _}) ->
     check_valid_const_expr(Body);
 check_valid_const_expr({app, Ann, Fun, Args0}) ->
-    {_, Args} = split_args(Args0),
+    {_, Args} = aeso_type_helpers:split_args(Args0),
     case aeso_syntax:get_ann(format, Ann) of
         infix ->
             lists:all(fun(X) -> X end, [ check_valid_const_expr(Arg) || Arg <- Args ]);
@@ -1414,11 +1365,6 @@ check_contract_construction(Env, ForceDef, ContractT, Fun, NamedArgsT, ArgTypes,
                                }
       ]),
     ok.
-
-split_args(Args0) ->
-    NamedArgs = [ Arg || Arg = {named_arg, _, _, _} <- Args0 ],
-    Args      = Args0 -- NamedArgs,
-    {NamedArgs, Args}.
 
 infer_named_arg(Env, NamedArgs, {named_arg, Ann, Id, E}) ->
     CheckedExpr = {typed, _, _, ArgType} = infer_expr(Env, E),
@@ -1535,12 +1481,12 @@ infer_const(Env, {letval, Ann, TypedId = {typed, _, Id = {id, _, _}, Type}, Expr
     {letval, Ann, TypedId, NewExpr};
 infer_const(Env, {letval, Ann, Id = {id, AnnId, _}, Expr}) ->
     check_valid_const_expr(Expr) orelse type_error({invalid_const_expr, Id}),
-    create_constraints(),
+    aeso_type_constraints:create_constraints(),
     NewExpr = {typed, _, _, Type} = infer_expr(Env#env{ current_const = Id }, Expr),
-    solve_then_destroy_and_report_unsolved_constraints(Env),
+    aeso_type_constraints:solve_then_destroy_and_report_unsolved_constraints(Env),
     IdType = setelement(2, Type, AnnId),
     NewId = {typed, aeso_syntax:get_ann(Id), Id, IdType},
-    instantiate({letval, Ann, NewId, NewExpr}).
+    aeso_type_unify:instantiate({letval, Ann, NewId, NewExpr}).
 
 infer_infix({BoolOp, As})
   when BoolOp =:= '&&'; BoolOp =:= '||' ->
@@ -1620,31 +1566,14 @@ free_vars(L) when is_list(L) ->
     [V || Elem <- L,
           V <- free_vars(Elem)].
 
-unify(Env, A, B, When) -> aeso_type_unify:unify(Env, A, B, When).
-dereference(T) -> aeso_type_helpers:dereference(T).
-dereference_deep(T) -> aeso_type_helpers:dereference_deep(T).
-instantiate(E) -> aeso_type_unify:instantiate(E).
-fresh_uvar(Attrs) -> aeso_type_helpers:fresh_uvar(Attrs).
-create_constraints() -> aeso_type_constraints:create_constraints().
-add_constraint(Constraint) -> aeso_type_constraints:add_constraint(Constraint).
-solve_all_constraints(Env) -> aeso_type_constraints:solve_all_constraints(Env).
-solve_then_destroy_and_report_unsolved_constraints(Env) -> aeso_type_constraints:solve_then_destroy_and_report_unsolved_constraints(Env).
-freshen_type(Ann, Type, Ctx) -> aeso_type_constraints:freshen_type(Ann, Type, Ctx).
-freshen_type_sig(Ann, TypeSig, Ctx) -> aeso_type_constraints:freshen_type_sig(Ann, TypeSig, Ctx).
-get_oracle_type(Fun, Args, Ret) -> aeso_type_helpers:get_oracle_type(Fun, Args, Ret).
-when_warning(Warn, Do) -> aeso_type_warnings:when_warning(Warn, Do).
-type_error(Err) -> aeso_type_helpers:type_error(Err).
-
 create_type_errors() ->
     aeso_type_ets:new(type_errors, [bag]).
-
 
 destroy_and_report_type_errors(Env) ->
     Errors0 = lists:reverse(aeso_type_ets:tab2list(type_errors)),
     aeso_type_ets:delete(type_errors),
     Errors  = [ aeso_type_fmt:mk_error(aeso_type_helpers:unqualify(Env, Err)) || Err <- Errors0 ],
     aeso_errors:throw(Errors).  %% No-op if Errors == []
-
 
 destroy_and_report_warnings_as_type_errors() ->
     Warnings = [ aeso_type_fmt:mk_warning(Warn) || Warn <- aeso_type_ets:tab2list(warnings) ],
@@ -1654,4 +1583,8 @@ destroy_and_report_warnings_as_type_errors() ->
 mk_t_err_from_warn(Warn) ->
     aeso_warnings:warn_to_err(type_error, Warn).
 
-pp(T) -> aeso_type_pretty:pp(T).
+unify(Env, A, B, When) -> aeso_type_unify:unify(Env, A, B, When).
+fresh_uvar(Attrs) -> aeso_type_helpers:fresh_uvar(Attrs).
+add_constraint(Constraint) -> aeso_type_constraints:add_constraint(Constraint).
+when_warning(Warn, Do) -> aeso_type_warnings:when_warning(Warn, Do).
+type_error(Err) -> aeso_type_helpers:type_error(Err).

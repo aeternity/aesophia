@@ -7,9 +7,19 @@
 
 -module(aeso_type_helpers).
 
--export([ dereference/1
+-export([ app_t/3
+        , dereference/1
         , dereference_deep/1
+        , ensure_first_order/2
+        , ensure_first_order_entrypoint/1
+        , ensure_monomorphic/2
         , fun_arity/1
+        , get_letfun_id/1
+        , is_first_order/1
+        , is_monomorphic/1
+        , is_string_type/1
+        , is_word_type/1
+        , map_t/3
         , name/1
         , option_t/2
         , opposite_variance/1
@@ -18,6 +28,7 @@
         , qname/1
         , set_qname/2
         , fresh_uvar/1
+        , split_args/1
         , type_error/1
         , typesig_to_fun_t/1
         , get_oracle_type/3
@@ -169,3 +180,81 @@ unqualify1(NS, Xs) ->
         _        -> Xs
     catch _:_ -> Xs
     end.
+
+%% -- Function utilities -----------------------------------------------------
+
+%% Extract function ID from function clauses or letfun definitions
+-spec get_letfun_id(aeso_syntax:decl()) -> aeso_syntax:id().
+get_letfun_id({fun_clauses, _, Id, _, _}) -> Id;
+get_letfun_id({letfun, _, Id, _, _, _})   -> Id.
+
+%% Split function arguments into named and positional arguments
+-spec split_args([term()]) -> {[term()], [term()]}.
+split_args(Args0) ->
+    NamedArgs = [ Arg || Arg = {named_arg, _, _, _} <- Args0 ],
+    Args      = Args0 -- NamedArgs,
+    {NamedArgs, Args}.
+
+%% -- Type classification utilities ------------------------------------------
+
+%% Check if a type is a "word type" (fits in a word)
+-spec is_word_type(utype()) -> boolean().
+is_word_type({id, _, Name}) ->
+    lists:member(Name, ["int", "address", "hash", "bits", "bool"]);
+is_word_type({app_t, _, {id, _, Name}, [_, _]}) ->
+    lists:member(Name, ["oracle", "oracle_query"]);
+is_word_type({bytes_t, _, N}) -> N =< 32;
+is_word_type({con, _, _}) -> true;
+is_word_type({qcon, _, _}) -> true;
+is_word_type(_) -> false.
+
+%% Check if a type is a string type
+-spec is_string_type(utype()) -> boolean().
+is_string_type({id, _, "string"}) -> true;
+is_string_type({bytes_t, _, N}) -> N > 32;
+is_string_type(_) -> false.
+
+%% Check if a type is first-order (not higher-order)
+-spec is_first_order(utype()) -> boolean().
+is_first_order({fun_t, _, _, _, _})    -> false;
+is_first_order(Ts) when is_list(Ts)    -> lists:all(fun is_first_order/1, Ts);
+is_first_order(Tup) when is_tuple(Tup) -> is_first_order(tuple_to_list(Tup));
+is_first_order(_)                      -> true.
+
+%% Ensure that a type is first-order, otherwise throw a type error
+-spec ensure_first_order(utype(), term()) -> boolean().
+ensure_first_order(Type, Err) ->
+    is_first_order(Type) orelse type_error(Err).
+
+%% Check if a type is monomorphic (no type variables)
+-spec is_monomorphic(utype()) -> boolean().
+is_monomorphic({tvar, _, _})           -> false;
+is_monomorphic(Ts) when is_list(Ts)    -> lists:all(fun is_monomorphic/1, Ts);
+is_monomorphic(Tup) when is_tuple(Tup) -> is_monomorphic(tuple_to_list(Tup));
+is_monomorphic(_)                      -> true.
+
+%% Ensure that a type is monomorphic, otherwise throw a type error
+-spec ensure_monomorphic(utype(), term()) -> boolean().
+ensure_monomorphic(Type, Err) ->
+    is_monomorphic(Type) orelse type_error(Err).
+
+%% Ensure that an entrypoint function has only first-order types
+-spec ensure_first_order_entrypoint(aeso_syntax:decl()) -> ok.
+ensure_first_order_entrypoint({letfun, Ann, Id = {id, _, Name}, Args, Ret, _}) ->
+    [ ensure_first_order(ArgType, {higher_order_entrypoint, AnnArg, Id, {argument, ArgId, ArgType}})
+      || {typed, AnnArg, ArgId, ArgType} <- Args ],
+    [ ensure_first_order(Ret, {higher_order_entrypoint, Ann, Id, {result, Ret}})
+      || Name /= "init" ],  %% init can return higher-order values, since they're written to the store
+                            %% rather than being returned.
+    ok.
+
+%% -- Type construction utilities -------------------------------------------
+
+%% Construct application type AST nodes
+-spec app_t(aeso_syntax:ann(), utype(), [utype()]) -> utype().
+app_t(_Ann, Name, [])  -> Name;
+app_t(Ann, Name, Args) -> {app_t, Ann, Name, Args}.
+
+%% Construct map type AST nodes  
+-spec map_t(aeso_syntax:ann(), utype(), utype()) -> utype().
+map_t(As, K, V) -> {app_t, As, {id, As, "map"}, [K, V]}.
