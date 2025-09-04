@@ -2,7 +2,6 @@
 %%% @copyright (C) 2018, Aeternity Anstalt
 %%% @doc
 %%%     Type unfolding utilities for the Sophia type checker.
-%%%     Functions for resolving type aliases, record types, and variants.
 %%% @end
 %%%-------------------------------------------------------------------
 

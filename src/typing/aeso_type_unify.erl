@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @copyright (C) 2025, Aeternity Anstalt
+%%% @copyright (C) 2018, Aeternity Anstalt
 %%% @doc Type unification utilities for Sophia.
 %%% @end
 %%%-------------------------------------------------------------------

@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @copyright (C) 2025, Aeternity Anstalt
+%%% @copyright (C) 2018, Aeternity Anstalt
 %%% @doc
 %%%     Type error and warning formatting functions for Sophia type checker.
 %%%     This module provides error and warning message formatting functionality.

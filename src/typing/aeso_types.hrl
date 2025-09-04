@@ -3,8 +3,7 @@
 %%% @doc
 %%%     Consolidated type definitions and records for Sophia type checker.
 %%%     This header file contains all type and record definitions used
-%%%     across the typing modules, consolidating aeso_type_records.hrl,
-%%%     aeso_why_record.hrl, and environment-related definitions.
+%%%     across the typing modules.
 %%% @end
 %%%-------------------------------------------------------------------
 

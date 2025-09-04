@@ -1,6 +1,6 @@
 %%%-------------------------------------------------------------------
-%%% @copyright (C) 2025, Aeternity Anstalt
-%%% @doc Pretty printing helpers for Sophia typing/errors.
+%%% @copyright (C) 2018, Aeternity Anstalt
+%%% @doc Pretty printing helpers for Sophia type checker.
 %%% @end
 %%%-------------------------------------------------------------------
 -module(aeso_type_pretty).

@@ -2,8 +2,7 @@
 %%% @copyright (C) 2018, Aeternity Anstalt
 %%% @doc
 %%%     Constraint solving for Sophia type checker.
-%%%     This module handles all constraint generation, solving, and checking
-%%%     that was previously part of aeso_type_infer.
+%%%     This module handles all constraint generation, solving, and checking.
 %%% @end
 %%%-------------------------------------------------------------------
 

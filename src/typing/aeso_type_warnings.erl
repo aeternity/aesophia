@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @copyright (C) 2025, Aeternity Anstalt
+%%% @copyright (C) 2018, Aeternity Anstalt
 %%% @doc
 %%%     Type warning generation and tracking for Sophia type checker.
 %%%     This module provides warning creation functions and handles tracking
