@@ -13,45 +13,6 @@
 -include("../aeso_utils.hrl").
 -include("aeso_types.hrl").
 
-%% Common helper functions
-mk_t_err(Pos, Msg) ->
-    aeso_errors:new(type_error, Pos, lists:flatten(Msg)).
-mk_t_err(Pos, Msg, Ctxt) ->
-    aeso_errors:new(type_error, Pos, lists:flatten(Msg), lists:flatten(Ctxt)).
-
-pos(T) -> aeso_type_helpers:pos(T).
-pos(L, C) -> aeso_type_helpers:pos(L, C).
-
-pp(T) -> aeso_type_pretty:pp(T).
-
-pp_typed(Label, E, T) -> aeso_type_pretty:pp_typed(Label, E, T).
-
-pp_expr(Expr) -> aeso_type_pretty:pp_expr(Expr).
-
-pp_type(Type) -> aeso_type_pretty:pp_type(Type).
-pp_type(Label, Type) -> aeso_type_pretty:pp_type(Label, Type).
-
-pp_context(Ctx) -> aeso_type_pretty:pp_context(Ctx).
-
-pp_loc(T) -> aeso_type_pretty:pp_loc(T).
-
-plural(No, _Yes, [_]) -> No;
-plural(_No, Yes, _)   -> Yes.
-
-name({typed, _, X, _}) -> name(X);
-name({id, _, X}) -> X;
-name({con, _, X}) -> X.
-
-instantiate(E) -> aeso_type_unify:instantiate(E).
-
-pp_why_record(Why) -> aeso_type_pretty:pp_why_record(Why).
-
-mk_entrypoint(Decl) ->
-    Ann   = [entrypoint | lists:keydelete(public, 1,
-                          lists:keydelete(private, 1,
-                            aeso_syntax:get_ann(Decl))) -- [public, private]],
-    aeso_syntax:set_ann(Ann, Decl).
-
 %% Warning creation function
 mk_warning({unused_include, FileName, SrcFile}) ->
     Msg = io_lib:format("The file `~s` is included but not used.", [FileName]),
@@ -542,3 +503,36 @@ mk_error({illegal_const_in_interface, Ann}) ->
 mk_error(Err) ->
     Msg = io_lib:format("Unknown error: ~p", [Err]),
     mk_t_err(pos(0, 0), Msg).
+
+%% Delegation wrappers to aeso_type_helpers
+pos(T) -> aeso_type_helpers:pos(T).
+pos(L, C) -> aeso_type_helpers:pos(L, C).
+name(X) -> aeso_type_helpers:name(X).
+
+%% Delegation wrappers to aeso_type_pretty
+pp(T) -> aeso_type_pretty:pp(T).
+pp_typed(Label, E, T) -> aeso_type_pretty:pp_typed(Label, E, T).
+pp_expr(Expr) -> aeso_type_pretty:pp_expr(Expr).
+pp_type(Type) -> aeso_type_pretty:pp_type(Type).
+pp_type(Label, Type) -> aeso_type_pretty:pp_type(Label, Type).
+pp_context(Ctx) -> aeso_type_pretty:pp_context(Ctx).
+pp_loc(T) -> aeso_type_pretty:pp_loc(T).
+pp_why_record(Why) -> aeso_type_pretty:pp_why_record(Why).
+
+%% Delegation wrappers to aeso_type_unify
+instantiate(E) -> aeso_type_unify:instantiate(E).
+
+%% Helper functions
+mk_t_err(Pos, Msg) ->
+    aeso_errors:new(type_error, Pos, lists:flatten(Msg)).
+mk_t_err(Pos, Msg, Ctxt) ->
+    aeso_errors:new(type_error, Pos, lists:flatten(Msg), lists:flatten(Ctxt)).
+
+plural(No, _Yes, [_]) -> No;
+plural(_No, Yes, _)   -> Yes.
+
+mk_entrypoint(Decl) ->
+    Ann   = [entrypoint | lists:keydelete(public, 1,
+                          lists:keydelete(private, 1,
+                            aeso_syntax:get_ann(Decl))) -- [public, private]],
+    aeso_syntax:set_ann(Ann, Decl).

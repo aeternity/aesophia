@@ -3,6 +3,7 @@
 %%% @doc Type unification utilities for Sophia.
 %%% @end
 %%%-------------------------------------------------------------------
+
 -module(aeso_type_unify).
 
 -include("aeso_types.hrl").
