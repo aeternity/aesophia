@@ -1,7 +1,7 @@
 %%%-------------------------------------------------------------------
 %%% @copyright (C) 2018, Aeternity Anstalt
 %%% @doc
-%%%     Desugaring functions for Sophia syntax.
+%%%     Pre-type checking desugaring functions for Sophia syntax.
 %%% @end
 %%%-------------------------------------------------------------------
 
@@ -13,8 +13,6 @@
 
 -include("../aeso_utils.hrl").
 -include("aeso_types.hrl").
-
-%% -- Pre-type checking desugaring -------------------------------------------
 
 %% Desugars nested record/map updates as follows:
 %%  { x.y = v1, x.z @ z = f(z) } becomes { x @ __x = __x { y = v1, z @ z = f(z) } }
