@@ -1,19 +1,18 @@
 -module(aeso_type_ets).
 
 -export([
-    init/0,
-    tab_exists/1,
-    tabid/1,
-    new/2,
     delete/1,
     delete/2,
+    init/0,
     insert/2,
     insert_new/2,
+    insert_ordered/2,
     lookup/2,
     match_delete/2,
+    new/2,
     tab2list/1,
-    insert_ordered/2,
-    tab2list_ordered/1
+    tab2list_ordered/1,
+    tab_exists/1
 ]).
 
 %% Named interface to ETS tables implemented without names.
