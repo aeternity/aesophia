@@ -23,6 +23,9 @@
         , get_oracle_type/3
         , pos/1
         , pos/2
+        , create_options/1
+        , get_option/2
+        , when_option/2
         ]).
 
 -include("aeso_types.hrl").
@@ -129,3 +132,20 @@ get_oracle_type({qid, _, ["Oracle", "check"]},        [OType| _], _    ) -> OTyp
 get_oracle_type({qid, _, ["Oracle", "check_query"]},  [OType| _], _    ) -> OType;
 get_oracle_type({qid, _, ["Oracle", "respond"]},      [OType| _], _    ) -> OType;
 get_oracle_type(_Fun, _Args, _Ret) -> false.
+
+%% -- Options management -----------------------------------------------------
+
+create_options(Options) ->
+    aeso_type_ets:new(options, [set]),
+    Tup = fun(Opt) when is_atom(Opt) -> {Opt, true};
+             (Opt) when is_tuple(Opt) -> Opt end,
+    aeso_type_ets:insert(options, lists:map(Tup, Options)).
+
+get_option(Key, Default) ->
+    case aeso_type_ets:lookup(options, Key) of
+        [{Key, Val}] -> Val;
+        _            -> Default
+    end.
+
+when_option(Opt, Do) ->
+    get_option(Opt, false) andalso Do().

@@ -31,10 +31,9 @@
 
 -define(CONSTRUCTOR_MOCK_NAME, "#__constructor__#").
 
-%% Get current scope from environment
--spec get_current_scope(env()) -> scope().
-get_current_scope(#env{ namespace = NS, scopes = Scopes }) ->
-    maps:get(NS, Scopes).
+%% Initialize environment with options
+-spec init_env(list(option())) -> env().
+init_env(_Options) -> global_env().
 
 %% Environment containing language primitives
 -spec global_env() -> env().
@@ -385,15 +384,82 @@ global_env() ->
                              || {N, T} <- TxFlds ])
         }.
 
-%% Initialize environment with options
--spec init_env(list(option())) -> env().
-init_env(_Options) -> global_env().
+%% -- Scoping functions -------------------------------------------------------
 
-%% -- Environment lookup functions -------------------------------------------
+%% Get current scope from environment
+-spec get_current_scope(env()) -> scope().
+get_current_scope(#env{ namespace = NS, scopes = Scopes }) ->
+    maps:get(NS, Scopes).
 
+%% Get a specific scope by name
 -spec get_scope(env(), qname()) -> false | scope().
 get_scope(#env{ scopes = Scopes }, Name) ->
     maps:get(Name, Scopes, false).
+
+%% Push a new scope onto the environment
+-spec push_scope(namespace | contract, aeso_syntax:con(), env()) -> env().
+push_scope(Kind, Con, Env) ->
+    Ann  = aeso_syntax:get_ann(Con),
+    Name = aeso_type_helpers:name(Con),
+    New  = Env#env.namespace ++ [Name],
+    Env#env{ namespace = New, scopes = (Env#env.scopes)#{ New => #scope{ kind = Kind, ann = Ann } } }.
+
+%% Pop the current scope from the environment
+-spec pop_scope(env()) -> env().
+pop_scope(Env) ->
+    Env#env{ namespace = lists:droplast(Env#env.namespace) }.
+
+%% Apply a function to the current scope
+-spec on_current_scope(env(), fun((scope()) -> scope())) -> env().
+on_current_scope(Env = #env{ namespace = NS, scopes = Scopes }, Fun) ->
+    Scope = get_current_scope(Env),
+    Env#env{ scopes = Scopes#{ NS => Fun(Scope) } }.
+
+%% Apply a function to all scopes
+-spec on_scopes(env(), fun((scope()) -> scope())) -> env().
+on_scopes(Env = #env{ scopes = Scopes }, Fun) ->
+    Env#env{ scopes = maps:map(fun(_, Scope) -> Fun(Scope) end, Scopes) }.
+
+%% What scopes could a given name come from?
+-spec possible_scopes(env(), qname()) -> [qname()].
+possible_scopes(#env{ namespace = Current, used_namespaces = UsedNamespaces }, Name) ->
+    Qual = lists:droplast(Name),
+    NewQuals = case lists:filter(fun(X) -> element(2, X) == Qual end, UsedNamespaces) of
+                   [] ->
+                       [Qual];
+                   Namespaces ->
+                       lists:map(fun(X) -> element(1, X) end, Namespaces)
+               end,
+    Ret1 = [ lists:sublist(Current, I) ++ Q || I <- lists:seq(0, length(Current)), Q <- NewQuals ],
+    Ret2 = [ Namespace ++ Q || {Namespace, none, _} <- UsedNamespaces, Q <- NewQuals ],
+    lists:usort(Ret1 ++ Ret2).
+
+%% Check if a name is visible in used namespaces
+-spec visible_in_used_namespaces(used_namespaces(), qname()) -> boolean().
+visible_in_used_namespaces(UsedNamespaces, QName) ->
+    Qual = lists:droplast(QName),
+    Name = lists:last(QName),
+    case lists:filter(fun({Ns, _, _}) -> Qual == Ns end, UsedNamespaces) of
+        [] ->
+            true;
+        Namespaces ->
+            IsVisible = fun(Namespace) ->
+                            case Namespace of
+                                {_, _, {for, Names}} ->
+                                    lists:member(Name, Names);
+                                {_, _, {hiding, Names}} ->
+                                    not lists:member(Name, Names);
+                                _ ->
+                                    true
+                            end
+                        end,
+            lists:any(IsVisible, Namespaces)
+    end.
+
+%% Check if an annotation indicates a private function
+is_private(Ann) -> proplists:get_value(private, Ann, false).
+
+%% -- Environment lookup functions -------------------------------------------
 
 -spec lookup_type(env(), type_id()) -> false | {qname(), type_info()}.
 lookup_type(Env, Id) ->
@@ -480,66 +546,25 @@ lookup_env1(#env{ namespace = Current, used_namespaces = UsedNamespaces, scopes 
             end
     end.
 
-%% What scopes could a given name come from?
--spec possible_scopes(env(), qname()) -> [qname()].
-possible_scopes(#env{ namespace = Current, used_namespaces = UsedNamespaces }, Name) ->
-    Qual = lists:droplast(Name),
-    NewQuals = case lists:filter(fun(X) -> element(2, X) == Qual end, UsedNamespaces) of
-                   [] ->
-                       [Qual];
-                   Namespaces ->
-                       lists:map(fun(X) -> element(1, X) end, Namespaces)
-               end,
-    Ret1 = [ lists:sublist(Current, I) ++ Q || I <- lists:seq(0, length(Current)), Q <- NewQuals ],
-    Ret2 = [ Namespace ++ Q || {Namespace, none, _} <- UsedNamespaces, Q <- NewQuals ],
-    lists:usort(Ret1 ++ Ret2).
+%% -- Record field lookup functions ------------------------------------------
 
--spec visible_in_used_namespaces(used_namespaces(), qname()) -> boolean().
-visible_in_used_namespaces(UsedNamespaces, QName) ->
-    Qual = lists:droplast(QName),
-    Name = lists:last(QName),
-    case lists:filter(fun({Ns, _, _}) -> Qual == Ns end, UsedNamespaces) of
-        [] ->
-            true;
-        Namespaces ->
-            IsVisible = fun(Namespace) ->
-                            case Namespace of
-                                {_, _, {for, Names}} ->
-                                    lists:member(Name, Names);
-                                {_, _, {hiding, Names}} ->
-                                    not lists:member(Name, Names);
-                                _ ->
-                                    true
-                            end
-                        end,
-            lists:any(IsVisible, Namespaces)
-    end.
+-spec lookup_record_field(env(), name()) -> [field_info()].
+lookup_record_field(Env, FieldName) ->
+    maps:get(FieldName, Env#env.fields, []).
 
-is_private(Ann) -> proplists:get_value(private, Ann, false).
+%% For 'create' or 'update' constraints we don't consider contract types.
+-spec lookup_record_field(env(), name(), create | project | update) -> [field_info()].
+lookup_record_field(Env, FieldName, Kind) ->
+    [ Fld || Fld = #field_info{ kind = K } <- lookup_record_field(Env, FieldName),
+             Kind == project orelse K /= contract ].
 
-%% Name manipulation functions moved to aeso_type_helpers
+lookup_record_field_arity(Env, FieldName, Arity, Kind) ->
+    Fields = lookup_record_field(Env, FieldName, Kind),
+    [ Fld || Fld = #field_info{ field_t = FldType } <- Fields,
+             aeso_type_helpers:fun_arity(aeso_type_helpers:dereference_deep(FldType)) == Arity ].
 
-%% -- Environment manipulation -----------------------------------------------
 
--spec push_scope(namespace | contract, aeso_syntax:con(), env()) -> env().
-push_scope(Kind, Con, Env) ->
-    Ann  = aeso_syntax:get_ann(Con),
-    Name = aeso_type_helpers:name(Con),
-    New  = Env#env.namespace ++ [Name],
-    Env#env{ namespace = New, scopes = (Env#env.scopes)#{ New => #scope{ kind = Kind, ann = Ann } } }.
-
--spec pop_scope(env()) -> env().
-pop_scope(Env) ->
-    Env#env{ namespace = lists:droplast(Env#env.namespace) }.
-
--spec on_current_scope(env(), fun((scope()) -> scope())) -> env().
-on_current_scope(Env = #env{ namespace = NS, scopes = Scopes }, Fun) ->
-    Scope = get_current_scope(Env),
-    Env#env{ scopes = Scopes#{ NS => Fun(Scope) } }.
-
--spec on_scopes(env(), fun((scope()) -> scope())) -> env().
-on_scopes(Env = #env{ scopes = Scopes }, Fun) ->
-    Env#env{ scopes = maps:map(fun(_, Scope) -> Fun(Scope) end, Scopes) }.
+%% -- Environment binding functions -------------------------------------------
 
 -spec bind_var(aeso_syntax:id(), utype(), env()) -> env().
 bind_var({id, Ann, X}, T, Env) ->
@@ -575,7 +600,7 @@ bind_fun(X, Type, Env) ->
 -spec force_bind_fun(name(), type() | typesig(), env()) -> env().
 force_bind_fun(X, Type, Env = #env{ what = What }) ->
     Ann    = aeso_syntax:get_ann(Type),
-    NoCode = get_option(no_code, false),
+    NoCode = aeso_type_helpers:get_option(no_code, false),
     Entry = if X == "init", What == contract, not NoCode ->
                     {reserved_init, Ann, Type};
                What == contract; What == contract_interface -> {contract_fun, Ann, Type};
@@ -584,16 +609,6 @@ force_bind_fun(X, Type, Env = #env{ what = What }) ->
     on_current_scope(Env, fun(Scope = #scope{ funs = Funs }) ->
                             Scope#scope{ funs = [{X, Entry} | Funs] }
                           end).
-
-%% -- Options access ---------------------------------------------------------
-
-get_option(Key, Default) ->
-    case aeso_type_ets:lookup(options, Key) of
-        [{Key, Val}] -> Val;
-        _            -> Default
-    end.
-
-%% -- Additional binding functions -------------------------------------------
 
 -spec bind_funs([{name(), type() | typesig()}], env()) -> env().
 bind_funs([], Env) -> Env;
@@ -617,8 +632,6 @@ bind_const(X, Ann, Type, Env) ->
             aeso_type_helpers:type_error({duplicate_definition, X, [Ann, aeso_syntax:get_ann(Type)]}),
             Env
     end.
-
-
 
 %% Bind state primitives
 -spec bind_state(env()) -> env().
@@ -722,22 +735,6 @@ bind_contract(Typing, {Contract, Ann, Id, _Impls, Contents}, Env)
     bind_type(Key, Ann, {[], {contract_t, Fields}},
         bind_fields(FieldInfo, Typing, Env)).
 
-%% -- Record field lookup functions ------------------------------------------
-
--spec lookup_record_field(env(), name()) -> [field_info()].
-lookup_record_field(Env, FieldName) ->
-    maps:get(FieldName, Env#env.fields, []).
-
-%% For 'create' or 'update' constraints we don't consider contract types.
--spec lookup_record_field(env(), name(), create | project | update) -> [field_info()].
-lookup_record_field(Env, FieldName, Kind) ->
-    [ Fld || Fld = #field_info{ kind = K } <- lookup_record_field(Env, FieldName),
-             Kind == project orelse K /= contract ].
-
-lookup_record_field_arity(Env, FieldName, Arity, Kind) ->
-    Fields = lookup_record_field(Env, FieldName, Kind),
-    [ Fld || Fld = #field_info{ field_t = FldType } <- Fields,
-             aeso_type_helpers:fun_arity(aeso_type_helpers:dereference_deep(FldType)) == Arity ].
 
 %% -- Warning management functions -------------------------------------------
 
@@ -761,8 +758,8 @@ when_warning(Warn, Do) ->
         true ->
             case aeso_type_ets:tab_exists(warnings) of
                 true ->
-                    IsEnabled = get_option(Warn, false),
-                    IsAll = get_option(warn_all, false) andalso lists:member(Warn, all_warnings()),
+                    IsEnabled = aeso_type_helpers:get_option(Warn, false),
+                    IsAll = aeso_type_helpers:get_option(warn_all, false) andalso lists:member(Warn, all_warnings()),
                     if
                         IsEnabled orelse IsAll -> Do();
                         true -> ok

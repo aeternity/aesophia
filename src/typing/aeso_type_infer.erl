@@ -20,7 +20,7 @@
 -include("aeso_types.hrl").
 
 -define(PRINT_TYPES(Fmt, Args),
-        when_option(pp_types, fun () -> io:format(Fmt, Args) end)).
+        aeso_type_helpers:when_option(pp_types, fun () -> io:format(Fmt, Args) end)).
 -define(CONSTRUCTOR_MOCK_NAME, "#__constructor__#").
 
 
@@ -47,7 +47,7 @@ infer(Contracts, Options) ->
     aeso_type_ets:init(), %% Init the ETS table state
     try
         Env = aeso_type_env:init_env(Options),
-        create_options(Options),
+        aeso_type_helpers:create_options(Options),
         aeso_type_ets:new(defined_contracts, [bag]),
         aeso_type_ets:new(type_vars, [set]),
         aeso_type_ets:new(warnings, [bag]),
@@ -67,7 +67,7 @@ infer(Contracts, Options) ->
         destroy_and_report_type_errors(Env),
         {Env1, Decls} = infer1(Env, Contracts1, [], Options),
         when_warning(warn_unused_functions, fun() -> aeso_type_warnings:destroy_and_report_unused_functions() end),
-        when_option(warn_error, fun() -> destroy_and_report_warnings_as_type_errors() end),
+        aeso_type_helpers:when_option(warn_error, fun() -> destroy_and_report_warnings_as_type_errors() end),
         {Env2, DeclsFolded, DeclsUnfolded} =
             case proplists:get_value(dont_unfold, Options, false) of
                 true  -> {Env1, Decls, Decls};
@@ -268,7 +268,7 @@ infer_contract(Env0, What, Defs0, Options) ->
     {ProtoSigs, Decls} = lists:unzip([ check_fundecl(Env2C, Decl) || Decl <- Get(prototype, Defs) ]),
     [ type_error({missing_definition, Id}) || {fun_decl, _, Id, _} <- Decls,
                                               What =:= contract,
-                                              get_option(no_code, false) =:= false ],
+                                              aeso_type_helpers:get_option(no_code, false) =:= false ],
     Env3      = aeso_type_env:bind_funs(ProtoSigs, Env2C),
     Functions = Get(function, Defs),
     %% Check for duplicates in Functions (we turn it into a map below)
@@ -991,7 +991,7 @@ check_entrypoints(Defs) ->
     [ ensure_first_order_entrypoint(LetFun)
       || LetFun <- Defs,
          aeso_syntax:get_ann(entrypoint, LetFun, false),
-         get_option(allow_higher_order_entrypoints, false) =:= false ].
+         aeso_type_helpers:get_option(allow_higher_order_entrypoints, false) =:= false ].
 
 ensure_first_order_entrypoint({letfun, Ann, Id = {id, _, Name}, Args, Ret, _}) ->
     [ ensure_first_order(ArgType, {higher_order_entrypoint, AnnArg, Id, {argument, ArgId, ArgType}})
@@ -1035,7 +1035,7 @@ check_state(Env, Defs) ->
     Funs      = [ {Top ++ [Name], Fun} || Fun = {letfun, _, {id, _, Name}, _Args, _Type, _GuardedBodies} <- Defs ],
     Deps      = maps:from_list([{Name, UsedNames(Def)} || {Name, Def} <- Funs]),
     case maps:get(Init, Deps, false) of
-        false -> get_option(no_code, false) orelse check_state_init(Env);
+        false -> aeso_type_helpers:get_option(no_code, false) orelse check_state_init(Env);
         _     ->
             [ type_error({init_depends_on_state, state, Chain})
               || Chain <- get_call_chains(Deps, Init, GetState) ],
@@ -1652,69 +1652,25 @@ clean_up_ets() ->
     [ catch aeso_type_ets:delete(Tab) || Tab <- ets_tables() ],
     ok.
 
-%% ETS helpers moved to `aeso_type_ets`
-
-%% Options
-
-create_options(Options) ->
-    aeso_type_ets:new(options, [set]),
-    Tup = fun(Opt) when is_atom(Opt) -> {Opt, true};
-             (Opt) when is_tuple(Opt) -> Opt end,
-    aeso_type_ets:insert(options, lists:map(Tup, Options)).
-
-get_option(Key, Default) ->
-    case aeso_type_ets:lookup(options, Key) of
-        [{Key, Val}] -> Val;
-        _            -> Default
-    end.
-
-when_option(Opt, Do) ->
-    get_option(Opt, false) andalso Do().
-
-
-
-
-
-
-
-
-%% Unification - delegate to aeso_type_unify module
 
 unify(Env, A, B, When) -> aeso_type_unify:unify(Env, A, B, When).
 dereference(T) -> aeso_type_helpers:dereference(T).
 dereference_deep(T) -> aeso_type_helpers:dereference_deep(T).
 instantiate(E) -> aeso_type_unify:instantiate(E).
-
 fresh_uvar(Attrs) -> aeso_type_helpers:fresh_uvar(Attrs).
-
-
-
-
-
-
-%% Constraint management functions - delegated to aeso_type_constraints
 create_constraints() -> aeso_type_constraints:create_constraints().
 add_constraint(Constraint) -> aeso_type_constraints:add_constraint(Constraint).
 solve_all_constraints(Env) -> aeso_type_constraints:solve_all_constraints(Env).
 solve_then_destroy_and_report_unsolved_constraints(Env) -> aeso_type_constraints:solve_then_destroy_and_report_unsolved_constraints(Env).
-
-%% Freshen functions - delegated to aeso_type_constraints
 freshen_type(Ann, Type, Ctx) -> aeso_type_constraints:freshen_type(Ann, Type, Ctx).
 freshen_type_sig(Ann, TypeSig, Ctx) -> aeso_type_constraints:freshen_type_sig(Ann, TypeSig, Ctx).
 get_oracle_type(Fun, Args, Ret) -> aeso_type_helpers:get_oracle_type(Fun, Args, Ret).
-
-%% Warnings
-
-when_warning(Warn, Do) ->
-    aeso_type_env:when_warning(Warn, Do).
-
-
+when_warning(Warn, Do) -> aeso_type_env:when_warning(Warn, Do).
+type_error(Err) -> aeso_type_helpers:type_error(Err).
 
 create_type_errors() ->
     aeso_type_ets:new(type_errors, [bag]).
 
-type_error(Err) ->
-    aeso_type_helpers:type_error(Err).
 
 destroy_and_report_type_errors(Env) ->
     Errors0 = lists:reverse(aeso_type_ets:tab2list(type_errors)),
@@ -1726,7 +1682,7 @@ destroy_and_report_type_errors(Env) ->
 
 %% Strip current namespace from error message for nicer printing.
 unqualify(#env{ namespace = NS }, {qid, Ann, Xs}) ->
-    qid(Ann, unqualify1(NS, Xs));
+    aeso_type_helpers:qid(Ann, unqualify1(NS, Xs));
 unqualify(#env{ namespace = NS }, {qcon, Ann, Xs}) ->
     aeso_type_helpers:qcon(Ann, unqualify1(NS, Xs));
 unqualify(Env, T) when is_tuple(T) ->
@@ -1741,20 +1697,13 @@ unqualify1(NS, Xs) ->
     catch _:_ -> Xs
     end.
 
-qid(Ann, [X]) -> {id, Ann, X};
-qid(Ann, Xs)  -> {qid, Ann, Xs}.
-
 destroy_and_report_warnings_as_type_errors() ->
     Warnings = [ aeso_type_fmt:mk_warning(Warn) || Warn <- aeso_type_ets:tab2list(warnings) ],
     Errors = lists:map(fun mk_t_err_from_warn/1, Warnings),
     aeso_errors:throw(Errors).  %% No-op if Warnings == []
 
-
-
 mk_t_err_from_warn(Warn) ->
     aeso_warnings:warn_to_err(type_error, Warn).
-
-
 
 pp(T) -> aeso_type_pretty:pp(T).
 
