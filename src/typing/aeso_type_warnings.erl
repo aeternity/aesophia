@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @copyright (C) 2018, Aeternity Anstalt
+%%% @copyright (C) 2025, Aeternity Anstalt
 %%% @doc
 %%%     Type warning generation and tracking for Sophia type checker.
 %%%     This module provides warning creation functions and handles tracking
@@ -33,14 +33,7 @@
     destroy_and_report_unused_functions/0
 ]).
 
-
-
-
-%% -------------------------------------------------------------------
-%% Functions for tracking and reporting unused code warnings
-%% -------------------------------------------------------------------
-
-%% Include warnings
+%% Unused include warnings
 potential_unused_include(Ann, SrcFile) ->
     IsIncluded = aeso_syntax:get_ann(include_type, Ann, none) =/= none,
     case IsIncluded of
@@ -58,7 +51,7 @@ used_include(Ann) ->
         File    -> aeso_type_ets:match_delete(warnings, {unused_include, File, '_'})
     end.
 
-%% Stateful warnings
+%% Unused stateful warnings
 potential_unused_stateful(Ann, Fun) ->
     case aeso_syntax:get_ann(stateful, Ann, false) of
         false -> ok;
@@ -68,21 +61,21 @@ potential_unused_stateful(Ann, Fun) ->
 used_stateful(Fun) ->
     aeso_type_ets:match_delete(warnings, {unused_stateful, '_', Fun}).
 
-%% Typedef warnings
+%% Unused typedef warnings
 potential_unused_typedefs(Namespace, TypeDefs) ->
     lists:map(
       fun({type_def, _Ann, {id, _, "event"}, _Args, _}) ->
               ok;
          ({type_def, Ann, Id, Args, _}) ->
-              aeso_type_ets:insert(warnings, {unused_typedef, Ann, Namespace ++ qname(Id), length(Args)})
+              aeso_type_ets:insert(warnings, {unused_typedef, Ann, Namespace ++ aeso_type_helpers:qname(Id), length(Args)})
       end,
       TypeDefs
      ).
 
 used_typedef(TypeAliasId, Arity) ->
-    aeso_type_ets:match_delete(warnings, {unused_typedef, '_', qname(TypeAliasId), Arity}).
+    aeso_type_ets:match_delete(warnings, {unused_typedef, '_', aeso_type_helpers:qname(TypeAliasId), Arity}).
 
-%% Variable warnings
+%% Unused variable warnings
 potential_unused_variables(Namespace, Fun, Vars0) ->
     Vars = [ Var || Var = {id, _, VarName} <- Vars0, VarName /= "_" ],
     lists:map(fun({id, Ann, VarName}) ->
@@ -92,7 +85,7 @@ used_variable(Namespace, Fun, [VarName]) ->
     aeso_type_ets:match_delete(warnings, {unused_variable, '_', Namespace, Fun, VarName});
 used_variable(_, _, _) -> ok.
 
-%% Constant warnings
+%% Unused constant warnings
 potential_unused_constants(#env{ what = namespace }, _Consts) ->
     [];
 potential_unused_constants(#env{ namespace = Namespace }, Consts) ->
@@ -102,7 +95,7 @@ used_constant(Namespace = [Contract], [Contract, ConstName]) ->
     aeso_type_ets:match_delete(warnings, {unused_constant, '_', Namespace, ConstName});
 used_constant(_, _) -> ok.
 
-%% Return value warnings
+%% Unused return value warnings
 potential_unused_return_value({typed, Ann, {app, _, {typed, _, _, {fun_t, _, _, _, {id, _, Type}}}, _}, _}) when Type /= "unit" ->
     aeso_type_ets:insert(warnings, {unused_return_value, Ann});
 potential_unused_return_value(_) -> ok.
@@ -154,7 +147,7 @@ remove_used_funs(All) ->
 
 destroy_and_report_unused_functions() ->
     AllFuns = aeso_type_ets:tab2list(all_functions),
-    lists:map(fun({Ann, _, FunId, _}) -> aeso_type_ets:insert(warnings, {unused_function, Ann, name(FunId)}) end,
+    lists:map(fun({Ann, _, FunId, _}) -> aeso_type_ets:insert(warnings, {unused_function, Ann, aeso_type_helpers:name(FunId)}) end,
               remove_used_funs(AllFuns)),
     aeso_type_ets:delete(all_functions),
     aeso_type_ets:delete(function_calls).
@@ -167,18 +160,3 @@ warn_potential_shadowing(CurrentScope, Vars, Ann, Name) ->
         false -> ok;
         {AnnOld, _} -> aeso_type_ets:insert(warnings, {shadowing, Ann, Name, AnnOld})
     end.
-
-%% -------------------------------------------------------------------
-%% Helper functions (merged and deduplicated)
-%% -------------------------------------------------------------------
-
-name({typed, _, X, _}) -> name(X);
-name({id, _, X}) -> X;
-name({con, _, X}) -> X.
-
-qname({id, _, Name}) -> [Name];
-qname({qid, _, Names}) -> Names;
-qname({con, _, Name}) -> [Name];
-qname({qcon, _, Names}) -> Names.
-
-
