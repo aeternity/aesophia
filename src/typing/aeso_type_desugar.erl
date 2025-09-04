@@ -5,7 +5,7 @@
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(aeso_desugar).
+-module(aeso_type_desugar).
 
 -export([ desugar/1
         , desugar_clauses/4

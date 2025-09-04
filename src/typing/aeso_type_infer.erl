@@ -227,7 +227,7 @@ check_scope_name_clash(Env, Kind, Name) ->
     {env(), [aeso_syntax:decl()]}.
 infer_contract_top(Env, Kind, Defs0, Options) ->
     create_type_errors(),
-    Defs = aeso_desugar:desugar(Defs0),
+    Defs = aeso_type_desugar:desugar(Defs0),
     destroy_and_report_type_errors(Env),
     infer_contract(Env, Kind, Defs, Options).
 
@@ -841,12 +841,12 @@ infer_letfun(Env = #env{ namespace = Namespace }, {fun_clauses, Ann, Fun = {id, 
             ClauseT = aeso_type_helpers:typesig_to_fun_t(ClauseSig),
             unify(Env, ClauseT, Type1, {check_typesig, Name, ClauseT, Type1})
           end || ClauseSig <- Sigs ],
-    {{Name, Sig}, aeso_desugar:desugar_clauses(Ann, Fun, Sig, Clauses1)};
+    {{Name, Sig}, aeso_type_desugar:desugar_clauses(Ann, Fun, Sig, Clauses1)};
 infer_letfun(Env = #env{ namespace = Namespace }, LetFun = {letfun, Ann, Fun, _, _, _}) ->
     when_warning(warn_unused_stateful, fun() -> aeso_type_warnings:potential_unused_stateful(Ann, Fun) end),
     when_warning(warn_unused_functions, fun() -> aeso_type_warnings:potential_unused_function(Env, Ann, Namespace ++ aeso_type_helpers:qname(Fun), Fun) end),
     {{Name, Sig}, Clause} = infer_letfun1(Env, LetFun),
-    {{Name, Sig}, aeso_desugar:desugar_clauses(Ann, Fun, Sig, [Clause])}.
+    {{Name, Sig}, aeso_type_desugar:desugar_clauses(Ann, Fun, Sig, [Clause])}.
 
 infer_letfun1(Env0 = #env{ namespace = NS }, {letfun, Attrib, Fun = {id, NameAttrib, Name}, Args, What, GuardedBodies}) ->
     Env = Env0#env{ stateful = aeso_syntax:get_ann(stateful, Attrib, false),
