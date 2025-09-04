@@ -261,9 +261,7 @@ pp_when(unknown) -> {pos(0,0), ""}.
 %% Internal Helper Functions
 %% -------------------------------------------------------------------
 
-typesig_to_fun_t({type_sig, Ann, _Constr, Named, Args, Res}) ->
-    {fun_t, Ann, Named, Args, Res}.
-
+%% Helper functions
 src_file(T)      -> aeso_syntax:get_ann(file, T, no_file).
 include_type(T)  -> aeso_syntax:get_ann(include_type, T, none).
 line_number(T)   -> aeso_syntax:get_ann(line, T, 0).
@@ -272,13 +270,6 @@ column_number(T) -> aeso_syntax:get_ann(col, T, 0).
 loc(T) ->
     {src_file(T), include_type(T), line_number(T), column_number(T)}.
 
-%% Position utility functions
-pos(T) ->
-    aeso_type_helpers:pos(T).
-pos(L, C) ->
-    aeso_type_helpers:pos(L, C).
-
-%% If-branch handling helper
 if_branches(If = {'if', Ann, _, Then, Else}) ->
     case proplists:get_value(format, Ann) of
         elif -> [Then | if_branches(Else)];
@@ -286,5 +277,13 @@ if_branches(If = {'if', Ann, _, Then, Else}) ->
     end;
 if_branches(E) -> [E].
 
-%% Type system delegate
+%% Delegation wrappers
+typesig_to_fun_t(TypeSig) ->
+    aeso_type_helpers:typesig_to_fun_t(TypeSig).
+
+pos(T) ->
+    aeso_type_helpers:pos(T).
+pos(L, C) ->
+    aeso_type_helpers:pos(L, C).
+
 instantiate(E) -> aeso_type_unify:instantiate(E).
