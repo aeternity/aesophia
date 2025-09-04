@@ -11,9 +11,6 @@
         , desugar_clauses/4
         ]).
 
--include("../aeso_utils.hrl").
--include("aeso_types.hrl").
-
 %% Desugars nested record/map updates as follows:
 %%  { x.y = v1, x.z @ z = f(z) } becomes { x @ __x = __x { y = v1, z @ z = f(z) } }
 %%  { [k1].x = v1, [k2].y = v2 } becomes { [k1] @ __x = __x { x = v1 }, [k2] @ __x = __x { y = v2 } }
