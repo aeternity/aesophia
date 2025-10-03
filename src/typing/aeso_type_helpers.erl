@@ -1,0 +1,260 @@
+%%%-------------------------------------------------------------------
+%%% @copyright (C) 2018, Aeternity Anstalt
+%%% @doc
+%%%     Helper functions for type system operations.
+%%% @end
+%%%-------------------------------------------------------------------
+
+-module(aeso_type_helpers).
+
+-export([ app_t/3
+        , dereference/1
+        , dereference_deep/1
+        , ensure_first_order/2
+        , ensure_first_order_entrypoint/1
+        , ensure_monomorphic/2
+        , fun_arity/1
+        , get_letfun_id/1
+        , is_first_order/1
+        , is_monomorphic/1
+        , is_string_type/1
+        , is_word_type/1
+        , map_t/3
+        , name/1
+        , option_t/2
+        , opposite_variance/1
+        , qcon/2
+        , qid/2
+        , qname/1
+        , set_qname/2
+        , fresh_uvar/1
+        , split_args/1
+        , type_error/1
+        , typesig_to_fun_t/1
+        , get_oracle_type/3
+        , pos/1
+        , pos/2
+        , create_options/1
+        , get_option/2
+        , when_option/2
+        , unqualify/2
+        ]).
+
+-include("aeso_types.hrl").
+
+-spec option_t(aeso_syntax:ann(), utype()) -> utype().
+option_t(As, T) -> {app_t, As, {id, As, "option"}, [T]}.
+
+-spec typesig_to_fun_t(typesig()) -> utype().
+typesig_to_fun_t({type_sig, Ann, _Constr, Named, Args, Res}) ->
+    {fun_t, Ann, Named, Args, Res}.
+
+%% -- Name manipulation ------------------------------------------------------
+
+-spec qname(type_id()) -> qname().
+qname({id,   _, X})  -> [X];
+qname({qid,  _, Xs}) -> Xs;
+qname({con,  _, X})  -> [X];
+qname({qcon, _, Xs}) -> Xs.
+
+-spec name(Named | {typed, _, Named, _}) -> name() when
+      Named :: aeso_syntax:id() | aeso_syntax:con().
+name({typed, _, X, _}) -> name(X);
+name({id, _, X}) -> X;
+name({con, _, X}) -> X.
+
+-spec qid(aeso_syntax:ann(), qname()) -> aeso_syntax:id() | aeso_syntax:qid().
+qid(Ann, [X]) -> {id, Ann, X};
+qid(Ann, Xs)  -> {qid, Ann, Xs}.
+
+-spec qcon(aeso_syntax:ann(), qname()) -> aeso_syntax:con() | aeso_syntax:qcon().
+qcon(Ann, [X]) -> {con, Ann, X};
+qcon(Ann, Xs)  -> {qcon, Ann, Xs}.
+
+-spec set_qname(qname(), type_id()) -> type_id().
+set_qname(Xs, {id,   Ann, _}) -> qid(Ann, Xs);
+set_qname(Xs, {qid,  Ann, _}) -> qid(Ann, Xs);
+set_qname(Xs, {con,  Ann, _}) -> qcon(Ann, Xs);
+set_qname(Xs, {qcon, Ann, _}) -> qcon(Ann, Xs).
+
+%% -- Type utilities ---------------------------------------------------------
+
+%% Dereference a unification variable to its current binding
+-spec dereference(utype()) -> utype().
+dereference(T = {uvar, _, R}) ->
+    case aeso_type_ets:lookup(type_vars, R) of
+        [] ->
+            T;
+        [{R, Type}] ->
+            dereference(Type)
+    end;
+dereference(T) ->
+    T.
+
+%% Deep dereference - recursively dereference all unification variables in a type
+-spec dereference_deep(utype()) -> utype().
+dereference_deep(Type) ->
+    case dereference(Type) of
+        Tup when is_tuple(Tup) ->
+            list_to_tuple(dereference_deep(tuple_to_list(Tup)));
+        [H | T] -> [dereference_deep(H) | dereference_deep(T)];
+        T -> T
+    end.
+
+%% Create a fresh unification variable with given annotations
+-spec fresh_uvar(aeso_syntax:ann()) -> utype().
+fresh_uvar(Attrs) -> {uvar, Attrs, make_ref()}.
+
+fun_arity({fun_t, _, _, Args, _}) -> length(Args);
+fun_arity(_)                      -> none.
+
+%% Flip variance for contravariant positions
+-spec opposite_variance(covariant | contravariant | invariant | bivariant) -> 
+                       covariant | contravariant | invariant | bivariant.
+opposite_variance(invariant) -> invariant;
+opposite_variance(covariant) -> contravariant;
+opposite_variance(contravariant) -> covariant;
+opposite_variance(bivariant) -> bivariant.
+
+%% -- Position utilities ------------------------------------------------------
+
+-spec pos(aeso_syntax:ann() | tuple()) -> aeso_errors:pos().
+pos(T) ->
+    aeso_errors:pos(aeso_syntax:get_ann(file, T, no_file),
+                    aeso_syntax:get_ann(line, T, 0),
+                    aeso_syntax:get_ann(col, T, 0)).
+
+-spec pos(non_neg_integer(), non_neg_integer()) -> aeso_errors:pos().
+pos(L, C) ->
+    aeso_errors:pos(L, C).
+
+%% -- Error management -------------------------------------------------------
+
+-spec type_error(term()) -> true.
+type_error(Err) ->
+    aeso_type_ets:insert(type_errors, Err).
+
+%% -- Oracle type helpers ----------------------------------------------------
+
+get_oracle_type({qid, _, ["Oracle", "register"]},      _        , OType) -> OType;
+get_oracle_type({qid, _, ["Oracle", "query"]},        [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "get_question"]}, [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "get_answer"]},   [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "check"]},        [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "check_query"]},  [OType| _], _    ) -> OType;
+get_oracle_type({qid, _, ["Oracle", "respond"]},      [OType| _], _    ) -> OType;
+get_oracle_type(_Fun, _Args, _Ret) -> false.
+
+%% -- Options management -----------------------------------------------------
+
+create_options(Options) ->
+    aeso_type_ets:new(options, [set]),
+    Tup = fun(Opt) when is_atom(Opt) -> {Opt, true};
+             (Opt) when is_tuple(Opt) -> Opt end,
+    aeso_type_ets:insert(options, lists:map(Tup, Options)).
+
+get_option(Key, Default) ->
+    case aeso_type_ets:lookup(options, Key) of
+        [{Key, Val}] -> Val;
+        _            -> Default
+    end.
+
+when_option(Opt, Do) ->
+    get_option(Opt, false) andalso Do().
+
+%% -- Namespace utilities ----------------------------------------------------
+
+%% Strip current namespace from error message for nicer printing.
+unqualify(#env{ namespace = NS }, {qid, Ann, Xs}) ->
+    qid(Ann, unqualify1(NS, Xs));
+unqualify(#env{ namespace = NS }, {qcon, Ann, Xs}) ->
+    qcon(Ann, unqualify1(NS, Xs));
+unqualify(Env, T) when is_tuple(T) ->
+    list_to_tuple(unqualify(Env, tuple_to_list(T)));
+unqualify(Env, [H | T]) -> [unqualify(Env, H) | unqualify(Env, T)];
+unqualify(_Env, X) -> X.
+
+unqualify1(NS, Xs) ->
+    try lists:split(length(NS), Xs) of
+        {NS, Ys} -> Ys;
+        _        -> Xs
+    catch _:_ -> Xs
+    end.
+
+%% -- Function utilities -----------------------------------------------------
+
+%% Extract function ID from function clauses or letfun definitions
+-spec get_letfun_id(aeso_syntax:decl()) -> aeso_syntax:id().
+get_letfun_id({fun_clauses, _, Id, _, _}) -> Id;
+get_letfun_id({letfun, _, Id, _, _, _})   -> Id.
+
+%% Split function arguments into named and positional arguments
+-spec split_args([term()]) -> {[term()], [term()]}.
+split_args(Args0) ->
+    NamedArgs = [ Arg || Arg = {named_arg, _, _, _} <- Args0 ],
+    Args      = Args0 -- NamedArgs,
+    {NamedArgs, Args}.
+
+%% -- Type classification utilities ------------------------------------------
+
+%% Check if a type is a "word type" (fits in a word)
+-spec is_word_type(utype()) -> boolean().
+is_word_type({id, _, Name}) ->
+    lists:member(Name, ["int", "address", "hash", "bits", "bool"]);
+is_word_type({app_t, _, {id, _, Name}, [_, _]}) ->
+    lists:member(Name, ["oracle", "oracle_query"]);
+is_word_type({bytes_t, _, N}) -> N =< 32;
+is_word_type({con, _, _}) -> true;
+is_word_type({qcon, _, _}) -> true;
+is_word_type(_) -> false.
+
+%% Check if a type is a string type
+-spec is_string_type(utype()) -> boolean().
+is_string_type({id, _, "string"}) -> true;
+is_string_type({bytes_t, _, N}) -> N > 32;
+is_string_type(_) -> false.
+
+%% Check if a type is first-order (not higher-order)
+-spec is_first_order(utype()) -> boolean().
+is_first_order({fun_t, _, _, _, _})    -> false;
+is_first_order(Ts) when is_list(Ts)    -> lists:all(fun is_first_order/1, Ts);
+is_first_order(Tup) when is_tuple(Tup) -> is_first_order(tuple_to_list(Tup));
+is_first_order(_)                      -> true.
+
+%% Ensure that a type is first-order, otherwise throw a type error
+-spec ensure_first_order(utype(), term()) -> boolean().
+ensure_first_order(Type, Err) ->
+    is_first_order(Type) orelse type_error(Err).
+
+%% Check if a type is monomorphic (no type variables)
+-spec is_monomorphic(utype()) -> boolean().
+is_monomorphic({tvar, _, _})           -> false;
+is_monomorphic(Ts) when is_list(Ts)    -> lists:all(fun is_monomorphic/1, Ts);
+is_monomorphic(Tup) when is_tuple(Tup) -> is_monomorphic(tuple_to_list(Tup));
+is_monomorphic(_)                      -> true.
+
+%% Ensure that a type is monomorphic, otherwise throw a type error
+-spec ensure_monomorphic(utype(), term()) -> boolean().
+ensure_monomorphic(Type, Err) ->
+    is_monomorphic(Type) orelse type_error(Err).
+
+%% Ensure that an entrypoint function has only first-order types
+-spec ensure_first_order_entrypoint(aeso_syntax:decl()) -> ok.
+ensure_first_order_entrypoint({letfun, Ann, Id = {id, _, Name}, Args, Ret, _}) ->
+    [ ensure_first_order(ArgType, {higher_order_entrypoint, AnnArg, Id, {argument, ArgId, ArgType}})
+      || {typed, AnnArg, ArgId, ArgType} <- Args ],
+    [ ensure_first_order(Ret, {higher_order_entrypoint, Ann, Id, {result, Ret}})
+      || Name /= "init" ],  %% init can return higher-order values, since they're written to the store
+                            %% rather than being returned.
+    ok.
+
+%% -- Type construction utilities -------------------------------------------
+
+%% Construct application type AST nodes
+-spec app_t(aeso_syntax:ann(), utype(), [utype()]) -> utype().
+app_t(_Ann, Name, [])  -> Name;
+app_t(Ann, Name, Args) -> {app_t, Ann, Name, Args}.
+
+%% Construct map type AST nodes  
+-spec map_t(aeso_syntax:ann(), utype(), utype()) -> utype().
+map_t(As, K, V) -> {app_t, As, {id, As, "map"}, [K, V]}.

@@ -181,7 +181,7 @@
 
 %% -- Entrypoint -------------------------------------------------------------
 
-%% Main entrypoint. Takes typed syntax produced by aeso_ast_infer_types:infer/1,2
+%% Main entrypoint. Takes typed syntax produced by aeso_type_infer:infer/1,2
 %% and produces Fate intermediate code.
 -spec ast_to_fcode(aeso_syntax:ast(), [option()]) -> {env(), fcode()}.
 ast_to_fcode(Code, Options) ->
